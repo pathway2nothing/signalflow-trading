@@ -1,0 +1,38 @@
+[project]
+name = "signal-flow"
+version = "0.1.0"
+description = "SignalFlow: modular framework for trading signal generation, filtering and execution"
+readme = "README.md"
+requires-python = ">=3.12"
+
+authors = [
+  { name = "pathway2nothing" }
+]
+
+license = { text = "MIT" }
+
+dependencies = [
+  "pandas>=2.0",
+  "numpy>=1.25",
+  "loguru>=0.7",
+]
+
+[project.optional-dependencies]
+docs = [
+  "mkdocs>=1.6",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.25",
+]
+
+[project.urls]
+Homepage = "https://github.com/pathway2nothing/signal-flow"
+Source = "https://github.com/pathway2nothing/signal-flow"
+Issues = "https://github.com/pathway2nothing/signal-flow/issues"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["signalflow*"]
