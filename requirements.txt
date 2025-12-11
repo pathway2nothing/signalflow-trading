@@ -2,3 +2,10 @@ ipython>=8.10
 jupyterlab>=3.0
 notebook
 kedro~=1.1.1
+dyckdb
+aiohttp
+loguru 
+polars
+pyarrow
+pandas 
+numpy
