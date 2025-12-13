@@ -160,3 +160,10 @@ venv.bak/
 
 # mlflow local runs
 mlruns/*
+
+merge.py
+project.txt
+about.txt
+*.duckdb
+*.ipynb
+.vscode
