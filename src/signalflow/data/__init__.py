@@ -1,10 +1,10 @@
-from .spot_store import SpotStore
-from .spot_loader import BinanceSpotLoader
+from .data_store import DataStore
+from .data_loader import BinanceSpotLoader
 from .cex_clients import BinanceClient
 
 
 __all__ = [
-    "SpotStore",
+    "DataStore",
     "BinanceSpotLoader",
     "BinanceClient",
 ]

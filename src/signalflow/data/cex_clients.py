@@ -27,7 +27,7 @@ class BinanceClient:
     
     async def get_klines(
         self,
-        symbol: str,
+        pair: str,
         timeframe: str = "1m",
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
@@ -46,7 +46,7 @@ class BinanceClient:
             List of OHLCV dictionaries.
         """
         params = {
-            "symbol": symbol,
+            "symbol": pair,
             "interval": timeframe,
             "limit": limit
         }
@@ -96,7 +96,7 @@ class BinanceClient:
     
     async def get_klines_range(
         self,
-        symbol: str,
+        pair: str,
         timeframe: str,
         start_time: datetime,
         end_time: datetime,
@@ -127,7 +127,7 @@ class BinanceClient:
         
         while current_start < end_time:
             klines = await self.get_klines(
-                symbol=symbol,
+                pair=pair,
                 timeframe=timeframe,
                 start_time=current_start,
                 end_time=min(current_start + step, end_time),
@@ -142,7 +142,7 @@ class BinanceClient:
             await asyncio.sleep(0.05)
             
             if len(all_klines) % 10000 == 0:
-                logger.info(f"{symbol}: loaded {len(all_klines):,} candles...")
+                logger.info(f"{pair}: loaded {len(all_klines):,} candles...")
         
         return all_klines
 
