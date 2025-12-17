@@ -1,20 +1,28 @@
 from enum import Enum
 
 
-class SignalType(Enum):
+class SignalType(str, Enum):
     """Enumeration of signal types."""
-    NONE = 0
-    RISE = 1
-    FALL = 2
+    NONE = "none"
+    RISE = "rise"
+    FALL = "fall"
 
 
-class PositionType(Enum):
+class PositionType(str, Enum):
     """Enumeration of signal types"""
-    LONG = 0
-    SHORT = 1
+    LONG = "long"
+    SHORT = "short"
 
 
 class SfComponentType(str, Enum):
+    FEATURE_EXTRACTOR = "feature/extractor"
+    FEATURE_PIPELINE = "feature/pipeline"
     DETECTOR = "detector"
     VALIDATOR = "validator"
     EXIT = "exit"
+
+
+class DataFrameType(str, Enum):
+    """Supported dataframe backends."""
+    POLARS = "polars"
+    PANDAS = "pandas"

@@ -122,32 +122,29 @@ class RawData:
             required = {"pair", "timestamp"}
             missing = required - set(spot.columns)
             if missing:
-                raise ValueError(
-                    f"Spot df missing columns: {sorted(missing)}"
-                )
+                raise ValueError(f"Spot df missing columns: {sorted(missing)}")
 
             if "timeframe" in spot.columns:
-                spot = spot.drop(columns=["timeframe"])
+                spot = spot.drop("timeframe")
 
-            spot["timestamp"] = pd.to_datetime(
-                spot["timestamp"], utc=True, errors="raise"
+            spot = spot.with_columns(
+                pl.col("timestamp").cast(pl.Datetime("us", "UTC"))
             )
 
-            if spot.duplicated(subset=["pair", "timestamp"]).any():
+            dup_count = spot.group_by(["pair", "timestamp"]).len().filter(
+                pl.col("len") > 1
+            )
+            if dup_count.height > 0:
                 dups = (
-                    spot[spot.duplicated(subset=["pair", "timestamp"], keep=False)]
-                    [["pair", "timestamp"]]
+                    spot.join(dup_count.select(["pair", "timestamp"]), on=["pair", "timestamp"])
+                    .select(["pair", "timestamp"])
                     .head(10)
                 )
                 raise ValueError(
                     f"Duplicate (pair, timestamp) detected. Examples:\n{dups}"
                 )
 
-            spot = (
-                spot
-                .set_index(["pair", "timestamp"])
-                .sort_index()
-            )
+            spot = spot.sort(["pair", "timestamp"])
 
             return RawData(
                 datetime_start=start,
