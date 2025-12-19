@@ -9,7 +9,7 @@ import polars as pl
 from signalflow.core import Signals, SignalType, SfComponentType
 from signalflow.detector import SignalDetector
 from signalflow.feature import FeatureSet
-from signalflow.feature.extractor import SmaExtractor
+from signalflow.feature.smoother import SmaExtractor
 
 
 @dataclass
