@@ -1,4 +1,4 @@
-from signalflow.feature.extractor.base import FeatureExtractor
+from signalflow.feature.extractor.base_extractor import FeatureExtractor
 from signalflow.feature.extractor.oscillator import RsiExtractor
 from signalflow.feature.extractor.pandasta_extractor import ( 
     PandasTaExtractor, 
