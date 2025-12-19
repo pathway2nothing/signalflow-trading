@@ -2,9 +2,8 @@ from .containers import RawData, Signals, RawDataView
 from .enums import SignalType, PositionType, SfComponentType, DataFrameType
 from .decorators import sf_component
 from .registry import default_registry, SignalFlowRegistry
-from .phase_splitter import PhaseSplitter
 from .signal_transforms import SignalsTransform
-
+from .offset_resampler import OffsetResampler
 
 __all__ = [
     "RawData", 
@@ -17,6 +16,6 @@ __all__ = [
     "sf_component",
     "default_registry",
     "SignalFlowRegistry",
-    "PhaseSplitter",
+    "OffsetResampler",
     "SignalsTransform",
 ]

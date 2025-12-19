@@ -1,5 +1,5 @@
 from signalflow.feature.extractor.base import FeatureExtractor
-from signalflow.feature.extractor.oscillator.rsi_extractor import RsiExtractor
+from signalflow.feature.extractor.oscillator import RsiExtractor
 from signalflow.feature.extractor.pandasta_extractor import ( 
     PandasTaExtractor, 
     PandasTaRsiExtractor, 
@@ -15,5 +15,5 @@ __all__ = [
     "PandasTaRsiExtractor",
     "PandasTaBbandsExtractor",
     "PandasTaMacdExtractor",
-    "PandasTaAtrExtractor"
+    "PandasTaAtrExtractor",
 ]
