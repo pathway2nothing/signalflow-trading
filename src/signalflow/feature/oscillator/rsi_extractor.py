@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import polars as pl
 import pandas as pd
-from signalflow.feature.extractor.base_extractor import FeatureExtractor
+from signalflow.feature.base_extractor import FeatureExtractor
 
 
 @dataclass

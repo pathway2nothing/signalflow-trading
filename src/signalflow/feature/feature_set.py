@@ -6,7 +6,7 @@ from typing import Any
 import polars as pl
 import pandas as pd
 
-from signalflow.feature.extractor.base import FeatureExtractor
+from signalflow.feature.base_extractor import FeatureExtractor
 from signalflow.core import RawDataView
 
 
