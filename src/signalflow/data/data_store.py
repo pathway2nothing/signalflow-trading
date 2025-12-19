@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, Iterable
 from loguru import logger
 import pandas as pd
+from datetime import timedelta
 
 
 @dataclass
@@ -134,7 +135,15 @@ class SpotStore:
             df = pl.DataFrame(
                 {
                     "pair": [pair] * len(klines),
-                    "timestamp": [k["timestamp"] for k in klines],
+                    "timestamp": [
+                        k["timestamp"]
+                        .replace(tzinfo=None)
+                        .replace(second=0, microsecond=0)
+                        + timedelta(minutes=1)
+                        if k["timestamp"].second != 0 or k["timestamp"].microsecond != 0
+                        else k["timestamp"].replace(tzinfo=None)
+                        for k in klines
+                    ],
                     "open": [k["open"] for k in klines],
                     "high": [k["high"] for k in klines],
                     "low": [k["low"] for k in klines],
@@ -228,7 +237,14 @@ class SpotStore:
             params.append(end)
 
         query += " ORDER BY timestamp"
-        return self._con.execute(query, params).pl()
+        df = self._con.execute(query, params).pl()
+
+        if 'timestamp' in df.columns:
+            df = df.with_columns(
+                pl.col('timestamp').dt.replace_time_zone(None)
+            )
+
+        return df
     
     def load_many_pandas(
         self,
@@ -289,7 +305,15 @@ class SpotStore:
             params.append(end)
 
         query += " ORDER BY pair, timestamp"
-        return self._con.execute(query, params).pl()
+
+        df = self._con.execute(query, params).pl()
+        
+        if 'timestamp' in df.columns:
+            df = df.with_columns(
+                pl.col('timestamp').dt.replace_time_zone(None)
+            )
+        
+        return df
 
     def get_stats(self) -> pl.DataFrame:
         """DB contents stats (timeframe not stored, but meta has it)."""

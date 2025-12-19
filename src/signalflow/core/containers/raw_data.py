@@ -128,7 +128,7 @@ class RawData:
                 spot = spot.drop("timeframe")
 
             spot = spot.with_columns(
-                pl.col("timestamp").cast(pl.Datetime("us", "UTC"))
+                pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None)
             )
 
             dup_count = spot.group_by(["pair", "timestamp"]).len().filter(
