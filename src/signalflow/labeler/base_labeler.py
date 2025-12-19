@@ -27,7 +27,7 @@ class Labeler(ABC):
             (or auto-detect newly added cols if output_columns is None)
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
+    component_type: ClassVar[SfComponentType] = SfComponentType.LABELER
     df_type: DataFrameType = DataFrameType.POLARS
     raw_data_type: str = "spot"
 

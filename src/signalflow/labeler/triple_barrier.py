@@ -6,7 +6,7 @@ import polars as pl
 import numpy as np
 
 from signalflow.core import SfComponentType, SignalType, Signals
-from signalflow.feature.labeler.base_labeler import Labeler
+from signalflow.labeler.base_labeler import Labeler
 
 
 @dataclass

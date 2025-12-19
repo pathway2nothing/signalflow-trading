@@ -7,7 +7,7 @@ from typing import Any, Literal
 import polars as pl
 import pandas as pd
 
-from signalflow.core.offset_resampler import OffsetResampler
+from signalflow.core import RawDataType, RollingAggregator
 
 
 DfLike = pl.DataFrame | pd.DataFrame
@@ -40,29 +40,29 @@ class FeatureExtractor(ABC):
     use_resample: bool = False
     resample_mode: Literal["add", "replace"] = "add"
     resample_prefix: str | None = None
-    data_type: str = "spot"
+    raw_data_type: RawDataType = RawDataType.SPOT
 
     keep_input_columns: bool = False  
 
     def __post_init__(self) -> None:
         if self.offset_window <= 0:
-            raise ValueError(f"window_minutes must be > 0, got {self.offset_window}")
+            raise ValueError(f"offset_window must be > 0, got {self.offset_window}")
         if self.resample_mode not in ("add", "replace"):
             raise ValueError(f"Invalid resample_mode: {self.resample_mode}")
-        if self.offset_col != OffsetResampler.OFFSET_COL:
-            raise ValueError(f"offset_col must be '{OffsetResampler.OFFSET_COL}', got '{self.offset_col}'")
+        if self.offset_col != RollingAggregator.OFFSET_COL:
+            raise ValueError(f"offset_col must be '{RollingAggregator.OFFSET_COL}', got '{self.offset_col}'")
         if not isinstance(self.pair_col, str) or not isinstance(self.ts_col, str) or not isinstance(self.offset_col, str):
             raise TypeError("pair_col/ts_col/offset_col must be str")
 
     @property
-    def _resampler(self) -> OffsetResampler:
-        return OffsetResampler(
-            window_minutes=self.offset_window,
+    def _resampler(self) -> RollingAggregator:
+        return RollingAggregator(
+            offset_window=self.offset_window,
             ts_col=self.ts_col,
             pair_col=self.pair_col,
             mode=self.resample_mode,
             prefix=self.resample_prefix,
-            data_type=self.data_type,
+            raw_data_type=self.raw_data_type,
         )
 
     def extract(self, df: DfLike, data_context: dict[str, Any] | None = None) -> DfLike:

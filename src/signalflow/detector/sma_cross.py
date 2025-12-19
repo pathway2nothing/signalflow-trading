@@ -10,9 +10,10 @@ from signalflow.core import Signals, SignalType, SfComponentType
 from signalflow.detector import SignalDetector
 from signalflow.feature import FeatureSet
 from signalflow.feature.smoother import SmaExtractor
-
+from signalflow.core import sf_component
 
 @dataclass
+@sf_component(name="sma_cross")
 class SmaCrossSignalDetector(SignalDetector):
     """
     SMA crossover signal detector.
@@ -27,9 +28,6 @@ class SmaCrossSignalDetector(SignalDetector):
       - signal: +1 for RISE, -1 for FALL, 0 for NONE
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
-    name: str = "sma_cross"
-
     fast_period: int = 20
     slow_period: int = 50
     price_col: str = "close"
@@ -37,7 +35,6 @@ class SmaCrossSignalDetector(SignalDetector):
     fast_col: str | None = None
     slow_col: str | None = None
 
-    keep_only_latest_per_pair: bool = True
 
     def __post_init__(self) -> None:
         if self.fast_period <= 0 or self.slow_period <= 0:

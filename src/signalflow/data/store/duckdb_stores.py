@@ -7,11 +7,10 @@ from pathlib import Path
 from typing import Optional, Iterable
 from loguru import logger
 import pandas as pd
-from datetime import timedelta
 
 
 @dataclass
-class SpotStore:
+class DuckDbSpotStore:
     """
     DuckDB storage for OHLCV data.
     Project timeframe is fixed -> timeframe is NOT stored in table and NOT present in APIs.

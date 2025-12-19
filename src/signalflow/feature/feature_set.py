@@ -7,7 +7,7 @@ import polars as pl
 import pandas as pd
 
 from signalflow.feature.base_extractor import FeatureExtractor
-from signalflow.core import RawDataView
+from signalflow.core import RawDataView, RawDataType
 
 
 @dataclass
@@ -74,7 +74,7 @@ class FeatureSet:
         Fallback:
           - assume "spot" + "polars" if attrs absent (fails fast if raw_data doesn't support)
         """
-        raw_data_type = getattr(extractor, "raw_data_type", "spot")
+        raw_data_type = getattr(extractor, "raw_data_type", RawDataType.SPOT)
         df_type = getattr(extractor, "df_type", None)
 
 

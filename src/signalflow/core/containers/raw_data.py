@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
-from signalflow.data.data_store import SpotStore
+from signalflow.data.store import DuckDbSpotStore
 
 
 @dataclass(frozen=True)
@@ -86,7 +86,7 @@ class RawData:
 
 
     @staticmethod
-    def from_store(
+    def from_db_store(
         store_db_path: Path,
         pairs: list[str],
         start: datetime,
@@ -115,7 +115,7 @@ class RawData:
         Raises:
             ValueError: If required columns are missing or duplicates detected.
         """
-        store = SpotStore(store_db_path)
+        store = DuckDbSpotStore(store_db_path)
         try:
             spot = store.load_many(pairs=pairs, start=start, end=end)
 

@@ -8,11 +8,11 @@ import pandas as pd
 
 
 @dataclass
-class OffsetResampler:
+class RollingAggregator:
     """
     Offset (sliding) resampler for RawData.
 
-    For each row t computes aggregates over last `window_minutes` rows per pair:
+    For each row t computes aggregates over last `offset_window` rows per pair:
       [t-(k-1), ..., t]
 
     Invariants:
@@ -21,7 +21,7 @@ class OffsetResampler:
       - first (k-1) rows per pair -> null/NaN for resampled fields (min_periods=k)
     """
 
-    window_minutes: int = 1
+    offset_window: int = 1
     ts_col: str = "timestamp"
     pair_col: str = "pair"
     mode: Literal["add", "replace"] = "replace"
@@ -32,17 +32,17 @@ class OffsetResampler:
 
     @property
     def out_prefix(self) -> str:
-        return self.prefix if self.prefix is not None else f"rs_{self.window_minutes}m_"
+        return self.prefix if self.prefix is not None else f"rs_{self.offset_window}m_"
 
     def add_offset_column(self, df: pl.DataFrame | pd.DataFrame) -> pl.DataFrame | pd.DataFrame:
-        if self.window_minutes <= 0:
-            raise ValueError(f"window_minutes must be > 0, got {self.window_minutes}")
+        if self.offset_window <= 0:
+            raise ValueError(f"offset_window must be > 0, got {self.offset_window}")
 
         if isinstance(df, pl.DataFrame):
             if self.ts_col not in df.columns:
                 raise ValueError(f"Missing '{self.ts_col}' column")
             return df.with_columns(
-                (pl.col(self.ts_col).dt.minute() % self.window_minutes).alias(self.OFFSET_COL)
+                (pl.col(self.ts_col).dt.minute() % self.offset_window).alias(self.OFFSET_COL)
             )
 
         if isinstance(df, pd.DataFrame):
@@ -50,7 +50,7 @@ class OffsetResampler:
                 raise ValueError(f"Missing '{self.ts_col}' column")
             out = df.copy()
             ts = pd.to_datetime(out[self.ts_col], utc=False, errors="raise")
-            out[self.OFFSET_COL] = (ts.dt.minute % self.window_minutes).astype("int64")
+            out[self.OFFSET_COL] = (ts.dt.minute % self.offset_window).astype("int64")
             return out
 
         raise TypeError(f"Unsupported df type: {type(df)}")
@@ -60,13 +60,13 @@ class OffsetResampler:
             if df.is_empty():
                 raise ValueError("Empty dataframe")
             last_ts = df.select(pl.col(self.ts_col).max()).item()
-            return int(last_ts.minute % self.window_minutes)
+            return int(last_ts.minute % self.offset_window)
 
         if isinstance(df, pd.DataFrame):
             if df.empty:
                 raise ValueError("Empty dataframe")
             last_ts = pd.to_datetime(df[self.ts_col], utc=False, errors="raise").max()
-            return int(last_ts.minute % self.window_minutes)
+            return int(last_ts.minute % self.offset_window)
 
         raise TypeError(f"Unsupported df type: {type(df)}")
 
@@ -87,8 +87,8 @@ class OffsetResampler:
         raise TypeError(f"Unsupported df type: {type(df)}")
 
     def _resample_pl(self, df: pl.DataFrame) -> pl.DataFrame:
-        if self.window_minutes <= 0:
-            raise ValueError(f"window_minutes must be > 0, got {self.window_minutes}")
+        if self.offset_window <= 0:
+            raise ValueError(f"offset_window must be > 0, got {self.offset_window}")
         if self.pair_col not in df.columns or self.ts_col not in df.columns:
             raise ValueError(f"Input must contain '{self.pair_col}' and '{self.ts_col}'")
 
@@ -99,7 +99,7 @@ class OffsetResampler:
         if self.OFFSET_COL not in df0.columns:
             df0 = self.add_offset_column(df0)
 
-        k = int(self.window_minutes)
+        k = int(self.offset_window)
         pfx = self.out_prefix
         over = [self.pair_col]
 
@@ -154,8 +154,8 @@ class OffsetResampler:
         return out
 
     def _resample_pd(self, df: pd.DataFrame) -> pd.DataFrame:
-        if self.window_minutes <= 0:
-            raise ValueError(f"window_minutes must be > 0, got {self.window_minutes}")
+        if self.offset_window <= 0:
+            raise ValueError(f"offset_window must be > 0, got {self.offset_window}")
         if self.pair_col not in df.columns or self.ts_col not in df.columns:
             raise ValueError(f"Input must contain '{self.pair_col}' and '{self.ts_col}'")
 
@@ -166,7 +166,7 @@ class OffsetResampler:
         if self.OFFSET_COL not in df0.columns:
             df0 = self.add_offset_column(df0)  
 
-        k = int(self.window_minutes)
+        k = int(self.offset_window)
         pfx = self.out_prefix
 
         g = df0.groupby(self.pair_col, sort=False)

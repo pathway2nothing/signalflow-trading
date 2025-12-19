@@ -14,7 +14,7 @@ class SmaExtractor(FeatureExtractor):
     SMA per (pair, resample_offset) group.
 
     Notes:
-    - offset_window here is for OffsetResampler (your framework requirement).
+    - offset_window here is for RollingAggregator (your framework requirement).
       SMA window is `sma_period`.
     - In v1 you said only spot -> keep data_type="spot" by default.
     """

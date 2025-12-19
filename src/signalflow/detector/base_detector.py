@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, SfComponentType, SignalType
+from signalflow.core import RawDataView, Signals, SfComponentType, SignalType, RawDataType
 from signalflow.feature import FeatureSet
 
 
@@ -30,12 +30,11 @@ class SignalDetector(ABC):
     """
 
     component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
-    name: str = "base_detector"
 
     pair_col: str = "pair"
     ts_col: str = "timestamp"
 
-    raw_data_type: str = "spot"
+    raw_data_type: RawDataType = RawDataType.SPOT
 
     feature_set: FeatureSet | None = None
 
@@ -59,7 +58,6 @@ class SignalDetector(ABC):
         return signals
 
     __call__ = run
-    predict = run
 
     def preprocess(self, raw_data_view: RawDataView, context: dict[str, Any] | None = None) -> pl.DataFrame:
         """

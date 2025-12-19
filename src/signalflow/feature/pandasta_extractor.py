@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 import pandas as pd
 
 from signalflow.core import DataFrameType, SfComponentType
-from signalflow.feature.extractor.base_extractor import FeatureExtractor
+from signalflow.feature.base_extractor import FeatureExtractor
 
 
 @dataclass
