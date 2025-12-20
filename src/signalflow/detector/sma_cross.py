@@ -2,15 +2,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Any
 
 import polars as pl
 
-from signalflow.core import Signals, SignalType, SfComponentType
+from signalflow.core import RawDataType, Signals, SignalType, sf_component
 from signalflow.detector import SignalDetector
 from signalflow.feature import FeatureSet
 from signalflow.feature.smoother import SmaExtractor
-from signalflow.core import sf_component
+
 
 @dataclass
 @sf_component(name="sma_cross")
@@ -35,7 +35,6 @@ class SmaCrossSignalDetector(SignalDetector):
     fast_col: str | None = None
     slow_col: str | None = None
 
-
     def __post_init__(self) -> None:
         if self.fast_period <= 0 or self.slow_period <= 0:
             raise ValueError("fast_period and slow_period must be > 0")
@@ -53,7 +52,7 @@ class SmaCrossSignalDetector(SignalDetector):
                     price_col=self.price_col,
                     out_col=self.fast_col,
                     use_resample=True,
-                    data_type="spot",
+                    raw_data_type=RawDataType.SPOT,
                 ),
                 SmaExtractor(
                     offset_window=1,
@@ -61,12 +60,12 @@ class SmaCrossSignalDetector(SignalDetector):
                     price_col=self.price_col,
                     out_col=self.slow_col,
                     use_resample=True,
-                    data_type="spot",
+                    raw_data_type=RawDataType.SPOT,
                 ),
             ]
         )
 
-    def detect(self, features: pl.DataFrame, context=None) -> Signals:
+    def detect(self, features: pl.DataFrame, context: dict[str, Any] | None = None) -> Signals:
         df = features.sort([self.pair_col, self.ts_col])
 
         if self.fast_col not in df.columns or self.slow_col not in df.columns:
@@ -74,6 +73,8 @@ class SmaCrossSignalDetector(SignalDetector):
                 f"Expected columns '{self.fast_col}' and '{self.slow_col}' in features. "
                 f"Got: {df.columns}"
             )
+
+        df = df.filter(pl.col(self.fast_col).is_not_null() & pl.col(self.slow_col).is_not_null())
 
         fast = pl.col(self.fast_col)
         slow = pl.col(self.slow_col)
@@ -101,7 +102,5 @@ class SmaCrossSignalDetector(SignalDetector):
                 .alias("signal")
             )
         )
-
-        out = out.filter(pl.col(self.fast_col).is_not_null() & pl.col(self.slow_col).is_not_null())
 
         return Signals(out)

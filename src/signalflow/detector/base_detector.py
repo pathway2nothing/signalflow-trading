@@ -13,20 +13,12 @@ from signalflow.feature import FeatureSet
 @dataclass
 class SignalDetector(ABC):
     """
-    Base Signal Detector.
+    Polars-first base Signal Detector.
 
-    Contract:
-      1) preprocess(raw_data_view) -> pl.DataFrame
-         - computes features used for decision making
-         - must return at least [pair_col, ts_col] + feature columns
-      2) detect(features) -> Signals
-         - makes decisions for all pairs / timestamps contained in features
-      3) run(raw_data_view) -> Signals
-         - orchestrator: preprocess -> validate -> detect -> validate output
-
-    Notes:
-      - Detectors are expected to work in real-time. (Your framework description) :contentReference[oaicite:1]{index=1}
-      - Feature computation can be implemented via FeatureSet (recommended).
+    Public contract:
+      - run(raw_data_view) -> Signals
+      - preprocess(raw_data_view) -> pl.DataFrame
+      - detect(features: pl.DataFrame) -> Signals
     """
 
     component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
@@ -42,11 +34,8 @@ class SignalDetector(ABC):
     keep_only_latest_per_pair: bool = False
 
     def run(self, raw_data_view: RawDataView, context: dict[str, Any] | None = None) -> Signals:
-        """
-        Orchestrator:
-          preprocess -> validate features -> detect -> validate output -> (optional) postprocess
-        """
         feats = self.preprocess(raw_data_view, context=context)
+        feats = self._normalize_index(feats)
         self._validate_features(feats)
 
         signals = self.detect(feats, context=context)
@@ -61,31 +50,34 @@ class SignalDetector(ABC):
 
     def preprocess(self, raw_data_view: RawDataView, context: dict[str, Any] | None = None) -> pl.DataFrame:
         """
-        Default implementation: if feature_set is provided -> run it.
-        Otherwise fail fast.
-
-        Override in child detectors if:
-          - you need custom feature logic
-          - you want to join multiple raw tables yourself
+        Default: delegate to FeatureSet (polars-first).
         """
         if self.feature_set is None:
             raise NotImplementedError(
                 f"{self.__class__.__name__}.preprocess is not implemented and feature_set is None"
             )
-
-        features = self.feature_set.extract(raw_data_view, context=context)
-        return features
+        out = self.feature_set.extract(raw_data_view, context=context)
+        if not isinstance(out, pl.DataFrame):
+            raise TypeError(f"{self.__class__.__name__}.feature_set.extract must return pl.DataFrame, got {type(out)}")
+        return out
 
     @abstractmethod
     def detect(self, features: pl.DataFrame, context: dict[str, Any] | None = None) -> Signals:
-        """
-        Must return Signals with at least:
-          - pair, timestamp, signal_type
-        Recommended:
-          - signal (0/1 or signed score)
-          - probability (0..1) if you do classification
-        """
+        """Polars-only detection."""
         raise NotImplementedError
+
+    def _normalize_index(self, df: pl.DataFrame) -> pl.DataFrame:
+        """
+        Normalize timestamp to timezone-naive, same idea as FeatureSet.
+        """
+        if not isinstance(df, pl.DataFrame):
+            raise TypeError(f"Expected pl.DataFrame, got {type(df)}")
+
+        if self.ts_col in df.columns:
+            ts_dtype = df.schema.get(self.ts_col)
+            if isinstance(ts_dtype, pl.Datetime) and ts_dtype.time_zone is not None:
+                df = df.with_columns(pl.col(self.ts_col).dt.replace_time_zone(None))
+        return df
 
     def _validate_features(self, df: pl.DataFrame) -> None:
         if not isinstance(df, pl.DataFrame):
@@ -109,7 +101,7 @@ class SignalDetector(ABC):
         )
         if dup.height > 0:
             raise ValueError(
-                f"Features contain duplicate keys (pair,timestamp). "
+                "Features contain duplicate keys (pair,timestamp). "
                 f"Examples:\n{dup.select([self.pair_col, self.ts_col]).head(10)}"
             )
 
@@ -133,15 +125,27 @@ class SignalDetector(ABC):
             .filter(~pl.col("signal_type").is_in(list(allowed)))
         )
         if bad.height > 0:
-            raise ValueError(f"Signals contain unknown signal_type values: {bad.get_column('signal_type').to_list()}")
+            raise ValueError(
+                f"Signals contain unknown signal_type values: {bad.get_column('signal_type').to_list()}"
+            )
 
         if self.require_probability and "probability" not in s.columns:
             raise ValueError("Signals must contain 'probability' column (require_probability=True)")
 
         ts_dtype = s.schema.get(self.ts_col)
         if isinstance(ts_dtype, pl.Datetime) and ts_dtype.time_zone is not None:
+            raise ValueError(f"Signals column '{self.ts_col}' must be timezone-naive, got tz={ts_dtype.time_zone}.")
+
+        # optional: hard guarantee no duplicates in signals
+        dup = (
+            s.group_by([self.pair_col, self.ts_col])
+            .len()
+            .filter(pl.col("len") > 1)
+        )
+        if dup.height > 0:
             raise ValueError(
-                f"Signals column '{self.ts_col}' must be timezone-naive, got tz={ts_dtype.time_zone}."
+                "Signals contain duplicate keys (pair,timestamp). "
+                f"Examples:\n{dup.select([self.pair_col, self.ts_col]).head(10)}"
             )
 
     def _keep_only_latest(self, signals: Signals) -> Signals:

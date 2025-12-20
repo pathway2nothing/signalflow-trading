@@ -5,18 +5,19 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import polars as pl
-import pandas as pd
 
 from signalflow.core import RawDataType, RollingAggregator
-
-
-DfLike = pl.DataFrame | pd.DataFrame
 
 
 @dataclass
 class FeatureExtractor(ABC):
     """
-    Base FeatureExtractor.
+    Polars-first base FeatureExtractor.
+
+    Contract:
+      - Input:  pl.DataFrame only
+      - Output: pl.DataFrame only
+      - Any other DF type must be handled by an adapter (e.g. PandasFeatureExtractor).
 
     Steps:
       1) sort (pair, timestamp)
@@ -30,7 +31,7 @@ class FeatureExtractor(ABC):
            - keep_input_columns=False -> return only [pair, timestamp] + new feature cols
     """
 
-    offset_window: int
+    offset_window: int = 1
     compute_last_offset: bool = False
 
     pair_col: str = "pair"
@@ -42,15 +43,20 @@ class FeatureExtractor(ABC):
     resample_prefix: str | None = None
     raw_data_type: RawDataType = RawDataType.SPOT
 
-    keep_input_columns: bool = False  
+    keep_input_columns: bool = False
 
     def __post_init__(self) -> None:
         if self.offset_window <= 0:
             raise ValueError(f"offset_window must be > 0, got {self.offset_window}")
+
         if self.resample_mode not in ("add", "replace"):
             raise ValueError(f"Invalid resample_mode: {self.resample_mode}")
+
         if self.offset_col != RollingAggregator.OFFSET_COL:
-            raise ValueError(f"offset_col must be '{RollingAggregator.OFFSET_COL}', got '{self.offset_col}'")
+            raise ValueError(
+                f"offset_col must be '{RollingAggregator.OFFSET_COL}', got '{self.offset_col}'"
+            )
+
         if not isinstance(self.pair_col, str) or not isinstance(self.ts_col, str) or not isinstance(self.offset_col, str):
             raise TypeError("pair_col/ts_col/offset_col must be str")
 
@@ -65,23 +71,21 @@ class FeatureExtractor(ABC):
             raw_data_type=self.raw_data_type,
         )
 
-    def extract(self, df: DfLike, data_context: dict[str, Any] | None = None) -> DfLike:
-        if isinstance(df, pl.DataFrame):
-            return self._extract_pl(df, data_context=data_context)
-        if isinstance(df, pd.DataFrame):
-            return self._extract_pd(df, data_context=data_context)
-        raise TypeError(f"Unsupported df type: {type(df)}")
-
-    def _extract_pl(self, df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
-        self._validate_input_pl(df)
+    def extract(self, df: pl.DataFrame, data_context: dict[str, Any] | None = None) -> pl.DataFrame:
+        if not isinstance(df, pl.DataFrame):
+            raise TypeError(
+                f"{self.__class__.__name__} is polars-first and accepts only pl.DataFrame. "
+                f"Got: {type(df)}. Use an adapter for other dataframe types."
+            )
+        self._validate_input(df)
 
         df0 = df.sort([self.pair_col, self.ts_col])
 
         if self.offset_col not in df0.columns:
-            df0 = self._resampler.add_offset_column(df0)  
+            df0 = self._resampler.add_offset_column(df0)
 
         if self.use_resample:
-            df0 = self._resampler.resample(df0) 
+            df0 = self._resampler.resample(df0)
 
         if self.compute_last_offset:
             last_off = self._resampler.get_last_offset(df0)
@@ -94,10 +98,11 @@ class FeatureExtractor(ABC):
             nonlocal inferred_features
 
             in_cols = set(g.columns)
-            out = self.compute_pl_group(g, data_context=data_context)
+            out = self.compute_group(g, data_context=data_context)
 
             if not isinstance(out, pl.DataFrame):
                 raise TypeError(f"{self.__class__.__name__}.compute_pl_group must return pl.DataFrame")
+
             if out.height != g.height:
                 raise ValueError(
                     f"{self.__class__.__name__}: len(output_group)={out.height} != len(input_group)={g.height}"
@@ -109,8 +114,7 @@ class FeatureExtractor(ABC):
             return out
 
         out = (
-            df0
-            .group_by(self.pair_col, self.offset_col, maintain_order=True)
+            df0.group_by(self.pair_col, self.offset_col, maintain_order=True)
             .map_groups(_wrapped)
             .sort([self.pair_col, self.ts_col])
         )
@@ -127,75 +131,22 @@ class FeatureExtractor(ABC):
 
         return out.select(keep_cols)
 
-    def compute_pl_group(
+    def compute_group(
         self,
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None,
     ) -> pl.DataFrame:
+        """
+        Compute features for a single (pair, resample_offset) group.
+
+        Requirements:
+          - Must return pl.DataFrame
+          - Must preserve row count (out.height == group_df.height)
+          - Should preserve ordering inside the group
+        """
         raise NotImplementedError
 
-    def _validate_input_pl(self, df: pl.DataFrame) -> None:
-        missing = [c for c in (self.pair_col, self.ts_col) if c not in df.columns]
-        if missing:
-            raise ValueError(f"Missing required columns: {missing}")
-
-    def _extract_pd(self, df: pd.DataFrame, data_context: dict[str, Any] | None) -> pd.DataFrame:
-        self._validate_input_pd(df)
-
-        df0 = df.sort_values([self.pair_col, self.ts_col], kind="stable").copy()
-
-        if self.offset_col not in df0.columns:
-            df0 = self._resampler.add_offset_column(df0)  
-
-        if self.use_resample:
-            df0 = self._resampler.resample(df0)  
-
-        if self.compute_last_offset:
-            last_off = self._resampler.get_last_offset(df0)
-            df0 = df0[df0[self.offset_col] == last_off].copy()
-
-        prepared_cols = set(df0.columns)
-
-        parts: list[pd.DataFrame] = []
-        for (_, _), g in df0.groupby([self.pair_col, self.offset_col], sort=False, dropna=False):
-            out_g = self.compute_pd_group(g, data_context=data_context)
-            if not isinstance(out_g, pd.DataFrame):
-                raise TypeError(f"{self.__class__.__name__}.compute_pd_group must return pd.DataFrame")
-            if len(out_g) != len(g):
-                raise ValueError(
-                    f"{self.__class__.__name__}: len(output_group)={len(out_g)} != len(input_group)={len(g)}"
-                )
-            parts.append(out_g)
-
-        out = pd.concat(parts, axis=0, ignore_index=True) if parts else df0.iloc[:0].copy()
-        out = out.sort_values([self.pair_col, self.ts_col], kind="stable").reset_index(drop=True)
-
-        if self.keep_input_columns:
-            return out
-
-        feature_cols = [c for c in out.columns if c not in prepared_cols]
-        keep_cols = [self.pair_col, self.ts_col] + feature_cols
-
-        missing = [c for c in keep_cols if c not in out.columns]
-        if missing:
-            raise ValueError(f"Projection error, missing columns: {missing}")
-
-        return out.loc[:, keep_cols]
-
-    def compute_pd_group(
-        self,
-        group_df: pd.DataFrame,
-        data_context: dict[str, Any] | None,
-    ) -> pd.DataFrame:
-        pl_in = pl.from_pandas(group_df)
-        pl_out = self.compute_pl_group(pl_in, data_context=data_context)
-        if pl_out.height != pl_in.height:
-            raise ValueError(
-                f"{self.__class__.__name__}: len(output_group)={pl_out.height} != len(input_group)={pl_in.height}"
-            )
-        return pl_out.to_pandas()
-
-    def _validate_input_pd(self, df: pd.DataFrame) -> None:
+    def _validate_input(self, df: pl.DataFrame) -> None:
         missing = [c for c in (self.pair_col, self.ts_col) if c not in df.columns]
         if missing:
             raise ValueError(f"Missing required columns: {missing}")

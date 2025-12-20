@@ -4,22 +4,25 @@ from dataclasses import dataclass
 from typing import Any
 
 import polars as pl
-import pandas as pd
 
 from signalflow.feature.base_extractor import FeatureExtractor
-from signalflow.core import RawDataView, RawDataType
+from signalflow.core import RawDataView, RawDataType, DataFrameType
 
 
 @dataclass
 class FeatureSet:
     """
-    Collection of independent extractors for parallel execution (future).
+    Polars-first collection of independent extractors.
 
-    Current behavior:
-      - for each extractor: fetch proper raw data backend (pd/pl)
-      - run extractor.extract(...)
-      - normalize to Polars
+    Behavior:
+      - for each extractor: fetch raw data as Polars (canonical)
+      - run extractor.extract(pl_df, context)
+      - normalize index (timestamp tz -> naive)
       - join all results on (pair, timestamp)
+
+    Notes:
+      - FeatureExtractor is polars-first, so any pandas-only logic must be wrapped by adapters
+        (e.g. PandasFeatureExtractor) that still expose pl.DataFrame output.
     """
 
     extractors: list[FeatureExtractor]
@@ -49,54 +52,41 @@ class FeatureSet:
 
         for extractor in self.extractors:
             input_df = self._get_input_df(raw_data, extractor)
-            result_df = extractor.extract(input_df, context) 
 
-            pl_df = self._to_polars(result_df)
-            pl_df = self._normalize_index(pl_df)
+            result_df = extractor.extract(input_df, data_context=context)
+            if not isinstance(result_df, pl.DataFrame):
+                raise TypeError(
+                    f"{extractor.__class__.__name__}.extract must return pl.DataFrame, got {type(result_df)}"
+                )
 
-            if self.pair_col not in pl_df.columns or self.ts_col not in pl_df.columns:
+            result_df = self._normalize_index(result_df)
+
+            if self.pair_col not in result_df.columns or self.ts_col not in result_df.columns:
                 raise ValueError(
                     f"{extractor.__class__.__name__} returned no index columns "
                     f"('{self.pair_col}', '{self.ts_col}'). "
                     f"FeatureSet requires index columns to combine features."
                 )
 
-            feature_dfs.append(pl_df)
+            feature_dfs.append(result_df)
 
         return self._combine_features(feature_dfs)
 
-    def _get_input_df(self, raw_data: RawDataView, extractor: FeatureExtractor) -> pl.DataFrame | pd.DataFrame:
+    def _get_input_df(self, raw_data: RawDataView, extractor: FeatureExtractor) -> pl.DataFrame:
         """
-        Backward compatible data fetch.
+        Polars-first data fetch.
 
-        Tries:
-          - extractor.raw_data_type / extractor.df_type (old API)
-        Fallback:
-          - assume "spot" + "polars" if attrs absent (fails fast if raw_data doesn't support)
+        Uses:
+          - extractor.raw_data_type if present
+        Always returns:
+          - pl.DataFrame (canonical)
         """
         raw_data_type = getattr(extractor, "raw_data_type", RawDataType.SPOT)
-        df_type = getattr(extractor, "df_type", None)
 
-
-        df_type_norm: Any = df_type
-        if hasattr(df_type, "name"):
-            df_type_norm = df_type.name.lower()
-        elif hasattr(df_type, "value"):
-            df_type_norm = str(df_type.value).lower()
-
-        if df_type_norm in ("pandas", "pd"):
-            return raw_data.get_data(raw_data_type, "pandas")
-        if df_type_norm in ("polars", "pl"):
+        try:
+            return raw_data.get_data(raw_data_type, DataFrameType.POLARS)
+        except TypeError:
             return raw_data.get_data(raw_data_type, "polars")
-
-        return raw_data.get_data(raw_data_type, "polars")
-
-    def _to_polars(self, df: pl.DataFrame | pd.DataFrame) -> pl.DataFrame:
-        if isinstance(df, pl.DataFrame):
-            return df
-        if isinstance(df, pd.DataFrame):
-            return pl.from_pandas(df)
-        raise TypeError(f"Unsupported df type: {type(df)}")
 
     def _normalize_index(self, df: pl.DataFrame) -> pl.DataFrame:
         if self.ts_col in df.columns:
@@ -112,14 +102,14 @@ class FeatureSet:
         combined = feature_dfs[0]
 
         for right in feature_dfs[1:]:
-            right_cols = [c for c in right.columns if c not in (self.pair_col, self.ts_col)]
-            dup = set(right_cols).intersection(set(combined.columns))
+            right_feature_cols = [c for c in right.columns if c not in (self.pair_col, self.ts_col)]
+            dup = set(right_feature_cols).intersection(set(combined.columns))
             if dup:
                 raise ValueError(
                     f"Duplicate feature columns during FeatureSet combine: {sorted(dup)}. "
                     f"Rename features or set unique prefixes."
                 )
 
-            combined = combined.join(right, on=[self.pair_col, self.ts_col], how="left")
+            combined = combined.join(right, on=[self.pair_col, self.ts_col], how="outer")
 
         return combined
