@@ -4,6 +4,7 @@ import polars as pl
 from .raw_data import RawData
 from signalflow.core.enums import DataFrameType
 
+# TODO raw_data_type -> RawDataType
 
 @dataclass
 class RawDataView:
@@ -31,7 +32,7 @@ class RawDataView:
                 self._pandas_cache[key] = df
 
         if "timestamp" in df.columns:
-            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="raise")
+            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=False, errors="raise")
 
         if {"pair", "timestamp"}.issubset(df.columns):
             df = df.sort_values(["pair", "timestamp"], kind="stable").reset_index(drop=True)
