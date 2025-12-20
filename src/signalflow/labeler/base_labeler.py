@@ -33,7 +33,6 @@ class Labeler(ABC):
     output_columns: list[str] | None = None
     filter_signal_type: SignalType | None = None
 
-    # Common params for signal masking
     mask_to_signals: bool = True
     out_col: str = "label"
     include_meta: bool = False

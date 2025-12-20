@@ -22,8 +22,8 @@ def _find_first_hit_static(
     Finds the first hit for static barriers.
 
     Returns:
-        up_off: offset першого PT hit (0 = no hit)
-        dn_off: offset першого SL hit (0 = no hit)
+        up_off: offset of the first PT hit (0 = no hit)
+        dn_off: offset of the first SL hit (0 = no hit)
     """
     n = len(prices)
     up_off = np.zeros(n, dtype=np.int32)
