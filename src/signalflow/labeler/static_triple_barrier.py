@@ -19,8 +19,8 @@ def _find_first_hit_static(
     lookforward: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Знаходить перший hit для static barriers.
-    
+    Finds the first hit for static barriers.
+
     Returns:
         up_off: offset першого PT hit (0 = no hit)
         dn_off: offset першого SL hit (0 = no hit)
@@ -32,18 +32,18 @@ def _find_first_hit_static(
     for i in prange(n):
         pt_i = pt[i]
         sl_i = sl[i]
-        
+
         max_j = min(i + lookforward, n - 1)
-        
+
         for k in range(1, max_j - i + 1):
             p = prices[i + k]
-            
+
             if up_off[i] == 0 and p >= pt_i:
                 up_off[i] = k
-            
+
             if dn_off[i] == 0 and p <= sl_i:
                 dn_off[i] = k
-            
+
             if up_off[i] > 0 and dn_off[i] > 0:
                 break
 
@@ -76,11 +76,6 @@ class StaticTripleBarrierLabeler(Labeler):
     profit_pct: float = 0.01
     stop_loss_pct: float = 0.01
 
-    include_meta: bool = False
-    out_col: str = "label"
-
-    mask_to_events: bool = True
-
     def __post_init__(self) -> None:
         if self.lookforward_window <= 0:
             raise ValueError("lookforward_window must be > 0")
@@ -89,10 +84,12 @@ class StaticTripleBarrierLabeler(Labeler):
 
         cols = [self.out_col]
         if self.include_meta:
-            cols += ["t_hit", "ret"]
+            cols += list(self.meta_columns)
         self.output_columns = cols
 
-    def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
+    def compute_group(
+        self, group_df: pl.DataFrame, data_context: dict[str, Any] | None
+    ) -> pl.DataFrame:
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
@@ -100,13 +97,11 @@ class StaticTripleBarrierLabeler(Labeler):
             return group_df
 
         lf = int(self.lookforward_window)
-        profit_pct = float(self.profit_pct)
-        stop_loss_pct = float(self.stop_loss_pct)
         n = group_df.height
 
         prices = group_df.get_column(self.price_col).to_numpy().astype(np.float64)
-        pt = prices * (1.0 + profit_pct)
-        sl = prices * (1.0 - stop_loss_pct)
+        pt = prices * (1.0 + self.profit_pct)
+        sl = prices * (1.0 - self.stop_loss_pct)
 
         up_off, dn_off = _find_first_hit_static(prices, pt, sl, lf)
 
@@ -115,13 +110,11 @@ class StaticTripleBarrierLabeler(Labeler):
 
         df = group_df.with_columns([up_off_series, dn_off_series])
 
-        choose_up = (
-            pl.col("_up_off").is_not_null()
-            & (pl.col("_dn_off").is_null() | (pl.col("_up_off") <= pl.col("_dn_off")))
+        choose_up = pl.col("_up_off").is_not_null() & (
+            pl.col("_dn_off").is_null() | (pl.col("_up_off") <= pl.col("_dn_off"))
         )
-        choose_dn = (
-            pl.col("_dn_off").is_not_null()
-            & (pl.col("_up_off").is_null() | (pl.col("_dn_off") < pl.col("_up_off")))
+        choose_dn = pl.col("_dn_off").is_not_null() & (
+            pl.col("_up_off").is_null() | (pl.col("_dn_off") < pl.col("_up_off"))
         )
 
         df = df.with_columns(
@@ -135,7 +128,7 @@ class StaticTripleBarrierLabeler(Labeler):
 
         if self.include_meta:
             ts_arr = group_df.get_column(self.ts_col).to_numpy()
-            
+
             up_np = up_off_series.fill_null(0).to_numpy()
             dn_np = dn_off_series.fill_null(0).to_numpy()
             idx = np.arange(n)
@@ -143,7 +136,7 @@ class StaticTripleBarrierLabeler(Labeler):
             hit_off = np.where(
                 (up_np > 0) & ((dn_np == 0) | (up_np <= dn_np)),
                 up_np,
-                np.where(dn_np > 0, dn_np, 0)
+                np.where(dn_np > 0, dn_np, 0),
             )
 
             hit_idx = np.clip(idx + hit_off, 0, n - 1)
@@ -153,58 +146,20 @@ class StaticTripleBarrierLabeler(Labeler):
             t_hit = ts_arr[final_idx]
             ret = np.log(prices[final_idx] / prices)
 
-            df = df.with_columns([
-                pl.Series("t_hit", t_hit),
-                pl.Series("ret", ret),
-            ])
+            df = df.with_columns(
+                [
+                    pl.Series("t_hit", t_hit),
+                    pl.Series("ret", ret),
+                ]
+            )
 
-        if self.mask_to_events and data_context is not None and "event_keys" in data_context:
-            df = self._apply_event_mask(df, data_context, group_df)
+        if (
+            self.mask_to_signals
+            and data_context is not None
+            and "signal_keys" in data_context
+        ):
+            df = self._apply_signal_mask(df, data_context, group_df)
 
         df = df.drop(["_up_off", "_dn_off"])
-
-        return df
-
-    def _apply_event_mask(
-        self,
-        df: pl.DataFrame,
-        data_context: dict[str, Any],
-        group_df: pl.DataFrame,
-    ) -> pl.DataFrame:
-        event_keys: pl.DataFrame = data_context["event_keys"]
-        pair_value = group_df.get_column(self.pair_col)[0]
-
-        event_ts = (
-            event_keys
-            .filter(pl.col(self.pair_col) == pair_value)
-            .select(self.ts_col)
-            .unique()
-        )
-
-        if event_ts.height == 0:
-            df = df.with_columns(pl.lit(SignalType.NONE.value).alias(self.out_col))
-            if self.include_meta:
-                df = df.with_columns([
-                    pl.lit(None).alias("t_hit"),
-                    pl.lit(None).alias("ret"),
-                ])
-        else:
-            is_event = pl.col("_is_event").fill_null(False)
-            df = (
-                df.join(
-                    event_ts.with_columns(pl.lit(True).alias("_is_event")),
-                    on=self.ts_col,
-                    how="left",
-                )
-                .with_columns([
-                    pl.when(is_event).then(pl.col(self.out_col))
-                    .otherwise(pl.lit(SignalType.NONE.value))
-                    .alias(self.out_col),
-                ] + ([
-                    pl.when(is_event).then(pl.col("t_hit")).otherwise(pl.lit(None)).alias("t_hit"),
-                    pl.when(is_event).then(pl.col("ret")).otherwise(pl.lit(None)).alias("ret"),
-                ] if self.include_meta else []))
-                .drop("_is_event")
-            )
 
         return df

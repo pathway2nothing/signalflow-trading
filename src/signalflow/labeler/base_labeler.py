@@ -9,10 +9,6 @@ import polars as pl
 from signalflow.core import RawDataType, SfComponentType, SignalType, Signals
 
 
-# =========================
-# Polars-only base (public interface)
-# =========================
-
 @dataclass
 class Labeler(ABC):
     """
@@ -37,17 +33,23 @@ class Labeler(ABC):
     output_columns: list[str] | None = None
     filter_signal_type: SignalType | None = None
 
-    def extract(
+    # Common params for signal masking
+    mask_to_signals: bool = True
+    out_col: str = "label"
+    include_meta: bool = False
+    meta_columns: tuple[str, ...] = ("t_hit", "ret")
+
+    def compute(
         self,
         df: pl.DataFrame,
         signals: Signals | None = None,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
         if not isinstance(df, pl.DataFrame):
-            raise TypeError(f"{self.__class__.__name__}.extract expects pl.DataFrame, got {type(df)}")
-        return self._extract_pl(df=df, signals=signals, data_context=data_context)
+            raise TypeError(f"{self.__class__.__name__}.compute expects pl.DataFrame, got {type(df)}")
+        return self._compute_pl(df=df, signals=signals, data_context=data_context)
 
-    def _extract_pl(
+    def _compute_pl(
         self,
         df: pl.DataFrame,
         signals: Signals | None,
@@ -98,10 +100,11 @@ class Labeler(ABC):
         s = signals.value
         if isinstance(s, pl.DataFrame):
             return s
-        else:
-            raise TypeError(f"Unsupported Signals.value type: {type(s)}")
+        raise TypeError(f"Unsupported Signals.value type: {type(s)}")
 
-    def _filter_by_signals_pl(self, df: pl.DataFrame, s: pl.DataFrame, signal_type: SignalType) -> pl.DataFrame:
+    def _filter_by_signals_pl(
+        self, df: pl.DataFrame, s: pl.DataFrame, signal_type: SignalType
+    ) -> pl.DataFrame:
         required = {self.pair_col, self.ts_col, "signal_type"}
         missing = required - set(s.columns)
         if missing:
@@ -115,7 +118,9 @@ class Labeler(ABC):
         return df.join(s_f, on=[self.pair_col, self.ts_col], how="inner")
 
     @abstractmethod
-    def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
+    def compute_group(
+        self, group_df: pl.DataFrame, data_context: dict[str, Any] | None
+    ) -> pl.DataFrame:
         """Polars implementation per pair."""
         raise NotImplementedError
 
@@ -123,3 +128,60 @@ class Labeler(ABC):
         missing = [c for c in (self.pair_col, self.ts_col) if c not in df.columns]
         if missing:
             raise ValueError(f"Missing required columns: {missing}")
+
+    def _apply_signal_mask(
+        self,
+        df: pl.DataFrame,
+        data_context: dict[str, Any],
+        group_df: pl.DataFrame,
+    ) -> pl.DataFrame:
+        """Mask labels to signal timestamps only.
+
+        Labels are computed for all rows, but only signal timestamps
+        get actual labels; others are set to SignalType.NONE.
+
+        Uses self.out_col, self.include_meta, and self.meta_columns.
+        """
+        signal_keys: pl.DataFrame = data_context["signal_keys"]
+        pair_value = group_df.get_column(self.pair_col)[0]
+
+        signal_ts = (
+            signal_keys.filter(pl.col(self.pair_col) == pair_value)
+            .select(self.ts_col)
+            .unique()
+        )
+
+        if signal_ts.height == 0:
+            df = df.with_columns(pl.lit(SignalType.NONE.value).alias(self.out_col))
+            if self.include_meta:
+                df = df.with_columns(
+                    [pl.lit(None).alias(col) for col in self.meta_columns]
+                )
+        else:
+            is_signal = pl.col("_is_signal").fill_null(False)
+            mask_exprs = [
+                pl.when(is_signal)
+                .then(pl.col(self.out_col))
+                .otherwise(pl.lit(SignalType.NONE.value))
+                .alias(self.out_col),
+            ]
+            if self.include_meta:
+                mask_exprs += [
+                    pl.when(is_signal)
+                    .then(pl.col(col))
+                    .otherwise(pl.lit(None))
+                    .alias(col)
+                    for col in self.meta_columns
+                ]
+
+            df = (
+                df.join(
+                    signal_ts.with_columns(pl.lit(True).alias("_is_signal")),
+                    on=self.ts_col,
+                    how="left",
+                )
+                .with_columns(mask_exprs)
+                .drop("_is_signal")
+            )
+
+        return df

@@ -15,7 +15,7 @@ class FixedHorizonLabeler(Labeler):
     Fixed-Horizon Labeling:
       label[t0] = sign(close[t0 + horizon] - close[t0])
 
-    If signals provided (events), labels are written only on event rows,
+    If signals provided, labels are written only on signal rows,
     while horizon is computed on full series (per pair).
     """
 
@@ -25,10 +25,7 @@ class FixedHorizonLabeler(Labeler):
     price_col: str = "close"
     horizon: int = 60
 
-    out_col: str = "label"
-    include_meta: bool = False
-
-    mask_to_signals: bool = True
+    meta_columns: tuple[str, ...] = ("t1", "ret")
 
     def __post_init__(self) -> None:
         if self.horizon <= 0:
@@ -36,10 +33,12 @@ class FixedHorizonLabeler(Labeler):
 
         cols = [self.out_col]
         if self.include_meta:
-            cols += ["t1", "ret"]
+            cols += list(self.meta_columns)
         self.output_columns = cols
 
-    def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
+    def compute_group(
+        self, group_df: pl.DataFrame, data_context: dict[str, Any] | None
+    ) -> pl.DataFrame:
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
@@ -50,9 +49,7 @@ class FixedHorizonLabeler(Labeler):
         price = pl.col(self.price_col)
         future_price = price.shift(-h)
 
-        df = group_df.with_columns([
-            future_price.alias("_future_price"),
-        ])
+        df = group_df.with_columns(future_price.alias("_future_price"))
 
         label_expr = (
             pl.when(
@@ -72,61 +69,27 @@ class FixedHorizonLabeler(Labeler):
         df = df.with_columns(label_expr.alias(self.out_col))
 
         if self.include_meta:
-            df = df.with_columns([
-                pl.col(self.ts_col).shift(-h).alias("t1"),
-                pl.when(
-                    pl.col("_future_price").is_not_null()
-                    & (pl.col(self.price_col) > 0)
-                    & (pl.col("_future_price") > 0)
-                )
-                .then((pl.col("_future_price") / pl.col(self.price_col)).log())
-                .otherwise(pl.lit(None))
-                .alias("ret"),
-            ])
+            df = df.with_columns(
+                [
+                    pl.col(self.ts_col).shift(-h).alias("t1"),
+                    pl.when(
+                        pl.col("_future_price").is_not_null()
+                        & (pl.col(self.price_col) > 0)
+                        & (pl.col("_future_price") > 0)
+                    )
+                    .then((pl.col("_future_price") / pl.col(self.price_col)).log())
+                    .otherwise(pl.lit(None))
+                    .alias("ret"),
+                ]
+            )
 
         df = df.drop("_future_price")
 
-        if self.mask_to_signals and data_context is not None and "event_keys" in data_context:
-            event_keys: pl.DataFrame = data_context["event_keys"]
-            pair_value = group_df.get_column(self.pair_col)[0]
-
-            event_ts = (
-                event_keys
-                .filter(pl.col(self.pair_col) == pair_value)
-                .select(self.ts_col)
-                .unique()
-            )
-
-            if event_ts.height == 0:
-                df = df.with_columns(pl.lit(SignalType.NONE.value).alias(self.out_col))
-                if self.include_meta:
-                    df = df.with_columns([
-                        pl.lit(None).alias("t1"),
-                        pl.lit(None).alias("ret"),
-                    ])
-            else:
-                df = (
-                    df.join(
-                        event_ts.with_columns(pl.lit(True).alias("_is_event")),
-                        on=self.ts_col,
-                        how="left",
-                    )
-                    .with_columns([
-                        pl.when(pl.col("_is_event").fill_null(False))
-                        .then(pl.col(self.out_col))
-                        .otherwise(pl.lit(SignalType.NONE.value))
-                        .alias(self.out_col),
-                    ] + ([
-                        pl.when(pl.col("_is_event").fill_null(False))
-                        .then(pl.col("t1"))
-                        .otherwise(pl.lit(None))
-                        .alias("t1"),
-                        pl.when(pl.col("_is_event").fill_null(False))
-                        .then(pl.col("ret"))
-                        .otherwise(pl.lit(None))
-                        .alias("ret"),
-                    ] if self.include_meta else []))
-                    .drop("_is_event")
-                )
+        if (
+            self.mask_to_signals
+            and data_context is not None
+            and "signal_keys" in data_context
+        ):
+            df = self._apply_signal_mask(df, data_context, group_df)
 
         return df
