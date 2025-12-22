@@ -6,9 +6,11 @@ from typing import Any
 import pandas as pd
 
 from signalflow.feature.adapter.pandas_feature_extractor import PandasFeatureExtractor
+from signalflow.core import sf_component
 
 
 @dataclass
+@sf_component(name="pta")
 class PandasTaExtractor(PandasFeatureExtractor):
     """
     Polars-first Pandas-TA adapter.

@@ -6,9 +6,11 @@ import polars as pl
 
 
 from signalflow.feature.base_extractor import FeatureExtractor
+from signalflow.core import sf_component
 
 
 @dataclass
+@sf_component(name="smooth/sma")
 class SmaExtractor(FeatureExtractor):
     """
     SMA per (pair, resample_offset) group.

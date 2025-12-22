@@ -6,7 +6,8 @@ from typing import Any, Literal
 
 import polars as pl
 
-from signalflow.core import RawDataType, RollingAggregator
+from signalflow.core import RawDataType, RollingAggregator, SfComponentType
+from typing import ClassVar
 
 
 @dataclass
@@ -42,7 +43,7 @@ class FeatureExtractor(ABC):
     resample_mode: Literal["add", "replace"] = "add"
     resample_prefix: str | None = None
     raw_data_type: RawDataType = RawDataType.SPOT
-
+    component_type: ClassVar[SfComponentType] = SfComponentType.FEATURE_EXTRACTOR
     keep_input_columns: bool = False
 
     def __post_init__(self) -> None:

@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 import polars as pl
 from signalflow.feature.base_extractor import FeatureExtractor
+from signalflow.core import sf_component
 
 
 @dataclass
+@sf_component(name="rsi")
 class RsiExtractor(FeatureExtractor):
     rsi_period: int = 14
     price_col: str = "close"

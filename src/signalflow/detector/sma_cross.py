@@ -86,7 +86,7 @@ class SmaCrossSignalDetector(SignalDetector):
         cross_down = (fast < slow) & (fast_prev >= slow_prev)
 
         out = (
-            df.select([self.pair_col, self.ts_col, self.fast_col, self.slow_col])
+            df.select([self.pair_col, self.ts_col])
             .with_columns(
                 pl.when(cross_up)
                 .then(pl.lit(SignalType.RISE.value))

@@ -2,9 +2,11 @@
 
 from dataclasses import dataclass
 from signalflow.feature.pandasta.pandas_ta_extractor import PandasTaExtractor
+from signalflow.core import sf_component
 
 
 @dataclass
+@sf_component(name="pta/rsi")
 class PandasTaRsiExtractor(PandasTaExtractor):
     length: int = 14
 
@@ -18,6 +20,7 @@ class PandasTaRsiExtractor(PandasTaExtractor):
 
 
 @dataclass
+@sf_component(name="pta/bbands")
 class PandasTaBbandsExtractor(PandasTaExtractor):
     length: int = 20
     std: float = 2.0
@@ -32,6 +35,7 @@ class PandasTaBbandsExtractor(PandasTaExtractor):
 
 
 @dataclass
+@sf_component(name="pta/macd")
 class PandasTaMacdExtractor(PandasTaExtractor):
     fast: int = 12
     slow: int = 26
@@ -47,6 +51,7 @@ class PandasTaMacdExtractor(PandasTaExtractor):
 
 
 @dataclass
+@sf_component(name="pta/atr")
 class PandasTaAtrExtractor(PandasTaExtractor):
     length: int = 14
 
