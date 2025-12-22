@@ -19,6 +19,11 @@ class SfComponentType(str, Enum):
     LABELER = "labeler"
     DETECTOR = "detector"
     VALIDATOR = "validator"
+    TORCH_MODULE = "torch_module"
+    MODEL = "model"
+
+
+
     EXIT = "strategy/exit"
     NEW_POSITION = "strategy/new-position"
     

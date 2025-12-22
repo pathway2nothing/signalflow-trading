@@ -4,6 +4,7 @@ from .decorators import sf_component
 from .registry import default_registry, SignalFlowRegistry
 from .signal_transforms import SignalsTransform
 from .rolling_aggregator import RollingAggregator
+from .base_mixin import SfTorchModuleMixin
 
 __all__ = [
     "RawData", 
@@ -19,4 +20,5 @@ __all__ = [
     "SignalFlowRegistry",
     "RollingAggregator",
     "SignalsTransform",
+    "SfTorchModuleMixin",
 ]
