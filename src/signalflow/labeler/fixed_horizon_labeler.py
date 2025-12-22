@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import Any
 
 import polars as pl
 
-from signalflow.core import SfComponentType, SignalType
+from signalflow.core import SignalType
 from signalflow.labeler.base_labeler import Labeler
+from signalflow.core import sf_component
 
 
 @dataclass
+@sf_component(name="fixed_horizon")
 class FixedHorizonLabeler(Labeler):
     """
     Fixed-Horizon Labeling:
@@ -18,10 +20,6 @@ class FixedHorizonLabeler(Labeler):
     If signals provided, labels are written only on signal rows,
     while horizon is computed on full series (per pair).
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.LABELER
-    name: str = "fixed_horizon"
-
     price_col: str = "close"
     horizon: int = 60
 

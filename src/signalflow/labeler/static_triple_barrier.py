@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import Any
 
 import numpy as np
 import polars as pl
 from numba import njit, prange
 
-from signalflow.core import SfComponentType, SignalType
+from signalflow.core import sf_component, SignalType 
 from signalflow.labeler.base_labeler import Labeler
 
 
@@ -51,6 +51,7 @@ def _find_first_hit_static(
 
 
 @dataclass
+@sf_component(name="static_triple_barrier")
 class StaticTripleBarrierLabeler(Labeler):
     """
     Triple-Barrier (first-touch) labeling with STATIC horizontal barriers.
@@ -66,10 +67,6 @@ class StaticTripleBarrierLabeler(Labeler):
           FALL if SL touched first
           NONE if none touched by t1
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.LABELER
-    name: str = "static_triple_barrier"
-
     price_col: str = "close"
 
     lookforward_window: int = 1440
