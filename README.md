@@ -1,36 +1,128 @@
 # SignalFlow
 
-**SignalFlow** is an algorithmic trading framework designed to streamline the lifecycle of trading strategies through advanced signal detection and processing. It bridges the gap between research and production by providing a robust pipeline for signal generation, validation (Meta-Labeling), and execution.
+**SignalFlow** is a high-performance Python framework for algorithmic trading, designed to manage the full strategy lifecycle from signal detection to execution. It bridges the gap between research and production by providing a robust pipeline for signal generation, meta-labeling validation, and automated trading.
 
-## Core Concept: The Signal Pipeline
+## Core Architecture: The Signal Pipeline
 
-SignalFlow treats trading as a signal-processing problem based on three key entities:
+The framework implements a modular three-stage processing logic:
 
-* **🕵️ Signal Detector:** Scans raw market data (tick or OHLCV) in real-time to identify potential market events. Whether it's a simple SMA cross or a pattern detected by a Transformer model, the Detector captures the moment of potential price change.
-* **⚖️ Signal Validator:** Implements **Meta-Labeling** techniques (inspired by Marcos Lopez de Prado). It uses classification models to assess the probability of a signal's success, filtering out false positives before capital is committed.
-* **♟️ Trading Strategy:** Converts high-confidence signals into actionable trade positions, handling entry/exit logic and risk management.
+1. 
+**🕵️ Signal Detector**: Scans market data (OHLCV or tick) to identify potential market events. Detectors can range from simple SMA crossovers to complex deep learning models.
+
+
+2. 
+**⚖️ Signal Validator (Meta-Labeling)**: Based on Lopez de Prado's methodology, this stage assesses the quality and risk of detected signals using classification models (e.g., LightGBM, XGBoost).
+
+
+3. 
+**♟️ Trading Strategy**: Converts validated signals into actionable trade positions, managing entry, exit, and risk.
+
+
 
 ## Key Features
 
-* **Deployment Ready:** Seamless transition from backtesting to production; the logic you write in research is the logic that runs live.
-* **Kedro Integration:** Includes a fully configured `signalflow-kedro` project template for reproducible R&D, data pipelines, and experiment tracking.
-* **High Frequency Capable:** Optimized architecture handles short timeframes (1m) and tick data efficiently.
-* **Extensible & Modular:** Easily plug in custom feature generators, deep learning models (Torch/Lightning), or validation logic.
+* 
+**Polars-First Performance**: Core data processing utilizes `polars` for extreme efficiency with large datasets.
+
+
+* 
+**Production Ready**: Code written for research and backtesting is designed for direct deployment to live trading.
+
+
+* 
+**Advanced Labeling**: Native support for Triple-Barrier Method and Fixed-Horizon labeling for ML training.
+
+
+* 
+**Kedro Integration**: Fully compatible with Kedro for reproducible R&D and automated data pipelines.
+
+
+* 
+**Flexible Extensibility**: Easily add custom features via the `@sf_component` registry.
+
+
+
+## Quick Start
+
+### Installation
+
+```bash
+pip install signal-flow
+
+```
+
+### Signal Detection Example
+
+```python
+from signalflow.core import RawDataView
+from signalflow.detector import SmaCrossSignalDetector
+
+# Initialize a detector (SMA 20/50 crossover)
+detector = SmaCrossSignalDetector(fast_period=20, slow_period=50)
+
+# Run detection on a data snapshot
+signals = detector.run(raw_data_view)
+
+```
+
+### Signal Validation (Meta-Labeling)
+
+```python
+from signalflow.validator import SklearnSignalValidator
+
+# Create a validator using LightGBM
+validator = SklearnSignalValidator(model_type="lightgbm")
+
+# Fit the model on labeled historical signals
+validator.fit(X_train, y_train)
+
+# Validate new signals to get success probabilities
+validated_signals = validator.validate_signals(signals, features)
+
+```
 
 ## Tech Stack
 
-Built on top of the modern Python data science stack:
-`polars`, `pandas`, `pytorch`, `lightning`, `scikit-learn`, `plotly`, `pandas-ta`.
+* 
+**Data**: `polars`, `pandas`, `duckdb`.
+
+
+* 
+**ML/Compute**: `pytorch`, `lightning`, `scikit-learn`, `numba`, `optuna`.
+
+
+* 
+**Technical Analysis**: `pandas-ta`.
 
 
 
-## Installation
+## Package Structure
 
-```bash
-conda create -n signalflow python=3.12
-conda activate signalflow
-
+* 
+`signalflow.core`: Core data containers (`RawData`, `Signals`) and registries.
 
 
-pip install -e .
-```
+* 
+`signalflow.data`: Binance API loaders and DuckDB storage.
+
+
+* 
+`signalflow.feature`: Feature extractors and technical indicator adapters.
+
+
+* 
+`signalflow.labeler`: Advanced labeling techniques for machine learning.
+
+
+* 
+`signalflow.detector`: Ready-to-use signal detection algorithms.
+
+
+
+---
+
+**License:** MIT 
+
+**Author:** pathway2nothing 
+
+---
