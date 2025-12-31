@@ -1,13 +1,13 @@
 [project]
-name = "signal-flow"
+name = "signalflow-trading"
 version = "0.1.0"
-description = "SignalFlow: modular framework for trading signal generation, filtering and execution"
+description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
   { name = "pathway2nothing" }
 ]
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 
 dependencies = [
     "pandas>=2.0.0",
