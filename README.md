@@ -21,3 +21,16 @@ SignalFlow treats trading as a signal-processing problem based on three key enti
 
 Built on top of the modern Python data science stack:
 `polars`, `pandas`, `pytorch`, `lightning`, `scikit-learn`, `plotly`, `pandas-ta`.
+
+
+
+## Installation
+
+```bash
+conda create -n signalflow python=3.12
+conda activate signalflow
+
+
+
+pip install -e .
+```
