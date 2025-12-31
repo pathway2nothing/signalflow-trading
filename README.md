@@ -47,7 +47,7 @@ The framework implements a modular three-stage processing logic:
 ### Installation
 
 ```bash
-pip install signal-flow
+pip install signalflow-trading
 
 ```
 
