@@ -23,10 +23,13 @@ class SfComponentType(str, Enum):
     MODEL = "model"
 
 
+    STRATEGY_STORE = "strategy/store"
+    STRATEGY_RUNNER = "strategy/runner"
+    STRATEGY_EXECUTOR = "strategy/executor"
 
-    EXIT = "strategy/exit"
-    NEW_POSITION = "strategy/new-position"
-    
+    STRATEGY_EXIT_RULE = "strategy/exit"
+    STRATEGY_ENTRY_RULE = "strategy/new-position"
+    STRATEGY_METRIC = "strategy/metric"
 
 
 class DataFrameType(str, Enum):

@@ -1,4 +1,4 @@
-from .containers import RawData, Signals, RawDataView
+from .containers import RawData, Signals, RawDataView, Position, Trade, Portfolio
 from .enums import SignalType, PositionType, SfComponentType, DataFrameType, RawDataType
 from .decorators import sf_component
 from .registry import default_registry, SignalFlowRegistry
@@ -10,6 +10,9 @@ __all__ = [
     "RawData", 
     "Signals", 
     "RawDataView", 
+    "Position", 
+    "Trade", 
+    "Portfolio", 
     "SignalType",
     "PositionType",
     "SfComponentType",
