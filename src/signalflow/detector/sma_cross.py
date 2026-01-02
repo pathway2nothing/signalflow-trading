@@ -1,5 +1,4 @@
-# src/signalflow/detector/sma_cross_detector.py
-from __future__ import annotations
+# IMPORTANT
 
 from dataclasses import dataclass
 from typing import Any

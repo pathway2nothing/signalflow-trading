@@ -1,11 +1,4 @@
-"""
-Sklearn-based signal validators for SignalFlow.
-
-Provides classification models for meta-labeling (signal risk assessment).
-Supports automatic model selection via cross-validation or optuna tuning.
-"""
-
-from __future__ import annotations
+# IMPORTANT
 
 from dataclasses import dataclass
 from typing import Any
