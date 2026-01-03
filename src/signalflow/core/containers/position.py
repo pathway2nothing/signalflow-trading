@@ -7,6 +7,8 @@ from typing import Any, Iterable, Literal
 
 import polars as pl
 
+from signalflow.core.containers.trade import Trade
+from signalflow.core.containers.trade import TradeSide
 from signalflow.core.enums import PositionType
 
 

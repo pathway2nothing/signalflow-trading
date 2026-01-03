@@ -1,102 +1,65 @@
-"""Base classes for strategy components."""
-from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, ClassVar
-
-import polars as pl
-
-from signalflow.core import SfComponentType, Position, Signals
-from signalflow.strategy.state import StrategyState
-from signalflow.strategy.types import StrategyContext, NewPositionOrder, ClosePositionOrder
+from typing import ClassVar
+from signalflow.core import SfComponentType, StrategyState, Position, Order, RawData, Signals
 
 
 @dataclass
 class StrategyMetric(ABC):
-    """Base class for strategy metrics.
-    
-    Metrics are computed FIRST in each step, making them available
-    to both entry and exit rules for decision making.
-    """
+    """Base class for strategy metrics."""
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
-
+    
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Metric name for storage."""
+        ...
+    
     @abstractmethod
     def compute(
-        self, 
-        *, 
-        state: StrategyState, 
-        context: StrategyContext
+        self,
+        state: StrategyState,
+        prices: dict[str, float]
     ) -> dict[str, float]:
-        """Compute metric values for current step.
-        
-        Args:
-            state: Current strategy state with portfolio
-            context: Current step context (ts, prices)
-            
-        Returns:
-            Dictionary of metric names to values
-        """
-        raise NotImplementedError
+        """Compute metric values."""
+        ...
 
 
 @dataclass
-class StrategyExitRule(ABC):
-    """Base class for exit rules.
-    
-    Exit rules determine when to close open positions.
-    They have access to computed metrics via context.metrics.
-    """
+class ExitRule(ABC):
+    """Base class for exit rules."""
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_EXIT_RULE
-
+    
     @abstractmethod
-    def should_exit(
-        self, 
-        *, 
-        position: Position, 
-        state: StrategyState, 
-        context: StrategyContext
-    ) -> tuple[bool, str]:
-        """Check if position should be closed.
-        
-        Args:
-            position: Position to evaluate
-            state: Current strategy state
-            context: Current step context with metrics
-            
-        Returns:
-            Tuple of (should_exit, reason)
+    def check_exits(
+        self,
+        positions: list[Position],
+        prices: dict[str, float],
+        state: StrategyState
+    ) -> list[Order]:
         """
-        raise NotImplementedError
+        Check if any positions should be closed.
+        
+        Returns list of close orders.
+        """
+        ...
 
 
 @dataclass
-class StrategyEntryRule(ABC):
-    """Base class for entry rules.
-    
-    Entry rules generate orders for new positions based on signals.
-    They have access to:
-    - Current open positions (for max_positions, price distance checks)
-    - Computed metrics via context.metrics
-    """
+class EntryRule(ABC):
+    """Base class for entry rules."""
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_ENTRY_RULE
-
+    
     @abstractmethod
-    def build_orders(
-        self, 
-        *, 
-        signals: pl.DataFrame, 
-        state: StrategyState, 
-        context: StrategyContext
-    ) -> list[NewPositionOrder]:
-        """Generate orders for new positions.
-        
-        Args:
-            signals: DataFrame with signals for current timestamp.
-                     Expected columns: pair, timestamp, signal_type, signal
-            state: Current strategy state with portfolio
-            context: Current step context with prices and metrics
-            
-        Returns:
-            List of orders for new positions
+    def check_entries(
+        self,
+        signals: Signals,
+        prices: dict[str, float],
+        state: StrategyState
+    ) -> list[Order]:
         """
-        raise NotImplementedError
+        Check signals and generate entry orders.
+        
+        Returns list of entry orders.
+        """
+        ...

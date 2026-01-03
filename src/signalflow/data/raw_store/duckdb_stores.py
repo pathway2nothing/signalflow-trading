@@ -9,9 +9,12 @@ from typing import Optional, Iterable
 from loguru import logger
 import pandas as pd
 
+from signalflow.core import sf_component
+from signalflow.data.raw_store.base import RawDataStore
 
 @dataclass
-class DuckDbSpotStore:
+@sf_component(name="duckdb/spot")
+class DuckDbSpotStore(RawDataStore):
     """
     DuckDB storage for OHLCV data.
     Project timeframe is fixed -> timeframe is NOT stored in table and NOT present in APIs.

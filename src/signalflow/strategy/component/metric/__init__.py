@@ -1,13 +1,5 @@
-from signalflow.strategy.component.metric.std_metrics import (
-    DrawdownMetrics,
-    ExposureMetrics,
-    StandardMetrics,
-    WinRateMetrics,
-)
+from signalflow.strategy.component.metric.total_return import TotalReturnMetric
 
 __all__ = [
-    "DrawdownMetrics",
-    "ExposureMetrics",
-    "StandardMetrics",
-    "WinRateMetrics",
+    "TotalReturnMetric",
 ]

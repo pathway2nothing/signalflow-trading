@@ -8,8 +8,8 @@ from typing import Optional
 import aiohttp
 from loguru import logger
 
-from signalflow.data.store.duckdb_stores import DuckDbSpotStore
-
+from signalflow.data.raw_store import DuckDbSpotStore
+from signalflow.core import sf_component
 
 _TIMEFRAME_MS: dict[str, int] = {
     "1m": 60_000,
@@ -59,6 +59,7 @@ def _ensure_utc_naive(dt: datetime) -> datetime:
 
 
 @dataclass
+@sf_component(name="binance")
 class BinanceClient:
     """Async client for Binance REST API."""
 
@@ -250,10 +251,11 @@ class BinanceClient:
 
 
 @dataclass
+@sf_component(name="binance/spot")
 class BinanceSpotLoader:
     """Downloads and stores Binance spot OHLCV data for a fixed project timeframe."""
 
-    db_path: Path = field(default_factory=lambda: Path("raw_data.duckdb"))
+    store: DuckDbSpotStore = field(default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data.duckdb")))
     timeframe: str = "1m"
 
     async def download(
@@ -264,7 +266,6 @@ class BinanceSpotLoader:
         end: Optional[datetime] = None,
         fill_gaps: bool = True,
     ) -> None:
-        store = DuckDbSpotStore(self.db_path, timeframe=self.timeframe)
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         if end is None:
@@ -295,7 +296,7 @@ class BinanceSpotLoader:
         async def download_pair(client: BinanceClient, pair: str) -> None:
             logger.info(f"Processing {pair} from {start} to {end}")
 
-            db_min, db_max = store.get_time_bounds(pair)
+            db_min, db_max = self.store.get_time_bounds(pair)
             ranges_to_download: list[tuple[datetime, datetime]] = []
 
             if db_min is None:
@@ -310,7 +311,7 @@ class BinanceSpotLoader:
                     overlap_start = max(start, db_min)
                     overlap_end = min(end, db_max)
                     if overlap_start < overlap_end:
-                        gaps = store.find_gaps(pair, overlap_start, overlap_end, tf_minutes)
+                        gaps = self.store.find_gaps(pair, overlap_start, overlap_end, tf_minutes)
                         ranges_to_download.extend(gaps)
 
             for range_start, range_end in ranges_to_download:
@@ -326,21 +327,20 @@ class BinanceSpotLoader:
                         start_time=range_start,
                         end_time=range_end,
                     )
-                    store.insert_klines(pair, klines)
-                except Exception as e:
+                    self.store.insert_klines(pair, klines)
+                except Exception as e:  
                     logger.error(f"Error downloading {pair}: {e}")
 
         async with BinanceClient() as client:
             await asyncio.gather(*[download_pair(client, pair) for pair in pairs])
 
-        store.close()
+        self.store.close()
 
     async def sync(
         self,
         pairs: list[str],
         update_interval_sec: int = 60,
     ) -> None:
-        store = DuckDbSpotStore(self.db_path, timeframe=self.timeframe)
 
         logger.info(f"Starting real-time sync for {pairs}")
         logger.info(f"Update interval: {update_interval_sec}s (timeframe={self.timeframe})")
@@ -348,7 +348,7 @@ class BinanceSpotLoader:
         async def fetch_and_store(client: BinanceClient, pair: str) -> None:
             try:
                 klines = await client.get_klines(pair=pair, timeframe=self.timeframe, limit=5)
-                store.insert_klines(pair, klines)
+                self.store.insert_klines(pair, klines)
             except Exception as e:
                 logger.error(f"Error syncing {pair}: {e}")
 

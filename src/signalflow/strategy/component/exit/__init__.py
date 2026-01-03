@@ -1,6 +1,5 @@
-from signalflow.strategy.component.exit.tp_sl import TpSlExit, TpSlExitConfig
+from signalflow.strategy.component.exit.tp_sl import TakeProfitStopLossExit
 
 __all__ = [
-    "TpSlExit",
-    "TpSlExitConfig",
+    "TakeProfitStopLossExit",
 ]

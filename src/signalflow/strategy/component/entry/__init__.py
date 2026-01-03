@@ -1,5 +1,7 @@
-from signalflow.strategy.component.entry.fixed_qty import FixedQtyEntryRule
+from signalflow.strategy.component.entry.signal import SignalEntryRule
+from signalflow.strategy.component.entry.fixed_size import FixedSizeEntryRule
 
 __all__ = [
-    "FixedQtyEntryRule",
+    "SignalEntryRule",
+    "FixedSizeEntryRule",
 ]

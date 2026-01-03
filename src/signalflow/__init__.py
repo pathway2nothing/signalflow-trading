@@ -2,8 +2,12 @@ import signalflow.core as core
 import signalflow.data as data
 import signalflow.detector as detector
 import signalflow.feature as feature
-import signalflow.validator as validator
+import signalflow.labeler as labeler
+import signalflow.model as model
 import signalflow.strategy as strategy
+import signalflow.utils as utils
+import signalflow.validator as validator
+
 
 
 __all__ = [
@@ -11,6 +15,9 @@ __all__ = [
     "data",
     "detector",
     "feature",
-    "validator",    
-    "strategy",
+    "labeler",
+    "model",
+    "strategy"
+    "utils",
+    "validator",
 ]

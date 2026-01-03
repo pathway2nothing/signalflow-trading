@@ -1,297 +1,210 @@
-"""Backtest runner for strategy execution."""
+
+"""Backtest runner - orchestrates the backtesting loop."""
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
+import polars as pl
 from loguru import logger
 
-import polars as pl
-
-from signalflow.core.containers import Position, Trade, Portfolio
-from signalflow.strategy.state import StrategyState
-from signalflow.strategy.types import StrategyContext, NewPositionOrder, ClosePositionOrder
-from signalflow.strategy.component.base import StrategyMetric, StrategyEntryRule, StrategyExitRule
-from signalflow.strategy.executor.backtest import BacktestExecutor
-from signalflow.strategy.signal_source import PrecomputedSignalSource, OhlcvPriceSource
-
-
-@dataclass
-class BacktestResult:
-    """Results from backtest run.
-    
-    Attributes:
-        positions: All positions (open and closed)
-        trades: All executed trades
-        metrics_history: Time series of metrics
-        final_state: Final strategy state
-    """
-    positions: list[Position]
-    trades: list[Trade]
-    metrics_history: list[dict[str, Any]]
-    final_state: StrategyState
-    
-    def positions_df(self) -> pl.DataFrame:
-        """Convert positions to DataFrame."""
-        return Portfolio.positions_to_pl(self.positions)
-    
-    def trades_df(self) -> pl.DataFrame:
-        """Convert trades to DataFrame."""
-        return Portfolio.trades_to_pl(self.trades)
-    
-    def metrics_df(self) -> pl.DataFrame:
-        """Convert metrics history to DataFrame."""
-        if not self.metrics_history:
-            return pl.DataFrame()
-        return pl.DataFrame(self.metrics_history)
-    
-    @property
-    def total_pnl(self) -> float:
-        """Total realized PnL across all closed positions."""
-        return sum(p.realized_pnl for p in self.positions if p.is_closed)
-    
-    @property
-    def total_fees(self) -> float:
-        """Total fees paid."""
-        return sum(p.fees_paid for p in self.positions)
-    
-    @property
-    def net_pnl(self) -> float:
-        """Net PnL after fees."""
-        return self.total_pnl - self.total_fees
-    
-    @property
-    def num_trades(self) -> int:
-        """Number of completed trades (closed positions)."""
-        return sum(1 for p in self.positions if p.is_closed)
-    
-    @property
-    def win_rate(self) -> float:
-        """Win rate (profitable trades / total trades)."""
-        closed = [p for p in self.positions if p.is_closed]
-        if not closed:
-            return 0.0
-        wins = sum(1 for p in closed if p.realized_pnl > 0)
-        return wins / len(closed)
+from signalflow.core.containers.raw_data import RawData
+from signalflow.core.containers.signals import Signals
+from signalflow.core.containers.strategy_state import StrategyState
+from signalflow.core.containers.trade import Trade
+from signalflow.core.enums import SfComponentType
+from signalflow.core.decorators import sf_component
+from signalflow.strategy.component.base import EntryRule, ExitRule, StrategyMetric
 
 
 @dataclass
+@sf_component(name='backtest_runner')
 class BacktestRunner:
-    """Backtest runner for strategy execution.
-    
-    Processes signals chronologically, executing entries and exits
-    according to configured rules.
-    
-    Step order:
-    1. Mark prices (update last_price for all open positions)
-    2. Compute metrics (available to entry/exit rules)
-    3. Check & execute exits
-    4. Check & execute entries
-    
-    Attributes:
-        strategy_id: Unique identifier for this strategy run
-        signal_source: Source of trading signals
-        price_source: Source of prices
-        entry_rule: Rule for generating entry orders
-        exit_rules: List of exit rules (checked in order)
-        metrics: List of metrics to compute each step
-        executor: Order executor (default: BacktestExecutor)
     """
-    strategy_id: str
-    signal_source: PrecomputedSignalSource
-    price_source: OhlcvPriceSource
-    entry_rule: StrategyEntryRule
-    exit_rules: list[StrategyExitRule] = field(default_factory=list)
-    metrics: list[StrategyMetric] = field(default_factory=list)
-    executor: BacktestExecutor = field(default_factory=BacktestExecutor)
+    Runs backtests over historical data.
     
-    # Callbacks for monitoring
-    on_step: Callable[[StrategyState, StrategyContext], None] | None = None
-    on_entry: Callable[[Position, Trade], None] | None = None
-    on_exit: Callable[[Position, Trade], None] | None = None
+    Execution flow per bar:
+        1. Mark prices on all positions
+        2. Compute metrics
+        3. Check and execute exits
+        4. Check and execute entries
+        
+    This order ensures:
+        - Metrics reflect current market state
+        - Exits are processed before entries (can close and re-enter same bar)
+        - No look-ahead bias
+    """
+    component_type = SfComponentType.STRATEGY_RUNNER
+    
+    strategy_id: str = 'backtest'
+    broker: Any = None 
+    entry_rules: list[EntryRule] = field(default_factory=list) 
+    exit_rules: list[ExitRule] = field(default_factory=list)  
+    metrics: list[StrategyMetric] = field(default_factory=list)     
+    
+    initial_capital: float = 10000.0
+    pair_col: str = 'pair'
+    ts_col: str = 'timestamp'
+    price_col: str = 'close'
+    data_key: str = 'spot'  
+    
+    _trades: list[Trade] = field(default_factory=list, init=False)
+    _metrics_history: list[dict] = field(default_factory=list, init=False)
     
     def run(
         self,
-        initial_state: StrategyState | None = None,
-        progress: bool = True,
-    ) -> BacktestResult:
-        """Run backtest over all signals.
+        raw_data: RawData,
+        signals: Signals,
+        state: StrategyState | None = None
+    ) -> StrategyState:
+        """
+        Run backtest over the entire dataset.
         
         Args:
-            initial_state: Starting state (default: empty portfolio)
-            progress: Whether to log progress
+            raw_data: Historical OHLCV data
+            signals: Pre-computed signals for the period
+            state: Optional initial state (for continuing backtests)
             
         Returns:
-            BacktestResult with all positions, trades, and metrics
+            Final strategy state
         """
-        state = initial_state or StrategyState(
-            strategy_id=self.strategy_id,
-            portfolio=Portfolio(cash=0.0),
-        )
-        
-        all_trades: list[Trade] = []
-        metrics_history: list[dict[str, Any]] = []
-        
-        timestamps = list(self.signal_source.timestamps())
-        total = len(timestamps)
-        
-        if progress:
-            logger.info(f"Starting backtest with {total} signal timestamps")
-        
-        for i, ts in enumerate(timestamps):
-            prices = self.price_source.get_prices_at(ts)
-            if not prices:
-                continue
-            
-            signals_df = self.signal_source.get_signals_at(ts)
-            
-            step_trades, step_metrics = self._step(
-                state=state,
-                ts=ts,
-                prices=prices,
-                signals_df=signals_df,
-            )
-            
-            all_trades.extend(step_trades)
-            if step_metrics:
-                metrics_history.append({'timestamp': ts, **step_metrics})
-            
-            if progress and (i + 1) % 1000 == 0:
-                logger.info(f"Processed {i + 1}/{total} timestamps")
-        
-        if progress:
-            logger.info(f"Backtest complete. {len(all_trades)} trades executed.")
-        
-        all_positions = list(state.portfolio.positions.values())
-        
-        return BacktestResult(
-            positions=all_positions,
-            trades=all_trades,
-            metrics_history=metrics_history,
-            final_state=state,
-        )
-    
-    def _step(
-        self,
-        state: StrategyState,
-        ts: datetime,
-        prices: dict[str, float],
-        signals_df: pl.DataFrame,
-    ) -> tuple[list[Trade], dict[str, float]]:
-        """Execute single step.
-        
-        Returns:
-            Tuple of (trades executed, metrics computed)
-        """
-        trades: list[Trade] = []
-        
-        for position in state.portfolio.open_positions():
-            price = prices.get(position.pair)
-            if price is not None:
-                position.mark(ts=ts, price=float(price))
-        
-        computed_metrics: dict[str, float] = {}
-        for metric in self.metrics:
-            ctx = StrategyContext(
+        if state is None:
+            state = StrategyState(
                 strategy_id=self.strategy_id,
-                ts=ts,
-                prices=prices,
-                metrics={},  
-                runtime=state.runtime,
             )
-            computed_metrics.update(metric.compute(state=state, context=ctx))
+            state.portfolio.cash = self.initial_capital
         
-        context = StrategyContext(
-            strategy_id=self.strategy_id,
-            ts=ts,
-            prices=prices,
-            metrics=computed_metrics,
-            runtime=state.runtime,
+        self._trades = []
+        self._metrics_history = []
+        
+        # Get data
+        df = raw_data.get(self.data_key)
+        if df.height == 0:
+            logger.warning("No data to backtest")
+            return state
+        
+        timestamps = df.select(self.ts_col).unique().sort(self.ts_col).get_column(self.ts_col)
+        
+        signals_df = signals.value if signals else pl.DataFrame()
+        
+        logger.info(f"Starting backtest: {len(timestamps)} bars, {signals_df.height} signals")
+        
+        for ts in timestamps:
+            state = self._process_bar(
+                ts=ts,
+                raw_df=df,
+                signals_df=signals_df,
+                state=state
+            )
+        
+        logger.info(
+            f"Backtest complete: {len(self._trades)} trades, "
+            f"{len(state.portfolio.open_positions())} open positions"
         )
         
-        exit_trades = self._process_exits(state, context)
-        trades.extend(exit_trades)
-        
-        entry_trades = self._process_entries(state, context, signals_df)
-        trades.extend(entry_trades)
-        
-        state.last_ts = ts
-        
-        if self.on_step:
-            self.on_step(state, context)
-        
-        return trades, computed_metrics
+        return state
     
-    def _process_exits(
+    def _process_bar(
         self,
-        state: StrategyState,
-        context: StrategyContext,
-    ) -> list[Trade]:
-        """Check and execute exits for open positions."""
-        trades: list[Trade] = []
-        
-        for position in list(state.portfolio.open_positions()):
-            for exit_rule in self.exit_rules:
-                should_exit, reason = exit_rule.should_exit(
-                    position=position,
-                    state=state,
-                    context=context,
-                )
-                
-                if should_exit:
-                    price = context.prices.get(position.pair)
-                    if price is None:
-                        logger.warning(
-                            f"No price for {position.pair} at {context.ts}, "
-                            f"skipping exit"
-                        )
-                        continue
-                    
-                    order = ClosePositionOrder(
-                        position_id=position.id,
-                        ts=context.ts,
-                        price=float(price),
-                        reason=reason,
-                    )
-                    
-                    trade = self.executor.execute_exit(position, order)
-                    trades.append(trade)
-                    
-                    if self.on_exit:
-                        self.on_exit(position, trade)
-                    
-                    break
-        
-        return trades
-    
-    def _process_entries(
-        self,
-        state: StrategyState,
-        context: StrategyContext,
+        ts: datetime,
+        raw_df: pl.DataFrame,
         signals_df: pl.DataFrame,
-    ) -> list[Trade]:
-        """Check and execute entries based on signals."""
-        trades: list[Trade] = []
+        state: StrategyState
+    ) -> StrategyState:
+        """Process a single bar."""
+        state.touch(ts)
+        state.reset_tick_cache()
         
-        if signals_df.is_empty():
-            return trades
+        bar_data = raw_df.filter(pl.col(self.ts_col) == ts)
+        prices = self._build_prices(bar_data)    
+        self.broker.mark_positions(state, prices, ts)
         
-        # Get entry orders from rule
-        orders = self.entry_rule.build_orders(
-            signals=signals_df,
-            state=state,
-            context=context,
-        )
+        all_metrics: dict[str, float] = {'timestamp': ts.timestamp()}
+        for metric in self.metrics:
+            metric_values = metric.compute(state, prices)
+            all_metrics.update(metric_values)
+        state.metrics = all_metrics
+        self._metrics_history.append(all_metrics.copy())
         
-        for order in orders:
-            # Execute entry
-            position, trade = self.executor.execute_entry(order)
-            
-            # Add position to portfolio
-            state.portfolio.positions[position.id] = position
-            trades.append(trade)
-            
-            # Callback
-            if self.on_entry:
-                self.on_entry(position, trade)
+        exit_orders = []
+        open_positions = state.portfolio.open_positions()
+        for exit_rule in self.exit_rules:
+            orders = exit_rule.check_exits(open_positions, prices, state)
+            exit_orders.extend(orders)
         
-        return trades
+        if exit_orders:
+            exit_fills = self.broker.submit_orders(exit_orders, prices, ts)
+            exit_trades = self.broker.process_fills(exit_fills, exit_orders, state)
+            self._trades.extend(exit_trades)
+        
+        bar_signals = self._get_bar_signals(signals_df, ts)
+        
+        entry_orders = []
+        for entry_rule in self.entry_rules:
+            orders = entry_rule.check_entries(bar_signals, prices, state)
+            entry_orders.extend(orders)
+        
+        if entry_orders:
+            entry_fills = self.broker.submit_orders(entry_orders, prices, ts)
+            entry_trades = self.broker.process_fills(entry_fills, entry_orders, state)
+            self._trades.extend(entry_trades)
+        
+        return state
+    
+    def _build_prices(self, bar_data: pl.DataFrame) -> dict[str, float]:
+        """Build pair -> price mapping from bar data."""
+        prices = {}
+        for row in bar_data.iter_rows(named=True):
+            pair = row.get(self.pair_col)
+            price = row.get(self.price_col)
+            if pair and price is not None:
+                prices[pair] = float(price)
+        return prices
+    
+    def _get_bar_signals(self, signals_df: pl.DataFrame, ts: datetime) -> Signals:
+        """Get signals for the current bar."""
+        if signals_df.height == 0:
+            return Signals(pl.DataFrame())
+        
+        bar_signals = signals_df.filter(pl.col(self.ts_col) == ts)
+        return Signals(bar_signals)
+    
+    @property
+    def trades(self) -> list[Trade]:
+        """Get all trades from the backtest."""
+        return self._trades
+    
+    @property
+    def trades_df(self) -> pl.DataFrame:
+        """Get trades as a DataFrame."""
+        from signalflow.core.containers.portfolio import Portfolio
+        return Portfolio.trades_to_pl(self._trades)
+    
+    @property
+    def metrics_df(self) -> pl.DataFrame:
+        """Get metrics history as a DataFrame."""
+        if not self._metrics_history:
+            return pl.DataFrame()
+        return pl.DataFrame(self._metrics_history)
+    
+    def get_results(self) -> dict[str, Any]:
+        """Get backtest results summary."""
+        trades_df = self.trades_df
+        metrics_df = self.metrics_df
+        
+        results = {
+            'total_trades': len(self._trades),
+            'metrics_df': metrics_df,
+            'trades_df': trades_df,
+        }
+        
+        if metrics_df.height > 0 and 'total_return' in metrics_df.columns:
+            results['final_return'] = metrics_df.select('total_return').tail(1).item()
+            results['final_equity'] = metrics_df.select('equity').tail(1).item()
+        
+        if trades_df.height > 0:
+            entry_trades = trades_df.filter(pl.col('meta').struct.field('type') == 'entry')
+            exit_trades = trades_df.filter(pl.col('meta').struct.field('type') == 'exit')
+            results['entry_count'] = entry_trades.height
+            results['exit_count'] = exit_trades.height
+        
+        return results
