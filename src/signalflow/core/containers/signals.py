@@ -10,18 +10,54 @@ from signalflow.core.enums import SignalType
 class Signals:
     """Immutable container for trading signals.
 
-    Canonical in-memory format is a Polars DataFrame (long schema).
+    Canonical in-memory format is a Polars DataFrame with long schema.
 
     Required columns:
-        - pair: str
-        - timestamp: datetime
-        - signal_type: SignalType | int
-        - signal: int | float
-        - probability: float (optional, but required for merge logic)
+        - pair (str): Trading pair identifier
+        - timestamp (datetime): Signal timestamp
+        - signal_type (SignalType | int): Signal type (RISE, FALL, NONE)
+        - signal (int | float): Signal value
 
-    Notes:
-        - All transformations return a new Signals instance.
-        - No in-place mutation is allowed.
+    Optional columns:
+        - probability (float): Signal probability (required for merge logic)
+
+    Attributes:
+        value (pl.DataFrame): Polars DataFrame containing signal data.
+
+    Example:
+        ```python
+        from signalflow.core import Signals, SignalType
+        import polars as pl
+        from datetime import datetime
+
+        # Create signals
+        signals_df = pl.DataFrame({
+            "pair": ["BTCUSDT", "ETHUSDT"],
+            "timestamp": [datetime.now(), datetime.now()],
+            "signal_type": [SignalType.RISE.value, SignalType.FALL.value],
+            "signal": [1, -1],
+            "probability": [0.8, 0.7]
+        })
+
+        signals = Signals(signals_df)
+
+        # Apply transformation
+        filtered = signals.apply(filter_transform)
+
+        # Chain transformations
+        processed = signals.pipe(
+            transform1,
+            transform2,
+            transform3
+        )
+
+        # Merge signals
+        combined = signals1 + signals2
+        ```
+
+    Note:
+        All transformations return new Signals instance.
+        No in-place mutation is allowed.
     """
 
     value: pl.DataFrame
@@ -30,10 +66,22 @@ class Signals:
         """Apply a single transformation to signals.
 
         Args:
-            transform: A callable transformation implementing SignalsTransform.
+            transform (SignalsTransform): Callable transformation implementing
+                SignalsTransform protocol.
 
         Returns:
-            New Signals instance with transformed data.
+            Signals: New Signals instance with transformed data.
+
+        Example:
+            ```python
+            from signalflow.core import Signals
+            import polars as pl
+
+            def filter_high_probability(df: pl.DataFrame) -> pl.DataFrame:
+                return df.filter(pl.col("probability") > 0.7)
+
+            filtered = signals.apply(filter_high_probability)
+            ```
         """
         out = transform(self.value)
         return Signals(out)
@@ -42,10 +90,19 @@ class Signals:
         """Apply multiple transformations sequentially.
 
         Args:
-            *transforms: Sequence of transformations.
+            *transforms (SignalsTransform): Sequence of transformations to apply in order.
 
         Returns:
-            New Signals instance after applying all transformations.
+            Signals: New Signals instance after applying all transformations.
+
+        Example:
+            ```python
+            result = signals.pipe(
+                filter_none_signals,
+                normalize_probabilities,
+                add_metadata
+            )
+            ```
         """
         s = self
         for t in transforms:
@@ -58,19 +115,36 @@ class Signals:
 
         Merge rules:
             1. Key: (pair, timestamp)
-            2. If signal_type differs:
-                - SignalType.NONE has the lowest priority.
-                - Non-NONE always overrides NONE.
-                - If both are non-NONE, `other` wins.
-            3. SignalType.NONE is always normalized to:
-                - probability = 0
-            4. Merge is deterministic.
+            2. Signal type priority:
+               - SignalType.NONE has lowest priority
+               - Non-NONE always overrides NONE
+               - If both non-NONE, `other` wins
+            3. SignalType.NONE normalized to probability = 0
+            4. Merge is deterministic
 
         Args:
-            other: Another Signals object.
+            other (Signals): Another Signals object to merge.
 
         Returns:
-            New merged Signals instance.
+            Signals: New merged Signals instance.
+
+        Raises:
+            TypeError: If other is not a Signals instance.
+
+        Example:
+            ```python
+            # Detector 1 signals
+            signals1 = detector1.run(data)
+
+            # Detector 2 signals
+            signals2 = detector2.run(data)
+
+            # Merge with priority to signals2
+            merged = signals1 + signals2
+
+            # NONE signals overridden by non-NONE
+            # Non-NONE conflicts resolved by taking signals2
+            ```
         """
         if not isinstance(other, Signals):
             return NotImplemented
