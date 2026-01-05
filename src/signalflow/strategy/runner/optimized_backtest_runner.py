@@ -8,14 +8,9 @@ from datetime import datetime
 import polars as pl
 
 @dataclass
-@sf_component(name='optimized_backtest_runner', override=True)
+@sf_component(name='backtest/optimized', override=True)
 class OptimizedBacktestRunner(StrategyRunner):
-    """
-    Оптимізований runner з:
-    - Vectorized price lookup
-    - Batch processing
-    - Pre-filtered signals
-    """
+
     component_type = SfComponentType.STRATEGY_RUNNER
     strategy_id: str = 'backtest'
     broker: Any = None
