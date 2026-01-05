@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import optuna
-from signalflow.core import SfComponentType
+from signalflow.core.enums import SfComponentType
 from typing import Literal
 
 

@@ -10,6 +10,7 @@ from loguru import logger
 
 from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.core import sf_component
+from signalflow.data.source.base import RawDataSource, RawDataLoader
 
 _TIMEFRAME_MS: dict[str, int] = {
     "1m": 60_000,
@@ -60,7 +61,7 @@ def _ensure_utc_naive(dt: datetime) -> datetime:
 
 @dataclass
 @sf_component(name="binance")
-class BinanceClient:
+class BinanceClient(RawDataSource):
     """Async client for Binance REST API."""
 
     base_url: str = "https://api.binance.com"
@@ -252,7 +253,7 @@ class BinanceClient:
 
 @dataclass
 @sf_component(name="binance/spot")
-class BinanceSpotLoader:
+class BinanceSpotLoader(RawDataLoader):
     """Downloads and stores Binance spot OHLCV data for a fixed project timeframe."""
 
     store: DuckDbSpotStore = field(default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data.duckdb")))

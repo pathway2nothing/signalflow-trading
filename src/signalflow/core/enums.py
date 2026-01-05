@@ -20,13 +20,15 @@ class SfComponentType(str, Enum):
     RAW_DATA_LOADER = "data/loader"
 
     FEATURE_EXTRACTOR = "feature/extractor"
-    LABELER = "labeler"
-    DETECTOR = "detector"
-    VALIDATOR = "validator"
-    TORCH_MODULE = "torch_module"
-    MODEL = "model"
 
-    STRATEGY_STORE = "data/strategy/store"
+    SIGNALS_TRANSFORM = "signals/transform"
+    LABELER = "signals/labeler"
+    DETECTOR = "signals/detector"
+    VALIDATOR = "signals/validator"
+    TORCH_MODULE = "torch_module"
+    VALIDATOR_MODEL = "signals/validator/model"
+
+    STRATEGY_STORE = "strategy/store"
     STRATEGY_RUNNER = "strategy/runner"
     STRATEGY_BROKER = "strategy/broker"
     STRATEGY_EXECUTOR = "strategy/executor"

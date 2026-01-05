@@ -111,6 +111,6 @@ class FeatureSet:
                     f"Rename features or set unique prefixes."
                 )
 
-            combined = combined.join(right, on=[self.pair_col, self.ts_col], how="outer")
+            combined = combined.join(right, on=[self.pair_col, self.ts_col], how="outer", coalesce=True)
 
         return combined

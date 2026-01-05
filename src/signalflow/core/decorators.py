@@ -1,6 +1,6 @@
 from typing import Any, Type
-from .registry import default_registry
-from .enums import SfComponentType
+from signalflow.core.registry import default_registry
+from signalflow.core.enums import SfComponentType
 
 
 def sf_component(*, name: str, override: bool = False):

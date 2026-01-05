@@ -3,10 +3,7 @@ import polars as pl
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from typing import Iterator
-
-from signalflow.data.raw_store import DuckDbSpotStore
 
 
 @dataclass(frozen=True)

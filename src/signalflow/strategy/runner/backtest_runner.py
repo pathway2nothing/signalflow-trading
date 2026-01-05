@@ -11,14 +11,14 @@ from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-from signalflow.core.enums import SfComponentType
 from signalflow.core.decorators import sf_component
 from signalflow.strategy.component.base import EntryRule, ExitRule, StrategyMetric
-
+from tqdm import tqdm
+from signalflow.strategy.runner.base import StrategyRunner
 
 @dataclass
 @sf_component(name='backtest_runner')
-class BacktestRunner:
+class BacktestRunner(StrategyRunner):
     """
     Runs backtests over historical data.
     
@@ -32,9 +32,7 @@ class BacktestRunner:
         - Metrics reflect current market state
         - Exits are processed before entries (can close and re-enter same bar)
         - No look-ahead bias
-    """
-    component_type = SfComponentType.STRATEGY_RUNNER
-    
+    """    
     strategy_id: str = 'backtest'
     broker: Any = None 
     entry_rules: list[EntryRule] = field(default_factory=list) 
@@ -88,7 +86,7 @@ class BacktestRunner:
         
         logger.info(f"Starting backtest: {len(timestamps)} bars, {signals_df.height} signals")
         
-        for ts in timestamps:
+        for ts in tqdm(timestamps, desc="Processing bars"):
             state = self._process_bar(
                 ts=ts,
                 raw_df=df,

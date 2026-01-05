@@ -70,20 +70,17 @@ class BacktestBroker(Broker):
             meta=fill.meta
         )
         position.apply_trade(trade)
-    
+
     def process_fills(
-        self,
-        fills: list[OrderFill],
-        orders: list[Order],
+        self, 
+        fills: list[OrderFill], 
+        orders: list[Order], 
         state: StrategyState
     ) -> list[Trade]:
         """
-        Process fills and update positions.
+        Process fills and UPDATE CASH BALANCE.
         
-        For entry fills: Create new positions
-        For exit fills: Update existing positions
-        
-        Returns list of trades created.
+        FIX: Properly update portfolio.cash when opening/closing positions
         """
         trades: list[Trade] = []
         order_map = {o.id: o for o in orders}
@@ -93,10 +90,16 @@ class BacktestBroker(Broker):
             if order is None:
                 continue
             
-            # Is this closing an existing position?
+            notional = fill.price * fill.qty
+            
             if fill.position_id and fill.position_id in state.portfolio.positions:
                 position = state.portfolio.positions[fill.position_id]
                 self.apply_fill_to_position(position, fill)
+                
+                if fill.side == 'SELL':
+                    state.portfolio.cash += (notional - fill.fee)
+                elif fill.side == 'BUY':
+                    state.portfolio.cash -= (notional + fill.fee)
                 
                 trade = Trade(
                     id=fill.id,
@@ -110,10 +113,15 @@ class BacktestBroker(Broker):
                     meta={'type': 'exit', **fill.meta}
                 )
                 trades.append(trade)
+                
             else:
-                # New position
                 position = self.create_position(order, fill)
                 state.portfolio.positions[position.id] = position
+                
+                if fill.side == 'BUY':
+                    state.portfolio.cash -= (notional + fill.fee)
+                elif fill.side == 'SELL':
+                    state.portfolio.cash += (notional - fill.fee)
                 
                 trade = Trade(
                     id=fill.id,

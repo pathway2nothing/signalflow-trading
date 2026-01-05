@@ -55,7 +55,6 @@ class RollingAggregator:
             raise ValueError("Empty dataframe")
 
         last_ts = df.select(pl.col(self.ts_col).max()).item()
-        # last_ts може бути python datetime або date; для datetime є .minute
         return int(last_ts.minute % self.offset_window)
 
     def _spot_validate(self, cols: list[str]) -> None:
