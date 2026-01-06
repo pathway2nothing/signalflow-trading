@@ -1,4 +1,4 @@
-from signalflow.labeler.base_labeler import Labeler
+from signalflow.target.base import Labeler
 from dataclasses import dataclass
 import pandas as pd
 import polars as pl

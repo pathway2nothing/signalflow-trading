@@ -6,7 +6,7 @@ from typing import Any
 import polars as pl
 
 from signalflow.core import SignalType
-from signalflow.labeler.base_labeler import Labeler
+from signalflow.target.base import Labeler
 from signalflow.core import sf_component
 
 

@@ -8,7 +8,7 @@ import polars as pl
 from numba import njit, prange
 
 from signalflow.core import sf_component, SignalType 
-from signalflow.labeler.base_labeler import Labeler
+from signalflow.target.base import Labeler
 
 
 @njit(parallel=True, cache=True)
