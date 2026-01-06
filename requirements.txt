@@ -1,7 +1,3 @@
-ipython>=8.10
-jupyterlab>=3.0
-notebook
-kedro~=1.1.1
 duckdb
 aiohttp
 loguru 
@@ -11,9 +7,8 @@ pandas
 numpy
 plotly
 scikit-learn
-torch>=2.0
-lightning>=2.0
+torch
 optuna
-xgboost==3.1.2
-scikit-learn==1.8.0
-lightgbm==4.6.0
+xgboost
+scikit-learn
+lightgbm

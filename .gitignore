@@ -123,9 +123,6 @@ instance/
 # Sphinx documentation
 docs/_build/
 
-# PyBuilder
-target/
-
 # Jupyter Notebook
 .ipynb_checkpoints
 
@@ -165,5 +162,5 @@ merge.py
 project.txt
 about.txt
 *.duckdb
-*.ipynb
+
 .vscode

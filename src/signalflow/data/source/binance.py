@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+# IMPORTANT
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -9,8 +8,9 @@ from typing import Optional
 import aiohttp
 from loguru import logger
 
-from signalflow.data.store.duckdb_stores import DuckDbSpotStore
-
+from signalflow.data.raw_store import DuckDbSpotStore
+from signalflow.core import sf_component
+from signalflow.data.source.base import RawDataSource, RawDataLoader
 
 _TIMEFRAME_MS: dict[str, int] = {
     "1m": 60_000,
@@ -29,12 +29,15 @@ _TIMEFRAME_MS: dict[str, int] = {
 
 
 def _dt_to_ms_utc(dt: datetime) -> int:
-    """
-    Convert datetime to UNIX ms in UTC.
+    """Convert datetime to UNIX milliseconds in UTC.
 
-    RawData should not carry timezones: this function accepts:
-      - naive datetime (assumed UTC)
-      - aware datetime (converted to UTC)
+    Accepts naive (assumed UTC) or aware (converted to UTC) datetimes.
+
+    Args:
+        dt (datetime): Input datetime.
+
+    Returns:
+        int: UNIX timestamp in milliseconds (UTC).
     """
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
@@ -44,15 +47,25 @@ def _dt_to_ms_utc(dt: datetime) -> int:
 
 
 def _ms_to_dt_utc_naive(ms: int) -> datetime:
-    """
-    Convert UNIX ms to UTC datetime without tzinfo (naive).
+    """Convert UNIX milliseconds to UTC-naive datetime.
+
+    Args:
+        ms (int): UNIX timestamp in milliseconds.
+
+    Returns:
+        datetime: UTC datetime without timezone info.
     """
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).replace(tzinfo=None)
 
 
 def _ensure_utc_naive(dt: datetime) -> datetime:
-    """
-    Normalize to UTC-naive datetime.
+    """Normalize to UTC-naive datetime.
+
+    Args:
+        dt (datetime): Input datetime (naive or aware).
+
+    Returns:
+        datetime: UTC-naive datetime.
     """
     if dt.tzinfo is None:
         return dt
@@ -60,8 +73,21 @@ def _ensure_utc_naive(dt: datetime) -> datetime:
 
 
 @dataclass
-class BinanceClient:
-    """Async client for Binance REST API."""
+@sf_component(name="binance")
+class BinanceClient(RawDataSource):
+    """Async client for Binance REST API.
+
+    Provides async methods for fetching OHLCV candlestick data with automatic
+    retries, rate limit handling, and pagination.
+
+    IMPORTANT: Returned timestamps are candle CLOSE times (Binance k[6]), UTC-naive.
+
+    Attributes:
+        base_url (str): Binance API base URL. Default: "https://api.binance.com".
+        max_retries (int): Maximum retry attempts. Default: 3.
+        timeout_sec (int): Request timeout in seconds. Default: 30.
+        min_delay_sec (float): Minimum delay between requests. Default: 0.05.
+    """
 
     base_url: str = "https://api.binance.com"
     max_retries: int = 3
@@ -71,11 +97,13 @@ class BinanceClient:
     _session: Optional[aiohttp.ClientSession] = field(default=None, init=False)
 
     async def __aenter__(self) -> "BinanceClient":
+        """Enter async context - creates session."""
         timeout = aiohttp.ClientTimeout(total=self.timeout_sec)
         self._session = aiohttp.ClientSession(timeout=timeout)
         return self
 
     async def __aexit__(self, *args) -> None:
+        """Exit async context - closes session."""
         if self._session:
             await self._session.close()
             self._session = None
@@ -89,22 +117,23 @@ class BinanceClient:
         end_time: Optional[datetime] = None,
         limit: int = 1000,
     ) -> list[dict]:
-        """
-        Fetch OHLCV klines from Binance.
+        """Fetch OHLCV klines from Binance.
 
-        IMPORTANT:
-          - returned "timestamp" is the CANDLE CLOSE TIME (Binance k[6])
-          - returned datetime is UTC-naive (no tzinfo)
+        IMPORTANT: Returned "timestamp" is CANDLE CLOSE TIME (UTC-naive).
 
         Args:
-            pair: Trading pair (e.g., 'BTCUSDT').
-            timeframe: Candle interval ('1m', '5m', '15m', '1h', '4h', '1d', ...).
-            start_time: Range start (naive=UTC or aware).
-            end_time: Range end (naive=UTC or aware).
-            limit: Max candles per request (max 1000).
+            pair (str): Trading pair (e.g., "BTCUSDT").
+            timeframe (str): Interval (1m, 5m, 1h, 1d, etc.). Default: "1m".
+            start_time (datetime | None): Range start (naive=UTC or aware).
+            end_time (datetime | None): Range end (naive=UTC or aware).
+            limit (int): Max candles (max 1000). Default: 1000.
 
         Returns:
-            List of OHLCV dictionaries.
+            list[dict]: OHLCV dicts with keys: timestamp, open, high, low,
+                close, volume, trades.
+
+        Raises:
+            RuntimeError: If not in async context or API error.
         """
         if self._session is None:
             raise RuntimeError("BinanceClient must be used as an async context manager.")
@@ -170,18 +199,31 @@ class BinanceClient:
         *,
         limit: int = 1000,
     ) -> list[dict]:
-        """
-        Download all klines for a specified period with pagination.
+        """Download all klines for period with automatic pagination.
 
         Semantics:
-          - Range is by CANDLE CLOSE TIME.
-          - We treat it as [start_time, end_time] (inclusive end is okay; store can dedup).
-          - Returned timestamps are UTC-naive.
+            - Range by CANDLE CLOSE TIME: [start_time, end_time] inclusive
+            - Returns UTC-naive timestamps
+            - Automatic deduplication
 
         Pagination strategy:
-          - Request windows of size limit * timeframe.
-          - Advance based on the LAST RETURNED CLOSE TIME + 1ms to avoid duplicates.
-          - Additional dedup at the end for safety.
+            - Request windows of size limit * timeframe
+            - Advance based on last returned close time + 1ms
+            - Additional dedup at end for safety
+
+        Args:
+            pair (str): Trading pair.
+            timeframe (str): Interval (must be in _TIMEFRAME_MS).
+            start_time (datetime): Range start (inclusive).
+            end_time (datetime): Range end (inclusive).
+            limit (int): Candles per request. Default: 1000.
+
+        Returns:
+            list[dict]: Deduplicated, sorted OHLCV dicts.
+
+        Raises:
+            ValueError: If timeframe unsupported.
+            RuntimeError: If pagination exceeds safety limit (2M loops).
         """
         if timeframe not in _TIMEFRAME_MS:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
@@ -251,10 +293,19 @@ class BinanceClient:
 
 
 @dataclass
-class BinanceSpotLoader:
-    """Downloads and stores Binance spot OHLCV data for a fixed project timeframe."""
+@sf_component(name="binance/spot")
+class BinanceSpotLoader(RawDataLoader):
+    """Downloads and stores Binance spot OHLCV data for fixed timeframe.
 
-    db_path: Path = field(default_factory=lambda: Path("raw_data.duckdb"))
+    Combines BinanceClient (source) and DuckDbSpotStore (storage) to provide
+    complete data pipeline with gap filling and incremental updates.
+
+    Attributes:
+        store (DuckDbSpotStore): Storage backend. Default: raw_data.duckdb.
+        timeframe (str): Fixed timeframe for all data. Default: "1m".
+    """
+
+    store: DuckDbSpotStore = field(default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data.duckdb")))
     timeframe: str = "1m"
 
     async def download(
@@ -265,7 +316,25 @@ class BinanceSpotLoader:
         end: Optional[datetime] = None,
         fill_gaps: bool = True,
     ) -> None:
-        store = DuckDbSpotStore(self.db_path, timeframe=self.timeframe)
+        """Download historical data with intelligent range detection.
+
+        Automatically determines what to download:
+            - If no existing data: download full range
+            - If data exists: download before/after existing range
+            - If fill_gaps=True: detect and fill gaps in existing range
+
+        Args:
+            pairs (list[str]): Trading pairs to download.
+            days (int | None): Number of days back from end. Default: 7.
+            start (datetime | None): Range start (overrides days).
+            end (datetime | None): Range end. Default: now.
+            fill_gaps (bool): Detect and fill gaps. Default: True.
+
+        Note:
+            Runs async download for all pairs concurrently.
+            Logs progress for large downloads.
+            Errors logged but don't stop other pairs.
+        """
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         if end is None:
@@ -296,7 +365,7 @@ class BinanceSpotLoader:
         async def download_pair(client: BinanceClient, pair: str) -> None:
             logger.info(f"Processing {pair} from {start} to {end}")
 
-            db_min, db_max = store.get_time_bounds(pair)
+            db_min, db_max = self.store.get_time_bounds(pair)
             ranges_to_download: list[tuple[datetime, datetime]] = []
 
             if db_min is None:
@@ -311,7 +380,7 @@ class BinanceSpotLoader:
                     overlap_start = max(start, db_min)
                     overlap_end = min(end, db_max)
                     if overlap_start < overlap_end:
-                        gaps = store.find_gaps(pair, overlap_start, overlap_end, tf_minutes)
+                        gaps = self.store.find_gaps(pair, overlap_start, overlap_end, tf_minutes)
                         ranges_to_download.extend(gaps)
 
             for range_start, range_end in ranges_to_download:
@@ -327,21 +396,34 @@ class BinanceSpotLoader:
                         start_time=range_start,
                         end_time=range_end,
                     )
-                    store.insert_klines(pair, klines)
-                except Exception as e:
+                    self.store.insert_klines(pair, klines)
+                except Exception as e:  
                     logger.error(f"Error downloading {pair}: {e}")
 
         async with BinanceClient() as client:
             await asyncio.gather(*[download_pair(client, pair) for pair in pairs])
 
-        store.close()
+        self.store.close()
 
     async def sync(
         self,
         pairs: list[str],
         update_interval_sec: int = 60,
     ) -> None:
-        store = DuckDbSpotStore(self.db_path, timeframe=self.timeframe)
+        """Real-time sync - continuously update with latest data.
+
+        Runs indefinitely, fetching latest candles at specified interval.
+        Useful for live trading or monitoring.
+
+        Args:
+            pairs (list[str]): Trading pairs to sync.
+            update_interval_sec (int): Update interval in seconds. Default: 60.
+
+        Note:
+            Runs forever - use Ctrl+C to stop or run in background task.
+            Fetches last 5 candles per update (ensures no gaps).
+            Errors logged but sync continues.
+        """
 
         logger.info(f"Starting real-time sync for {pairs}")
         logger.info(f"Update interval: {update_interval_sec}s (timeframe={self.timeframe})")
@@ -349,7 +431,7 @@ class BinanceSpotLoader:
         async def fetch_and_store(client: BinanceClient, pair: str) -> None:
             try:
                 klines = await client.get_klines(pair=pair, timeframe=self.timeframe, limit=5)
-                store.insert_klines(pair, klines)
+                self.store.insert_klines(pair, klines)
             except Exception as e:
                 logger.error(f"Error syncing {pair}: {e}")
 
