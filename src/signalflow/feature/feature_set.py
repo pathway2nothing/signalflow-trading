@@ -1,3 +1,4 @@
+# IMPORTANT
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,24 +6,88 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.feature.base_extractor import FeatureExtractor
+from signalflow.feature.base import FeatureExtractor
 from signalflow.core import RawDataView, RawDataType, DataFrameType
 
 
 @dataclass
 class FeatureSet:
-    """
-    Polars-first collection of independent extractors.
+    """Polars-first orchestrator for multiple feature extractors.
 
-    Behavior:
-      - for each extractor: fetch raw data as Polars (canonical)
-      - run extractor.extract(pl_df, context)
-      - normalize index (timestamp tz -> naive)
-      - join all results on (pair, timestamp)
+    Combines independent feature extractors via outer join on (pair, timestamp).
+    Each extractor fetches its required data, computes features, and results
+    are merged into single DataFrame.
 
-    Notes:
-      - FeatureExtractor is polars-first, so any pandas-only logic must be wrapped by adapters
-        (e.g. PandasFeatureExtractor) that still expose pl.DataFrame output.
+    Key features:
+        - Automatic data fetching per extractor
+        - Timezone normalization (all → naive)
+        - Outer join on (pair, timestamp) for alignment
+        - Duplicate feature column detection
+        - Consistent index columns across extractors
+
+    Processing flow:
+        For each extractor:
+            1. Fetch appropriate raw data as Polars
+            2. Run extractor.extract()
+            3. Normalize timestamps to timezone-naive
+            4. Validate index columns present
+        Then:
+            5. Outer join all results on (pair, timestamp)
+
+    Attributes:
+        extractors (list[FeatureExtractor]): Feature extractors to orchestrate.
+        parallel (bool): Parallel execution flag (not yet implemented). Default: False.
+        pair_col (str): Trading pair column name. Default: "pair".
+        ts_col (str): Timestamp column name. Default: "timestamp".
+
+    Example:
+        ```python
+        from signalflow.feature import FeatureSet, SmaExtractor, RsiExtractor
+
+        # Create feature set
+        feature_set = FeatureSet([
+            SmaExtractor(window=10, column="close"),
+            SmaExtractor(window=20, column="close"),
+            RsiExtractor(window=14, column="close")
+        ])
+
+        # Extract all features at once
+        from signalflow.core import RawDataView
+        view = RawDataView(raw=raw_data)
+        features = feature_set.extract(view)
+
+        # Result has: pair, timestamp, sma_10, sma_20, rsi_14
+        print(features.columns)
+        # ['pair', 'timestamp', 'sma_10', 'sma_20', 'rsi_14']
+        ```
+
+    Example:
+        ```python
+        # With multi-timeframe features
+        feature_set = FeatureSet([
+            # 1-minute features
+            SmaExtractor(window=10, offset_window=1),
+            # 5-minute features
+            SmaExtractor(
+                window=10,
+                offset_window=5,
+                use_resample=True,
+                resample_prefix="5m_"
+            )
+        ])
+
+        features = feature_set.extract(view)
+        # Has both 1m and 5m features aligned
+        ```
+
+    Note:
+        All extractors must use same pair_col and ts_col.
+        Feature column names must be unique across extractors.
+        Timestamps automatically normalized to timezone-naive.
+
+    See Also:
+        FeatureExtractor: Base class for individual extractors.
+        RawDataView: Provides data in required format.
     """
 
     extractors: list[FeatureExtractor]
@@ -32,6 +97,16 @@ class FeatureSet:
     ts_col: str = "timestamp"
 
     def __post_init__(self) -> None:
+        """Validate extractors configuration.
+
+        Checks:
+            - At least one extractor provided
+            - All extractors use same pair_col
+            - All extractors use same ts_col
+
+        Raises:
+            ValueError: If validation fails.
+        """
         if not self.extractors:
             raise ValueError("At least one extractor must be provided")
 
@@ -48,6 +123,57 @@ class FeatureSet:
                 )
 
     def extract(self, raw_data: RawDataView, context: dict[str, Any] | None = None) -> pl.DataFrame:
+        """Extract and combine features from all extractors.
+
+        Main entry point - orchestrates extraction and merging.
+
+        Processing:
+            1. For each extractor:
+                - Fetch appropriate data format
+                - Run extraction
+                - Normalize timestamps
+                - Validate output
+            2. Outer join all results on (pair, timestamp)
+            3. Detect duplicate feature columns
+
+        Args:
+            raw_data (RawDataView): View to raw market data.
+            context (dict[str, Any] | None): Additional context passed to extractors.
+
+        Returns:
+            pl.DataFrame: Combined features with columns:
+                - pair, timestamp (index)
+                - feature columns from all extractors
+
+        Raises:
+            ValueError: If no extractors or duplicate feature columns.
+            TypeError: If extractor doesn't return pl.DataFrame.
+
+        Example:
+            ```python
+            from signalflow.core import RawData, RawDataView
+
+            # Create view
+            view = RawDataView(raw=raw_data)
+
+            # Extract features
+            features = feature_set.extract(view)
+
+            # Check result
+            print(f"Features: {features.columns}")
+            print(f"Shape: {features.shape}")
+
+            # With context
+            features = feature_set.extract(
+                view,
+                context={"lookback_bars": 100}
+            )
+            ```
+
+        Note:
+            Outer join means all (pair, timestamp) combinations preserved.
+            Missing features filled with null for non-matching timestamps.
+        """
         feature_dfs: list[pl.DataFrame] = []
 
         for extractor in self.extractors:
@@ -73,13 +199,21 @@ class FeatureSet:
         return self._combine_features(feature_dfs)
 
     def _get_input_df(self, raw_data: RawDataView, extractor: FeatureExtractor) -> pl.DataFrame:
-        """
-        Polars-first data fetch.
+        """Fetch input data for extractor in Polars format.
 
-        Uses:
-          - extractor.raw_data_type if present
-        Always returns:
-          - pl.DataFrame (canonical)
+        Determines required data type from extractor.raw_data_type and
+        fetches as Polars DataFrame (canonical format).
+
+        Args:
+            raw_data (RawDataView): Data view.
+            extractor (FeatureExtractor): Extractor needing data.
+
+        Returns:
+            pl.DataFrame: Raw data in Polars format.
+
+        Note:
+            Always returns Polars (Polars-first design).
+            Falls back to string "polars" for backward compatibility.
         """
         raw_data_type = getattr(extractor, "raw_data_type", RawDataType.SPOT)
 
@@ -89,6 +223,16 @@ class FeatureSet:
             return raw_data.get_data(raw_data_type, "polars")
 
     def _normalize_index(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Normalize timestamp to timezone-naive.
+
+        Ensures consistent timezone handling across all extractors.
+
+        Args:
+            df (pl.DataFrame): DataFrame to normalize.
+
+        Returns:
+            pl.DataFrame: DataFrame with timezone-naive timestamps.
+        """
         if self.ts_col in df.columns:
             ts_dtype = df.schema.get(self.ts_col)
             if isinstance(ts_dtype, pl.Datetime) and ts_dtype.time_zone is not None:
@@ -96,6 +240,33 @@ class FeatureSet:
         return df
 
     def _combine_features(self, feature_dfs: list[pl.DataFrame]) -> pl.DataFrame:
+        """Combine feature DataFrames via outer join.
+
+        Merges all feature DataFrames on (pair, timestamp) index.
+        Detects and rejects duplicate feature column names.
+
+        Args:
+            feature_dfs (list[pl.DataFrame]): Feature DataFrames to combine.
+
+        Returns:
+            pl.DataFrame: Combined features with outer join semantics.
+
+        Raises:
+            ValueError: If no DataFrames or duplicate feature columns found.
+
+        Example:
+            ```python
+            # Internal usage
+            df1 = pl.DataFrame({"pair": ["BTC"], "timestamp": [t1], "sma_10": [45000]})
+            df2 = pl.DataFrame({"pair": ["BTC"], "timestamp": [t1], "rsi_14": [50]})
+            combined = self._combine_features([df1, df2])
+            # Result: pair, timestamp, sma_10, rsi_14
+            ```
+
+        Note:
+            Outer join preserves all (pair, timestamp) from all extractors.
+            Duplicate columns trigger error - use unique prefixes.
+        """
         if not feature_dfs:
             raise ValueError("No feature DataFrames to combine")
 
@@ -110,6 +281,6 @@ class FeatureSet:
                     f"Rename features or set unique prefixes."
                 )
 
-            combined = combined.join(right, on=[self.pair_col, self.ts_col], how="outer")
+            combined = combined.join(right, on=[self.pair_col, self.ts_col], how="outer", coalesce=True)
 
         return combined
