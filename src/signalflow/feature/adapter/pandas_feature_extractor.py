@@ -6,24 +6,13 @@ from typing import Any, Callable
 import polars as pl
 import pandas as pd
 
-from signalflow.feature.base_extractor import FeatureExtractor
+from signalflow.feature.base import FeatureExtractor
 
 PandasGroupFn = Callable[[pd.DataFrame, dict[str, Any] | None], pd.DataFrame | pd.Series]
 
 
 @dataclass
 class PandasFeatureExtractor(FeatureExtractor):
-    """
-    Adapter: run pandas-based group feature function inside Polars-first pipeline.
-
-    - group_df приходит як pl.DataFrame (вже відсортований/підготовлений FeatureExtractor)
-    - конвертимо group_df -> pandas
-    - запускаємо pandas_group_fn, яка MUST зберегти довжину і порядок
-    - додаємо колонки назад у pl.DataFrame і повертаємо pl.DataFrame
-    """
-
-    # kw_only=True прибирає dataclass-ordering проблему:
-    # base має default-поля, а тут non-default (без kw_only це падає)
     pandas_group_fn: PandasGroupFn | None = field(default=None, kw_only=True)
 
     out_cols: list[str] | None = None
@@ -35,7 +24,6 @@ class PandasFeatureExtractor(FeatureExtractor):
         if self.pandas_group_fn is None or not callable(self.pandas_group_fn):
             raise TypeError("pandas_group_fn must be provided and callable (keyword-only argument)")
 
-    # ВАЖЛИВО: базовий FeatureExtractor викликає compute_group(), не compute_pl_group()
     def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
         pdf = group_df.to_pandas()
         result = self.pandas_group_fn(pdf, data_context)

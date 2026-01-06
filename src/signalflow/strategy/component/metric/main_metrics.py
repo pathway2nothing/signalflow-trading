@@ -45,14 +45,6 @@ class TotalReturnMetric(StrategyMetric):
 @dataclass
 @sf_component(name='balance_allocation', override=True)
 class BalanceAllocationMetric(StrategyMetric):
-    """
-    Трекає розподіл балансу: вільний (cash) vs задіяний (in positions).
-    
-    Розраховує:
-    - capital_utilization: % балансу в позиціях
-    - free_balance_pct: % вільного балансу
-    - allocated_value: абсолютна вартість в позиціях
-    """
     
     initial_capital: float = 10000.0
     
@@ -80,11 +72,6 @@ class BalanceAllocationMetric(StrategyMetric):
 @dataclass
 @sf_component(name='drawdown', override=True)
 class DrawdownMetric(StrategyMetric):
-    """
-    Розраховує поточний та максимальний drawdown.
-    
-    Drawdown = (Peak - Current) / Peak
-    """
     
     _peak_equity: float = 0.0
     _max_drawdown: float = 0.0
@@ -116,11 +103,6 @@ class DrawdownMetric(StrategyMetric):
 @dataclass
 @sf_component(name='win_rate', override=True)
 class WinRateMetric(StrategyMetric):
-    """
-    Розраховує win rate на основі закритих позицій.
-    
-    Win = realized_pnl > 0
-    """
     
     @property
     def name(self) -> str:
@@ -154,12 +136,7 @@ class WinRateMetric(StrategyMetric):
 @dataclass
 @sf_component(name='sharpe_ratio', override=True)
 class SharpeRatioMetric(StrategyMetric):
-    """
-    Rolling Sharpe Ratio на основі returns.
-    
-    Використовує останні N returns для розрахунку.
-    """
-    
+
     initial_capital: float = 10000.0
     window_size: int = 100  
     risk_free_rate: float = 0.0 

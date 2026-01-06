@@ -61,7 +61,6 @@ class OptimizedBacktestRunner(StrategyRunner):
         return state
 
     def _build_price_lookup(self, df: pl.DataFrame) -> dict[datetime, dict[str, float]]:
-        """Створює lookup таблицю: timestamp -> {pair: price}"""
         lookup = {}
         for row in df.select([self.ts_col, self.pair_col, self.price_col]).iter_rows():
             ts, pair, price = row
@@ -71,7 +70,6 @@ class OptimizedBacktestRunner(StrategyRunner):
         return lookup
 
     def _build_signal_lookup(self, signals_df: pl.DataFrame) -> dict[datetime, pl.DataFrame]:
-        """Створює lookup: timestamp -> signals DataFrame"""
         lookup = {}
         if signals_df.height == 0:
             return lookup

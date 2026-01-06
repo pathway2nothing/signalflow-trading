@@ -10,7 +10,7 @@ import polars as pl
 
 from signalflow.core import sf_component, Signals
 from signalflow.utils import import_model_class, build_optuna_params
-from signalflow.validator.base_signal_validator import SignalValidator
+from signalflow.validator.base import SignalValidator
 
 SKLEARN_MODELS: dict[str, dict[str, Any]] = {
     "lightgbm": {

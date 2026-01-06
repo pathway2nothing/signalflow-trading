@@ -18,13 +18,6 @@ def _find_first_hit(
     sl: np.ndarray,
     lookforward: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Знаходить перший hit для кожного рядка.
-
-    Returns:
-        up_off: offset першого PT hit (0 = no hit)
-        dn_off: offset першого SL hit (0 = no hit)
-    """
     n = len(prices)
     up_off = np.zeros(n, dtype=np.int32)
     dn_off = np.zeros(n, dtype=np.int32)
