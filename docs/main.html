@@ -3,24 +3,40 @@
 {% block announce %}
   <style>
     .md-announce {
-      background: linear-gradient(90deg, #d35400 0%, #f39c12 50%, #d35400 100%);
+      background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 50%, #1e3a8a 100%);
       background-size: 200% 100%;
-      animation: gradient-shift 3s ease infinite;
+      animation: gradient-shift 4s ease infinite;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
+    
     @keyframes gradient-shift {
-      0%, 100% { background-position: 0% 50%; }
+      0% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
+    
     .md-announce__inner {
-      color: white;
+      color: #ffffff;
       font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    
+    .md-announce__inner a {
+      color: #ffffff;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .md-announce__inner a:hover {
+      color: #e0f2fe;
     }
   </style>
-  🚀 <strong>SignalFlow v1.0</strong> is now available! Check out the <a href="changelog/">changelog</a> for what's new.
+  
+  🚀 <strong>SignalFlow v0.2.0</strong> is now available! Check out the <a href="{{ base_url }}changelog/">changelog</a> for the new NN-Core updates.
 {% endblock %}
 
 {% block extrahead %}
-  <meta name="theme-color" content="#1a3a3a">
+  <meta name="theme-color" content="#0b0d10">
+  
   <meta property="og:type" content="website">
   <meta property="og:title" content="{{ config.site_name }}">
   <meta property="og:description" content="{{ config.site_description }}">

@@ -1,38 +1,185 @@
-/* --- Modern Black & High Contrast Theme for SignalFlow --- */
+/* --- SIGNALFLOW: HYBRID PRO THEME --- */
+/* Концепція: Завжди темна навігація (Header/Tabs) + Адаптивний контент */
 
 :root {
-  --md-primary-fg-color:        #000000;
-  --md-primary-fg-color--light: #1a1b1e; 
-  --md-primary-fg-color--dark:  #000000;
+  /* --- НАЛАШТУВАННЯ КОНТЕНТУ (LIGHT THEME) --- */
+  --sf-accent:          #3b82f6; /* Blue 500 */
+  --sf-accent-light:    #60a5fa; 
+  
+  --sf-bg:              #ffffff;
+  --sf-bg-surface:      #f8fafc; /* Slate 50 */
+  --sf-text-title:      #0f172a; /* Slate 900 */
+  --sf-text-body:       #334155; /* Slate 700 */
+  --sf-border:          rgba(0, 0, 0, 0.08);
+  
+  /* --- НАЛАШТУВАННЯ НАВІГАЦІЇ (ЗАВЖДИ ТЕМНА) --- */
+  --sf-nav-bg:          #0b0d10; /* Майже чорний, матовий */
+  --sf-nav-text:        #e2e8f0; /* Світло-сірий для тексту меню */
+  --sf-nav-border:      rgba(255, 255, 255, 0.1);
+  
+  /* Перевизначення MkDocs для світлої теми */
+  --md-primary-fg-color:        var(--sf-nav-bg); 
+  --md-text-color:              var(--sf-text-body);
+  --md-accent-fg-color:         var(--sf-accent);
 }
 
+/* --- НАЛАШТУВАННЯ DARK THEME (SLATE) --- */
 [data-md-color-scheme="slate"] {
-  --md-default-bg-color:        #0b0c0f;
-  --md-default-bg-color--alt:   #15171b;
-  --md-text-color:              #e6e6e6;
-  --md-code-bg-color:           #15171b;
-  --md-accent-fg-color:         #00d4ff; 
+  --sf-bg:              #0f1115; /* Deep Anthracite */
+  --sf-bg-surface:      #161920; 
+  --sf-text-title:      #f8fafc; 
+  --sf-text-body:       #cbd5e1; 
+  --sf-border:          rgba(255, 255, 255, 0.08);
+
+  /* Перевизначення MkDocs */
+  --md-default-bg-color:        var(--sf-bg);
+  --md-default-bg-color--alt:   var(--sf-bg-surface);
+  --md-text-color:              var(--sf-text-body);
+  --md-code-bg-color:           #1e293b;
+  --md-shadow-z1: none;
 }
 
+/* --- 1. HEADER (ШАПКА) - ЗАВЖДИ ТЕМНА --- */
 .md-header {
-  background-color: #000000 !important;
+  background-color: var(--sf-nav-bg) !important;
+  color: var(--sf-nav-text) !important;
+  border-bottom: 1px solid var(--sf-nav-border);
 }
 
+/* Логотип */
+.md-header__button.md-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+}
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+    height: 38px !important;
+    width: auto !important;
+    min-width: 38px;
+    object-fit: contain;
+}
+
+/* Заголовок сайту в шапці */
+.md-header__title {
+    color: #ffffff !important; /* Завжди білий */
+    font-weight: 700;
+}
+
+/* Іконки в шапці (Github, Search, Theme Toggle) */
+.md-header__icon, 
+.md-search__icon {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Поле пошуку на темному фоні */
+.md-search__form {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+.md-search__form:hover {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+.md-search__input { color: #ffffff !important; }
+.md-search__input::placeholder { color: rgba(255, 255, 255, 0.5); }
+
+
+/* --- 2. TABS (МЕНЮ) - ЗАВЖДИ ТЕМНЕ --- */
 .md-tabs {
-  background-color: #000000 !important;
-  border-bottom: 1px solid #222;
+  background-color: var(--sf-nav-bg) !important;
+  border-bottom: 1px solid var(--sf-nav-border);
+  color: var(--sf-nav-text) !important;
 }
+
+.md-tabs__link {
+    opacity: 0.75;
+    transition: all 0.2s;
+    color: var(--sf-nav-text) !important; /* Примусово світлий текст */
+}
+
+.md-tabs__link--active,
+.md-tabs__link:hover {
+    color: var(--sf-accent-light) !important; /* Акцентний блакитний */
+    opacity: 1;
+    font-weight: 600;
+    background-color: rgba(255, 255, 255, 0.05); /* Легка підсвітка фону */
+    border-radius: 4px;
+}
+
+/* --- 3. КОНТЕНТ (ЗМІНЮЄТЬСЯ ВІД ТЕМИ) --- */
+
+/* Заголовки */
+.md-typeset h1, 
+.md-typeset h2, 
+.md-typeset h3 {
+    color: var(--sf-text-title) !important; /* Темний в Light, Білий в Dark */
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.md-typeset h1 { margin-bottom: 1.5rem; }
+.md-typeset h2 { 
+    margin-top: 3rem; 
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--sf-border);
+}
+
+/* Блоки коду (Завжди темні для читабельності, як в IDE) */
 .highlight pre {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+    background-color: #0f172a !important; 
+    border: 1px solid var(--sf-border);
+    border-radius: 6px;
 }
+/* Рамка коду адаптується */
+[data-md-color-scheme="default"] .highlight pre { border-color: rgba(0,0,0,0.1); }
+[data-md-color-scheme="slate"] .highlight pre { border-color: rgba(255,255,255,0.1); }
+
+/* Admonitions (Note/Info) */
 .md-typeset .admonition, 
 .md-typeset details {
-  border-radius: 8px;
-  border-width: 1px;
+    border: 1px solid var(--sf-border);
+    border-radius: 8px;
+    box-shadow: none !important;
 }
 
-.md-hero {
-  background-color: #000000;
-  color: #fff;
+/* Стиль для світлої теми */
+[data-md-color-scheme="default"] .md-typeset .admonition {
+    background-color: #f1f5f9; /* Дуже світлий сірий фон */
+}
+/* Стиль для темної теми */
+[data-md-color-scheme="slate"] .md-typeset .admonition {
+    background-color: rgba(59, 130, 246, 0.05);
+}
+
+.md-typeset .admonition__title {
+    color: var(--sf-accent) !important;
+    font-weight: 600;
+    background: transparent !important;
+    border: none;
+}
+
+/* Кнопки */
+.md-button--primary {
+    background-color: var(--sf-accent) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 6px;
+    font-weight: 600;
+}
+.md-button--primary:hover {
+    background-color: var(--sf-accent-light) !important;
+}
+
+/* Таблиці */
+.md-typeset table:not([class]) {
+    border: 1px solid var(--sf-border);
+    border-radius: 6px;
+    box-shadow: none;
+}
+.md-typeset table:not([class]) th {
+    background-color: var(--sf-bg-surface);
+    color: var(--sf-text-title);
+    font-weight: 600;
 }
