@@ -1,37 +1,30 @@
-/* --- SIGNALFLOW: HYBRID PRO THEME --- */
-/* Концепція: Завжди темна навігація (Header/Tabs) + Адаптивний контент */
-
 :root {
-  /* --- НАЛАШТУВАННЯ КОНТЕНТУ (LIGHT THEME) --- */
-  --sf-accent:          #3b82f6; /* Blue 500 */
+  --sf-accent:          #3b82f6; 
   --sf-accent-light:    #60a5fa; 
   
   --sf-bg:              #ffffff;
-  --sf-bg-surface:      #f8fafc; /* Slate 50 */
-  --sf-text-title:      #0f172a; /* Slate 900 */
-  --sf-text-body:       #334155; /* Slate 700 */
+  --sf-bg-surface:      #f8fafc; 
+  --sf-text-title:      #0f172a; 
+  --sf-text-body:       #334155; 
   --sf-border:          rgba(0, 0, 0, 0.08);
   
-  /* --- НАЛАШТУВАННЯ НАВІГАЦІЇ (ЗАВЖДИ ТЕМНА) --- */
-  --sf-nav-bg:          #0b0d10; /* Майже чорний, матовий */
-  --sf-nav-text:        #e2e8f0; /* Світло-сірий для тексту меню */
+  --sf-nav-bg:          #0b0d10; 
+  --sf-nav-text:        #e2e8f0; 
   --sf-nav-border:      rgba(255, 255, 255, 0.1);
   
-  /* Перевизначення MkDocs для світлої теми */
+
   --md-primary-fg-color:        var(--sf-nav-bg); 
   --md-text-color:              var(--sf-text-body);
   --md-accent-fg-color:         var(--sf-accent);
 }
 
-/* --- НАЛАШТУВАННЯ DARK THEME (SLATE) --- */
 [data-md-color-scheme="slate"] {
-  --sf-bg:              #0f1115; /* Deep Anthracite */
+  --sf-bg:              #0f1115; 
   --sf-bg-surface:      #161920; 
   --sf-text-title:      #f8fafc; 
   --sf-text-body:       #cbd5e1; 
   --sf-border:          rgba(255, 255, 255, 0.08);
 
-  /* Перевизначення MkDocs */
   --md-default-bg-color:        var(--sf-bg);
   --md-default-bg-color--alt:   var(--sf-bg-surface);
   --md-text-color:              var(--sf-text-body);
@@ -39,14 +32,12 @@
   --md-shadow-z1: none;
 }
 
-/* --- 1. HEADER (ШАПКА) - ЗАВЖДИ ТЕМНА --- */
 .md-header {
   background-color: var(--sf-nav-bg) !important;
   color: var(--sf-nav-text) !important;
   border-bottom: 1px solid var(--sf-nav-border);
 }
 
-/* Логотип */
 .md-header__button.md-logo {
     display: flex;
     align-items: center;
@@ -61,19 +52,16 @@
     object-fit: contain;
 }
 
-/* Заголовок сайту в шапці */
 .md-header__title {
-    color: #ffffff !important; /* Завжди білий */
+    color: #ffffff !important;
     font-weight: 700;
 }
 
-/* Іконки в шапці (Github, Search, Theme Toggle) */
 .md-header__icon, 
 .md-search__icon {
     color: rgba(255, 255, 255, 0.8) !important;
 }
 
-/* Поле пошуку на темному фоні */
 .md-search__form {
     background-color: rgba(255, 255, 255, 0.1) !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
@@ -86,7 +74,6 @@
 .md-search__input::placeholder { color: rgba(255, 255, 255, 0.5); }
 
 
-/* --- 2. TABS (МЕНЮ) - ЗАВЖДИ ТЕМНЕ --- */
 .md-tabs {
   background-color: var(--sf-nav-bg) !important;
   border-bottom: 1px solid var(--sf-nav-border);
@@ -96,25 +83,23 @@
 .md-tabs__link {
     opacity: 0.75;
     transition: all 0.2s;
-    color: var(--sf-nav-text) !important; /* Примусово світлий текст */
+    color: var(--sf-nav-text) !important;
 }
 
 .md-tabs__link--active,
 .md-tabs__link:hover {
-    color: var(--sf-accent-light) !important; /* Акцентний блакитний */
+    color: var(--sf-accent-light) !important;
     opacity: 1;
     font-weight: 600;
-    background-color: rgba(255, 255, 255, 0.05); /* Легка підсвітка фону */
+    background-color: rgba(255, 255, 255, 0.05);
     border-radius: 4px;
 }
 
-/* --- 3. КОНТЕНТ (ЗМІНЮЄТЬСЯ ВІД ТЕМИ) --- */
 
-/* Заголовки */
 .md-typeset h1, 
 .md-typeset h2, 
 .md-typeset h3 {
-    color: var(--sf-text-title) !important; /* Темний в Light, Білий в Dark */
+    color: var(--sf-text-title) !important;
     font-weight: 700;
     letter-spacing: -0.01em;
 }
@@ -126,17 +111,14 @@
     border-top: 1px solid var(--sf-border);
 }
 
-/* Блоки коду (Завжди темні для читабельності, як в IDE) */
 .highlight pre {
     background-color: #0f172a !important; 
     border: 1px solid var(--sf-border);
     border-radius: 6px;
 }
-/* Рамка коду адаптується */
 [data-md-color-scheme="default"] .highlight pre { border-color: rgba(0,0,0,0.1); }
 [data-md-color-scheme="slate"] .highlight pre { border-color: rgba(255,255,255,0.1); }
 
-/* Admonitions (Note/Info) */
 .md-typeset .admonition, 
 .md-typeset details {
     border: 1px solid var(--sf-border);
@@ -144,11 +126,9 @@
     box-shadow: none !important;
 }
 
-/* Стиль для світлої теми */
 [data-md-color-scheme="default"] .md-typeset .admonition {
-    background-color: #f1f5f9; /* Дуже світлий сірий фон */
+    background-color: #f1f5f9; 
 }
-/* Стиль для темної теми */
 [data-md-color-scheme="slate"] .md-typeset .admonition {
     background-color: rgba(59, 130, 246, 0.05);
 }
@@ -160,7 +140,6 @@
     border: none;
 }
 
-/* Кнопки */
 .md-button--primary {
     background-color: var(--sf-accent) !important;
     color: #ffffff !important;
@@ -172,7 +151,6 @@
     background-color: var(--sf-accent-light) !important;
 }
 
-/* Таблиці */
 .md-typeset table:not([class]) {
     border: 1px solid var(--sf-border);
     border-radius: 6px;
@@ -182,4 +160,125 @@
     background-color: var(--sf-bg-surface);
     color: var(--sf-text-title);
     font-weight: 600;
+}
+
+
+
+[data-md-color-scheme="default"] .mermaid .node foreignObject,
+[data-md-color-scheme="default"] .mermaid .node foreignObject div, 
+[data-md-color-scheme="default"] .mermaid .node foreignObject span,
+[data-md-color-scheme="default"] .mermaid .nodeLabel,
+[data-md-color-scheme="default"] .mermaid span.nodeLabel,
+[data-md-color-scheme="default"] .mermaid .label {
+    color: #0f172a !important; 
+    font-family: var(--md-code-font-family) !important;
+    font-weight: 600 !important;
+}
+[data-md-color-scheme="default"] .mermaid .node text, 
+[data-md-color-scheme="default"] .mermaid .node tspan,
+[data-md-color-scheme="default"] .mermaid text.label {
+    fill: #0f172a !important;
+    font-family: var(--md-code-font-family) !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .node foreignObject,
+[data-md-color-scheme="slate"] .mermaid .node foreignObject div, 
+[data-md-color-scheme="slate"] .mermaid .node foreignObject span,
+[data-md-color-scheme="slate"] .mermaid .nodeLabel,
+[data-md-color-scheme="slate"] .mermaid span.nodeLabel,
+[data-md-color-scheme="slate"] .mermaid .label {
+    color: #ffffff !important; 
+    font-family: var(--md-code-font-family) !important;
+    font-weight: 600 !important;
+}
+[data-md-color-scheme="slate"] .mermaid .node text, 
+[data-md-color-scheme="slate"] .mermaid .node tspan,
+[data-md-color-scheme="slate"] .mermaid text.label {
+    fill: #ffffff !important;
+    font-family: var(--md-code-font-family) !important;
+}
+
+[data-md-color-scheme="default"] .mermaid .edgePath .path,
+[data-md-color-scheme="default"] .mermaid .flowchart-link {
+    stroke: #475569 !important; 
+    stroke-width: 2px !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .edgePath .path,
+[data-md-color-scheme="slate"] .mermaid .flowchart-link {
+    stroke: #cbd5e1 !important; 
+    stroke-width: 2px !important;
+    opacity: 1 !important;
+}
+
+[data-md-color-scheme="default"] .mermaid .marker {
+    fill: #475569 !important;
+    stroke: #475569 !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .marker {
+    fill: #cbd5e1 !important;
+    stroke: #cbd5e1 !important;
+}
+
+[data-md-color-scheme="default"] .mermaid .node rect,
+[data-md-color-scheme="default"] .mermaid .node circle,
+[data-md-color-scheme="default"] .mermaid .node polygon {
+    stroke: rgba(15, 23, 42, 0.3) !important;
+    stroke-width: 2px !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .node rect,
+[data-md-color-scheme="slate"] .mermaid .node circle,
+[data-md-color-scheme="slate"] .mermaid .node polygon {
+    stroke: rgba(255, 255, 255, 0.4) !important;
+    stroke-width: 2px !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill:#e1f5ff"],
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill: rgb(225, 245, 255)"] {
+    fill: #1e3a52 !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill:#fff3cd"],
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill: rgb(255, 243, 205)"] {
+    fill: #4a4520 !important; 
+}
+
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill:#d4edda"],
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill: rgb(212, 237, 218)"] {
+    fill: #1e4d2b !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill:#f8d7da"],
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill: rgb(248, 215, 218)"] {
+    fill: #5a2a2e !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill:#e2e3e5"],
+[data-md-color-scheme="slate"] .mermaid .node rect[style*="fill: rgb(226, 227, 229)"] {
+    fill: #2d3138 !important;
+}
+
+.mermaid svg {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block;
+    margin: 0 auto;
+}
+
+.mermaid .node {
+    white-space: nowrap !important;
+}
+
+.mermaid[data-processed] {
+    text-align: center;
+    display: block;
+    overflow-x: auto;
+}
+
+@media (max-width: 768px) {
+    .mermaid svg {
+        min-width: 600px;
+    }
 }
