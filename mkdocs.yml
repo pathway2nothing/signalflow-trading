@@ -9,7 +9,6 @@ copyright: "Copyright &copy; 2026 SignalFlow"
 
 theme:
   name: material
-  custom_dir: docs/overrides
   logo: assets/logo.png
   favicon: assets/favicon.png
   
