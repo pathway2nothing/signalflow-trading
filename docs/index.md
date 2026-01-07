@@ -4,7 +4,7 @@ hide:
   - navigation
 ---
 
-# Welcome to SignalFlow-trading
+# Welcome to SignalFlow-trading 0.2.0
 
 **SignalFlow** is a high-performance Python framework for algorithmic trading and quantitative finance. Built on a signal processing pipeline architecture, it transforms market data into validated trading signals and executable strategies.
 
@@ -260,8 +260,8 @@ Ready to build your first trading strategy?
 
 ## Support & Community
 
-- **GitHub**: [github.com/pathway2nothing/signal-flow](https://github.com/pathway2nothing/signal-flow)
-- **Issues**: [Report bugs or request features](https://github.com/pathway2nothing/signal-flow/issues)
+- **GitHub**: [github.com/pathway2nothing/signalflow-trading](https://github.com/pathway2nothing/signalflow-trading)
+- **Issues**: [Report bugs or request features](https://github.com/pathway2nothing/signalflow-trading/issues)
 - **Email**: [pathway2nothing@gmail.com](mailto:pathway2nothing@gmail.com)
 
 ---

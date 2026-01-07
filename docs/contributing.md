@@ -11,8 +11,8 @@ We welcome contributions to SignalFlow!
 
 ## Development Setup
 ```bash
-git clone https://github.com/pathway2nothing/signal-flow.git
-cd signal-flow
+git clone https://github.com/pathway2nothing/signalflow-trading.git
+cd signalflow-trading
 pip install -e ".[dev,docs,nn]"
 ```
 
@@ -37,4 +37,4 @@ mkdocs serve
 ## Contact
 
 - **Email**: [pathway2nothing@gmail.com](mailto:pathway2nothing@gmail.com)
-- **Issues**: [GitHub Issues](https://github.com/pathway2nothing/signal-flow/issues)
+- **Issues**: [GitHub Issues](https://github.com/pathway2nothing/signalflow-trading/issues)

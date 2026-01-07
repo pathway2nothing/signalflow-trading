@@ -556,7 +556,7 @@ pip install lightgbm xgboost plotly
 ## Getting Help
 
 - **Email**: [pathway2nothing@gmail.com](mailto:pathway2nothing@gmail.com)
-- **GitHub Issues**: [Report bugs or request features](https://github.com/pathway2nothing/signal-flow/issues)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/pathway2nothing/signalflow-trading/issues)
 - **Documentation**: Explore the [User Guide](../guide/overview.md) and [API Reference](../api/index.md)
 
 ---

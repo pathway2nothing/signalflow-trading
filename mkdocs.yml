@@ -1,8 +1,8 @@
 site_name: SignalFlow
 site_description: "High-performance algorithmic trading framework"
 site_url: "" #
-repo_url: "https://github.com/pathway2nothing/signal-flow"
-repo_name: "pathway2nothing/signal-flow"
+repo_url: "https://github.com/pathway2nothing/signalflow-trading"
+repo_name: "pathway2nothing/signalflow-trading"
 edit_uri: "edit/main/docs/"
 
 copyright: "Copyright &copy; 2026 SignalFlow"
