@@ -335,7 +335,7 @@ from datetime import datetime
 
 from signalflow.data import BinanceSpotLoader, RawDataFactory
 from signalflow.detector import SmaCrossSignalDetector
-from signalflow.labeler import TripleBarrierLabeler
+from signalflow.target import TripleBarrierLabeler
 from signalflow.feature import FeatureSet, RsiExtractor, BollingerBandsExtractor
 from signalflow.validator import SklearnSignalValidator
 from signalflow.strategy import BacktestRunner, VirtualSpotExecutor, TakeProfitStopLossExit

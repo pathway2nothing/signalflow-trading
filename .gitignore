@@ -162,5 +162,5 @@ merge.py
 project.txt
 about.txt
 *.duckdb
-
+*.duckdb.wal
 .vscode
