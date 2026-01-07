@@ -13,3 +13,5 @@ xgboost
 scikit-learn
 lightgbm
 mike
+numba
+kaleido

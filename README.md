@@ -83,7 +83,7 @@ validated_signals = validator.validate_signals(signals, features)
 
 * `signalflow.feature`: Feature extractors and technical indicator adapters.
 
-* `signalflow.labeler`: Advanced labeling techniques for machine learning.
+* `signalflow.target`: Advanced labeling techniques for machine learning.
 
 * `signalflow.detector`: Ready-to-use signal detection algorithms.
 

@@ -1,5 +1,5 @@
 from signalflow.feature.feature_set import FeatureSet
-from signalflow.feature.base_extractor import FeatureExtractor
+from signalflow.feature.base import FeatureExtractor
 import signalflow.feature.smoother as smoother
 import signalflow.feature.oscillator as oscillator
 import signalflow.feature.pandasta as pandasta

@@ -3,7 +3,6 @@ import signalflow.data as data
 import signalflow.detector as detector
 import signalflow.feature as feature
 import signalflow.target as target
-import signalflow.model as model
 import signalflow.strategy as strategy
 import signalflow.utils as utils
 import signalflow.validator as validator
@@ -15,8 +14,7 @@ __all__ = [
     "data",
     "detector",
     "feature",
-    "labeler",
-    "model",
+    "target",
     "strategy"
     "utils",
     "validator",
