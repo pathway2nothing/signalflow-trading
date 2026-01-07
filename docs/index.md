@@ -1,157 +1,276 @@
 ---
+title: Home
 hide:
   - navigation
-  - toc
 ---
 
-<div class="hero" markdown>
+# Welcome to SignalFlow-trading 0.2.0
 
-# SignalFlow
+**SignalFlow** is a high-performance Python framework for algorithmic trading and quantitative finance. Built on a signal processing pipeline architecture, it transforms market data into validated trading signals and executable strategies.
 
-**Modern signal processing and algorithmic trading framework for Python**
+<div class="grid cards" markdown>
 
-Build, test, and deploy trading strategies with confidence.
+-   :material-lightning-bolt:{ .lg .middle } **High Performance**
 
-[Get Started](getting-started/installation.md){ .md-button .md-button--primary }
-[View on GitHub](https://github.com/pathway2nothing/signal-flow){ .md-button }
+    ---
 
-</div>
+    Powered by Polars for blazing-fast processing of large datasets (100+ trading pairs, 500k+ candles)
 
-<div class="feature-grid" markdown>
+-   :material-puzzle:{ .lg .middle } **Modular Design**
 
-<div class="feature-card" markdown>
+    ---
 
-### :material-lightning-bolt: High Performance
+    Component registry system with pluggable detectors, validators, features, and strategies
 
-Optimized for speed with GPU acceleration support. Process millions of data points in seconds with cuML and PyTorch backends.
+-   :material-chart-line:{ .lg .middle } **Production Ready**
 
-</div>
+    ---
 
-<div class="feature-card" markdown>
+    Seamless transition from research to production with unified backtesting and live trading interfaces
 
-### :material-chart-line: Advanced Signals
+-   :material-brain:{ .lg .middle } **ML-Powered**
 
-Comprehensive library of technical indicators and custom signal generation. From simple moving averages to complex ML-based predictions.
+    ---
 
-</div>
-
-<div class="feature-card" markdown>
-
-### :material-flask: Backtesting Engine
-
-Robust backtesting with realistic market simulation. Account for slippage, fees, and market impact in your strategy evaluation.
+    Built-in support for scikit-learn, XGBoost, LightGBM, and PyTorch-based signal validation
 
 </div>
 
-<div class="feature-card" markdown>
+---
 
-### :material-robot: ML Integration
+## The Signal Processing Pipeline
 
-Seamless integration with scikit-learn, PyTorch, and Optuna. Build adaptive strategies that learn from market data.
+SignalFlow organizes algorithmic trading into four distinct stages:
 
-</div>
+```mermaid
+flowchart LR
+    A[Market Data] --> B[Signal Detection]
+    B --> C[Signal Validation]
+    C --> D[Strategy Execution]
+    
+    style A fill:#2563eb,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style B fill:#ea580c,stroke:#f97316,stroke-width:2px,color:#fff
+    style C fill:#16a34a,stroke:#22c55e,stroke-width:2px,color:#fff
+    style D fill:#dc2626,stroke:#ef4444,stroke-width:2px,color:#fff
+```
 
-<div class="feature-card" markdown>
+### 1. Data & Features
+Load and process market data with efficient storage and feature engineering:
 
-### :material-pipe: Pipeline Architecture
+- Flexible data loaders (Binance Spot, Futures, custom sources)
+- DuckDB and Parquet storage backends
+- Technical indicators via pandas-ta and custom Polars extractors
 
-Built on Kedro patterns for reproducible, maintainable workflows. Track experiments with MLflow integration.
+### 2. Signal Detection
+Identify potential trading opportunities from market patterns:
 
-</div>
+- Classical algorithms (SMA crossover, MACD, RSI thresholds)
+- Pattern recognition (candlestick patterns, chart formations)
+- Neural network outputs (CNN, LSTM, Transformer predictions)
 
-<div class="feature-card" markdown>
+### 3. Signal Validation (Meta-Labeling)
+Filter signals using machine learning to predict success probability:
 
-### :material-clock-fast: Real-time Ready
+- Implements Lopez de Prado's meta-labeling methodology
+- Support for scikit-learn, XGBoost, LightGBM classifiers
+- Deep learning validators via PyTorch Lightning (signalflow-nn)
 
-Deploy strategies to live markets with minimal code changes. Support for multiple exchanges and data providers.
+### 4. Strategy Execution
+Convert validated signals into trades with risk management:
 
-</div>
+- Entry/exit rules with take-profit and stop-loss
+- Position sizing and risk controls
+- Unified interface for backtesting and live trading
 
-</div>
+---
 
 ## Quick Example
 
 ```python
-from signalflow import Strategy, Signal
-from signalflow.indicators import RSI, MACD
+from signalflow.core import RawDataView
+from signalflow.detector import SmaCrossSignalDetector
+from signalflow.validator import SklearnSignalValidator
+from signalflow.strategy import SimpleStrategy
 
-class MomentumStrategy(Strategy):
-    def setup(self):
-        self.rsi = RSI(period=14)
-        self.macd = MACD(fast=12, slow=26, signal=9)
-    
-    def generate_signals(self, data):
-        rsi_signal = Signal.when(self.rsi(data) < 30, action="buy")
-        macd_signal = Signal.when(self.macd.crossover(data), action="buy")
-        
-        return rsi_signal & macd_signal
+# Load data
+data = RawDataView.load_from_duckdb("market_data.duckdb")
 
-# Backtest the strategy
-from signalflow import Backtest
+# Detect signals
+detector = SmaCrossSignalDetector(fast_period=20, slow_period=50)
+signals = detector.run(data)
 
-bt = Backtest(
-    strategy=MomentumStrategy(),
-    data="BTC/USDT",
-    start="2024-01-01",
-    end="2024-12-01"
+# Validate with ML
+validator = SklearnSignalValidator(model_type="lightgbm")
+validator.fit(X_train, y_train)
+validated_signals = validator.validate_signals(signals, features)
+
+# Execute strategy
+strategy = SimpleStrategy(
+    initial_capital=10000,
+    take_profit=0.02,
+    stop_loss=0.01
 )
+portfolio = strategy.run(validated_signals, data)
 
-results = bt.run()
-print(results.summary())
+# Analyze results
+print(portfolio.metrics())
 ```
 
-## Installation
+---
 
-=== "pip"
+## Key Features
 
-    ```bash
-    pip install signal-flow
-    ```
+### :octicons-zap-16: Polars-First Performance
+Core data processing uses Polars for extreme efficiency on large datasets, with seamless Pandas compatibility for prototyping.
 
-=== "pip (with GPU)"
+### :octicons-plug-16: Component Registry
+All components (detectors, validators, features) are registered via `@sf_component` decorator for easy customization:
 
-    ```bash
-    pip install signal-flow[gpu]
-    ```
+```python
+from signalflow.core import sf_component, SignalDetector
 
-=== "poetry"
+@sf_component(name="my_detector")
+class CustomDetector(SignalDetector):
+    def detect(self, data):
+        # Your logic here
+        return signals
+```
 
-    ```bash
-    poetry add signal-flow
-    ```
+### :octicons-beaker-16: Advanced Labeling
+Built-in support for sophisticated labeling strategies:
 
-## What's Next?
+- **Triple Barrier Method**: Combines take-profit, stop-loss, and time barriers
+- **Fixed Horizon**: Label signals based on future returns
+- Numba-accelerated for performance (45s → 0.3s on large datasets)
 
-<div class="feature-grid" markdown>
+### :octicons-workflow-16: Kedro Integration
+Full compatibility with Kedro for MLOps pipelines, experiment tracking, and production deployment.
 
-<div class="feature-card" markdown>
+---
 
-### :material-book-open-variant: User Guide
+## Technology Stack
 
-Learn the core concepts and build your first strategy.
+<div class="grid" markdown>
 
-[Read the Guide →](guide/overview.md)
+=== "Data Processing"
+    - **Polars** - High-performance DataFrames
+    - **Pandas** - Legacy compatibility & prototyping
+    - **DuckDB** - Embedded analytics database
+    - **NumPy** - Numerical computing
+
+=== "Machine Learning"
+    - **scikit-learn** - Classical ML models
+    - **XGBoost** - Gradient boosting
+    - **LightGBM** - Fast gradient boosting
+    - **PyTorch** - Deep learning framework
+    - **Lightning** - PyTorch training framework
+    - **Optuna** - Hyperparameter optimization
+
+=== "Trading Tools"
+    - **pandas-ta** - Technical analysis indicators
+    - **Numba** - JIT compilation for speed
+    - **Plotly** - Interactive visualizations
+
+=== "Infrastructure"
+    - **Kedro** - Pipeline orchestration
+    - **MLflow** - Experiment tracking (planned)
+    - **DuckDB** - Local data storage
 
 </div>
 
-<div class="feature-card" markdown>
+---
 
-### :material-api: API Reference
+## SignalFlow Ecosystem
 
-Detailed documentation for all modules and classes.
+SignalFlow is growing into a multi-repository ecosystem:
 
-[Browse API →](api/index.md)
+### signalflow (Core) :material-package-variant-closed:
+The main library with foundational components:
+
+- Core data containers and abstractions
+- Binance connectors and data loaders
+- Backtesting infrastructure
+- Basic detectors and validators
+- Strategy execution framework
+
+### signalflow-nn (Neural Networks) :material-brain:
+Specialized repository for deep learning:
+
+- PyTorch Lightning-based validators
+- Time series architectures (LSTM, GRU, Transformers)
+- VAE and autoencoder implementations
+- Temporal feature extractors
+
+### signalflow-kedro (MLOps) :material-pipeline:
+Kedro project template for production workflows:
+
+- End-to-end ML pipelines
+- Model training and versioning
+- Experiment tracking integration
+- Custom component development environment
+
+---
+
+## Philosophy
+
+**Minimize time from successful experiment to production deployment.**
+
+SignalFlow bridges the research-production gap by:
+
+1. **Unified API**: Same code works for backtesting and live trading
+2. **Performance**: Polars-optimized for production-scale data
+3. **Modularity**: Swap components without rewriting strategies
+4. **Testability**: Every stage independently analyzable
+
+---
+
+## Getting Started
+
+Ready to build your first trading strategy?
+
+<div class="grid cards" markdown>
+
+-   :material-download:{ .lg .middle } **[Installation](getting-started/installation.md)**
+
+    ---
+
+    Install SignalFlow and set up your development environment
+
+-   :material-rocket-launch:{ .lg .middle } **[Quick Start](getting-started/quickstart.md)**
+
+    ---
+
+    Build your first signal detector and backtest a strategy
+
+-   :material-book-open-variant:{ .lg .middle } **[User Guide](guide/overview.md)**
+
+    ---
+
+    Learn core concepts and advanced features
+
+-   :material-code-braces:{ .lg .middle } **[API Reference](api/index.md)**
+
+    ---
+
+    Detailed documentation for all classes and methods
 
 </div>
 
-<div class="feature-card" markdown>
+---
 
-### :material-code-tags: Examples
+## Support & Community
 
-Real-world examples and use cases to get you started.
+- **GitHub**: [github.com/pathway2nothing/signalflow-trading](https://github.com/pathway2nothing/signalflow-trading)
+- **Issues**: [Report bugs or request features](https://github.com/pathway2nothing/signalflow-trading/issues)
+- **Email**: [pathway2nothing@gmail.com](mailto:pathway2nothing@gmail.com)
 
-[View Examples →](examples/index.md)
+---
 
-</div>
+## License
 
-</div>
+SignalFlow is open source software released under the [MIT License](https://opensource.org/licenses/MIT).
+
+---
+
+!!! warning "Disclaimer"
+    SignalFlow is provided for research purposes. Trading financial instruments carries risk. Past performance does not guarantee future results. Use at your own risk.

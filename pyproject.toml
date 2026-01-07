@@ -33,9 +33,9 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/pathway2nothing/signal-flow"
-Source = "https://github.com/pathway2nothing/signal-flow"
-Issues = "https://github.com/pathway2nothing/signal-flow/issues"
+Homepage = "https://github.com/pathway2nothing/signalflow-trading"
+Source = "https://github.com/pathway2nothing/signalflow-trading"
+Issues = "https://github.com/pathway2nothing/signalflow-trading/issues"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
