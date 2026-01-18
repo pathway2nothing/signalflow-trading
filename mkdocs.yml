@@ -1,6 +1,6 @@
 site_name: SignalFlow
 site_description: "High-performance algorithmic trading framework"
-site_url: "" #
+site_url: https://signalflow-trading.com/
 repo_url: "https://github.com/pathway2nothing/signalflow-trading"
 repo_name: "pathway2nothing/signalflow-trading"
 edit_uri: "edit/main/docs/"
@@ -43,7 +43,6 @@ theme:
     - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
-    - navigation.path
     - navigation.top
     - navigation.footer
     - search.suggest
@@ -51,6 +50,9 @@ theme:
     - content.code.copy
     - content.code.annotate
     - content.tabs.link
+    - navigation.tracking
+    - navigation.indexes
+    - versioning
 
 markdown_extensions:
   - abbr
@@ -63,7 +65,8 @@ markdown_extensions:
   - toc:
       permalink: true
       permalink_title: Anchor link to this section
-  
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -84,7 +87,9 @@ markdown_extensions:
 plugins:
   - search: 
       lang: en
-  
+  - sitemap:
+      changefreq: weekly
+      priority: 0.6
   - mkdocstrings:
       default_handler: python
       handlers:
@@ -102,3 +107,16 @@ plugins:
 
 extra_css:
   - stylesheets/extra.css
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/pathway2nothing/signalflow-trading
+
+extra_meta:
+  - name: description
+    content: High-performance algorithmic trading framework with reproducible research and production-ready pipelines
+  - name: keywords
+    content: algorithmic trading, quantitative finance, backtesting, ML trading, signal processing
