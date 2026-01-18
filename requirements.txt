@@ -1,18 +1,22 @@
+# Core
 duckdb
 aiohttp
-loguru 
+loguru
 polars
 pyarrow
-pandas 
+pandas
 numpy
 plotly
 scikit-learn
 torch
 optuna
 xgboost
-scikit-learn
 lightgbm
-mike
 numba
 kaleido
-pyarrow
+
+# Docs
+mkdocs
+mkdocs-material>=9
+mkdocstrings[python]
+mike
