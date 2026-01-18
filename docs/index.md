@@ -1,12 +1,21 @@
 ---
 title: Home
+description: >
+  SignalFlow is a high-performance Python framework for algorithmic trading,
+  quantitative finance, backtesting, and ML-powered signal validation.
+
 hide:
   - navigation
 ---
 
-# Welcome to SignalFlow-trading 0.2.0
+# SignalFlow — High-Performance Algorithmic Trading Framework
 
-**SignalFlow** is a high-performance Python framework for algorithmic trading and quantitative finance. Built on a signal processing pipeline architecture, it transforms market data into validated trading signals and executable strategies.
+> Current stable version: **0.2.2**
+
+**SignalFlow** is a high-performance Python framework for
+**algorithmic trading**, **quantitative finance**, and
+**machine learning-based trading strategies**.
+
 
 <div class="grid cards" markdown>
 
@@ -53,6 +62,10 @@ flowchart LR
     style C fill:#16a34a,stroke:#22c55e,stroke-width:2px,color:#fff
     style D fill:#dc2626,stroke:#ef4444,stroke-width:2px,color:#fff
 ```
+
+SignalFlow implements a four-stage algorithmic trading pipeline:
+market data ingestion, signal detection, machine learning-based
+signal validation, and strategy execution with risk management.
 
 ### 1. Data & Features
 Load and process market data with efficient storage and feature engineering:
@@ -201,7 +214,7 @@ Specialized repository for deep learning:
 - VAE and autoencoder implementations
 - Temporal feature extractors
 
-### signalflow-kedro (MLOps) :material-pipeline:
+### sf-kedro (MLOps) :material-pipeline:
 Kedro project template for production workflows:
 
 - End-to-end ML pipelines
@@ -230,13 +243,13 @@ Ready to build your first trading strategy?
 
 <div class="grid cards" markdown>
 
--   :material-download:{ .lg .middle } **[Installation](getting-started/installation.md)**
+-   :material-download:{ .lg .middle } **[Installation Guide for SignalFlow](getting-started/installation.md)**
 
     ---
 
     Install SignalFlow and set up your development environment
 
--   :material-rocket-launch:{ .lg .middle } **[Quick Start](getting-started/quickstart.md)**
+-   :material-rocket-launch:{ .lg .middle } **[Quick Start Algorithmic Trading Example](getting-started/quickstart.md)**
 
     ---
 
@@ -248,7 +261,7 @@ Ready to build your first trading strategy?
 
     Learn core concepts and advanced features
 
--   :material-code-braces:{ .lg .middle } **[API Reference](api/index.md)**
+-   :material-code-braces:{ .lg .middle } **[SignalFlow API Reference](api/index.md)**
 
     ---
 
@@ -274,3 +287,19 @@ SignalFlow is open source software released under the [MIT License](https://open
 
 !!! warning "Disclaimer"
     SignalFlow is provided for research purposes. Trading financial instruments carries risk. Past performance does not guarantee future results. Use at your own risk.
+
+---
+
+## FAQ
+
+### What is SignalFlow used for?
+SignalFlow is used to build, validate, and deploy algorithmic trading
+strategies using classical indicators and machine learning models.
+
+### Is SignalFlow suitable for production trading?
+Yes. SignalFlow is designed with production pipelines, reproducibility,
+and performance in mind, using Polars, DuckDB, and Kedro.
+
+### Does SignalFlow support machine learning?
+SignalFlow supports scikit-learn, XGBoost, LightGBM, and PyTorch-based
+models for signal validation and meta-labeling.
