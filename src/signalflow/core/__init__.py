@@ -17,7 +17,7 @@ from signalflow.core.enums import (
     RawDataType
 )
 from signalflow.core.decorators import sf_component
-from signalflow.core.registry import default_registry, SignalFlowRegistry
+from signalflow.core.registry import default_registry, SignalFlowRegistry, get_component
 from signalflow.core.signal_transforms import SignalsTransform
 from signalflow.core.rolling_aggregator import RollingAggregator
 from signalflow.core.base_mixin import SfTorchModuleMixin
@@ -40,6 +40,7 @@ __all__ = [
     "sf_component",
     "default_registry",
     "SignalFlowRegistry",
+    "get_component",
     "RollingAggregator",
     "SignalsTransform",
     "SfTorchModuleMixin",
