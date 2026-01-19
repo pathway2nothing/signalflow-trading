@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.2.3"
+version = "0.2.5"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
