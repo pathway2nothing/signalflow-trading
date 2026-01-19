@@ -320,3 +320,7 @@ Example:
     )
     ```
 """
+
+def get_component(type: SfComponentType, name: str  ) -> Type[Any]:
+    """Get a registered component by type and name."""
+    return default_registry.get(type, name) 
