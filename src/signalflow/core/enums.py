@@ -166,6 +166,7 @@ class SfComponentType(str, Enum):
     FEATURE_EXTRACTOR = "feature/extractor"
 
     SIGNALS_TRANSFORM = "signals/transform"
+    SIGNAL_METRIC = "signals/metric"
     LABELER = "signals/labeler"
     DETECTOR = "signals/detector"
     VALIDATOR = "signals/validator"
