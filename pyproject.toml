@@ -48,3 +48,16 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["signalflow*"]
+
+# --- Semantic Release Configuration ---
+[tool.semantic_release]
+version_variables = [
+    "src/signalflow/__init__.py:__version__", 
+    "pyproject.toml:version"
+]
+branch = "main"
+upload_to_pypi = false  # Публікацією займається окремий workflow pypi-publish.yml
+upload_to_release = true
+build_command = "pip install build && python -m build"
+commit_message = "chore(release): {version} [skip ci]"
+major_on_zero = false   # Забороняє автоматичний перехід на v1.0.0 з v0.x.x
