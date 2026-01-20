@@ -25,3 +25,4 @@ jobs:
       uses: python-semantic-release/python-semantic-release@master
       with:
         github_token: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
+        extra_options: "--verbose"
