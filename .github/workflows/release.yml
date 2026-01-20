@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'CHANGELOG.md' 
+      - 'CHANGELOG.md'
       - 'pyproject.toml'
 
 jobs:
@@ -14,7 +14,7 @@ jobs:
     concurrency: release
     permissions:
       id-token: write
-      contents: write 
+      contents: write
 
     steps:
     - uses: actions/checkout@v4
@@ -24,4 +24,4 @@ jobs:
     - name: Python Semantic Release
       uses: python-semantic-release/python-semantic-release@master
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
