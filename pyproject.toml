@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "1.0.0"
+version = "1.1.0"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -56,8 +56,8 @@ version_variables = [
     "pyproject.toml:version"
 ]
 branch = "main"
-upload_to_pypi = false  # Публікацією займається окремий workflow pypi-publish.yml
+upload_to_pypi = false 
 upload_to_release = true
 build_command = "pip install build && python -m build"
 commit_message = "chore(release): {version} [skip ci]"
-major_on_zero = false   # Забороняє автоматичний перехід на v1.0.0 з v0.x.x
+major_on_zero = false
