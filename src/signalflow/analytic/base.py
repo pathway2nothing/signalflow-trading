@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar
-from signalflow.core import SfComponentType, RawData, Signals
+from signalflow.core import SfComponentType, RawData, Signals, StrategyState
 import plotly.graph_objects as go
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 import polars as pl
 from loguru import logger
 
