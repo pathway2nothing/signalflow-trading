@@ -12,9 +12,10 @@ from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
 from signalflow.core.decorators import sf_component
-from signalflow.strategy.component.base import EntryRule, ExitRule, StrategyMetric
+from signalflow.strategy.component.base import EntryRule, ExitRule
 from tqdm import tqdm
 from signalflow.strategy.runner.base import StrategyRunner
+from signalflow.analytic import StrategyMetric
 
 @dataclass
 @sf_component(name='backtest_runner')

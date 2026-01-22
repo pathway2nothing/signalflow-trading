@@ -1,9 +1,11 @@
-from signalflow.strategy.component.base import StrategyMetric, ExitRule, EntryRule
-from signalflow.strategy.component.exit import TakeProfitStopLossExit
+from signalflow.strategy.component.base import ExitRule, EntryRule
+import signalflow.strategy.component.entry as entry
+import signalflow.strategy.component.exit as exit
+
 
 __all__ = [
-    "StrategyMetric",
     "ExitRule",
     "EntryRule",
-    "TakeProfitStopLossExit",
+    "entry",
+    "exit",
 ]

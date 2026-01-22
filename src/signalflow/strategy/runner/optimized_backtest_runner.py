@@ -2,7 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 from signalflow.core import SfComponentType, StrategyState, Signals, sf_component
-from signalflow.strategy.component.base import EntryRule, ExitRule, StrategyMetric
+from signalflow.strategy.component.base import EntryRule, ExitRule
+from signalflow.analytic import StrategyMetric
 from signalflow.strategy.runner.base import StrategyRunner
 from datetime import datetime
 import polars as pl
