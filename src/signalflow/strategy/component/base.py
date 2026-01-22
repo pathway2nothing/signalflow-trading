@@ -4,31 +4,6 @@ from typing import ClassVar
 from signalflow.core import SfComponentType, StrategyState, Position, Order, RawData, Signals
 import plotly.graph_objects as go
 
-@dataclass
-class StrategyMetric(ABC):
-    """Base class for strategy metrics."""
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
-    
-    @abstractmethod
-    def compute(
-        self,
-        state: StrategyState,
-        prices: dict[str, float], 
-        **kwargs: Any
-    ) -> Dict[str, float]:
-        """Compute metric values."""
-        return {}
-
-    def plot(
-        self,
-        results: dict,
-        state: StrategyState,
-        raw_data: RawData,
-    ) -> list[go.Figure] | go.Figure | None:
-        """Plot metric values."""
-        return None
-
-
 
 @dataclass
 class ExitRule(ABC):
