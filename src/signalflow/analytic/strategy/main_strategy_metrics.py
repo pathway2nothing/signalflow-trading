@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from signalflow.core import StrategyState, sf_component
-from signalflow.analytic.strategy.base import StrategyMetric
+from signalflow.analytic.base import StrategyMetric
 import numpy as np
 
 

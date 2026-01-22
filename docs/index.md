@@ -10,7 +10,7 @@ hide:
 
 # SignalFlow — High-Performance Algorithmic Trading Framework
 
-> Current stable version: **0.2.7**
+> Current stable version: **0.2.8**
 
 **SignalFlow** is a high-performance Python framework for
 **algorithmic trading**, **quantitative finance**, and
