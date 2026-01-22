@@ -12,11 +12,7 @@ class TotalReturnMetric(StrategyMetric):
     """Computes total return metrics for the portfolio."""
     
     initial_capital: float = 10000.0
-    
-    @property
-    def name(self) -> str:
-        return 'total_return'
-    
+
     def compute(
         self,
         state: StrategyState,
@@ -47,10 +43,6 @@ class TotalReturnMetric(StrategyMetric):
 class BalanceAllocationMetric(StrategyMetric):
     
     initial_capital: float = 10000.0
-    
-    @property
-    def name(self) -> str:
-        return 'balance_allocation'
     
     def compute(self, state: StrategyState, prices: dict[str, float]) -> dict[str, float]:
         equity = state.portfolio.equity(prices=prices)
@@ -103,11 +95,6 @@ class DrawdownMetric(StrategyMetric):
 @dataclass
 @sf_component(name='win_rate', override=True)
 class WinRateMetric(StrategyMetric):
-    
-    @property
-    def name(self) -> str:
-        return 'win_rate'
-    
     def compute(self, state: StrategyState, prices: dict[str, float]) -> dict[str, float]:
         closed_positions = [
             p for p in state.portfolio.positions.values() 
@@ -178,4 +165,3 @@ class SharpeRatioMetric(StrategyMetric):
         sharpe = (mean_return - self.risk_free_rate) / std_return
         
         return {'sharpe_ratio': sharpe}
-
