@@ -87,6 +87,8 @@ markdown_extensions:
 plugins:
   - search: 
       lang: en
+  - macros:
+      module_name: docs/hooks
   - mkdocstrings:
       default_handler: python
       handlers:

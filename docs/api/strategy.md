@@ -13,10 +13,3 @@
     options:
       show_root_heading: true
       show_source: true
-
-## Metrics
-
-::: signalflow.strategy.component.metric
-    options:
-      show_root_heading: true
-      members: true
