@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.2.8"
+version = "0.2.9"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -31,6 +31,7 @@ docs = [
   "pymdown-extensions>=10.0",
   "mkdocs-minify-plugin>=0.7.0",
   "mike>=2.1.0",
+  "mkdocs-macros-plugin>=1.5.0",
 ]
 
 [project.urls]
