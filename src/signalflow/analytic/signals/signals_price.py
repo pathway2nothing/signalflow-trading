@@ -1,5 +1,5 @@
 from signalflow.core import sf_component
-from signalflow.analytic.base import SignalMetricsProcessor
+from signalflow.analytic.base import SignalMetric
 from typing import List, Dict, Any
 import plotly.graph_objects as go
 import polars as pl
@@ -9,7 +9,7 @@ from signalflow.core import RawData, Signals
 
 @dataclass
 @sf_component(name="pair")
-class SignalPairPrice(SignalMetricsProcessor):
+class SignalPairPrice(SignalMetric):
     """Visualize signals overlaid on price chart for specified pairs."""
     
     pairs: List[str] = None  
@@ -37,7 +37,6 @@ class SignalPairPrice(SignalMetricsProcessor):
         """
         signals_df = signals.value
         
-        # Determine pairs to analyze
         pairs_to_analyze = self.pairs
         if pairs_to_analyze is None:
             pairs_to_analyze = signals_df["pair"].unique().to_list()
@@ -147,7 +146,6 @@ class SignalPairPrice(SignalMetricsProcessor):
                 hovertemplate='Buy<br>%{x}<br>Price: %{y:.2f}<extra></extra>'
             ))
         
-        # Add sell signals
         sells = signals_pd[signals_pd['signal'] == -1]
         if not sells.empty:
             fig.add_trace(go.Scatter(
