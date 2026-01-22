@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 import plotly.graph_objects as go
 import polars as pl
 from loguru import logger
+from signalflow.core import RawData, Signals
 
 
 @dataclass
@@ -25,8 +26,8 @@ class SignalPairPrice(SignalMetricsProcessor):
     
     def compute(
         self,
-        raw_data: sf.RawData,
-        signals: sf.Signals,
+        raw_data: RawData,
+        signals: Signals,
         labels: pl.DataFrame | None = None,
     ) -> Dict[str, Any]:
         """Compute basic signal statistics per pair.
@@ -63,8 +64,8 @@ class SignalPairPrice(SignalMetricsProcessor):
         self,
         computed_metrics: Dict[str, Any],
         plots_context: Dict[str, Any],
-        raw_data: sf.RawData,
-        signals: sf.Signals,
+        raw_data: RawData,
+        signals: Signals,
         labels: pl.DataFrame | None = None,
     ) -> List[go.Figure]:
         """Generate price charts with signal overlays for each pair.

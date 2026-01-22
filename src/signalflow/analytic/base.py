@@ -16,8 +16,8 @@ class SignalMetric:
 
     def compute(
         self,
-        raw_data: sf.RawData,
-        signals: sf.Signals,
+        raw_data: RawData,
+        signals: Signals,
         labels: pl.DataFrame | None = None,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]: 
         """Compute metrics from signals.
@@ -32,8 +32,8 @@ class SignalMetric:
         self,
         computed_metrics: Dict[str, Any],
         plots_context: Dict[str, Any],
-        raw_data: sf.RawData,
-        signals: sf.Signals,
+        raw_data: RawData,
+        signals: Signals,
         labels: pl.DataFrame | None = None,
     ) -> List[go.Figure] | go.Figure | None:
         """Generate visualization from computed metrics.
@@ -46,8 +46,8 @@ class SignalMetric:
     
     def __call__(
         self,
-        raw_data: sf.RawData,
-        signals: sf.Signals,
+        raw_data: RawData,
+        signals: Signals,
         labels: pl.DataFrame | None = None,
     ):
         computed_metrics, plots_context = self.compute(
