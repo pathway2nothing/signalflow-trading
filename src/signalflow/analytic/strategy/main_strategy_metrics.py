@@ -1,8 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from signalflow.core import StrategyState
-from signalflow.core.decorators import sf_component
-from signalflow.strategy.component.base import StrategyMetric
+from signalflow.core import StrategyState, sf_component
+from signalflow.analytic.strategy.base import StrategyMetric
 import numpy as np
 
 
@@ -16,7 +15,8 @@ class TotalReturnMetric(StrategyMetric):
     def compute(
         self,
         state: StrategyState,
-        prices: dict[str, float]
+        prices: dict[str, float],
+        **kwargs
     ) -> dict[str, float]:
         equity = state.portfolio.equity(prices=prices)
         cash = state.portfolio.cash
@@ -44,7 +44,7 @@ class BalanceAllocationMetric(StrategyMetric):
     
     initial_capital: float = 10000.0
     
-    def compute(self, state: StrategyState, prices: dict[str, float]) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
         equity = state.portfolio.equity(prices=prices)
         cash = state.portfolio.cash
         
@@ -72,7 +72,7 @@ class DrawdownMetric(StrategyMetric):
     def name(self) -> str:
         return 'drawdown'
     
-    def compute(self, state: StrategyState, prices: dict[str, float]) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
         equity = state.portfolio.equity(prices=prices)
         
         if equity > self._peak_equity:
@@ -95,7 +95,7 @@ class DrawdownMetric(StrategyMetric):
 @dataclass
 @sf_component(name='win_rate', override=True)
 class WinRateMetric(StrategyMetric):
-    def compute(self, state: StrategyState, prices: dict[str, float]) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
         closed_positions = [
             p for p in state.portfolio.positions.values() 
             if p.is_closed
@@ -132,11 +132,7 @@ class SharpeRatioMetric(StrategyMetric):
     def __post_init__(self):
         self._returns_history = []
     
-    @property
-    def name(self) -> str:
-        return 'sharpe_ratio'
-    
-    def compute(self, state: StrategyState, prices: dict[str, float]) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
         import numpy as np
         
         equity = state.portfolio.equity(prices=prices)
