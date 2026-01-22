@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import polars as pl
 from loguru import logger
 from signalflow.core import RawData, Signals
+from dataclasses import dataclass
 
 
 @dataclass
