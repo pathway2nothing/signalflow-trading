@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 from signalflow.core import SfComponentType, StrategyState, Position, Order, RawData, Signals
 from signalflow.strategy.broker.base import Broker
-from signalflow.strategy.component.base import EntryRule, ExitRule, StrategyMetric
+from signalflow.strategy.component.base import EntryRule, ExitRule
+from signalflow.analytic import StrategyMetric
 
 class StrategyRunner(ABC):
     """Base class for strategy runners."""

@@ -2,27 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar
 from signalflow.core import SfComponentType, StrategyState, Position, Order, RawData, Signals
-
-
-@dataclass
-class StrategyMetric(ABC):
-    """Base class for strategy metrics."""
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
-    
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Metric name for storage."""
-        ...
-    
-    @abstractmethod
-    def compute(
-        self,
-        state: StrategyState,
-        prices: dict[str, float]
-    ) -> dict[str, float]:
-        """Compute metric values."""
-        ...
+import plotly.graph_objects as go
 
 
 @dataclass
