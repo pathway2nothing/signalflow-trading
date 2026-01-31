@@ -164,7 +164,7 @@ class SfComponentType(str, Enum):
     RAW_DATA_LOADER = "data/loader"
 
     FEATURE_EXTRACTOR = "feature/extractor"
-
+    FEATURE = "feature"
     SIGNALS_TRANSFORM = "signals/transform"
     SIGNAL_METRIC = "signals/metric"
     LABELER = "signals/labeler"

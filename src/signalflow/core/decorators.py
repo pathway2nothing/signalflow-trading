@@ -3,7 +3,7 @@ from signalflow.core.registry import default_registry
 from signalflow.core.enums import SfComponentType
 
 
-def sf_component(*, name: str, override: bool = False):
+def sf_component(*, name: str, override: bool = True):
     """Register class as SignalFlow component.
 
     Decorator that registers a class in the global component registry,
