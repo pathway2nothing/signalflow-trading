@@ -4,56 +4,45 @@ Feature extraction for technical indicators and derived metrics.
 
 ## Base Classes
 
-::: signalflow.feature.base.FeatureExtractor
+::: signalflow.feature.base.Feature
     options:
       show_root_heading: true
       show_source: true
       members: true
 
-::: signalflow.feature.feature_set.FeatureSet
+::: signalflow.feature.feature_pipeline.FeaturePipeline
     options:
       show_root_heading: true
       show_source: true
       members: true
 
-## Smoothing Extractors
-
-::: signalflow.feature.smoother.sma_extractor.SmaExtractor
+::: signalflow.feature.global_feature.GlobalFeature
     options:
       show_root_heading: true
       show_source: true
       members: true
 
-
-## Pandas-TA Extractors
-
-::: signalflow.feature.pandasta.top_pandasta_extractors.PandasTaRsiExtractor
+::: signalflow.feature.offset_feature.OffsetFeature
     options:
       show_root_heading: true
       show_source: true
       members: true
 
-::: signalflow.feature.pandasta.top_pandasta_extractors.PandasTaBbandsExtractor
+## Examples
+
+::: signalflow.feature.examples.ExampleRsiFeature
     options:
       show_root_heading: true
       show_source: true
       members: true
 
-::: signalflow.feature.pandasta.top_pandasta_extractors.PandasTaAtrExtractor
+::: signalflow.feature.examples.ExampleSmaFeature
     options:
       show_root_heading: true
       show_source: true
       members: true
 
-::: signalflow.feature.pandasta.top_pandasta_extractors.PandasTaMacdExtractor
-    options:
-      show_root_heading: true
-      show_source: true
-      members: true
-
-## Pandas-TA Base
-
-::: signalflow.feature.pandasta.pandas_ta_extractor.PandasTaExtractor
+::: signalflow.feature.examples.ExampleGlobalMeanRsiFeature
     options:
       show_root_heading: true
       show_source: true
