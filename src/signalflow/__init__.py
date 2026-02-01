@@ -24,6 +24,7 @@ import signalflow.analytic as analytic
 import signalflow.data as data
 import signalflow.detector as detector
 import signalflow.feature as feature
+from signalflow.feature import Feature, FeaturePipeline, GlobalFeature, OffsetFeature
 import signalflow.target as target
 import signalflow.strategy as strategy
 import signalflow.utils as utils
@@ -61,5 +62,9 @@ __all__ = [
     "default_registry",
     "SfTorchModuleMixin",
     "RollingAggregator",
-    "SignalsTransform"
+    "SignalsTransform",
+    "Feature",
+    "FeaturePipeline",
+    "GlobalFeature",
+    "OffsetFeature",
 ]

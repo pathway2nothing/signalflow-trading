@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 import polars as pl
-from signalflow.feature.base import Feature
-from signalflow.feature.global_feature import GlobalFeature
+from signalflow.feature.base import Feature, GlobalFeature
 from signalflow.core import sf_component
 from typing import Any
 
@@ -46,7 +45,6 @@ class ExampleRsiFeature(Feature):
         rsi = 100 - (100 / (1 + rs))
         
         return df.with_columns(rsi.alias(col_name))
-
 
 
 @dataclass
