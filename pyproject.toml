@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.2.10"
+version = "0.3.0"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -35,7 +35,7 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/pathway2nothing/signalflow-trading"
+Homepage = "https://signalflow-trading.com"
 Source = "https://github.com/pathway2nothing/signalflow-trading"
 Issues = "https://github.com/pathway2nothing/signalflow-trading/issues"
 

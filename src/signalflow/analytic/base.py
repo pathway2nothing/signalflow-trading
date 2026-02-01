@@ -71,7 +71,6 @@ class StrategyMetric(ABC):
     """Base class for strategy metrics."""
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     
-    @abstractmethod
     def compute(
         self,
         state: StrategyState,
@@ -79,6 +78,7 @@ class StrategyMetric(ABC):
         **kwargs
     ) -> Dict[str, float]:
         """Compute metric values."""
+        logger.warning("Computing is not implemented for this component")
         return {}
 
     def plot(
