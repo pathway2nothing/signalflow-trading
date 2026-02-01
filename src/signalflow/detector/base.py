@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 import polars as pl
 
 from signalflow.core import RawDataView, Signals, SfComponentType, SignalType, RawDataType
-from signalflow.feature import FeatureSet
+from signalflow.feature import FeaturePipeline
 
 
 @dataclass
@@ -21,14 +21,14 @@ class SignalDetector(ABC):
 
     Key features:
         - Polars-native for performance
-        - Automatic feature extraction via FeatureSet
+        - Automatic feature extraction via FeaturePipeline
         - Built-in validation (schema, duplicates, timezones)
         - Optional probability requirement
         - Keep latest signal per pair option
 
     Public API:
         - run(): Complete pipeline (preprocess → detect → validate)
-        - preprocess(): Feature extraction (delegates to FeatureSet)
+        - preprocess(): Feature extraction (delegates to FeaturePipeline)
         - detect(): Signal generation (must implement)
 
     Attributes:
@@ -36,7 +36,7 @@ class SignalDetector(ABC):
         pair_col (str): Trading pair column name. Default: "pair".
         ts_col (str): Timestamp column name. Default: "timestamp".
         raw_data_type (RawDataType): Type of raw data to process. Default: SPOT.
-        feature_set (FeatureSet | None): Feature extractor. Default: None.
+        features (FeaturePipeline | None): Feature extractor. Default: None.
         require_probability (bool): Require probability column in signals. Default: False.
         keep_only_latest_per_pair (bool): Keep only latest signal per pair. Default: False.
 
@@ -52,8 +52,8 @@ class SignalDetector(ABC):
             def __init__(self, fast_window: int = 10, slow_window: int = 20):
                 super().__init__()
                 # Auto-generate features
-                from signalflow.feature import FeatureSet, SmaExtractor
-                self.feature_set = FeatureSet([
+                from signalflow.feature import FeaturePipeline, SmaExtractor
+                self.features = FeaturePipeline([
                     SmaExtractor(window=fast_window, column="close"),
                     SmaExtractor(window=slow_window, column="close")
                 ])
@@ -91,7 +91,7 @@ class SignalDetector(ABC):
         Duplicate (pair, timestamp) combinations are rejected.
 
     See Also:
-        FeatureSet: Orchestrates feature extraction.
+        FeaturePipeline: Orchestrates feature extraction.
         Signals: Container for signal output.
     """
 
@@ -102,7 +102,7 @@ class SignalDetector(ABC):
 
     raw_data_type: RawDataType = RawDataType.SPOT
 
-    feature_set: FeatureSet | None = None
+    features: FeaturePipeline | None = None
 
     require_probability: bool = False
     keep_only_latest_per_pair: bool = False
@@ -164,7 +164,7 @@ class SignalDetector(ABC):
     def preprocess(self, raw_data_view: RawDataView, context: dict[str, Any] | None = None) -> pl.DataFrame:
         """Extract features from raw data.
 
-        Default implementation delegates to FeatureSet. Override for custom
+        Default implementation delegates to FeaturePipeline. Override for custom
         feature extraction logic.
 
         Args:
@@ -175,12 +175,12 @@ class SignalDetector(ABC):
             pl.DataFrame: Features with at minimum pair and timestamp columns.
 
         Raises:
-            NotImplementedError: If feature_set is None and not overridden.
-            TypeError: If FeatureSet doesn't return pl.DataFrame.
+            NotImplementedError: If feature_pipeline is None and not overridden.
+            TypeError: If FeaturePipeline doesn't return pl.DataFrame.
 
         Example:
             ```python
-            # Default: uses FeatureSet
+            # Default: uses FeaturePipeline
             features = detector.preprocess(raw_data_view)
 
             # Custom override
@@ -192,13 +192,13 @@ class SignalDetector(ABC):
                     ])
             ```
         """
-        if self.feature_set is None:
+        if self.feature_pipeline is None:
             raise NotImplementedError(
-                f"{self.__class__.__name__}.preprocess is not implemented and feature_set is None"
+                f"{self.__class__.__name__}.preprocess is not implemented and features is None"
             )
-        out = self.feature_set.extract(raw_data_view, context=context)
+        out = self.feature_pipeline.run(raw_data_view, context=context)
         if not isinstance(out, pl.DataFrame):
-            raise TypeError(f"{self.__class__.__name__}.feature_set.extract must return pl.DataFrame, got {type(out)}")
+            raise TypeError(f"{self.__class__.__name__}.features.extract must return pl.DataFrame, got {type(out)}")
         return out
 
     @abstractmethod

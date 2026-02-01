@@ -163,7 +163,6 @@ class SfComponentType(str, Enum):
     RAW_DATA_SOURCE = "data/source"
     RAW_DATA_LOADER = "data/loader"
 
-    FEATURE_EXTRACTOR = "feature/extractor"
     FEATURE = "feature"
     SIGNALS_TRANSFORM = "signals/transform"
     SIGNAL_METRIC = "signals/metric"
@@ -269,3 +268,18 @@ class RawDataType(str, Enum):
         - LOB: Limit order book data
     """
     SPOT = "spot"
+    FUTURES = "futures"
+    PERPETUAL = "perpetual"
+    
+    @property
+    def columns(self) -> set[str]:
+        """Columns guaranteed to be present."""
+        base = {"pair", "timestamp", "open", "high", "low", "close", "volume"}
+        
+        if self == RawDataType.FUTURES:
+            return base | {"open_interest"}
+        elif self == RawDataType.PERPETUAL:
+            return base | {"funding_rate", "open_interest"}
+        
+        return base
+

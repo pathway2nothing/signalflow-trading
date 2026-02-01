@@ -132,7 +132,7 @@ class RawDataView:
         """Get raw data in specified format.
         
         Unified interface for accessing data in required DataFrame format.
-        Used by FeatureSet to get data in format expected by extractors.
+        Used by FeaturePipeline to get data in format expected by extractors.
         
         Args:
             raw_data_type (str): Type of data ('spot', 'futures', 'perpetual').
