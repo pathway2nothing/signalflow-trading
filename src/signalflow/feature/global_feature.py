@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import polars as pl
 from signalflow.feature.base import Feature, ExampleRsiFeature
 from signalflow.core import sf_component
-
+from typing import Any
 
 @dataclass
 class GlobalFeature(Feature):
@@ -11,7 +11,7 @@ class GlobalFeature(Feature):
     Override compute() with custom aggregation logic.
     """
     
-    def compute(self, df: pl.DataFrame) -> pl.DataFrame:
+    def compute(self, df: pl.DataFrame, context: dict[str, Any] | None = None) -> pl.DataFrame:
         """Must override - compute global feature across all pairs."""
         raise NotImplementedError(f"{self.__class__.__name__} must implement compute()")
 
@@ -43,7 +43,7 @@ class ExampleGlobalMeanRsiFeature(GlobalFeature):
             cols.append(f"{prefix}rsi_{self.period}_diff")
         return cols
     
-    def compute(self, df: pl.DataFrame) -> pl.DataFrame:
+    def compute(self, df: pl.DataFrame,  context: dict[str, Any] | None = None) -> pl.DataFrame:
         rsi_col = f"rsi_{self.period}"
         out_col = f"global_mean_rsi_{self.period}"
         

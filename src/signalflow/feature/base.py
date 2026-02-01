@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
-from typing import ClassVar
+from typing import ClassVar, Any
 import polars as pl
 from signalflow.core import SfComponentType, sf_component
-
 
 
 @dataclass
@@ -25,7 +24,7 @@ class Feature:
     ts_col: str = "timestamp"
     
     def compute(self, df: pl.DataFrame, context: dict[str, Any] | None = None) -> pl.DataFrame:
-        """Compute feature for all pairs. Must override."""
+        """Compute feature for all pairs"""
         return df.group_by(self.group_col, maintain_order=True).map_groups(self.compute_pair)
     
     def compute_pair(self, df: pl.DataFrame) -> pl.DataFrame:

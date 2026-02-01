@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import polars as pl
 from signalflow.feature.base import Feature
+from typing import Any
 
 
 @dataclass
@@ -115,7 +116,7 @@ class OffsetFeature(Feature):
         
         return result
     
-    def compute(self, df: pl.DataFrame) -> pl.DataFrame:
+    def compute(self, df: pl.DataFrame,  context: dict[str, Any] | None = None) -> pl.DataFrame:
         return df.group_by(self.group_col, maintain_order=True).map_groups(self.compute_pair)
     
     def to_dict(self) -> dict:

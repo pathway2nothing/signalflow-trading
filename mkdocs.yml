@@ -18,7 +18,6 @@ theme:
   
   icon:
     repo: fontawesome/brands/github
-    logo: material/chart-timeline-variant
     
   palette:
     - media: "(prefers-color-scheme: dark)"
