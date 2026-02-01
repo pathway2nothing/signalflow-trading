@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import ClassVar
+from typing import ClassVar, Any
 from signalflow.core import RawDataView, RawDataType
 import polars as pl
 from signalflow.feature.base import Feature
+from signalflow.feature.global_feature import GlobalFeature
+from signalflow.feature.offset_feature import OffsetFeature
 
 
 @dataclass
@@ -71,7 +73,7 @@ class FeaturePipeline(Feature):
         current_batch = []
         
         for f in self.features:
-            is_global = isinstance(f, (GlobalFeature, GlobalMeanRsiFeature, FeaturePipeline))
+            is_global = isinstance(f, (GlobalFeature, FeaturePipeline))
             
             if is_global:
                 if current_batch:
@@ -88,7 +90,7 @@ class FeaturePipeline(Feature):
     def _is_per_pair_batch(self, batch: list[Feature]) -> bool:
         """Check if batch contains only per-pair features."""
         return not any(
-            isinstance(f, (GlobalFeature, GlobalMeanRsiFeature, FeaturePipeline)) 
+            isinstance(f, (GlobalFeature, FeaturePipeline)) 
             for f in batch
         )
     

@@ -17,13 +17,11 @@ Before starting, ensure you have:
 ## Installation
 
 Install SignalFlow via pip:
-
 ```bash
 pip install signalflow-trading
 ```
 
 For development installation with all extras:
-
 ```bash
 pip install signalflow-trading[nn]
 ```
@@ -42,7 +40,6 @@ We'll build a classic Simple Moving Average (SMA) crossover strategy step by ste
 ### Step 1: Load Market Data
 
 First, download historical data from Binance:
-
 ```python
 import asyncio
 from pathlib import Path
@@ -73,7 +70,6 @@ asyncio.run(download_data())
 ### Step 2: Load Data into Framework
 
 Convert stored data to SignalFlow's `RawData` format:
-
 ```python
 from signalflow.data import RawDataFactory
 
@@ -98,7 +94,6 @@ print(f"Date range: {raw_data.datetime_start} to {raw_data.datetime_end}")
 ### Step 3: Detect Signals
 
 Use the built-in SMA crossover detector:
-
 ```python
 from signalflow.detector import SmaCrossSignalDetector
 
@@ -127,7 +122,6 @@ print(signals_df.filter(pl.col("signal_type") != "none").head())
 ### Step 4: Label Signals for ML
 
 Add labels to signals using the Triple Barrier Method:
-
 ```python
 from signalflow.labeler import TripleBarrierLabeler
 
@@ -160,24 +154,23 @@ print(label_counts)
 ### Step 5: Extract Features
 
 Create features for machine learning validation:
-
 ```python
-from signalflow.feature import FeatureSet
 from signalflow.feature import (
-    RsiExtractor,
-    BollingerBandsExtractor,
-    AtrExtractor
+    FeaturePipeline,
+    RsiFeature,
+    BollingerBandsFeature,
+    AtrFeature
 )
 
-# Define feature set
-feature_set = FeatureSet([
-    RsiExtractor(window=14),
-    BollingerBandsExtractor(window=20, num_std=2),
-    AtrExtractor(window=14)
+# Define feature pipeline
+pipeline = FeaturePipeline(features=[
+    RsiFeature(period=14),
+    BollingerBandsFeature(period=20, num_std=2),
+    AtrFeature(period=14)
 ])
 
 # Extract features
-features = feature_set.extract(raw_data, data_type="spot")
+features = pipeline.run(raw_data_view)
 
 # Check extracted features
 print(features.columns)
@@ -187,7 +180,6 @@ print(features.columns)
 ### Step 6: Train Signal Validator (Optional)
 
 Filter and validate signals using machine learning:
-
 ```python
 import polars as pl
 from signalflow.validator import SklearnSignalValidator
@@ -251,7 +243,6 @@ print(f"High confidence signals: {len(high_confidence)}")
 ### Step 7: Backtest Strategy
 
 Simulate trading with your signals:
-
 ```python
 from signalflow.strategy import BacktestRunner, VirtualSpotExecutor
 from signalflow.strategy import TakeProfitStopLossExit
@@ -299,7 +290,6 @@ print(f"Win Rate: {metrics['win_rate']:.2%}")
 ### Step 8: Analyze Results
 
 Visualize backtest performance:
-
 ```python
 import plotly.graph_objects as go
 from signalflow.utils.visualization import plot_equity_curve
@@ -326,7 +316,6 @@ fig.show()
 ## Complete Example
 
 Here's the full workflow in one script:
-
 ```python
 import asyncio
 import polars as pl
@@ -336,7 +325,7 @@ from datetime import datetime
 from signalflow.data import BinanceSpotLoader, RawDataFactory
 from signalflow.detector import SmaCrossSignalDetector
 from signalflow.target import TripleBarrierLabeler
-from signalflow.feature import FeatureSet, RsiExtractor, BollingerBandsExtractor
+from signalflow.feature import FeaturePipeline, RsiFeature, BollingerBandsFeature
 from signalflow.validator import SklearnSignalValidator
 from signalflow.strategy import BacktestRunner, VirtualSpotExecutor, TakeProfitStopLossExit
 from signalflow.core import Signals
@@ -365,10 +354,10 @@ labeler = TripleBarrierLabeler(take_profit=0.02, stop_loss=0.01)
 labeled_signals = labeler.label(signals, raw_data)
 
 # 5. Extract features (optional)
-features = FeatureSet([
-    RsiExtractor(window=14),
-    BollingerBandsExtractor(window=20)
-]).extract(raw_data, data_type="spot")
+features = FeaturePipeline(features=[
+    RsiFeature(period=14),
+    BollingerBandsFeature(period=20)
+]).run(raw_data_view)
 
 # 6. Train validator (optional)
 train_data = labeled_signals.value.filter(
@@ -434,7 +423,6 @@ Congratulations! You've built your first trading strategy with SignalFlow. Here'
 ### Using the Component Registry
 
 Register and discover components dynamically:
-
 ```python
 from signalflow.core import sf_component, default_registry, SfComponentType
 
@@ -462,7 +450,6 @@ detector = default_registry.create(
 ### Working with Polars DataFrames
 
 SignalFlow is Polars-first for performance:
-
 ```python
 import polars as pl
 
@@ -488,7 +475,6 @@ enriched = signals.value.join(
 ### Pandas Compatibility
 
 Convert to Pandas when needed:
-
 ```python
 # Convert Polars to Pandas
 pandas_df = signals.value.to_pandas()
@@ -504,7 +490,6 @@ polars_df = pl.from_pandas(pandas_df)
 ### No signals detected?
 
 Check your detector parameters and data quality:
-
 ```python
 # Verify data
 print(raw_data['spot'].describe())
@@ -524,7 +509,6 @@ detector = SmaCrossSignalDetector(
 ### Slow performance?
 
 SignalFlow uses Polars for speed, but check:
-
 ```python
 # Reduce data size
 raw_data = RawDataFactory.from_duckdb_spot_store(
@@ -542,7 +526,6 @@ labeler = TripleBarrierLabeler(
 ### Import errors?
 
 Ensure all dependencies are installed:
-
 ```bash
 # Full installation
 pip install signalflow-trading[dev,nn]
