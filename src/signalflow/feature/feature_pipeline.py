@@ -3,8 +3,7 @@ from enum import Enum
 from typing import ClassVar, Any
 from signalflow.core import RawDataView, RawDataType
 import polars as pl
-from signalflow.feature.base import Feature
-from signalflow.feature.global_feature import GlobalFeature
+from signalflow.feature.base import Feature, GlobalFeature
 from signalflow.feature.offset_feature import OffsetFeature
 
 
@@ -66,14 +65,17 @@ class FeaturePipeline(Feature):
                 )
             
             available.update(f.output_cols())
-    
+
     def _group_into_batches(self) -> list[list[Feature]]:
         """Group features: consecutive per-pair → batch, global → separate."""
         batches = []
         current_batch = []
         
         for f in self.features:
-            is_global = isinstance(f, (GlobalFeature, FeaturePipeline))
+            is_global = (
+                isinstance(f, (GlobalFeature, FeaturePipeline)) or
+                getattr(f, '_is_global', False) 
+            )
             
             if is_global:
                 if current_batch:
@@ -82,15 +84,17 @@ class FeaturePipeline(Feature):
                 batches.append([f])
             else:
                 current_batch.append(f)
+        
         if current_batch:
             batches.append(current_batch)
         
         return batches
-    
+
     def _is_per_pair_batch(self, batch: list[Feature]) -> bool:
         """Check if batch contains only per-pair features."""
         return not any(
-            isinstance(f, (GlobalFeature, FeaturePipeline)) 
+            isinstance(f, (GlobalFeature, FeaturePipeline)) or
+            getattr(f, '_is_global', False) 
             for f in batch
         )
     
