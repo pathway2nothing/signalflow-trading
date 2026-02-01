@@ -164,3 +164,6 @@ about.txt
 *.duckdb
 *.duckdb.wal
 .vscode
+src/*.png
+notebooks/*.png
+notebooks/*.html

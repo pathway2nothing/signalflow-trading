@@ -16,13 +16,19 @@ Feature extraction for technical indicators and derived metrics.
       show_source: true
       members: true
 
-::: signalflow.feature.global_feature.GlobalFeature
+::: signalflow.feature.base.GlobalFeature
     options:
       show_root_heading: true
       show_source: true
       members: true
 
 ::: signalflow.feature.offset_feature.OffsetFeature
+    options:
+      show_root_heading: true
+      show_source: true
+      members: true
+
+::: signalflow.feature.lin_reg_forecast.LinRegForecastFeature
     options:
       show_root_heading: true
       show_source: true
