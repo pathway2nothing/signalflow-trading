@@ -2,10 +2,11 @@ from dataclasses import dataclass, field
 from typing import ClassVar, Any
 import polars as pl
 from signalflow.core import SfComponentType, sf_component
+from signalflow.utils import KwargsTolerantMixin
 
 
 @dataclass
-class Feature:
+class Feature(KwargsTolerantMixin):
     """Base class for all features.
     
     Two methods to implement:
@@ -42,6 +43,7 @@ class Feature:
             for tpl in self.requires
         ]
 
+    test_params: ClassVar[list[dict]] = []
 
 @dataclass
 class GlobalFeature(Feature):

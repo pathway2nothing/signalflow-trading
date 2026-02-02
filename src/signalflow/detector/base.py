@@ -8,10 +8,10 @@ import polars as pl
 
 from signalflow.core import RawDataView, Signals, SfComponentType, SignalType, RawDataType
 from signalflow.feature import FeaturePipeline
-
+from signalflow.utils import KwargsTolerantMixin
 
 @dataclass
-class SignalDetector(ABC):
+class SignalDetector(KwargsTolerantMixin, ABC):
     """Base class for Polars-first signal detection.
 
     Provides standardized pipeline for detecting trading signals from raw data:
