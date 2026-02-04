@@ -83,7 +83,7 @@ class RollingAggregator:
     pair_col: str = "pair"
     mode: Literal["add", "replace"] = "replace"
     prefix: str | None = None
-    raw_data_type: RawDataType = RawDataType.SPOT 
+    raw_data_type: RawDataType | str = RawDataType.SPOT
 
     OFFSET_COL: str = "resample_offset"
 

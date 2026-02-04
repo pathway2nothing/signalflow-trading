@@ -231,55 +231,47 @@ class DataFrameType(str, Enum):
     PANDAS = "pandas"
 
 class RawDataType(str, Enum):
-    """Supported raw data types.
+    """Built-in raw data types.
 
     Defines types of market data that can be loaded and processed.
+    Column definitions are stored in :class:`SignalFlowRegistry` and can be
+    extended with custom types via ``default_registry.register_raw_data_type()``.
 
     Values:
         SPOT: Spot trading data (OHLCV).
+        FUTURES: Futures trading data (OHLCV + open_interest).
+        PERPETUAL: Perpetual swaps data (OHLCV + funding_rate + open_interest).
 
     Example:
         ```python
         from signalflow.core.enums import RawDataType
 
-        # Load spot data
-        loader = BinanceLoader(
-            pairs=["BTCUSDT", "ETHUSDT"],
-            data_type=RawDataType.SPOT
+        # Built-in types
+        spot_cols = RawDataType.SPOT.columns
+        # {'pair', 'timestamp', 'open', 'high', 'low', 'close', 'volume'}
+
+        # Custom types — register via registry
+        from signalflow.core.registry import default_registry
+
+        default_registry.register_raw_data_type(
+            name="lob",
+            columns=["pair", "timestamp", "bid", "ask", "bid_size", "ask_size"],
         )
-
-        raw_data = loader.load(
-            datetime_start=datetime(2024, 1, 1),
-            datetime_end=datetime(2024, 12, 31)
-        )
-
-        # Access spot data
-        spot_df = raw_data[RawDataType.SPOT.value]
-
-        # Check data type
-        if raw_data_type == RawDataType.SPOT:
-            print("Processing spot data")
+        cols = default_registry.get_raw_data_columns("lob")
         ```
 
     Note:
-        Future versions will add:
-        - FUTURES: Futures trading data
-        - PERPETUAL: Perpetual swaps data
-        - LOB: Limit order book data
+        Use ``default_registry.register_raw_data_type()`` to add custom types.
+        Use ``default_registry.get_raw_data_columns(name)`` to look up columns
+        for any type (built-in or custom).
     """
     SPOT = "spot"
     FUTURES = "futures"
     PERPETUAL = "perpetual"
-    
+
     @property
     def columns(self) -> set[str]:
-        """Columns guaranteed to be present."""
-        base = {"pair", "timestamp", "open", "high", "low", "close", "volume"}
-        
-        if self == RawDataType.FUTURES:
-            return base | {"open_interest"}
-        elif self == RawDataType.PERPETUAL:
-            return base | {"funding_rate", "open_interest"}
-        
-        return base
+        """Columns guaranteed to be present (looked up from registry)."""
+        from signalflow.core.registry import default_registry
+        return default_registry.get_raw_data_columns(self.value)
 

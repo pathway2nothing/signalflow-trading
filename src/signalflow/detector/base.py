@@ -100,7 +100,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
     pair_col: str = "pair"
     ts_col: str = "timestamp"
 
-    raw_data_type: RawDataType = RawDataType.SPOT
+    raw_data_type: RawDataType | str = RawDataType.SPOT
 
     features: FeaturePipeline | None = None
 

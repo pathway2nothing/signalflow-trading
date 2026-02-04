@@ -91,7 +91,7 @@ class Labeler(ABC):
     """
 
     component_type: ClassVar[SfComponentType] = SfComponentType.LABELER
-    raw_data_type: RawDataType = RawDataType.SPOT
+    raw_data_type: RawDataType | str = RawDataType.SPOT
 
     pair_col: str = "pair"
     ts_col: str = "timestamp"

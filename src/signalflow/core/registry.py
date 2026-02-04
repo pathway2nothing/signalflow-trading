@@ -6,13 +6,24 @@ from loguru import logger
 from .enums import SfComponentType
 
 
+_BUILTIN_RAW_DATA_TYPES: Dict[str, set[str]] = {
+    "spot": {"pair", "timestamp", "open", "high", "low", "close", "volume"},
+    "futures": {"pair", "timestamp", "open", "high", "low", "close", "volume", "open_interest"},
+    "perpetual": {"pair", "timestamp", "open", "high", "low", "close", "volume", "funding_rate", "open_interest"},
+}
+
+
 @dataclass
 class SignalFlowRegistry:
     """Component registry for dynamic component discovery and instantiation.
 
     Provides centralized registration and lookup for SignalFlow components.
-    Components are organized by type (DETECTOR, EXTRACTOR, etc.) and 
+    Components are organized by type (DETECTOR, EXTRACTOR, etc.) and
     accessed by case-insensitive names.
+
+    Also manages extensible raw data type definitions — each data type maps
+    to a set of required columns. Built-in types (SPOT, FUTURES, PERPETUAL)
+    are pre-registered; users can add custom types via ``register_raw_data_type()``.
 
     Registry structure:
         component_type -> name -> class
@@ -27,42 +38,27 @@ class SignalFlowRegistry:
         - EXECUTOR: Order execution engines
 
     Attributes:
-        _items (dict[SfComponentType, dict[str, Type[Any]]]): 
+        _items (dict[SfComponentType, dict[str, Type[Any]]]):
             Internal storage mapping component types to name-class pairs.
+        _raw_data_types (dict[str, set[str]]):
+            Mapping of raw data type names to their required column sets.
 
     Example:
         ```python
-        from signalflow.core.registry import SignalFlowRegistry
-        from signalflow.core.enums import SfComponentType
+        from signalflow.core.registry import SignalFlowRegistry, default_registry
 
-        # Create registry
-        registry = SignalFlowRegistry()
-
-        # Register component
-        registry.register(
-            SfComponentType.DETECTOR,
-            name="sma_cross",
-            cls=SmaCrossDetector
+        # Register custom raw data type
+        default_registry.register_raw_data_type(
+            name="lob",
+            columns=["pair", "timestamp", "bid", "ask", "bid_size", "ask_size"],
         )
 
-        # Get component class
-        detector_cls = registry.get(SfComponentType.DETECTOR, "sma_cross")
+        # Get columns for any type
+        cols = default_registry.get_raw_data_columns("spot")
+        custom_cols = default_registry.get_raw_data_columns("lob")
 
-        # Instantiate component
-        detector = registry.create(
-            SfComponentType.DETECTOR,
-            "sma_cross",
-            fast_window=10,
-            slow_window=20
-        )
-
-        # List available components
-        detectors = registry.list(SfComponentType.DETECTOR)
-        print(f"Available detectors: {detectors}")
-
-        # Full snapshot
-        snapshot = registry.snapshot()
-        print(snapshot)
+        # List all registered raw data types
+        print(default_registry.list_raw_data_types())
         ```
 
     Note:
@@ -75,6 +71,7 @@ class SignalFlowRegistry:
     #TODO: Registry autodiscover
 
     _items: Dict[SfComponentType, Dict[str, Type[Any]]] = field(default_factory=dict)
+    _raw_data_types: Dict[str, set[str]] = field(default_factory=lambda: {k: v.copy() for k, v in _BUILTIN_RAW_DATA_TYPES.items()})
 
     def _ensure(self, component_type: SfComponentType) -> None:
         """Ensure component type exists in registry.
@@ -259,6 +256,91 @@ class SignalFlowRegistry:
         """
         self._ensure(component_type)
         return sorted(self._items[component_type])
+
+    # ── Raw data type registry ─────────────────────────────────────────
+
+    def register_raw_data_type(
+        self,
+        name: str,
+        columns: list[str] | set[str],
+        *,
+        override: bool = False,
+    ) -> None:
+        """Register a custom raw data type with its required columns.
+
+        Args:
+            name: Data type identifier (case-insensitive, stored lowercase).
+            columns: Required column names for this data type.
+            override: Allow overriding an existing registration.
+
+        Raises:
+            ValueError: If name is empty, columns are empty, or name already
+                registered (when override=False).
+
+        Example:
+            ```python
+            default_registry.register_raw_data_type(
+                name="lob",
+                columns=["pair", "timestamp", "bid", "ask", "bid_size", "ask_size"],
+            )
+            ```
+        """
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("name must be a non-empty string")
+
+        cols = set(columns)
+        if not cols:
+            raise ValueError("columns must be a non-empty collection")
+
+        key = name.strip().lower()
+
+        if key in self._raw_data_types and not override:
+            raise ValueError(f"Raw data type '{key}' already registered")
+
+        if key in self._raw_data_types and override:
+            logger.warning(f"Overriding raw data type '{key}'")
+
+        self._raw_data_types[key] = cols
+
+    def get_raw_data_columns(self, name: str) -> set[str]:
+        """Get required columns for a raw data type.
+
+        Args:
+            name: Data type identifier (case-insensitive). Accepts both
+                ``RawDataType`` enum members and plain strings.
+
+        Returns:
+            Copy of the column set for the requested type.
+
+        Raises:
+            KeyError: If data type is not registered.
+
+        Example:
+            ```python
+            cols = default_registry.get_raw_data_columns("spot")
+            # {'pair', 'timestamp', 'open', 'high', 'low', 'close', 'volume'}
+
+            cols = default_registry.get_raw_data_columns("lob")
+            # {'pair', 'timestamp', 'bid', 'ask', ...}
+            ```
+        """
+        raw = getattr(name, "value", name)
+        key = str(raw).strip().lower()
+        try:
+            return self._raw_data_types[key].copy()
+        except KeyError:
+            available = ", ".join(sorted(self._raw_data_types))
+            raise KeyError(
+                f"Raw data type '{key}' not registered. Available: [{available}]"
+            ) from None
+
+    def list_raw_data_types(self) -> list[str]:
+        """List all registered raw data type names.
+
+        Returns:
+            Sorted list of registered data type names.
+        """
+        return sorted(self._raw_data_types)
 
     def snapshot(self) -> dict[str, list[str]]:
         """Snapshot of registry for debugging.

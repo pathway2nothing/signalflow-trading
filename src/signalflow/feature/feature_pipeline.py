@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import ClassVar, Any
 from signalflow.core import RawDataView, RawDataType
+from signalflow.core.registry import default_registry
 import polars as pl
 from signalflow.feature.base import Feature, GlobalFeature
 from signalflow.feature.offset_feature import OffsetFeature
@@ -30,7 +31,7 @@ class FeaturePipeline(Feature):
     """
     
     features: list[Feature] = field(default_factory=list)
-    raw_data_type: RawDataType = RawDataType.SPOT
+    raw_data_type: RawDataType | str = RawDataType.SPOT
     
     requires: ClassVar[list[str]] = []
     
@@ -52,7 +53,7 @@ class FeaturePipeline(Feature):
     
     def _validate(self):
         """Validate all dependencies are satisfied."""
-        available = self.raw_data_type.columns.copy()
+        available = default_registry.get_raw_data_columns(self.raw_data_type)
         
         for f in self.features:
             required = set(f.required_cols())
@@ -120,14 +121,15 @@ class FeaturePipeline(Feature):
     
     def run(self, raw_data_view: RawDataView, context: dict[str, Any] | None = None) -> pl.DataFrame:
         """Entry point: load from RawDataView and compute."""
-        df = raw_data_view.to_polars(self.raw_data_type)
+        key = getattr(self.raw_data_type, "value", self.raw_data_type)
+        df = raw_data_view.to_polars(key)
         return self.compute(df)
     
     def to_mermaid(self) -> str:
         """Generate Mermaid diagram of feature dependencies."""
         lines = ["graph LR"]
         lines.append("    subgraph Input")
-        for col in sorted(self.raw_data_type.columns):
+        for col in sorted(default_registry.get_raw_data_columns(self.raw_data_type)):
             lines.append(f"        {col}[{col}]")
         lines.append("    end")
         
