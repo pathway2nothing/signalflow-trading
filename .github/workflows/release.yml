@@ -6,11 +6,15 @@ on:
       - main
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
   release:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     outputs:
       version: ${{ steps.get_version.outputs.version }}
       released: ${{ steps.create_release.outputs.released }}

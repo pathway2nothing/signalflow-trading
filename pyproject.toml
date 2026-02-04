@@ -24,6 +24,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+]
 docs = [
   "mkdocs>=1.6",
   "mkdocs-material>=9.5",
@@ -62,3 +65,10 @@ upload_to_release = true
 build_command = "pip install build && python -m build"
 commit_message = "chore(release): {version} [skip ci]"
 major_on_zero = false
+
+# --- Pytest Configuration ---
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
