@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import ClassVar, Literal
 
 import numpy as np
 import polars as pl
@@ -45,7 +45,12 @@ class LinRegForecastFeature(Feature):
         "{source_col}_forecast_change",
         "{source_col}_forecast_direction"
     ]
-    
+
+    test_params: ClassVar[list[dict]] = [
+        {"source_col": "rsi_14", "n_lags": 10},
+        {"source_col": "rsi_14", "n_lags": 5, "mean_window": 10},
+    ]
+
     def __post_init__(self):
         if self.n_lags < 1:
             raise ValueError(f"n_lags must be >= 1")
@@ -154,4 +159,8 @@ class LinRegForecastFeature(Feature):
             pl.Series(name=forecast_col, values=forecasts),
             pl.Series(name=change_col, values=forecast_changes),
             pl.Series(name=direction_col, values=np.sign(forecast_changes)),
-        ])  
+        ])
+
+    @property
+    def warmup(self) -> int:
+        return self.min_samples + max(self.n_lags, self.mean_window)  
