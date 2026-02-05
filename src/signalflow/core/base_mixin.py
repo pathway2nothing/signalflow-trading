@@ -70,7 +70,7 @@ class SfTorchModuleMixin(ABC):
 
         # Hyperparameter tuning
         study = optuna.create_study()
-        
+
         def objective(trial):
             params = MyLSTMDetector.tune(trial, model_size="medium")
             model = MyLSTMDetector(**params)
@@ -88,9 +88,9 @@ class SfTorchModuleMixin(ABC):
         sf_component: Decorator for registering modules in the registry.
         SfComponentType: Enum of all component types including TORCH_MODULE.
     """
-    
+
     component_type: SfComponentType = SfComponentType.TORCH_MODULE
-    
+
     @classmethod
     @abstractmethod
     def default_params(cls) -> dict:
@@ -132,7 +132,7 @@ class SfTorchModuleMixin(ABC):
             Consider computational constraints when setting defaults.
         """
         ...
-    
+
     @classmethod
     @abstractmethod
     def tune(cls, trial: optuna.Trial, model_size: Literal["small", "medium", "large"] = "small") -> dict:
@@ -155,7 +155,7 @@ class SfTorchModuleMixin(ABC):
         Example:
             ```python
             class MyRNN(nn.Module, SfTorchModuleMixin):
-                def __init__(self, input_size: int, hidden_size: int, 
+                def __init__(self, input_size: int, hidden_size: int,
                            num_layers: int, dropout: float):
                     super().__init__()
                     # ... initialization ...
@@ -186,17 +186,17 @@ class SfTorchModuleMixin(ABC):
                             "layers": (3, 5)
                         }
                     }
-                    
+
                     config = size_config[model_size]
-                    
+
                     return {
                         "input_size": 20,
                         "hidden_size": trial.suggest_int(
-                            "hidden_size", 
+                            "hidden_size",
                             *config["hidden"]
                         ),
                         "num_layers": trial.suggest_int(
-                            "num_layers", 
+                            "num_layers",
                             *config["layers"]
                         ),
                         "dropout": trial.suggest_float("dropout", 0.0, 0.5)
@@ -208,11 +208,11 @@ class SfTorchModuleMixin(ABC):
             def objective(trial):
                 params = MyRNN.tune(trial, model_size="medium")
                 model = MyRNN(**params)
-                
+
                 # Train model
                 trainer = Trainer(model, train_data, val_data)
                 val_loss = trainer.train()
-                
+
                 return val_loss
 
             study = optuna.create_study(direction="minimize")

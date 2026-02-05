@@ -5,6 +5,7 @@ from typing import Optional, ClassVar
 from signalflow.core import SfComponentType
 import polars as pl
 
+
 @dataclass
 class RawDataSource(ABC):
     """Abstract base class for raw data sources.
@@ -42,7 +43,7 @@ class RawDataSource(ABC):
             api_key: str = ""
             api_secret: str = ""
             base_url: str = "https://api.binance.com"
-            
+
             def get_client(self):
                 '''Create authenticated client'''
                 from binance.client import Client
@@ -69,7 +70,7 @@ class RawDataSource(ABC):
             '''CSV file source'''
             file_path: Path
             separator: str = ","
-            
+
             def read(self) -> pl.DataFrame:
                 return pl.read_csv(self.file_path, separator=self.separator)
 
@@ -83,7 +84,7 @@ class RawDataSource(ABC):
             database: str
             user: str
             password: str
-            
+
             def get_connection_string(self) -> str:
                 return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
         ```
@@ -97,6 +98,7 @@ class RawDataSource(ABC):
         RawDataLoader: Active component that uses sources to download data.
         RawDataStore: Storage backend for persisting downloaded data.
     """
+
     component_type: ClassVar[SfComponentType] = SfComponentType.RAW_DATA_SOURCE
 
 
@@ -132,7 +134,7 @@ class RawDataLoader(ABC):
         @sf_component(name="binance_spot_loader")
         class BinanceSpotLoader(RawDataLoader):
             '''Loads Binance spot data'''
-            
+
             def __init__(self, source: BinanceSpotSource, store: DuckDbSpotStore):
                 self.source = source
                 self.store = store
@@ -147,10 +149,10 @@ class RawDataLoader(ABC):
                         start_str=start.isoformat(),
                         end_str=end.isoformat()
                     )
-                    
+
                     # Transform to canonical format
                     formatted = self._format_klines(klines)
-                    
+
                     # Store
                     self.store.insert_klines(pair, formatted)
 
@@ -159,7 +161,7 @@ class RawDataLoader(ABC):
                 for pair in pairs:
                     # Get last timestamp
                     _, max_ts = self.store.get_time_bounds(pair)
-                    
+
                     if max_ts:
                         # Fetch data from max_ts to now
                         self.download(
@@ -209,6 +211,7 @@ class RawDataLoader(ABC):
         RawDataStore: Defines where data is stored.
         RawDataFactory: Creates RawData from stored data.
     """
+
     component_type: ClassVar[SfComponentType] = SfComponentType.RAW_DATA_LOADER
 
     @abstractmethod
@@ -284,11 +287,11 @@ class RawDataLoader(ABC):
 
             # Scheduled sync (e.g., cron job)
             import schedule
-            
+
             def daily_sync():
                 loader.sync(pairs=["BTCUSDT", "ETHUSDT"])
                 print(f"Synced at {datetime.now()}")
-            
+
             schedule.every().day.at("00:00").do(daily_sync)
             ```
 

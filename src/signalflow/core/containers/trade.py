@@ -9,6 +9,7 @@ import polars as pl
 
 TradeSide = Literal["BUY", "SELL"]
 
+
 @dataclass(frozen=True, slots=True)
 class Trade:
     """Immutable domain event representing an executed trade.

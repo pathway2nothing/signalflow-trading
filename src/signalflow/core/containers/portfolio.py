@@ -10,6 +10,7 @@ import polars as pl
 from signalflow.core.containers.position import Position
 from signalflow.core.containers.trade import Trade
 
+
 @dataclass(slots=True)
 class Portfolio:
     """Portfolio snapshot (pure domain).
@@ -69,7 +70,7 @@ class Portfolio:
             ```python
             open = portfolio.open_positions()
             print(f"Open positions: {len(open)}")
-            
+
             for pos in open:
                 print(f"{pos.pair}: {pos.qty} @ ${pos.entry_price}")
             ```
@@ -97,7 +98,7 @@ class Portfolio:
             }
             equity = portfolio.equity(prices=prices)
             print(f"Total equity: ${equity:,.2f}")
-            
+
             # Track equity over time
             equity_history = []
             for ts, prices in price_history:
@@ -129,13 +130,13 @@ class Portfolio:
             ```python
             # Convert all positions
             all_df = Portfolio.positions_to_pl(portfolio.positions.values())
-            
+
             # Convert only open positions
             open_df = Portfolio.positions_to_pl(portfolio.open_positions())
-            
+
             # Analyze positions
             print(open_df.select(["pair", "qty", "realized_pnl"]))
-            
+
             # Group by pair
             by_pair = open_df.group_by("pair").agg([
                 pl.col("qty").sum().alias("total_qty"),
@@ -145,24 +146,26 @@ class Portfolio:
         """
         if not positions:
             return pl.DataFrame()
-        return pl.DataFrame([
-            {
-                "id": p.id,
-                "is_closed": p.is_closed,
-                "pair": p.pair,
-                "position_type": p.position_type.value,
-                "signal_strength": p.signal_strength,
-                "entry_time": p.entry_time,
-                "last_time": p.last_time,
-                "entry_price": p.entry_price,
-                "last_price": p.last_price,
-                "qty": p.qty,
-                "fees_paid": p.fees_paid,
-                "realized_pnl": p.realized_pnl,
-                "meta": p.meta,
-            }
-            for p in positions
-        ])
+        return pl.DataFrame(
+            [
+                {
+                    "id": p.id,
+                    "is_closed": p.is_closed,
+                    "pair": p.pair,
+                    "position_type": p.position_type.value,
+                    "signal_strength": p.signal_strength,
+                    "entry_time": p.entry_time,
+                    "last_time": p.last_time,
+                    "entry_price": p.entry_price,
+                    "last_price": p.last_price,
+                    "qty": p.qty,
+                    "fees_paid": p.fees_paid,
+                    "realized_pnl": p.realized_pnl,
+                    "meta": p.meta,
+                }
+                for p in positions
+            ]
+        )
 
     @staticmethod
     def trades_to_pl(trades: Iterable[Trade]) -> pl.DataFrame:
@@ -178,15 +181,15 @@ class Portfolio:
             ```python
             # Convert all trades
             trades_df = Portfolio.trades_to_pl(all_trades)
-            
+
             # Analyze trades
             print(trades_df.select(["pair", "side", "price", "qty"]))
-            
+
             # Filter by type
             entry_trades = trades_df.filter(
                 pl.col("meta").struct.field("type") == "entry"
             )
-            
+
             # Calculate total volume
             total_volume = trades_df.select(
                 (pl.col("price") * pl.col("qty")).sum()
@@ -195,17 +198,19 @@ class Portfolio:
         """
         if not trades:
             return pl.DataFrame()
-        return pl.DataFrame([
-            {
-                "id": t.id,
-                "position_id": t.position_id,
-                "pair": t.pair,
-                "side": t.side,
-                "ts": t.ts,
-                "price": t.price,
-                "qty": t.qty,
-                "fee": t.fee,
-                "meta": t.meta,
-            }
-            for t in trades
-        ])
+        return pl.DataFrame(
+            [
+                {
+                    "id": t.id,
+                    "position_id": t.position_id,
+                    "pair": t.pair,
+                    "side": t.side,
+                    "ts": t.ts,
+                    "price": t.price,
+                    "qty": t.qty,
+                    "fee": t.fee,
+                    "meta": t.meta,
+                }
+                for t in trades
+            ]
+        )

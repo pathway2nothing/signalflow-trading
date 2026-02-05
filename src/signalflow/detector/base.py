@@ -10,6 +10,7 @@ from signalflow.core import RawDataView, Signals, SfComponentType, SignalType, R
 from signalflow.feature import FeaturePipeline
 from signalflow.utils import KwargsTolerantMixin
 
+
 @dataclass
 class SignalDetector(KwargsTolerantMixin, ABC):
     """Base class for Polars-first signal detection.
@@ -48,7 +49,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
 
         class SmaCrossDetector(SignalDetector):
             '''Simple SMA crossover detector'''
-            
+
             def __init__(self, fast_window: int = 10, slow_window: int = 20):
                 super().__init__()
                 # Auto-generate features
@@ -57,7 +58,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
                     SmaExtractor(window=fast_window, column="close"),
                     SmaExtractor(window=slow_window, column="close")
                 ])
-            
+
             def detect(self, features: pl.DataFrame, context=None) -> Signals:
                 signals = features.with_columns([
                     # Detect crossover
@@ -77,7 +78,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
                     "signal_type",
                     pl.lit(1).alias("signal")
                 ])
-                
+
                 return Signals(signals)
 
         # Usage
@@ -100,7 +101,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
     pair_col: str = "pair"
     ts_col: str = "timestamp"
 
-    raw_data_type: RawDataType = RawDataType.SPOT
+    raw_data_type: RawDataType | str = RawDataType.SPOT
 
     features: FeaturePipeline | None = None
 
@@ -193,9 +194,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
             ```
         """
         if self.feature_pipeline is None:
-            raise NotImplementedError(
-                f"{self.__class__.__name__}.preprocess is not implemented and features is None"
-            )
+            raise NotImplementedError(f"{self.__class__.__name__}.preprocess is not implemented and features is None")
         out = self.feature_pipeline.run(raw_data_view, context=context)
         if not isinstance(out, pl.DataFrame):
             raise TypeError(f"{self.__class__.__name__}.features.extract must return pl.DataFrame, got {type(out)}")
@@ -236,7 +235,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
                     "signal",
                     "probability"
                 ])
-                
+
                 return Signals(signals)
             ```
 
@@ -298,11 +297,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
                 f"Use .dt.replace_time_zone(None)."
             )
 
-        dup = (
-            df.group_by([self.pair_col, self.ts_col])
-            .len()
-            .filter(pl.col("len") > 1)
-        )
+        dup = df.group_by([self.pair_col, self.ts_col]).len().filter(pl.col("len") > 1)
         if dup.height > 0:
             raise ValueError(
                 "Features contain duplicate keys (pair,timestamp). "
@@ -340,15 +335,9 @@ class SignalDetector(KwargsTolerantMixin, ABC):
             raise ValueError(f"Signals missing required columns: {missing}")
 
         allowed = {t.value for t in SignalType}
-        bad = (
-            s.select(pl.col("signal_type"))
-            .unique()
-            .filter(~pl.col("signal_type").is_in(list(allowed)))
-        )
+        bad = s.select(pl.col("signal_type")).unique().filter(~pl.col("signal_type").is_in(list(allowed)))
         if bad.height > 0:
-            raise ValueError(
-                f"Signals contain unknown signal_type values: {bad.get_column('signal_type').to_list()}"
-            )
+            raise ValueError(f"Signals contain unknown signal_type values: {bad.get_column('signal_type').to_list()}")
 
         if self.require_probability and "probability" not in s.columns:
             raise ValueError("Signals must contain 'probability' column (require_probability=True)")
@@ -358,11 +347,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
             raise ValueError(f"Signals column '{self.ts_col}' must be timezone-naive, got tz={ts_dtype.time_zone}.")
 
         # optional: hard guarantee no duplicates in signals
-        dup = (
-            s.group_by([self.pair_col, self.ts_col])
-            .len()
-            .filter(pl.col("len") > 1)
-        )
+        dup = s.group_by([self.pair_col, self.ts_col]).len().filter(pl.col("len") > 1)
         if dup.height > 0:
             raise ValueError(
                 "Signals contain duplicate keys (pair,timestamp). "

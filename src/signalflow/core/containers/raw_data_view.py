@@ -2,9 +2,8 @@ from dataclasses import dataclass, field
 import pandas as pd
 import polars as pl
 from .raw_data import RawData
-from signalflow.core.enums import DataFrameType
+from signalflow.core.enums import DataFrameType, RawDataType
 
-# TODO raw_data_type -> RawDataType
 
 @dataclass
 class RawDataView:
@@ -124,46 +123,37 @@ class RawDataView:
 
         return df
 
-    def get_data(
-        self, 
-        raw_data_type: str, 
-        df_type: DataFrameType
-    ) -> pl.DataFrame | pd.DataFrame:
+    def get_data(self, raw_data_type: RawDataType | str, df_type: DataFrameType) -> pl.DataFrame | pd.DataFrame:
         """Get raw data in specified format.
-        
+
         Unified interface for accessing data in required DataFrame format.
         Used by FeaturePipeline to get data in format expected by extractors.
-        
+
         Args:
-            raw_data_type (str): Type of data ('spot', 'futures', 'perpetual').
+            raw_data_type: Data type key (built-in ``RawDataType`` or custom string).
             df_type (DataFrameType): Target DataFrame type (POLARS or PANDAS).
-            
+
         Returns:
             pl.DataFrame | pd.DataFrame: Dataset in requested format.
 
         Raises:
             ValueError: If df_type is not POLARS or PANDAS.
-            
+
         Example:
             ```python
-            from signalflow.core.enums import DataFrameType
+            from signalflow.core.enums import DataFrameType, RawDataType
 
             # Get as Polars
-            spot_pl = view.get_data('spot', DataFrameType.POLARS)
+            spot_pl = view.get_data(RawDataType.SPOT, DataFrameType.POLARS)
 
-            # Get as Pandas
-            spot_pd = view.get_data('spot', DataFrameType.PANDAS)
-
-            # Used by FeatureExtractor
-            class MyExtractor(FeatureExtractor):
-                def extract(self, df):
-                    # df will be in format specified by df_type
-                    pass
+            # Get as Pandas (custom type)
+            lob_pd = view.get_data('lob', DataFrameType.PANDAS)
             ```
         """
+        key = getattr(raw_data_type, "value", raw_data_type)
         if df_type == DataFrameType.POLARS:
-            return self.to_polars(raw_data_type)   
+            return self.to_polars(key)
         elif df_type == DataFrameType.PANDAS:
-            return self.to_pandas(raw_data_type)
+            return self.to_pandas(key)
         else:
             raise ValueError(f"Unsupported df_type: {df_type}")

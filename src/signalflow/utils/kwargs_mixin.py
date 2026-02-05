@@ -6,6 +6,7 @@ from loguru import logger
 
 T = TypeVar("T")
 
+
 class KwargsTolerantMixin:
     """
     Mixin for dataclasses:
@@ -16,14 +17,14 @@ class KwargsTolerantMixin:
 
     __ignore_unknown_kwargs__: bool = True
     __log_unknown_kwargs__: bool = True
-    __strict_unknown_kwargs__: bool = False 
+    __strict_unknown_kwargs__: bool = False
 
     def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)
 
         orig_init = cls.__dict__.get("__init__")
         if orig_init is None:
-            return  
+            return
 
         def wrapped_init(self: T, *args: Any, **kwargs2: Any) -> None:
             if not kwargs2:
@@ -40,8 +41,7 @@ class KwargsTolerantMixin:
             if unknown:
                 if getattr(cls, "__strict_unknown_kwargs__", False):
                     raise TypeError(
-                        f"{cls.__name__} got unexpected kwargs: {sorted(unknown)}. "
-                        f"Available: {sorted(known)}"
+                        f"{cls.__name__} got unexpected kwargs: {sorted(unknown)}. Available: {sorted(known)}"
                     )
 
                 if getattr(cls, "__log_unknown_kwargs__", True):

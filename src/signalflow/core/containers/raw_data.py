@@ -76,7 +76,7 @@ class RawData:
         Example:
             ```python
             spot_df = raw_data.get("spot")
-            
+
             # Returns empty DataFrame if key doesn't exist
             missing_df = raw_data.get("nonexistent")
             assert missing_df.is_empty()
@@ -86,9 +86,7 @@ class RawData:
         if obj is None:
             return pl.DataFrame()
         if not isinstance(obj, pl.DataFrame):
-            raise TypeError(
-                f"Dataset '{key}' is not a polars.DataFrame: {type(obj)}"
-            )
+            raise TypeError(f"Dataset '{key}' is not a polars.DataFrame: {type(obj)}")
         return obj
 
     def __getitem__(self, key: str) -> pl.DataFrame:

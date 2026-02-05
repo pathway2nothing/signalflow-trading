@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+import importlib
+import pkgutil
+import sys
 from dataclasses import dataclass, field
-from typing import Any, Dict, Type
+from importlib.metadata import entry_points
+from typing import Any
+
 from loguru import logger
+
 from .enums import SfComponentType
+
+_BUILTIN_RAW_DATA_TYPES: dict[str, set[str]] = {
+    "spot": {"pair", "timestamp", "open", "high", "low", "close", "volume"},
+    "futures": {"pair", "timestamp", "open", "high", "low", "close", "volume", "open_interest"},
+    "perpetual": {"pair", "timestamp", "open", "high", "low", "close", "volume", "funding_rate", "open_interest"},
+}
 
 
 @dataclass
@@ -11,8 +23,12 @@ class SignalFlowRegistry:
     """Component registry for dynamic component discovery and instantiation.
 
     Provides centralized registration and lookup for SignalFlow components.
-    Components are organized by type (DETECTOR, EXTRACTOR, etc.) and 
+    Components are organized by type (DETECTOR, EXTRACTOR, etc.) and
     accessed by case-insensitive names.
+
+    Also manages extensible raw data type definitions — each data type maps
+    to a set of required columns. Built-in types (SPOT, FUTURES, PERPETUAL)
+    are pre-registered; users can add custom types via ``register_raw_data_type()``.
 
     Registry structure:
         component_type -> name -> class
@@ -27,42 +43,27 @@ class SignalFlowRegistry:
         - EXECUTOR: Order execution engines
 
     Attributes:
-        _items (dict[SfComponentType, dict[str, Type[Any]]]): 
+        _items (dict[SfComponentType, dict[str, Type[Any]]]):
             Internal storage mapping component types to name-class pairs.
+        _raw_data_types (dict[str, set[str]]):
+            Mapping of raw data type names to their required column sets.
 
     Example:
         ```python
-        from signalflow.core.registry import SignalFlowRegistry
-        from signalflow.core.enums import SfComponentType
+        from signalflow.core.registry import SignalFlowRegistry, default_registry
 
-        # Create registry
-        registry = SignalFlowRegistry()
-
-        # Register component
-        registry.register(
-            SfComponentType.DETECTOR,
-            name="sma_cross",
-            cls=SmaCrossDetector
+        # Register custom raw data type
+        default_registry.register_raw_data_type(
+            name="lob",
+            columns=["pair", "timestamp", "bid", "ask", "bid_size", "ask_size"],
         )
 
-        # Get component class
-        detector_cls = registry.get(SfComponentType.DETECTOR, "sma_cross")
+        # Get columns for any type
+        cols = default_registry.get_raw_data_columns("spot")
+        custom_cols = default_registry.get_raw_data_columns("lob")
 
-        # Instantiate component
-        detector = registry.create(
-            SfComponentType.DETECTOR,
-            "sma_cross",
-            fast_window=10,
-            slow_window=20
-        )
-
-        # List available components
-        detectors = registry.list(SfComponentType.DETECTOR)
-        print(f"Available detectors: {detectors}")
-
-        # Full snapshot
-        snapshot = registry.snapshot()
-        print(snapshot)
+        # List all registered raw data types
+        print(default_registry.list_raw_data_types())
         ```
 
     Note:
@@ -72,9 +73,12 @@ class SignalFlowRegistry:
     See Also:
         sf_component: Decorator for automatic component registration.
     """
-    #TODO: Registry autodiscover
 
-    _items: Dict[SfComponentType, Dict[str, Type[Any]]] = field(default_factory=dict)
+    _items: dict[SfComponentType, dict[str, type[Any]]] = field(default_factory=dict)
+    _raw_data_types: dict[str, set[str]] = field(
+        default_factory=lambda: {k: v.copy() for k, v in _BUILTIN_RAW_DATA_TYPES.items()}
+    )
+    _discovered: bool = field(default=False, repr=False)
 
     def _ensure(self, component_type: SfComponentType) -> None:
         """Ensure component type exists in registry.
@@ -86,7 +90,84 @@ class SignalFlowRegistry:
         """
         self._items.setdefault(component_type, {})
 
-    def register(self, component_type: SfComponentType, name: str, cls: Type[Any], *, override: bool = False) -> None:
+    # ── Autodiscovery ─────────────────────────────────────────────────
+
+    def _discover_if_needed(self) -> None:
+        """Trigger autodiscovery on first read access (lazy loading)."""
+        if not self._discovered:
+            self.autodiscover()
+
+    def autodiscover(self) -> None:
+        """Scan ``signalflow.*`` packages and entry-points for components.
+
+        Walks all sub-modules of the ``signalflow`` package using
+        :func:`pkgutil.walk_packages` and imports them.  Because
+        :func:`sf_component` registers classes at import time, importing
+        a module is sufficient to populate the registry.
+
+        External packages can expose components via the
+        ``signalflow.components`` entry-point group.  Each entry-point
+        should reference a module (not a callable); importing it triggers
+        registration through the ``@sf_component`` decorator.
+
+        This method is idempotent — subsequent calls are no-ops once
+        ``_discovered`` is ``True``.
+
+        Example:
+            ```python
+            from signalflow.core.registry import default_registry
+
+            # Explicit discovery (normally automatic on first get/list)
+            default_registry.autodiscover()
+
+            # All @sf_component-decorated classes are now registered
+            print(default_registry.snapshot())
+            ```
+        """
+        if self._discovered:
+            return
+        self._discovered = True
+
+        self._discover_internal_packages()
+        self._discover_entry_points()
+
+    def _discover_internal_packages(self) -> None:
+        """Import all ``signalflow.*`` sub-modules to trigger registration."""
+        try:
+            import signalflow as _sf_root
+        except ImportError:  # pragma: no cover
+            logger.warning("signalflow package not importable — skipping internal autodiscovery")
+            return
+
+        pkg_path = getattr(_sf_root, "__path__", None)
+        if pkg_path is None:  # pragma: no cover
+            return
+
+        for _importer, modname, _ispkg in pkgutil.walk_packages(pkg_path, prefix="signalflow."):
+            if modname in sys.modules:
+                continue
+            try:
+                importlib.import_module(modname)
+            except Exception:
+                logger.debug(f"autodiscover: failed to import {modname}")
+
+    def _discover_entry_points(self) -> None:
+        """Load external plugins registered under ``signalflow.components``."""
+        eps = entry_points()
+
+        # Python 3.12+: entry_points() returns SelectableGroups
+        if hasattr(eps, "select"):
+            group = eps.select(group="signalflow.components")
+        else:  # pragma: no cover
+            group = eps.get("signalflow.components", [])
+
+        for ep in group:
+            try:
+                ep.load()
+            except Exception:
+                logger.warning(f"autodiscover: failed to load entry-point {ep.name!r}")
+
+    def register(self, component_type: SfComponentType, name: str, cls: type[Any], *, override: bool = False) -> None:
         """Register a class under (component_type, name).
 
         Stores class in registry for later lookup and instantiation.
@@ -137,7 +218,7 @@ class SignalFlowRegistry:
 
         self._items[component_type][key] = cls
 
-    def get(self, component_type: SfComponentType, name: str) -> Type[Any]:
+    def get(self, component_type: SfComponentType, name: str) -> type[Any]:
         """Get a registered class by key.
 
         Lookup is case-insensitive. Raises helpful error with available
@@ -172,15 +253,14 @@ class SignalFlowRegistry:
                 # Shows: "Component not found: DETECTOR:unknown. Available: [sma_cross, ...]"
             ```
         """
+        self._discover_if_needed()
         self._ensure(component_type)
         key = name.lower()
         try:
             return self._items[component_type][key]
         except KeyError as e:
             available = ", ".join(sorted(self._items[component_type]))
-            raise KeyError(
-                f"Component not found: {component_type.value}:{key}. Available: [{available}]"
-            ) from e
+            raise KeyError(f"Component not found: {component_type.value}:{key}. Available: [{available}]") from e
 
     def create(self, component_type: SfComponentType, name: str, **kwargs: Any) -> Any:
         """Instantiate a component by registry key.
@@ -257,8 +337,92 @@ class SignalFlowRegistry:
                 print(f"{component_type.value}: {components}")
             ```
         """
+        self._discover_if_needed()
         self._ensure(component_type)
         return sorted(self._items[component_type])
+
+    # ── Raw data type registry ─────────────────────────────────────────
+
+    def register_raw_data_type(
+        self,
+        name: str,
+        columns: list[str] | set[str],
+        *,
+        override: bool = False,
+    ) -> None:
+        """Register a custom raw data type with its required columns.
+
+        Args:
+            name: Data type identifier (case-insensitive, stored lowercase).
+            columns: Required column names for this data type.
+            override: Allow overriding an existing registration.
+
+        Raises:
+            ValueError: If name is empty, columns are empty, or name already
+                registered (when override=False).
+
+        Example:
+            ```python
+            default_registry.register_raw_data_type(
+                name="lob",
+                columns=["pair", "timestamp", "bid", "ask", "bid_size", "ask_size"],
+            )
+            ```
+        """
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("name must be a non-empty string")
+
+        cols = set(columns)
+        if not cols:
+            raise ValueError("columns must be a non-empty collection")
+
+        key = name.strip().lower()
+
+        if key in self._raw_data_types and not override:
+            raise ValueError(f"Raw data type '{key}' already registered")
+
+        if key in self._raw_data_types and override:
+            logger.warning(f"Overriding raw data type '{key}'")
+
+        self._raw_data_types[key] = cols
+
+    def get_raw_data_columns(self, name: str) -> set[str]:
+        """Get required columns for a raw data type.
+
+        Args:
+            name: Data type identifier (case-insensitive). Accepts both
+                ``RawDataType`` enum members and plain strings.
+
+        Returns:
+            Copy of the column set for the requested type.
+
+        Raises:
+            KeyError: If data type is not registered.
+
+        Example:
+            ```python
+            cols = default_registry.get_raw_data_columns("spot")
+            # {'pair', 'timestamp', 'open', 'high', 'low', 'close', 'volume'}
+
+            cols = default_registry.get_raw_data_columns("lob")
+            # {'pair', 'timestamp', 'bid', 'ask', ...}
+            ```
+        """
+        raw = getattr(name, "value", name)
+        key = str(raw).strip().lower()
+        try:
+            return self._raw_data_types[key].copy()
+        except KeyError:
+            available = ", ".join(sorted(self._raw_data_types))
+            raise KeyError(f"Raw data type '{key}' not registered. Available: [{available}]") from None
+
+    def list_raw_data_types(self) -> list[str]:
+        """List all registered raw data type names.
+
+        Returns:
+            Sorted list of registered data type names.
+        """
+        return sorted(self._raw_data_types)
 
     def snapshot(self) -> dict[str, list[str]]:
         """Snapshot of registry for debugging.
@@ -266,7 +430,7 @@ class SignalFlowRegistry:
         Returns complete registry state organized by component type.
 
         Returns:
-            dict[str, list[str]]: Dictionary mapping component type names 
+            dict[str, list[str]]: Dictionary mapping component type names
                 to sorted lists of registered component names.
 
         Example:
@@ -293,6 +457,7 @@ class SignalFlowRegistry:
                 print("SMA detector is registered")
             ```
         """
+        self._discover_if_needed()
         return {t.value: sorted(v.keys()) for t, v in self._items.items()}
 
 
@@ -321,6 +486,7 @@ Example:
     ```
 """
 
-def get_component(type: SfComponentType, name: str  ) -> Type[Any]:
+
+def get_component(type: SfComponentType, name: str) -> type[Any]:
     """Get a registered component by type and name."""
-    return default_registry.get(type, name) 
+    return default_registry.get(type, name)

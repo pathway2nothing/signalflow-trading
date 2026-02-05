@@ -53,7 +53,7 @@ class SignalsTransform(Protocol):
 
         # Use in signal pipeline
         signals = detector.detect(data)
-        
+
         # Single transform
         filtered = signals.apply(filter_high_probability)
 
@@ -104,7 +104,7 @@ class SignalsTransform(Protocol):
             "cooldown_filter",
             cooldown_minutes=120
         )
-        
+
         filtered_signals = signals.apply(cooldown)
         ```
 

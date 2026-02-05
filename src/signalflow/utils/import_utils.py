@@ -7,5 +7,6 @@ def import_model_class(class_path: str) -> type:
         raise ValueError(f"Invalid class path: {class_path}")
 
     import importlib
+
     module = importlib.import_module(module_name)
     return getattr(module, class_name)

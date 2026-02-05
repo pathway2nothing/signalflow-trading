@@ -87,10 +87,10 @@ class Position:
     entry_time: datetime | None = None
     last_time: datetime | None = None
 
-    entry_price: float = 0.0   
+    entry_price: float = 0.0
     last_price: float = 0.0
 
-    qty: float = 0.0          
+    qty: float = 0.0
     fees_paid: float = 0.0
     realized_pnl: float = 0.0
 
@@ -248,9 +248,8 @@ class Position:
         Returns:
             bool: True if trade increases position.
         """
-        return (
-            (self.position_type == PositionType.LONG and side == "BUY")
-            or (self.position_type == PositionType.SHORT and side == "SELL")
+        return (self.position_type == PositionType.LONG and side == "BUY") or (
+            self.position_type == PositionType.SHORT and side == "SELL"
         )
 
     def _increase(self, trade: Trade) -> None:
@@ -269,9 +268,7 @@ class Position:
             self.entry_price = trade.price
             self.entry_time = trade.ts
         else:
-            self.entry_price = (
-                self.entry_price * self.qty + trade.price * trade.qty
-            ) / new_qty
+            self.entry_price = (self.entry_price * self.qty + trade.price * trade.qty) / new_qty
 
         self.qty = new_qty
 

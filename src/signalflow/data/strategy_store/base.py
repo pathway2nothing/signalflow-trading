@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Iterable, Optional
+from typing import ClassVar, Iterable, Optional
 
-from signalflow.core import StrategyState, Position, Trade
+from signalflow.core import SfComponentType, StrategyState, Position, Trade
 
 
 class StrategyStore(ABC):
+    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_STORE
     """Abstract base class for strategy state persistence.
 
     Defines the interface for persisting strategy execution state, including
@@ -43,7 +44,7 @@ class StrategyStore(ABC):
         try:
             # Load existing state
             state = store.load_state("my_strategy")
-            
+
             if state is None:
                 # Initialize new state
                 state = StrategyState(strategy_id="my_strategy")
@@ -130,7 +131,7 @@ class StrategyStore(ABC):
             ```python
             # Load existing state
             state = store.load_state("my_strategy")
-            
+
             if state:
                 print(f"Resuming from: {state.last_ts}")
                 print(f"Cash: ${state.portfolio.cash}")
@@ -274,5 +275,14 @@ class StrategyStore(ABC):
             Append-only time series.
             Metric names should be consistent across snapshots.
             Used for performance visualization and optimization.
+        """
+        ...
+
+    @abstractmethod
+    def close(self) -> None:
+        """Close storage connection and cleanup resources.
+
+        Releases database connections, file handles, or other resources.
+        Idempotent — safe to call multiple times.
         """
         ...

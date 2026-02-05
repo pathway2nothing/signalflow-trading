@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.3.4"
+version = "0.3.5"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -21,9 +21,23 @@ dependencies = [
     "lightning>=2.1.0",
     "numpy>=1.24.0",
     "pandas-ta>=0.3.14b",
+    "plotly>=5.0.0",
+    "pyarrow>=14.0.0",
 ]
 
 [project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-timeout>=2.2",
+  "pytest-asyncio>=0.23",
+  "pre-commit>=3.7",
+  "ruff>=0.15",
+  "mypy>=1.19",
+]
+test = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+]
 docs = [
   "mkdocs>=1.6",
   "mkdocs-material>=9.5",
@@ -62,3 +76,52 @@ upload_to_release = true
 build_command = "pip install build && python -m build"
 commit_message = "chore(release): {version} [skip ci]"
 major_on_zero = false
+
+# --- Ruff Configuration ---
+[tool.ruff]
+target-version = "py312"
+src = ["src"]
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["signalflow"]
+
+# --- Mypy Configuration ---
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "loguru",
+    "pandas_ta.*",
+    "plotly.*",
+    "numba.*",
+    "optuna.*",
+    "lightning.*",
+    "duckdb.*",
+    "aiohttp.*",
+    "sklearn.*",
+]
+ignore_missing_imports = true
+
+# --- Pytest Configuration ---
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
