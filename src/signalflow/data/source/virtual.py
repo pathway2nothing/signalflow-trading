@@ -268,10 +268,7 @@ class VirtualDataProvider(RawDataLoader):
             pairs: Trading pairs to stream.
             update_interval_sec: Seconds between new bars.
         """
-        logger.info(
-            f"VirtualDataProvider sync started pairs={pairs} "
-            f"interval={update_interval_sec}s"
-        )
+        logger.info(f"VirtualDataProvider sync started pairs={pairs} interval={update_interval_sec}s")
 
         tf_minutes = _TIMEFRAME_MINUTES.get(self.timeframe, 1)
         delta = timedelta(minutes=tf_minutes)
@@ -279,9 +276,7 @@ class VirtualDataProvider(RawDataLoader):
 
         while True:
             for pair in pairs:
-                price = self._last_prices.get(
-                    pair, self.base_prices.get(pair, 100.0)
-                )
+                price = self._last_prices.get(pair, self.base_prices.get(pair, 100.0))
                 n = self._bars_generated.get(pair, 0)
 
                 # Get last timestamp from store

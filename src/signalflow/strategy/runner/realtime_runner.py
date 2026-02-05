@@ -133,13 +133,8 @@ class RealtimeRunner(StrategyRunner):
 
         sync_task: asyncio.Task | None = None
         if self.loader is not None:
-            sync_task = asyncio.create_task(
-                self.loader.sync(self.pairs, update_interval_sec=self.sync_interval_sec)
-            )
-            logger.info(
-                "Started background data sync "
-                f"pairs={self.pairs} interval={self.sync_interval_sec}s"
-            )
+            sync_task = asyncio.create_task(self.loader.sync(self.pairs, update_interval_sec=self.sync_interval_sec))
+            logger.info(f"Started background data sync pairs={self.pairs} interval={self.sync_interval_sec}s")
 
         logger.info(
             f"RealtimeRunner started strategy_id={self.strategy_id} "
@@ -273,7 +268,9 @@ class RealtimeRunner(StrategyRunner):
         warmup_start = ts - timedelta(minutes=tf_minutes * self.warmup_bars)
 
         window_df = self.raw_store.load_many(
-            self.pairs, start=warmup_start, end=ts,
+            self.pairs,
+            start=warmup_start,
+            end=ts,
         )
 
         if window_df.height == 0:
@@ -343,13 +340,7 @@ class RealtimeRunner(StrategyRunner):
         if df.height == 0:
             return []
 
-        timestamps = (
-            df.select(self.ts_col)
-            .unique()
-            .sort(self.ts_col)
-            .get_column(self.ts_col)
-            .to_list()
-        )
+        timestamps = df.select(self.ts_col).unique().sort(self.ts_col).get_column(self.ts_col).to_list()
 
         # Filter out already-processed bar
         if state.last_ts is not None:
@@ -369,10 +360,7 @@ class RealtimeRunner(StrategyRunner):
             restored = self.strategy_store.load_state(self.strategy_id)
             if restored is not None:
                 state = self._reconstruct_state(restored)
-                logger.info(
-                    f"Restored state strategy_id={self.strategy_id} "
-                    f"last_ts={state.last_ts}"
-                )
+                logger.info(f"Restored state strategy_id={self.strategy_id} last_ts={state.last_ts}")
                 return state
 
         new_state = StrategyState(strategy_id=self.strategy_id)
@@ -446,11 +434,15 @@ class RealtimeRunner(StrategyRunner):
 
             if ts is not None and state.metrics:
                 self.strategy_store.append_metrics(
-                    self.strategy_id, ts, state.metrics,
+                    self.strategy_id,
+                    ts,
+                    state.metrics,
                 )
                 if hasattr(state.portfolio, "open_positions"):
                     self.strategy_store.upsert_positions(
-                        self.strategy_id, ts, state.portfolio.open_positions(),
+                        self.strategy_id,
+                        ts,
+                        state.portfolio.open_positions(),
                     )
         except Exception:
             logger.exception("Failed to persist state")
@@ -474,8 +466,7 @@ class RealtimeRunner(StrategyRunner):
         n_trades = len(trades)
 
         logger.info(
-            f"bar ts={ts} equity={equity:.2f} cash={cash:.2f} "
-            f"positions={n_open} signals={n_signals} trades={n_trades}"
+            f"bar ts={ts} equity={equity:.2f} cash={cash:.2f} positions={n_open} signals={n_signals} trades={n_trades}"
         )
 
         if self.summary_interval > 0 and self._bars_processed % self.summary_interval == 0:

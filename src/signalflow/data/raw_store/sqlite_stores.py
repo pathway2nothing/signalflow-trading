@@ -217,7 +217,9 @@ class SqliteSpotStore(RawDataStore):
             return pl.DataFrame(schema=_EMPTY_SCHEMA)
 
         placeholders = ",".join(["?"] * len(pairs))
-        query = f"SELECT pair, timestamp, open, high, low, close, volume, trades FROM ohlcv WHERE pair IN ({placeholders})"
+        query = (
+            f"SELECT pair, timestamp, open, high, low, close, volume, trades FROM ohlcv WHERE pair IN ({placeholders})"
+        )
         params: list[object] = [*pairs]
 
         if hours is not None:

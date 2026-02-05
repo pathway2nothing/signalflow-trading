@@ -17,10 +17,7 @@ try:
 except ImportError:
     psycopg = None  # type: ignore[assignment]
 
-_PG_MISSING_MSG = (
-    "psycopg is required for PostgreSQL stores. "
-    "Install with: pip install signalflow-trading[postgres]"
-)
+_PG_MISSING_MSG = "psycopg is required for PostgreSQL stores. Install with: pip install signalflow-trading[postgres]"
 
 _EMPTY_SCHEMA = {
     "pair": pl.Utf8,
@@ -102,8 +99,7 @@ class PgSpotStore(RawDataStore):
                 )
             """)
             cur.execute(
-                "INSERT INTO meta(key, value) VALUES (%s, %s) "
-                "ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value",
+                "INSERT INTO meta(key, value) VALUES (%s, %s) ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value",
                 (self.timeframe, self.timeframe),
             )
         self._con.commit()
@@ -229,7 +225,9 @@ class PgSpotStore(RawDataStore):
             return pl.DataFrame(schema=_EMPTY_SCHEMA)
 
         placeholders = ",".join(["%s"] * len(pairs))
-        query = f"SELECT pair, timestamp, open, high, low, close, volume, trades FROM ohlcv WHERE pair IN ({placeholders})"
+        query = (
+            f"SELECT pair, timestamp, open, high, low, close, volume, trades FROM ohlcv WHERE pair IN ({placeholders})"
+        )
         params: list[object] = [*pairs]
 
         if hours is not None:
