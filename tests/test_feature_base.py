@@ -11,6 +11,7 @@ from signalflow.feature.base import Feature, GlobalFeature
 @dataclass
 class DummyFeature(Feature):
     """Simple feature that adds a constant column."""
+
     requires: ClassVar[list[str]] = ["close"]
     outputs: ClassVar[list[str]] = ["dummy_out"]
 
@@ -21,6 +22,7 @@ class DummyFeature(Feature):
 @dataclass
 class ParameterizedFeature(Feature):
     """Feature with template-based outputs."""
+
     requires: ClassVar[list[str]] = ["{price_col}"]
     outputs: ClassVar[list[str]] = ["sma_{period}"]
 
@@ -28,9 +30,7 @@ class ParameterizedFeature(Feature):
     period: int = 10
 
     def compute_pair(self, df: pl.DataFrame) -> pl.DataFrame:
-        return df.with_columns(
-            pl.col(self.price_col).rolling_mean(window_size=self.period).alias(f"sma_{self.period}")
-        )
+        return df.with_columns(pl.col(self.price_col).rolling_mean(window_size=self.period).alias(f"sma_{self.period}"))
 
     @property
     def warmup(self) -> int:

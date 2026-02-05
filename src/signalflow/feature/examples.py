@@ -79,9 +79,7 @@ class ExampleRsiFeature(Feature):
 
         # Normalization: rescale bounded [0, 100] → [-1, 1]
         if self.normalized:
-            df = df.with_columns(
-                ((pl.col(col_name) - 50) / 50).alias(col_name)
-            )
+            df = df.with_columns(((pl.col(col_name) - 50) / 50).alias(col_name))
 
         return df
 
@@ -176,16 +174,12 @@ class ExampleGlobalMeanRsiFeature(GlobalFeature):
             rsi = ExampleRsiFeature(period=self.period, price_col=self.price_col)
             df = rsi.compute(df)
 
-        mean_df = df.group_by(self.ts_col).agg(
-            pl.col(rsi_col).mean().alias(out_col)
-        )
+        mean_df = df.group_by(self.ts_col).agg(pl.col(rsi_col).mean().alias(out_col))
 
         df = df.join(mean_df, on=self.ts_col, how="left")
 
         if self.add_diff:
-            df = df.with_columns(
-                (pl.col(rsi_col) - pl.col(out_col)).alias(f"rsi_{self.period}_diff")
-            )
+            df = df.with_columns((pl.col(rsi_col) - pl.col(out_col)).alias(f"rsi_{self.period}_diff"))
 
         if not has_rsi:
             df = df.drop(rsi_col)

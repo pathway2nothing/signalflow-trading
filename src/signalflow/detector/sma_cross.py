@@ -30,18 +30,17 @@ class ExampleSmaCrossDetector(SignalDetector):
         self.fast_col = f"sma_{self.fast_period}"
         self.slow_col = f"sma_{self.slow_period}"
 
-        self.feature_pipeline = FeaturePipeline(features=[
-            ExampleSmaFeature(period=self.fast_period, price_col=self.price_col),
-            ExampleSmaFeature(period=self.slow_period, price_col=self.price_col),
-        ])
+        self.feature_pipeline = FeaturePipeline(
+            features=[
+                ExampleSmaFeature(period=self.fast_period, price_col=self.price_col),
+                ExampleSmaFeature(period=self.slow_period, price_col=self.price_col),
+            ]
+        )
 
     def detect(self, features: pl.DataFrame, context: dict[str, Any] | None = None) -> Signals:
         df = features.sort([self.pair_col, self.ts_col])
 
-        df = df.filter(
-            pl.col(self.fast_col).is_not_null() & 
-            pl.col(self.slow_col).is_not_null()
-        )
+        df = df.filter(pl.col(self.fast_col).is_not_null() & pl.col(self.slow_col).is_not_null())
 
         fast = pl.col(self.fast_col)
         slow = pl.col(self.slow_col)
@@ -51,17 +50,18 @@ class ExampleSmaCrossDetector(SignalDetector):
         cross_up = (fast > slow) & (fast_prev <= slow_prev)
         cross_down = (fast < slow) & (fast_prev >= slow_prev)
 
-        out = df.select([
-            self.pair_col,
-            self.ts_col,
-            pl.when(cross_up).then(pl.lit(SignalType.RISE.value))
-              .when(cross_down).then(pl.lit(SignalType.FALL.value))
-              .otherwise(pl.lit(SignalType.NONE.value))
-              .alias("signal_type"),
-            pl.when(cross_up).then(1)
-              .when(cross_down).then(-1)
-              .otherwise(0)
-              .alias("signal"),
-        ])
+        out = df.select(
+            [
+                self.pair_col,
+                self.ts_col,
+                pl.when(cross_up)
+                .then(pl.lit(SignalType.RISE.value))
+                .when(cross_down)
+                .then(pl.lit(SignalType.FALL.value))
+                .otherwise(pl.lit(SignalType.NONE.value))
+                .alias("signal_type"),
+                pl.when(cross_up).then(1).when(cross_down).then(-1).otherwise(0).alias("signal"),
+            ]
+        )
 
         return Signals(out)

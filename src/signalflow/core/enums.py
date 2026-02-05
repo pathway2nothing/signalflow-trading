@@ -41,6 +41,7 @@ class SignalType(str, Enum):
         Stored as string values in DataFrames for serialization.
         Use .value to get string representation.
     """
+
     NONE = "none"
     RISE = "rise"
     FALL = "fall"
@@ -87,6 +88,7 @@ class PositionType(str, Enum):
         Currently only LONG positions are fully implemented.
         SHORT positions planned for future versions.
     """
+
     LONG = "long"
     SHORT = "short"
 
@@ -159,6 +161,7 @@ class SfComponentType(str, Enum):
         All registered components must have component_type class attribute.
         Component types are organized hierarchically (category/subcategory).
     """
+
     RAW_DATA_STORE = "data/store"
     RAW_DATA_SOURCE = "data/source"
     RAW_DATA_LOADER = "data/loader"
@@ -199,7 +202,7 @@ class DataFrameType(str, Enum):
         # Polars-based extractor
         class MyExtractor(FeatureExtractor):
             df_type = DataFrameType.POLARS
-            
+
             def extract(self, df: pl.DataFrame) -> pl.DataFrame:
                 return df.with_columns(
                     pl.col("close").rolling_mean(20).alias("sma_20")
@@ -208,7 +211,7 @@ class DataFrameType(str, Enum):
         # Pandas-based extractor
         class LegacyExtractor(FeatureExtractor):
             df_type = DataFrameType.PANDAS
-            
+
             def extract(self, df: pd.DataFrame) -> pd.DataFrame:
                 df["sma_20"] = df["close"].rolling(20).mean()
                 return df
@@ -217,7 +220,7 @@ class DataFrameType(str, Enum):
         from signalflow.core import RawDataView
 
         view = RawDataView(raw=raw_data)
-        
+
         # Get data in required format
         df_polars = view.get_data("spot", DataFrameType.POLARS)
         df_pandas = view.get_data("spot", DataFrameType.PANDAS)
@@ -227,8 +230,10 @@ class DataFrameType(str, Enum):
         New code should prefer POLARS for better performance.
         PANDAS supported for backward compatibility and legacy libraries.
     """
+
     POLARS = "polars"
     PANDAS = "pandas"
+
 
 class RawDataType(str, Enum):
     """Built-in raw data types.
@@ -265,6 +270,7 @@ class RawDataType(str, Enum):
         Use ``default_registry.get_raw_data_columns(name)`` to look up columns
         for any type (built-in or custom).
     """
+
     SPOT = "spot"
     FUTURES = "futures"
     PERPETUAL = "perpetual"
@@ -273,5 +279,5 @@ class RawDataType(str, Enum):
     def columns(self) -> set[str]:
         """Columns guaranteed to be present (looked up from registry)."""
         from signalflow.core.registry import default_registry
-        return default_registry.get_raw_data_columns(self.value)
 
+        return default_registry.get_raw_data_columns(self.value)

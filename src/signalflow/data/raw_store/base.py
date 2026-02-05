@@ -7,6 +7,7 @@ from signalflow.core import SfComponentType
 import polars as pl
 import pandas as pd
 
+
 @dataclass
 class RawDataStore(ABC):
     """Abstract base class for raw data storage backends.
@@ -77,10 +78,13 @@ class RawDataStore(ABC):
         DuckDbSpotStore: DuckDB implementation for spot data.
         RawDataFactory: Factory for creating RawData from stores.
     """
+
     component_type: ClassVar[SfComponentType] = SfComponentType.RAW_DATA_STORE
-    
+
     @abstractmethod
-    def load(self, pair: str, hours: Optional[int] = None, start: Optional[datetime] = None, end: Optional[datetime] = None) -> pl.DataFrame:
+    def load(
+        self, pair: str, hours: Optional[int] = None, start: Optional[datetime] = None, end: Optional[datetime] = None
+    ) -> pl.DataFrame:
         """Load data for a single trading pair.
 
         Loads historical market data with flexible time filtering.
@@ -127,7 +131,13 @@ class RawDataStore(ABC):
         pass
 
     @abstractmethod
-    def load_many(self, pairs: list[str], hours: Optional[int] = None, start: Optional[datetime] = None, end: Optional[datetime] = None) -> pl.DataFrame:
+    def load_many(
+        self,
+        pairs: list[str],
+        hours: Optional[int] = None,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+    ) -> pl.DataFrame:
         """Load data for multiple trading pairs efficiently.
 
         Batch loading is more efficient than calling load() repeatedly.
@@ -178,7 +188,9 @@ class RawDataStore(ABC):
         pass
 
     @abstractmethod
-    def load_many_pandas(self, pairs: list[str], start: Optional[datetime] = None, end: Optional[datetime] = None) -> pd.DataFrame:
+    def load_many_pandas(
+        self, pairs: list[str], start: Optional[datetime] = None, end: Optional[datetime] = None
+    ) -> pd.DataFrame:
         """Load data for multiple pairs as Pandas DataFrame.
 
         Convenience method for legacy code or libraries requiring Pandas.

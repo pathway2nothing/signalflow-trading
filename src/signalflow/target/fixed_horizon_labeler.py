@@ -20,6 +20,7 @@ class FixedHorizonLabeler(Labeler):
     If signals provided, labels are written only on signal rows,
     while horizon is computed on full series (per pair).
     """
+
     price_col: str = "close"
     horizon: int = 60
 
@@ -34,9 +35,7 @@ class FixedHorizonLabeler(Labeler):
             cols += list(self.meta_columns)
         self.output_columns = cols
 
-    def compute_group(
-        self, group_df: pl.DataFrame, data_context: dict[str, Any] | None
-    ) -> pl.DataFrame:
+    def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
@@ -83,11 +82,7 @@ class FixedHorizonLabeler(Labeler):
 
         df = df.drop("_future_price")
 
-        if (
-            self.mask_to_signals
-            and data_context is not None
-            and "signal_keys" in data_context
-        ):
+        if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
         return df

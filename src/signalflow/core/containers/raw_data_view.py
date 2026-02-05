@@ -4,6 +4,7 @@ import polars as pl
 from .raw_data import RawData
 from signalflow.core.enums import DataFrameType, RawDataType
 
+
 @dataclass
 class RawDataView:
     """Adapter for accessing RawData in different DataFrame formats.
@@ -122,11 +123,7 @@ class RawDataView:
 
         return df
 
-    def get_data(
-        self,
-        raw_data_type: RawDataType | str,
-        df_type: DataFrameType
-    ) -> pl.DataFrame | pd.DataFrame:
+    def get_data(self, raw_data_type: RawDataType | str, df_type: DataFrameType) -> pl.DataFrame | pd.DataFrame:
         """Get raw data in specified format.
 
         Unified interface for accessing data in required DataFrame format.

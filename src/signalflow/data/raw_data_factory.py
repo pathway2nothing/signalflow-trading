@@ -159,13 +159,13 @@ class RawDataFactory:
 
             # Check data quality
             spot_df = raw_data["spot"]
-            
+
             # Verify timestamps are sorted
             assert spot_df["timestamp"].is_sorted()
-            
+
             # Verify timezone-naive
             assert spot_df["timestamp"].dtype == pl.Datetime("us")
-            
+
             # Verify no nulls in key columns
             assert spot_df["pair"].null_count() == 0
             assert spot_df["timestamp"].null_count() == 0
@@ -191,14 +191,9 @@ class RawDataFactory:
                 if "timeframe" in spot.columns:
                     spot = spot.drop("timeframe")
 
-                spot = spot.with_columns(
-                    pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None)
-                )
+                spot = spot.with_columns(pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None))
 
-                dup_count = (
-                    spot.group_by(["pair", "timestamp"]).len()
-                    .filter(pl.col("len") > 1)
-                )
+                dup_count = spot.group_by(["pair", "timestamp"]).len().filter(pl.col("len") > 1)
                 if dup_count.height > 0:
                     dups = (
                         spot.join(
@@ -208,9 +203,7 @@ class RawDataFactory:
                         .select(["pair", "timestamp"])
                         .head(10)
                     )
-                    raise ValueError(
-                        f"Duplicate (pair, timestamp) detected. Examples:\n{dups}"
-                    )
+                    raise ValueError(f"Duplicate (pair, timestamp) detected. Examples:\n{dups}")
 
                 spot = spot.sort(["pair", "timestamp"])
                 data["spot"] = spot

@@ -12,15 +12,17 @@ def sample_ohlcv_df() -> pl.DataFrame:
     rows = []
     for pair in ["BTCUSDT", "ETHUSDT"]:
         for i in range(20):
-            rows.append({
-                "pair": pair,
-                "timestamp": base + timedelta(hours=i),
-                "open": 100.0 + i,
-                "high": 105.0 + i,
-                "low": 95.0 + i,
-                "close": 102.0 + i,
-                "volume": 1000.0 + i * 10,
-            })
+            rows.append(
+                {
+                    "pair": pair,
+                    "timestamp": base + timedelta(hours=i),
+                    "open": 100.0 + i,
+                    "high": 105.0 + i,
+                    "low": 95.0 + i,
+                    "close": 102.0 + i,
+                    "volume": 1000.0 + i * 10,
+                }
+            )
     return pl.DataFrame(rows)
 
 
@@ -30,13 +32,15 @@ def sample_signals_df() -> pl.DataFrame:
     from signalflow.core.enums import SignalType
 
     base = datetime(2024, 1, 1)
-    return pl.DataFrame({
-        "pair": ["BTCUSDT", "BTCUSDT", "ETHUSDT"],
-        "timestamp": [base, base + timedelta(hours=1), base],
-        "signal_type": [SignalType.RISE.value, SignalType.FALL.value, SignalType.NONE.value],
-        "signal": [1, -1, 0],
-        "probability": [0.9, 0.8, 0.0],
-    })
+    return pl.DataFrame(
+        {
+            "pair": ["BTCUSDT", "BTCUSDT", "ETHUSDT"],
+            "timestamp": [base, base + timedelta(hours=1), base],
+            "signal_type": [SignalType.RISE.value, SignalType.FALL.value, SignalType.NONE.value],
+            "signal": [1, -1, 0],
+            "probability": [0.9, 0.8, 0.0],
+        }
+    )
 
 
 @pytest.fixture

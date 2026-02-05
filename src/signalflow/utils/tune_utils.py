@@ -16,4 +16,3 @@ def build_optuna_params(trial: optuna.Trial, tune_space: dict[str, tuple]) -> di
         elif param_type == "categorical":
             params[name] = trial.suggest_categorical(name, spec[1])
     return params
-

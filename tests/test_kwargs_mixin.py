@@ -20,6 +20,7 @@ from signalflow.utils.kwargs_mixin import KwargsTolerantMixin
 
 class TolerantWithKwargs(KwargsTolerantMixin):
     """Non-dataclass with **kwargs - mixin falls through to orig __init__."""
+
     def __init__(self, x: int = 0, y: str = "hello", **kwargs):
         self.x = x
         self.y = y
@@ -28,6 +29,7 @@ class TolerantWithKwargs(KwargsTolerantMixin):
 @dataclass
 class DataclassChild(KwargsTolerantMixin):
     """Direct @dataclass - wrapping doesn't apply (decorator order)."""
+
     x: int = 0
     y: str = "hello"
 

@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 from numba import njit, prange
 
-from signalflow.core import sf_component, SignalType 
+from signalflow.core import sf_component, SignalType
 from signalflow.target.base import Labeler
 
 
@@ -75,9 +75,7 @@ class TripleBarrierLabeler(Labeler):
             cols += list(self.meta_columns)
         self.output_columns = cols
 
-    def compute_group(
-        self, group_df: pl.DataFrame, data_context: dict[str, Any] | None
-    ) -> pl.DataFrame:
+    def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
@@ -94,14 +92,8 @@ class TripleBarrierLabeler(Labeler):
             .alias("_vol")
         ).with_columns(
             [
-                (
-                    pl.col(self.price_col)
-                    * (pl.col("_vol") * self.profit_multiplier).exp()
-                ).alias("_pt"),
-                (
-                    pl.col(self.price_col)
-                    * (-pl.col("_vol") * self.stop_loss_multiplier).exp()
-                ).alias("_sl"),
+                (pl.col(self.price_col) * (pl.col("_vol") * self.profit_multiplier).exp()).alias("_pt"),
+                (pl.col(self.price_col) * (-pl.col("_vol") * self.stop_loss_multiplier).exp()).alias("_sl"),
             ]
         )
 
@@ -121,11 +113,7 @@ class TripleBarrierLabeler(Labeler):
         if self.include_meta:
             df = self._compute_meta(df, prices, up_off_series, dn_off_series, lf)
 
-        if (
-            self.mask_to_signals
-            and data_context is not None
-            and "signal_keys" in data_context
-        ):
+        if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
         drop_cols = ["_vol", "_pt", "_sl", "_up_off", "_dn_off"]

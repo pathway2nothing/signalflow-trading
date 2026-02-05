@@ -52,12 +52,12 @@ class Labeler(ABC):
 
         class FixedHorizonLabeler(Labeler):
             '''Label based on fixed-horizon return'''
-            
+
             def __init__(self, horizon: int = 10, threshold: float = 0.01):
                 super().__init__()
                 self.horizon = horizon
                 self.threshold = threshold
-            
+
             def compute_group(self, group_df, data_context=None):
                 # Compute forward return
                 labels = group_df.with_columns([
@@ -72,7 +72,7 @@ class Labeler(ABC):
                     .otherwise(pl.lit(SignalType.NONE.value))
                     .alias("label")
                 ])
-                
+
                 return labels
 
         # Usage
@@ -199,20 +199,12 @@ class Labeler(ABC):
                 )
             return out
 
-        out = (
-            df0.group_by(self.pair_col, maintain_order=True)
-            .map_groups(_wrapped)
-            .sort([self.pair_col, self.ts_col])
-        )
+        out = df0.group_by(self.pair_col, maintain_order=True).map_groups(_wrapped).sort([self.pair_col, self.ts_col])
 
         if self.keep_input_columns:
             return out
 
-        label_cols = (
-            sorted(set(out.columns) - input_cols)
-            if self.output_columns is None
-            else list(self.output_columns)
-        )
+        label_cols = sorted(set(out.columns) - input_cols) if self.output_columns is None else list(self.output_columns)
 
         keep_cols = [self.pair_col, self.ts_col] + label_cols
         missing = [c for c in keep_cols if c not in out.columns]
@@ -238,9 +230,7 @@ class Labeler(ABC):
             return s
         raise TypeError(f"Unsupported Signals.value type: {type(s)}")
 
-    def _filter_by_signals_pl(
-        self, df: pl.DataFrame, s: pl.DataFrame, signal_type: SignalType
-    ) -> pl.DataFrame:
+    def _filter_by_signals_pl(self, df: pl.DataFrame, s: pl.DataFrame, signal_type: SignalType) -> pl.DataFrame:
         """Filter input to rows matching signal timestamps.
 
         Inner join with signal timestamps of specific type.
@@ -269,9 +259,7 @@ class Labeler(ABC):
         return df.join(s_f, on=[self.pair_col, self.ts_col], how="inner")
 
     @abstractmethod
-    def compute_group(
-        self, group_df: pl.DataFrame, data_context: dict[str, Any] | None
-    ) -> pl.DataFrame:
+    def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
         """Compute labels for single pair group.
 
         Core labeling logic - must be implemented by subclasses.
@@ -349,13 +337,13 @@ class Labeler(ABC):
             def compute_group(self, group_df, data_context=None):
                 # Compute labels for all rows
                 labeled = group_df.with_columns([...])
-                
+
                 # Mask to signal timestamps only
                 if self.mask_to_signals and data_context:
                     labeled = self._apply_signal_mask(
                         labeled, data_context, group_df
                     )
-                
+
                 return labeled
             ```
 
@@ -367,18 +355,12 @@ class Labeler(ABC):
         signal_keys: pl.DataFrame = data_context["signal_keys"]
         pair_value = group_df.get_column(self.pair_col)[0]
 
-        signal_ts = (
-            signal_keys.filter(pl.col(self.pair_col) == pair_value)
-            .select(self.ts_col)
-            .unique()
-        )
+        signal_ts = signal_keys.filter(pl.col(self.pair_col) == pair_value).select(self.ts_col).unique()
 
         if signal_ts.height == 0:
             df = df.with_columns(pl.lit(SignalType.NONE.value).alias(self.out_col))
             if self.include_meta:
-                df = df.with_columns(
-                    [pl.lit(None).alias(col) for col in self.meta_columns]
-                )
+                df = df.with_columns([pl.lit(None).alias(col) for col in self.meta_columns])
         else:
             is_signal = pl.col("_is_signal").fill_null(False)
             mask_exprs = [
@@ -389,11 +371,7 @@ class Labeler(ABC):
             ]
             if self.include_meta:
                 mask_exprs += [
-                    pl.when(is_signal)
-                    .then(pl.col(col))
-                    .otherwise(pl.lit(None))
-                    .alias(col)
-                    for col in self.meta_columns
+                    pl.when(is_signal).then(pl.col(col)).otherwise(pl.lit(None)).alias(col) for col in self.meta_columns
                 ]
 
             df = (

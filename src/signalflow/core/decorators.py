@@ -33,14 +33,14 @@ def sf_component(*, name: str, override: bool = True):
         @sf_component(name="my_detector")
         class MyDetector(SignalDetector):
             component_type = SfComponentType.DETECTOR
-            
+
             def detect(self, df):
                 # Detection logic
                 return signals
 
         # Later, instantiate by name
         from signalflow.core.registry import default_registry
-        
+
         detector_cls = default_registry.get(
             SfComponentType.DETECTOR,
             "my_detector"
@@ -57,7 +57,7 @@ def sf_component(*, name: str, override: bool = True):
     Example:
         ```python
         # Register multiple component types
-        
+
         @sf_component(name="sma_cross")
         class SmaCrossDetector(SignalDetector):
             component_type = SfComponentType.DETECTOR
@@ -84,13 +84,11 @@ def sf_component(*, name: str, override: bool = True):
         The class itself is not modified - only registered.
         Use override=True carefully to avoid accidental overrides.
     """
+
     def decorator(cls: Type[Any]) -> Type[Any]:
         component_type = getattr(cls, "component_type", None)
         if not isinstance(component_type, SfComponentType):
-            raise ValueError(
-                f"{cls.__name__} must define class attribute "
-                f"'component_type: SfComponentType'"
-            )
+            raise ValueError(f"{cls.__name__} must define class attribute 'component_type: SfComponentType'")
 
         default_registry.register(
             component_type,

@@ -186,7 +186,7 @@ class RollingAggregator:
         Example:
             ```python
             agg = RollingAggregator(offset_window=5)
-            
+
             # Check current offset
             last_offset = agg.get_last_offset(spot_df)
             print(f"Current offset: {last_offset}")  # 0-4
@@ -253,7 +253,7 @@ class RollingAggregator:
             df = pl.DataFrame({
                 "pair": ["BTCUSDT"] * 10,
                 "timestamp": [
-                    datetime(2024, 1, 1, 10, i) 
+                    datetime(2024, 1, 1, 10, i)
                     for i in range(10)
                 ],
                 "open": [45000 + i*10 for i in range(10)],
@@ -322,17 +322,11 @@ class RollingAggregator:
             ]
             if has_volume:
                 exprs.append(
-                    pl.col("volume")
-                    .rolling_sum(window_size=k, min_periods=k)
-                    .over(over)
-                    .alias(f"{pfx}volume")
+                    pl.col("volume").rolling_sum(window_size=k, min_periods=k).over(over).alias(f"{pfx}volume")
                 )
             if has_trades:
                 exprs.append(
-                    pl.col("trades")
-                    .rolling_sum(window_size=k, min_periods=k)
-                    .over(over)
-                    .alias(f"{pfx}trades")
+                    pl.col("trades").rolling_sum(window_size=k, min_periods=k).over(over).alias(f"{pfx}trades")
                 )
             out = df0.with_columns(exprs)
 
@@ -344,13 +338,9 @@ class RollingAggregator:
                 rs_close.alias("close"),
             ]
             if has_volume:
-                exprs2.append(
-                    pl.col("volume").rolling_sum(window_size=k, min_periods=k).over(over).alias("volume")
-                )
+                exprs2.append(pl.col("volume").rolling_sum(window_size=k, min_periods=k).over(over).alias("volume"))
             if has_trades:
-                exprs2.append(
-                    pl.col("trades").rolling_sum(window_size=k, min_periods=k).over(over).alias("trades")
-                )
+                exprs2.append(pl.col("trades").rolling_sum(window_size=k, min_periods=k).over(over).alias("trades"))
             out = df0.with_columns(exprs2)
 
         else:

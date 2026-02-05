@@ -19,6 +19,7 @@ class Feature(KwargsTolerantMixin):
         normalized: If True, apply rolling z-score normalization to output.
         norm_period: Window for normalization. Defaults to 3x feature period.
     """
+
     component_type: ClassVar[SfComponentType] = SfComponentType.FEATURE
     requires: ClassVar[list[str]] = []
     outputs: ClassVar[list[str]] = []
@@ -28,7 +29,6 @@ class Feature(KwargsTolerantMixin):
     ts_col: str = "timestamp"
     normalized: bool = False
     norm_period: int | None = None
-
 
     def compute(self, df: pl.DataFrame, context: dict[str, Any] | None = None) -> pl.DataFrame:
         """Compute feature for all pairs"""
@@ -44,10 +44,7 @@ class Feature(KwargsTolerantMixin):
 
     def required_cols(self) -> list[str]:
         """Actual required column names with parameter substitution."""
-        return [
-            tpl.format(**self.__dict__) if "{" in tpl else tpl
-            for tpl in self.requires
-        ]
+        return [tpl.format(**self.__dict__) if "{" in tpl else tpl for tpl in self.requires]
 
     @property
     def warmup(self) -> int:
@@ -58,13 +55,14 @@ class Feature(KwargsTolerantMixin):
         """
         return 0
 
+
 @dataclass
 class GlobalFeature(Feature):
     """Base class for features computed across all pairs.
-    
+
     Override compute() with custom aggregation logic.
     """
-    
+
     def compute(self, df: pl.DataFrame, context: dict[str, Any] | None = None) -> pl.DataFrame:
         """Must override - compute global feature across all pairs."""
         raise NotImplementedError(f"{self.__class__.__name__} must implement compute()")

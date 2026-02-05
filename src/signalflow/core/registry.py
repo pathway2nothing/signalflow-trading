@@ -73,6 +73,7 @@ class SignalFlowRegistry:
     See Also:
         sf_component: Decorator for automatic component registration.
     """
+
     _items: dict[SfComponentType, dict[str, type[Any]]] = field(default_factory=dict)
     _raw_data_types: dict[str, set[str]] = field(
         default_factory=lambda: {k: v.copy() for k, v in _BUILTIN_RAW_DATA_TYPES.items()}
@@ -142,9 +143,7 @@ class SignalFlowRegistry:
         if pkg_path is None:  # pragma: no cover
             return
 
-        for _importer, modname, _ispkg in pkgutil.walk_packages(
-            pkg_path, prefix="signalflow."
-        ):
+        for _importer, modname, _ispkg in pkgutil.walk_packages(pkg_path, prefix="signalflow."):
             if modname in sys.modules:
                 continue
             try:
@@ -261,9 +260,7 @@ class SignalFlowRegistry:
             return self._items[component_type][key]
         except KeyError as e:
             available = ", ".join(sorted(self._items[component_type]))
-            raise KeyError(
-                f"Component not found: {component_type.value}:{key}. Available: [{available}]"
-            ) from e
+            raise KeyError(f"Component not found: {component_type.value}:{key}. Available: [{available}]") from e
 
     def create(self, component_type: SfComponentType, name: str, **kwargs: Any) -> Any:
         """Instantiate a component by registry key.
@@ -417,9 +414,7 @@ class SignalFlowRegistry:
             return self._raw_data_types[key].copy()
         except KeyError:
             available = ", ".join(sorted(self._raw_data_types))
-            raise KeyError(
-                f"Raw data type '{key}' not registered. Available: [{available}]"
-            ) from None
+            raise KeyError(f"Raw data type '{key}' not registered. Available: [{available}]") from None
 
     def list_raw_data_types(self) -> list[str]:
         """List all registered raw data type names.
@@ -491,6 +486,7 @@ Example:
     ```
 """
 
-def get_component(type: SfComponentType, name: str  ) -> type[Any]:
+
+def get_component(type: SfComponentType, name: str) -> type[Any]:
     """Get a registered component by type and name."""
     return default_registry.get(type, name)

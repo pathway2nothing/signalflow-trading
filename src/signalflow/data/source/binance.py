@@ -397,7 +397,7 @@ class BinanceSpotLoader(RawDataLoader):
                         end_time=range_end,
                     )
                     self.store.insert_klines(pair, klines)
-                except Exception as e:  
+                except Exception as e:
                     logger.error(f"Error downloading {pair}: {e}")
 
         async with BinanceClient() as client:

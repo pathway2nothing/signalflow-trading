@@ -43,7 +43,7 @@ class StrategyStore(ABC):
         try:
             # Load existing state
             state = store.load_state("my_strategy")
-            
+
             if state is None:
                 # Initialize new state
                 state = StrategyState(strategy_id="my_strategy")
@@ -130,7 +130,7 @@ class StrategyStore(ABC):
             ```python
             # Load existing state
             state = store.load_state("my_strategy")
-            
+
             if state:
                 print(f"Resuming from: {state.last_ts}")
                 print(f"Cash: ${state.portfolio.cash}")

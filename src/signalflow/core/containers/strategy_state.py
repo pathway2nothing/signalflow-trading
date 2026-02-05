@@ -47,7 +47,7 @@ class StrategyState:
         # Save and resume
         saved_state = save_to_db(state)
         resumed_state = load_from_db(strategy_id="my_strategy")
-        
+
         # Continue from last watermark
         print(f"Resuming from: {resumed_state.last_ts}")
 
@@ -90,7 +90,7 @@ class StrategyState:
             # Process bar successfully
             for bar in bars:
                 # ... process trading logic ...
-                
+
                 # Commit and update watermarks
                 state.touch(ts=bar.timestamp)
                 save_to_db(state)
@@ -98,7 +98,7 @@ class StrategyState:
             # Live trading with event IDs
             for event in event_stream:
                 # ... process event ...
-                
+
                 # Track event for idempotency
                 state.touch(ts=event.timestamp, event_id=event.id)
                 save_to_db(state)

@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 from numba import njit, prange
 
-from signalflow.core import sf_component, SignalType 
+from signalflow.core import sf_component, SignalType
 from signalflow.target.base import Labeler
 
 
@@ -67,6 +67,7 @@ class StaticTripleBarrierLabeler(Labeler):
           FALL if SL touched first
           NONE if none touched by t1
     """
+
     price_col: str = "close"
 
     lookforward_window: int = 1440
@@ -84,9 +85,7 @@ class StaticTripleBarrierLabeler(Labeler):
             cols += list(self.meta_columns)
         self.output_columns = cols
 
-    def compute_group(
-        self, group_df: pl.DataFrame, data_context: dict[str, Any] | None
-    ) -> pl.DataFrame:
+    def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
@@ -150,11 +149,7 @@ class StaticTripleBarrierLabeler(Labeler):
                 ]
             )
 
-        if (
-            self.mask_to_signals
-            and data_context is not None
-            and "signal_keys" in data_context
-        ):
+        if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
         df = df.drop(["_up_off", "_dn_off"])

@@ -12,6 +12,7 @@ import pandas as pd
 from signalflow.core import sf_component
 from signalflow.data.raw_store.base import RawDataStore
 
+
 @dataclass
 @sf_component(name="duckdb/spot")
 class DuckDbSpotStore(RawDataStore):
@@ -93,7 +94,7 @@ class DuckDbSpotStore(RawDataStore):
     """
 
     db_path: Path
-    timeframe: str = "1m"  
+    timeframe: str = "1m"
     _con: duckdb.DuckDBPyConnection = field(init=False)
 
     def __post_init__(self) -> None:
@@ -139,7 +140,6 @@ class DuckDbSpotStore(RawDataStore):
             """)
 
             if "open_time" in existing_cols:
-
                 self._con.execute("""
                     INSERT OR REPLACE INTO ohlcv_new
                     SELECT
@@ -191,9 +191,12 @@ class DuckDbSpotStore(RawDataStore):
                 value VARCHAR NOT NULL
             )
         """)
-        self._con.execute("""
+        self._con.execute(
+            """
             INSERT OR REPLACE INTO meta(key, value) VALUES ('timeframe', ?)
-        """, [self.timeframe])
+        """,
+            [self.timeframe],
+        )
 
         logger.info(f"Database initialized: {self.db_path} (timeframe={self.timeframe})")
 
@@ -295,10 +298,7 @@ class DuckDbSpotStore(RawDataStore):
                 {
                     "pair": [pair] * len(klines),
                     "timestamp": [
-                        k["timestamp"]
-                        .replace(tzinfo=None)
-                        .replace(second=0, microsecond=0)
-                        + timedelta(minutes=1)
+                        k["timestamp"].replace(tzinfo=None).replace(second=0, microsecond=0) + timedelta(minutes=1)
                         if k["timestamp"].second != 0 or k["timestamp"].microsecond != 0
                         else k["timestamp"].replace(tzinfo=None)
                         for k in klines
@@ -336,7 +336,7 @@ class DuckDbSpotStore(RawDataStore):
             ```python
             # Check data availability
             min_ts, max_ts = store.get_time_bounds("BTCUSDT")
-            
+
             if min_ts and max_ts:
                 print(f"Data available: {min_ts} to {max_ts}")
                 days = (max_ts - min_ts).days
@@ -351,11 +351,14 @@ class DuckDbSpotStore(RawDataStore):
                 fetch_data(start=max_ts, end=datetime.now())
             ```
         """
-        result = self._con.execute("""
+        result = self._con.execute(
+            """
             SELECT MIN(timestamp), MAX(timestamp)
             FROM ohlcv
             WHERE pair = ?
-        """, [pair]).fetchone()
+        """,
+            [pair],
+        ).fetchone()
         return (result[0], result[1]) if result and result[0] else (None, None)
 
     def find_gaps(
@@ -397,7 +400,7 @@ class DuckDbSpotStore(RawDataStore):
                 for gap_start, gap_end in gaps:
                     duration = gap_end - gap_start
                     print(f"  {gap_start} to {gap_end} ({duration})")
-                    
+
                     # Backfill gaps
                     backfill_data(pair="BTCUSDT", start=gap_start, end=gap_end)
             else:
@@ -415,12 +418,15 @@ class DuckDbSpotStore(RawDataStore):
             Returns full range [(start, end)] if no data exists.
             Computationally expensive for large date ranges - use sparingly.
         """
-        existing = self._con.execute("""
+        existing = self._con.execute(
+            """
             SELECT timestamp
             FROM ohlcv
             WHERE pair = ? AND timestamp BETWEEN ? AND ?
             ORDER BY timestamp
-        """, [pair, start, end]).fetchall()
+        """,
+            [pair, start, end],
+        ).fetchall()
 
         if not existing:
             return [(start, end)]
@@ -506,13 +512,11 @@ class DuckDbSpotStore(RawDataStore):
         query += " ORDER BY timestamp"
         df = self._con.execute(query, params).pl()
 
-        if 'timestamp' in df.columns:
-            df = df.with_columns(
-                pl.col('timestamp').dt.replace_time_zone(None)
-            )
+        if "timestamp" in df.columns:
+            df = df.with_columns(pl.col("timestamp").dt.replace_time_zone(None))
 
         return df
-    
+
     def load_many_pandas(
         self,
         pairs: list[str],
@@ -624,12 +628,10 @@ class DuckDbSpotStore(RawDataStore):
         query += " ORDER BY pair, timestamp"
 
         df = self._con.execute(query, params).pl()
-        
-        if 'timestamp' in df.columns:
-            df = df.with_columns(
-                pl.col('timestamp').dt.replace_time_zone(None)
-            )
-        
+
+        if "timestamp" in df.columns:
+            df = df.with_columns(pl.col("timestamp").dt.replace_time_zone(None))
+
         return df
 
     def get_stats(self) -> pl.DataFrame:

@@ -109,7 +109,6 @@ class Signals:
             s = s.apply(t)
         return s
 
-
     def __add__(self, other: "Signals") -> "Signals":
         """Merge two Signals objects.
 
@@ -155,12 +154,7 @@ class Signals:
         all_cols = list(dict.fromkeys([*a.columns, *b.columns]))
 
         def align(df: pl.DataFrame) -> pl.DataFrame:
-            return (
-                df.with_columns(
-                    [pl.lit(None).alias(c) for c in all_cols if c not in df.columns]
-                )
-                .select(all_cols)
-            )
+            return df.with_columns([pl.lit(None).alias(c) for c in all_cols if c not in df.columns]).select(all_cols)
 
         a = align(a).with_columns(pl.lit(0).alias("_src"))
         b = align(b).with_columns(pl.lit(1).alias("_src"))
@@ -182,8 +176,7 @@ class Signals:
         )
 
         merged = (
-            merged
-            .sort(
+            merged.sort(
                 ["pair", "timestamp", "_priority", "_src"],
                 descending=[False, False, True, True],
             )
