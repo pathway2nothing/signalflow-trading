@@ -10,8 +10,15 @@ import pandas as pd
 import polars as pl
 from loguru import logger
 
-from signalflow.core import sf_component
+from signalflow.core import sf_component, SfComponentType
+from signalflow.core.registry import default_registry
 from signalflow.data.raw_store.base import RawDataStore
+from signalflow.data.raw_store._schema import (
+    CORE_COLUMNS,
+    normalize_ts,
+    polars_schema,
+    resolve_columns,
+)
 
 
 def _adapt_datetime(val: datetime) -> str:
@@ -25,52 +32,31 @@ def _convert_datetime(val: bytes) -> datetime:
 sqlite3.register_adapter(datetime, _adapt_datetime)
 sqlite3.register_converter("TIMESTAMP", _convert_datetime)
 
-_EMPTY_SCHEMA = {
-    "pair": pl.Utf8,
-    "timestamp": pl.Datetime,
-    "open": pl.Float64,
-    "high": pl.Float64,
-    "low": pl.Float64,
-    "close": pl.Float64,
-    "volume": pl.Float64,
-    "trades": pl.Int64,
+# SQLite type mapping.
+_SQL_TYPES: dict[str, str] = {
+    "pair": "TEXT NOT NULL",
+    "timestamp": "TIMESTAMP NOT NULL",
+    "trades": "INTEGER",
 }
-
-_COLUMNS = ["pair", "timestamp", "open", "high", "low", "close", "volume", "trades"]
-
-
-def _rows_to_df(rows: list[tuple]) -> pl.DataFrame:
-    """Convert raw cursor rows to a Polars DataFrame with standard OHLCV schema."""
-    if not rows:
-        return pl.DataFrame(schema=_EMPTY_SCHEMA)
-    data = {col: [row[i] for row in rows] for i, col in enumerate(_COLUMNS)}
-    df = pl.DataFrame(data)
-    if "timestamp" in df.columns:
-        df = df.with_columns(pl.col("timestamp").cast(pl.Datetime).dt.replace_time_zone(None))
-    return df
-
-
-def _normalize_ts(ts: datetime) -> datetime:
-    """Normalize timestamp: strip tz, zero seconds/microseconds, round up if needed."""
-    if ts.second != 0 or ts.microsecond != 0:
-        return ts.replace(tzinfo=None, second=0, microsecond=0) + timedelta(minutes=1)
-    return ts.replace(tzinfo=None)
 
 
 @dataclass
 @sf_component(name="sqlite/spot")
-class SqliteSpotStore(RawDataStore):
-    """SQLite storage backend for OHLCV spot data.
+class SqliteRawStore(RawDataStore):
+    """SQLite storage backend for raw market data.
 
+    Supports any registered raw data type (spot, futures, perpetual, custom).
     Zero extra dependencies — uses stdlib sqlite3.
-    Same interface as DuckDbSpotStore.
     """
 
     db_path: Path
+    data_type: str = "spot"
     timeframe: str = "1m"
     _con: sqlite3.Connection = field(init=False, repr=False)
+    _columns: list[str] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        self._columns = resolve_columns(self.data_type)
         self._con = sqlite3.connect(
             str(self.db_path),
             detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
@@ -78,21 +64,42 @@ class SqliteSpotStore(RawDataStore):
         self._con.execute("PRAGMA journal_mode=WAL")
         self._ensure_tables()
 
+    # ── Schema management ─────────────────────────────────────────────
+
+    @property
+    def _all_column_names(self) -> list[str]:
+        return ["pair", "timestamp"] + self._columns
+
+    def _col_sql_type(self, col: str) -> str:
+        if col in _SQL_TYPES:
+            return _SQL_TYPES[col]
+        return "REAL NOT NULL" if col in CORE_COLUMNS else "REAL"
+
     def _ensure_tables(self) -> None:
+        # Check existing columns
+        cur = self._con.execute("PRAGMA table_info(ohlcv)")
+        existing_cols = {row[1] for row in cur.fetchall()}
+
+        if not existing_cols:
+            col_defs = ", ".join(
+                f"{c} {self._col_sql_type(c)}" for c in self._all_column_names
+            )
+            self._con.executescript(f"""
+                CREATE TABLE ohlcv (
+                    {col_defs},
+                    PRIMARY KEY (pair, timestamp)
+                );
+                CREATE INDEX idx_ohlcv_pair_ts ON ohlcv(pair, timestamp DESC);
+            """)
+        else:
+            for col in self._columns:
+                if col not in existing_cols:
+                    sql_type = self._col_sql_type(col)
+                    self._con.execute(f"ALTER TABLE ohlcv ADD COLUMN {col} {sql_type}")
+                    logger.info(f"Added column {col} ({sql_type}) to ohlcv table")
+
         self._con.executescript("""
-            CREATE TABLE IF NOT EXISTS ohlcv (
-                pair TEXT NOT NULL,
-                timestamp TIMESTAMP NOT NULL,
-                open REAL NOT NULL,
-                high REAL NOT NULL,
-                low REAL NOT NULL,
-                close REAL NOT NULL,
-                volume REAL NOT NULL,
-                trades INTEGER,
-                PRIMARY KEY (pair, timestamp)
-            );
-            CREATE INDEX IF NOT EXISTS idx_ohlcv_pair_ts
-                ON ohlcv(pair, timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_ohlcv_pair_ts ON ohlcv(pair, timestamp DESC);
             CREATE TABLE IF NOT EXISTS meta (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -102,35 +109,37 @@ class SqliteSpotStore(RawDataStore):
             "INSERT OR REPLACE INTO meta(key, value) VALUES ('timeframe', ?)",
             (self.timeframe,),
         )
+        self._con.execute(
+            "INSERT OR REPLACE INTO meta(key, value) VALUES ('data_type', ?)",
+            (self.data_type,),
+        )
         self._con.commit()
-        logger.info(f"Database initialized: {self.db_path} (timeframe={self.timeframe})")
+        logger.info(
+            f"Database initialized: {self.db_path} "
+            f"(data_type={self.data_type}, timeframe={self.timeframe})"
+        )
+
+    # ── Insert ────────────────────────────────────────────────────────
 
     def insert_klines(self, pair: str, klines: list[dict]) -> None:
-        """Upsert klines (INSERT OR REPLACE)."""
         if not klines:
             return
+        n_cols = len(self._all_column_names)
+        placeholders = ", ".join(["?"] * n_cols)
         rows = [
-            (
-                pair,
-                _normalize_ts(k["timestamp"]),
-                k["open"],
-                k["high"],
-                k["low"],
-                k["close"],
-                k["volume"],
-                k.get("trades"),
-            )
+            (pair, normalize_ts(k["timestamp"])) + tuple(k.get(c) for c in self._columns)
             for k in klines
         ]
         self._con.executemany(
-            "INSERT OR REPLACE INTO ohlcv VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT OR REPLACE INTO ohlcv VALUES ({placeholders})",
             rows,
         )
         self._con.commit()
         logger.debug(f"Inserted {len(klines):,} rows for {pair}")
 
+    # ── Queries ───────────────────────────────────────────────────────
+
     def get_time_bounds(self, pair: str) -> tuple[Optional[datetime], Optional[datetime]]:
-        """Get earliest and latest timestamps for a pair."""
         result = self._con.execute(
             "SELECT MIN(timestamp), MAX(timestamp) FROM ohlcv WHERE pair = ?",
             (pair,),
@@ -148,7 +157,6 @@ class SqliteSpotStore(RawDataStore):
         end: datetime,
         tf_minutes: int,
     ) -> list[tuple[datetime, datetime]]:
-        """Find gaps in data coverage for a pair."""
         existing = self._con.execute(
             "SELECT timestamp FROM ohlcv WHERE pair = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp",
             (pair, start, end),
@@ -177,6 +185,18 @@ class SqliteSpotStore(RawDataStore):
 
         return gaps
 
+    # ── Load ──────────────────────────────────────────────────────────
+
+    def _rows_to_df(self, rows: list[tuple]) -> pl.DataFrame:
+        if not rows:
+            return pl.DataFrame(schema=polars_schema(self._columns))
+        all_cols = self._all_column_names
+        data = {col: [row[i] for row in rows] for i, col in enumerate(all_cols)}
+        df = pl.DataFrame(data)
+        if "timestamp" in df.columns:
+            df = df.with_columns(pl.col("timestamp").cast(pl.Datetime).dt.replace_time_zone(None))
+        return df
+
     def load(
         self,
         pair: str,
@@ -184,7 +204,8 @@ class SqliteSpotStore(RawDataStore):
         start: Optional[datetime] = None,
         end: Optional[datetime] = None,
     ) -> pl.DataFrame:
-        query = "SELECT pair, timestamp, open, high, low, close, volume, trades FROM ohlcv WHERE pair = ?"
+        col_list = ", ".join(self._all_column_names)
+        query = f"SELECT {col_list} FROM ohlcv WHERE pair = ?"
         params: list[object] = [pair]
 
         if hours is not None:
@@ -203,7 +224,7 @@ class SqliteSpotStore(RawDataStore):
 
         query += " ORDER BY timestamp"
         rows = self._con.execute(query, params).fetchall()
-        return _rows_to_df(rows)
+        return self._rows_to_df(rows)
 
     def load_many(
         self,
@@ -214,12 +235,11 @@ class SqliteSpotStore(RawDataStore):
     ) -> pl.DataFrame:
         pairs = list(pairs)
         if not pairs:
-            return pl.DataFrame(schema=_EMPTY_SCHEMA)
+            return pl.DataFrame(schema=polars_schema(self._columns))
 
+        col_list = ", ".join(self._all_column_names)
         placeholders = ",".join(["?"] * len(pairs))
-        query = (
-            f"SELECT pair, timestamp, open, high, low, close, volume, trades FROM ohlcv WHERE pair IN ({placeholders})"
-        )
+        query = f"SELECT {col_list} FROM ohlcv WHERE pair IN ({placeholders})"
         params: list[object] = [*pairs]
 
         if hours is not None:
@@ -238,7 +258,7 @@ class SqliteSpotStore(RawDataStore):
 
         query += " ORDER BY pair, timestamp"
         rows = self._con.execute(query, params).fetchall()
-        return _rows_to_df(rows)
+        return self._rows_to_df(rows)
 
     def load_many_pandas(
         self,
@@ -246,11 +266,11 @@ class SqliteSpotStore(RawDataStore):
         start: datetime | None = None,
         end: datetime | None = None,
     ) -> pd.DataFrame:
-        df_pl = self.load_many(pairs=pairs, start=start, end=end)
-        return df_pl.to_pandas()
+        return self.load_many(pairs=pairs, start=start, end=end).to_pandas()
+
+    # ── Stats / lifecycle ─────────────────────────────────────────────
 
     def get_stats(self) -> pl.DataFrame:
-        """Get database statistics per pair."""
         rows = self._con.execute("""
             SELECT
                 pair,
@@ -278,3 +298,15 @@ class SqliteSpotStore(RawDataStore):
 
     def close(self) -> None:
         self._con.close()
+
+
+# Register for futures and perpetual.
+default_registry.register(
+    SfComponentType.RAW_DATA_STORE, "sqlite/futures", SqliteRawStore, override=True
+)
+default_registry.register(
+    SfComponentType.RAW_DATA_STORE, "sqlite/perpetual", SqliteRawStore, override=True
+)
+
+# Backward-compatible alias.
+SqliteSpotStore = SqliteRawStore

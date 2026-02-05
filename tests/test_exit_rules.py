@@ -15,7 +15,7 @@ def _make_state():
     return StrategyState(strategy_id="test")
 
 
-# ── TakeProfitStopLossExit — LONG positions ────────────────────────────────
+# ── TakeProfitStopLossExit - LONG positions ────────────────────────────────
 
 
 class TestTpSlLong:
@@ -72,7 +72,7 @@ class TestTpSlLong:
         assert orders[0].meta["exit_reason"] == "stop_loss"
 
 
-# ── TakeProfitStopLossExit — SHORT positions ───────────────────────────────
+# ── TakeProfitStopLossExit - SHORT positions ───────────────────────────────
 
 
 class TestTpSlShort:
@@ -98,7 +98,7 @@ class TestTpSlShort:
         assert orders == []
 
 
-# ── TakeProfitStopLossExit — dynamic levels ────────────────────────────────
+# ── TakeProfitStopLossExit - dynamic levels ────────────────────────────────
 
 
 class TestTpSlDynamicLevels:
@@ -125,7 +125,7 @@ class TestTpSlDynamicLevels:
         assert orders == []
 
 
-# ── TakeProfitStopLossExit — order details ─────────────────────────────────
+# ── TakeProfitStopLossExit - order details ─────────────────────────────────
 
 
 class TestTpSlOrderMeta:

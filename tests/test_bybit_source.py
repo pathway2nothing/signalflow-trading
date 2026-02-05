@@ -1,4 +1,4 @@
-"""Tests for Bybit data source — BybitClient, BybitSpotLoader, BybitFuturesLoader."""
+"""Tests for Bybit data source - BybitClient, BybitSpotLoader, BybitFuturesLoader."""
 
 from __future__ import annotations
 
@@ -126,8 +126,9 @@ class TestBybitClient:
 
                 klines = await client.get_klines(PAIR, timeframe="1m")
 
-                assert klines[0]["timestamp"] == _ms_to_dt_utc_naive(_dt_to_ms_utc(t1))
-                assert klines[2]["timestamp"] == _ms_to_dt_utc_naive(_dt_to_ms_utc(t3))
+                # timestamps are shifted to close time (open + 1 tf)
+                assert klines[0]["timestamp"] == t1 + timedelta(minutes=1)
+                assert klines[2]["timestamp"] == t3 + timedelta(minutes=1)
 
         asyncio.run(_run())
 

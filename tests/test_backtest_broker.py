@@ -59,7 +59,7 @@ class TestCreatePosition:
         assert pos.meta["fill_id"] == "f1"
 
 
-# ── process_fills — entry flow ──────────────────────────────────────────────
+# ── process_fills - entry flow ──────────────────────────────────────────────
 
 
 class TestProcessFillsEntry:
@@ -92,7 +92,7 @@ class TestProcessFillsEntry:
         assert state.portfolio.cash == pytest.approx(10000.0 + 99.9)
 
 
-# ── process_fills — exit flow ───────────────────────────────────────────────
+# ── process_fills - exit flow ───────────────────────────────────────────────
 
 
 class TestProcessFillsExit:

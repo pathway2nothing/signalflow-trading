@@ -8,7 +8,7 @@ hide:
   - navigation
 ---
 
-# SignalFlow — High-Performance Algorithmic Trading Framework
+# SignalFlow - High-Performance Algorithmic Trading Framework
 
 > Current stable version: **{{ project_version }}**
 
@@ -100,33 +100,47 @@ Convert validated signals into trades with risk management:
 ## Quick Example
 
 ```python
-from signalflow.core import RawDataView
-from signalflow.detector import SmaCrossSignalDetector
-from signalflow.validator import SklearnSignalValidator
-from signalflow.strategy import SimpleStrategy
+from datetime import datetime
+from pathlib import Path
+
+from signalflow.data.source import VirtualDataProvider
+from signalflow.data.raw_store import DuckDbSpotStore
+from signalflow.data import RawDataFactory
+from signalflow.detector import ExampleSmaCrossDetector
+from signalflow.strategy.runner import BacktestRunner
+from signalflow.strategy.component.entry.signal import SignalEntryRule
+from signalflow.strategy.component.exit.tp_sl import TakeProfitStopLossExit
+from signalflow.strategy.broker import BacktestBroker
+from signalflow.strategy.broker.executor import VirtualSpotExecutor
+
+# Generate synthetic data (no API keys needed)
+store = DuckDbSpotStore(db_path=Path("data.duckdb"))
+VirtualDataProvider(store=store, seed=42).download(
+    pairs=["BTCUSDT"], n_bars=10_000
+)
 
 # Load data
-data = RawDataView.load_from_duckdb("market_data.duckdb")
-
-# Detect signals
-detector = SmaCrossSignalDetector(fast_period=20, slow_period=50)
-signals = detector.run(data)
-
-# Validate with ML
-validator = SklearnSignalValidator(model_type="lightgbm")
-validator.fit(X_train, y_train)
-validated_signals = validator.validate_signals(signals, features)
-
-# Execute strategy
-strategy = SimpleStrategy(
-    initial_capital=10000,
-    take_profit=0.02,
-    stop_loss=0.01
+raw_data = RawDataFactory.from_duckdb_spot_store(
+    spot_store_path=Path("data.duckdb"),
+    pairs=["BTCUSDT"],
+    start=datetime(2020, 1, 1),
+    end=datetime(2030, 1, 1),
 )
-portfolio = strategy.run(validated_signals, data)
 
-# Analyze results
-print(portfolio.metrics())
+# Detect SMA crossover signals
+detector = ExampleSmaCrossDetector(fast_period=20, slow_period=50)
+signals = detector.run(raw_data.view())
+
+# Backtest with entry/exit rules
+runner = BacktestRunner(
+    strategy_id="quickstart",
+    broker=BacktestBroker(executor=VirtualSpotExecutor(fee_rate=0.001)),
+    entry_rules=[SignalEntryRule(base_position_size=100.0, use_probability_sizing=False)],
+    exit_rules=[TakeProfitStopLossExit(take_profit_pct=0.02, stop_loss_pct=0.01)],
+    initial_capital=10_000.0,
+)
+state = runner.run(raw_data=raw_data, signals=signals)
+print(f"Trades: {len(runner.trades)}, Final capital: ${state.capital:.2f}")
 ```
 
 ---
@@ -154,10 +168,15 @@ Built-in support for sophisticated labeling strategies:
 
 - **Triple Barrier Method**: Combines take-profit, stop-loss, and time barriers
 - **Fixed Horizon**: Label signals based on future returns
+- **Signal masking**: Label only signal timestamps for efficient ML training
 - Numba-accelerated for performance (45s → 0.3s on large datasets)
 
-### :octicons-workflow-16: Kedro Integration
-Full compatibility with Kedro for MLOps pipelines, experiment tracking, and production deployment.
+### :octicons-graph-16: 199+ Technical Indicators
+The [signalflow-ta](ecosystem/signalflow-ta.md) extension provides production-grade technical analysis:
+
+- Momentum, Overlap, Volatility, Volume, Trend, Statistics
+- Physics-based indicators (energy, viscosity, impedance analogs)
+- Preset pipeline factories for rapid feature engineering
 
 ---
 
@@ -180,14 +199,15 @@ Full compatibility with Kedro for MLOps pipelines, experiment tracking, and prod
     - **Optuna** - Hyperparameter optimization
 
 === "Trading Tools"
-    - **pandas-ta** - Technical analysis indicators
+    - **signalflow-ta** - 199+ technical indicators
+    - **pandas-ta** - Technical analysis foundation
     - **Numba** - JIT compilation for speed
     - **Plotly** - Interactive visualizations
 
 === "Infrastructure"
-    - **Kedro** - Pipeline orchestration
-    - **MLflow** - Experiment tracking (planned)
     - **DuckDB** - Local data storage
+    - **SQLite / PostgreSQL** - Alternative storage backends
+    - **Kedro** - Pipeline orchestration
 
 </div>
 
@@ -195,32 +215,32 @@ Full compatibility with Kedro for MLOps pipelines, experiment tracking, and prod
 
 ## SignalFlow Ecosystem
 
-SignalFlow is growing into a multi-repository ecosystem:
+SignalFlow is a multi-repository ecosystem with specialized extensions:
 
-### signalflow (Core) :material-package-variant-closed:
+### signalflow-trading (Core) :material-package-variant-closed:
 The main library with foundational components:
 
-- Core data containers and abstractions
-- Binance connectors and data loaders
-- Backtesting infrastructure
-- Basic detectors and validators
-- Strategy execution framework
+- Core data containers and abstractions (`RawData`, `Signals`, `RawDataView`)
+- Exchange connectors (Binance Spot) and virtual data generation
+- DuckDB, SQLite, and PostgreSQL storage backends
+- Backtesting infrastructure with modular entry/exit rules
+- Component registry system (`@sf_component`)
 
-### signalflow-nn (Neural Networks) :material-brain:
-Specialized repository for deep learning:
+### [signalflow-ta](ecosystem/signalflow-ta.md) (Technical Analysis) :material-chart-bell-curve-cumulative:
+199+ technical indicators across 8 modules:
 
-- PyTorch Lightning-based validators
-- Time series architectures (LSTM, GRU, Transformers)
-- VAE and autoencoder implementations
-- Temporal feature extractors
+- Momentum, Overlap, Volatility, Volume, Trend, Statistics
+- Physics-based market analogs (energy, viscosity, impedance)
+- Preset pipeline factories for rapid feature engineering
+- AutoFeatureNormalizer for automatic scaling
 
-### sf-kedro (MLOps) :material-pipeline:
-Kedro project template for production workflows:
+### [signalflow-nn](ecosystem/signalflow-nn.md) (Neural Networks) :material-brain:
+Deep learning validators built on PyTorch Lightning:
 
-- End-to-end ML pipelines
-- Model training and versioning
-- Experiment tracking integration
-- Custom component development environment
+- Encoder + Head composition (LSTM, GRU + MLP, Attention, Residual)
+- TemporalValidator for seamless signalflow integration
+- Per-asset preprocessing with TimeSeriesPreprocessor
+- Optuna hyperparameter tuning support
 
 ---
 
@@ -249,17 +269,17 @@ Ready to build your first trading strategy?
 
     Install SignalFlow and set up your development environment
 
--   :material-rocket-launch:{ .lg .middle } **[Quick Start Algorithmic Trading Example](getting-started/quickstart.md)**
+-   :material-rocket-launch:{ .lg .middle } **[Quick Start Algorithmic Trading Example](quickstart.md)**
 
     ---
 
     Build your first signal detector and backtest a strategy
 
--   :material-book-open-variant:{ .lg .middle } **[User Guide](guide/overview.md)**
+-   :material-puzzle:{ .lg .middle } **[Ecosystem Extensions](ecosystem/index.md)**
 
     ---
 
-    Learn core concepts and advanced features
+    signalflow-ta (199 indicators) and signalflow-nn (deep learning)
 
 -   :material-code-braces:{ .lg .middle } **[SignalFlow API Reference](api/index.md)**
 

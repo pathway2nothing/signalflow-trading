@@ -26,7 +26,7 @@ class SignalFlowRegistry:
     Components are organized by type (DETECTOR, EXTRACTOR, etc.) and
     accessed by case-insensitive names.
 
-    Also manages extensible raw data type definitions — each data type maps
+    Also manages extensible raw data type definitions - each data type maps
     to a set of required columns. Built-in types (SPOT, FUTURES, PERPETUAL)
     are pre-registered; users can add custom types via ``register_raw_data_type()``.
 
@@ -110,7 +110,7 @@ class SignalFlowRegistry:
         should reference a module (not a callable); importing it triggers
         registration through the ``@sf_component`` decorator.
 
-        This method is idempotent — subsequent calls are no-ops once
+        This method is idempotent - subsequent calls are no-ops once
         ``_discovered`` is ``True``.
 
         Example:
@@ -136,7 +136,7 @@ class SignalFlowRegistry:
         try:
             import signalflow as _sf_root
         except ImportError:  # pragma: no cover
-            logger.warning("signalflow package not importable — skipping internal autodiscovery")
+            logger.warning("signalflow package not importable - skipping internal autodiscovery")
             return
 
         pkg_path = getattr(_sf_root, "__path__", None)

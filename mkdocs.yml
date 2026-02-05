@@ -92,7 +92,7 @@ plugins:
       default_handler: python
       handlers:
         python:
-          paths: [src]      
+          paths: [src]
           options:
             docstring_style: google
             show_source: true
@@ -101,7 +101,31 @@ plugins:
             separate_signature: true
             merge_init_into_class: true
             show_signature_annotations: true
+            allow_inspection: true
 
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: quickstart.md
+  - User Guide:
+    - Custom Data Types: guide/custom-data-types.md
+  - Ecosystem:
+    - Overview: ecosystem/index.md
+    - signalflow-ta: ecosystem/signalflow-ta.md
+    - signalflow-nn: ecosystem/signalflow-nn.md
+  - API Reference:
+    - api/index.md
+    - Core: api/core.md
+    - Data: api/data.md
+    - Detector: api/detector.md
+    - Feature: api/feature.md
+    - Labeler: api/labeler.md
+    - Validator: api/validator.md
+    - Strategy: api/strategy.md
+    - Technical Analysis (ta): api/ta.md
+  - Contributing: contributing.md
 
 extra_css:
   - stylesheets/extra.css

@@ -380,7 +380,7 @@ class TestRestartRecovery:
                 metrics=[],
             )
 
-        # First run — load initial batch, process, then stop
+        # First run - load initial batch, process, then stop
         bars_batch1 = generate_ohlcv(PAIR, START, n_bars=50, seed=42)
         raw_db.insert_klines(PAIR, bars_batch1)
 
@@ -407,7 +407,7 @@ class TestRestartRecovery:
         )
         raw_db.insert_klines(PAIR, bars_batch2)
 
-        # Second run — should resume from last_ts and process new bars
+        # Second run - should resume from last_ts and process new bars
         runner2 = make_runner()
 
         async def stop_again():

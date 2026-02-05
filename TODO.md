@@ -12,7 +12,7 @@ Close technical debt before the main work.
 
 ### 0.1 Extensible RawDataType ~~(StrEnum + registry)~~
 
-> **Done** in `e368956` — `register_raw_data_type()`, `get_raw_data_columns()`, `list_raw_data_types()`
+> **Done** in `e368956` - `register_raw_data_type()`, `get_raw_data_columns()`, `list_raw_data_types()`
 
 - [x] Keep built-in types as `StrEnum`: `SPOT`, `FUTURES`, `PERPETUAL`
 - [x] Add column registry in `SignalFlowRegistry` with built-in defaults
@@ -30,7 +30,7 @@ Close technical debt before the main work.
   - Find all classes decorated with `@sf_component`
   - Auto-register on first registry access
 - [x] Support external packages via `entry_points` group `signalflow.components`
-- [x] Lazy loading — import modules only on first `registry.get()` / `registry.list()`
+- [x] Lazy loading - import modules only on first `registry.get()` / `registry.list()`
 - [x] Tests for autodiscovery
 
 ### 0.3 Pre-commit Hooks
@@ -38,7 +38,7 @@ Close technical debt before the main work.
 **Files**: `.pre-commit-config.yaml` (new), `pyproject.toml` (ruff config)
 
 - [x] Configure `.pre-commit-config.yaml`:
-  - `ruff` — linter + formatter
+  - `ruff` - linter + formatter
   - `ruff format --check`
   - `mypy --strict` on core modules
   - `pytest tests/ -x --timeout=30` (quick smoke test)
@@ -55,11 +55,11 @@ Add alternative storage backends so users can choose what fits their setup: loca
 
 **Files**: `data/raw_store/sqlite_stores.py` (new), `data/strategy_store/sqlite.py` (new)
 
-- [x] `SqliteSpotStore(RawDataStore)` — same interface as `DuckDbSpotStore`:
+- [x] `SqliteSpotStore(RawDataStore)` - same interface as `DuckDbSpotStore`:
   - `load()`, `load_many()`, `load_many_pandas()`, `insert_klines()`, `close()`
   - Schema: `ohlcv` table with `(pair, timestamp)` primary key
-  - Use `sqlite3` from stdlib — zero extra dependencies
-- [x] `SqliteStrategyStore(StrategyStore)` — same interface as `DuckDbStrategyStore`:
+  - Use `sqlite3` from stdlib - zero extra dependencies
+- [x] `SqliteStrategyStore(StrategyStore)` - same interface as `DuckDbStrategyStore`:
   - `init()`, `load_state()`, `save_state()`, `upsert_positions()`, `append_trade()`, `append_metrics()`
   - Reuse `schema.py` SQL (SQLite-compatible subset)
 - [x] Tests: mirror existing DuckDB test suite, parametrize over `[duckdb, sqlite]`
@@ -68,11 +68,11 @@ Add alternative storage backends so users can choose what fits their setup: loca
 
 **Files**: `data/raw_store/pg_stores.py` (new), `data/strategy_store/pg.py` (new)
 
-- [x] `PgSpotStore(RawDataStore)` — sync via `psycopg`:
+- [x] `PgSpotStore(RawDataStore)` - sync via `psycopg`:
   - Same public interface as `DuckDbSpotStore`
   - Connection string from config / env var `SIGNALFLOW_PG_DSN`
   - Schema auto-creation on `init()` (idempotent `CREATE TABLE IF NOT EXISTS`)
-- [x] `PgStrategyStore(StrategyStore)` — same interface as `DuckDbStrategyStore`:
+- [x] `PgStrategyStore(StrategyStore)` - same interface as `DuckDbStrategyStore`:
   - Reuse JSON-based serialization pattern
   - Connection pooling for concurrent access
 - [x] Add `psycopg[binary]` as optional dependency (`pip install signalflow-trading[postgres]`)
@@ -87,7 +87,7 @@ Add alternative storage backends so users can choose what fits their setup: loca
   - Raise clear error if optional deps missing (`psycopg`)
 - [x] `StoreFactory.create_strategy_store(backend=..., **kwargs) -> StrategyStore`
 - [x] Register all backends in `SignalFlowRegistry` for autodiscovery
-- [ ] Docs: `docs/guide/storage-backends.md` — comparison table (features, deps, use-case)
+- [ ] Docs: `docs/guide/storage-backends.md` - comparison table (features, deps, use-case)
 
 ---
 
@@ -103,11 +103,11 @@ Real-time data via existing `BinanceSpotLoader.sync()` (REST polling), orders vi
   - Poll DuckDB for new bars since `state.last_ts`
   - Process each new bar through strategy pipeline
   - Persist state after each cycle
-- [ ] `process_bar()` — adapted from `BacktestRunner._process_bar()`:
+- [ ] `process_bar()` - adapted from `BacktestRunner._process_bar()`:
   - Mark positions to market
   - Check exit rules -> submit exit orders
   - Compute features -> detect signals -> check entry rules -> submit entry orders
-  - Process fills (`VirtualSpotExecutor` — instant fills)
+  - Process fills (`VirtualSpotExecutor` - instant fills)
   - Compute metrics
 - [ ] Signal pipeline integration:
   - `FeaturePipeline.compute()` -> `Detector.detect()` -> `Validator.validate()` (optional)
@@ -117,7 +117,7 @@ Real-time data via existing `BinanceSpotLoader.sync()` (REST polling), orders vi
   - Save state to DuckDB
   - Log final portfolio state
 - [ ] Idempotency:
-  - `state.last_ts` for deduplication — skip already-processed bars
+  - `state.last_ts` for deduplication - skip already-processed bars
   - Safe restart from last checkpoint
 
 ### 2.2 Data Sync Integration
@@ -153,10 +153,10 @@ Replace REST polling with real-time WebSocket streams for lower latency.
   - Heartbeat / ping-pong
   - Exponential backoff on reconnect
 - [ ] Market data streams:
-  - `@kline_{interval}` — real-time OHLCV candles
-  - `@bookTicker` — best bid/ask (for future LIMIT orders)
+  - `@kline_{interval}` - real-time OHLCV candles
+  - `@bookTicker` - best bid/ask (for future LIMIT orders)
 - [ ] Callback-based architecture: `on_kline()`, `on_tick()`
-- [ ] Integrate with `RealtimeRunner` — switch from polling to WS events
+- [ ] Integrate with `RealtimeRunner` - switch from polling to WS events
 - [ ] Fallback: if WS disconnects -> automatic switch to polling
 
 ---
@@ -168,9 +168,9 @@ Implement order submission and tracking on Binance Spot.
 **Files**: `strategy/broker/executor/binance_spot.py` (stub -> full), `data/source/binance.py`
 
 - [ ] Add Trading API methods to `BinanceClient`:
-  - `post_order()` — `POST /api/v3/order`
-  - `get_order()` — `GET /api/v3/order`
-  - `cancel_order()` — `DELETE /api/v3/order`
+  - `post_order()` - `POST /api/v3/order`
+  - `get_order()` - `GET /api/v3/order`
+  - `cancel_order()` - `DELETE /api/v3/order`
   - `get_open_orders()`, `get_account()`
 - [ ] HMAC-SHA256 request signing (API key + secret)
 - [ ] `BinanceSpotExecutor.execute()`:
@@ -256,14 +256,14 @@ Phase 8 (CLI/ops)          --- operational convenience
 | File | Action | Phase |
 |------|--------|-------|
 | `core/registry.py` | Autodiscovery via importlib + entry_points | 0 |
-| `.pre-commit-config.yaml` | New — ruff, mypy, pytest | 0 |
-| `data/raw_store/sqlite_stores.py` | New — SQLite raw data store | 1 |
-| `data/strategy_store/sqlite.py` | New — SQLite strategy store | 1 |
-| `data/raw_store/pg_stores.py` | New — PostgreSQL raw data store | 1 |
-| `data/strategy_store/pg.py` | New — PostgreSQL strategy store | 1 |
-| `data/store_factory.py` | New — backend-agnostic store factory | 1 |
+| `.pre-commit-config.yaml` | New - ruff, mypy, pytest | 0 |
+| `data/raw_store/sqlite_stores.py` | New - SQLite raw data store | 1 |
+| `data/strategy_store/sqlite.py` | New - SQLite strategy store | 1 |
+| `data/raw_store/pg_stores.py` | New - PostgreSQL raw data store | 1 |
+| `data/strategy_store/pg.py` | New - PostgreSQL strategy store | 1 |
+| `data/store_factory.py` | New - backend-agnostic store factory | 1 |
 | `strategy/runner/realtime_runner.py` | Full paper trading runner | 2 |
-| `data/source/binance_ws.py` | New — WebSocket manager | 3 |
+| `data/source/binance_ws.py` | New - WebSocket manager | 3 |
 | `strategy/broker/executor/binance_spot.py` | Full executor implementation | 4 |
 | `data/source/binance.py` | Trading API endpoints | 4 |
 | `strategy/broker/realtime_spot.py` | Full live broker implementation | 5 |
@@ -282,7 +282,7 @@ Phase 8 (CLI/ops)          --- operational convenience
 ## Verification
 
 After each phase:
-1. `pytest tests/ -v` — all existing tests must pass
+1. `pytest tests/ -v` - all existing tests must pass
 2. New tests for all new code
-3. Phase 2 — paper trading on real data (manual verification)
-4. Phase 7 — full E2E on Binance Testnet
+3. Phase 2 - paper trading on real data (manual verification)
+4. Phase 7 - full E2E on Binance Testnet

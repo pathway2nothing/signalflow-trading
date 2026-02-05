@@ -1,4 +1,4 @@
-"""Virtual data provider — generates synthetic OHLCV bars for testing."""
+"""Virtual data provider - generates synthetic OHLCV bars for testing."""
 
 from __future__ import annotations
 
@@ -261,7 +261,7 @@ class VirtualDataProvider(RawDataLoader):
     ) -> None:
         """Continuously generate new bars at a fixed interval.
 
-        Mimics ``BinanceSpotLoader.sync()`` — runs forever, writing
+        Mimics ``BinanceSpotLoader.sync()`` - runs forever, writing
         new bars to the store each cycle.
 
         Args:

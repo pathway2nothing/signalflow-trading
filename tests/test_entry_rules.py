@@ -27,7 +27,7 @@ def _signals(rows):
     return Signals(pl.DataFrame(rows))
 
 
-# ── SignalEntryRule — basics ────────────────────────────────────────────────
+# ── SignalEntryRule - basics ────────────────────────────────────────────────
 
 
 class TestSignalEntryRuleBasic:

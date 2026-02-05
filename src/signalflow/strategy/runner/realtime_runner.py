@@ -1,4 +1,4 @@
-"""Realtime runner — async paper/live trading loop."""
+"""Realtime runner - async paper/live trading loop."""
 
 from __future__ import annotations
 
@@ -109,7 +109,7 @@ class RealtimeRunner(StrategyRunner):
         signals: Signals | None = None,
         state: StrategyState | None = None,
     ) -> StrategyState:
-        """Sync wrapper — delegates to :meth:`run_async`.
+        """Sync wrapper - delegates to :meth:`run_async`.
 
         ``raw_data`` and ``signals`` are ignored (the runner generates
         its own).  Provided for ``StrategyRunner`` interface compat.
@@ -156,7 +156,7 @@ class RealtimeRunner(StrategyRunner):
             self._persist_cycle(state, trades=[], ts=state.last_ts)
             n_open = len(state.portfolio.open_positions()) if hasattr(state.portfolio, "open_positions") else 0
             logger.info(
-                f"RealtimeRunner stopped — bars={self._bars_processed} "
+                f"RealtimeRunner stopped - bars={self._bars_processed} "
                 f"trades={len(self._trades)} "
                 f"open_positions={n_open}"
             )
@@ -211,7 +211,7 @@ class RealtimeRunner(StrategyRunner):
         state: StrategyState,
         out_trades: list[Trade],
     ) -> StrategyState:
-        """Process a single bar — identical logic to BacktestRunner."""
+        """Process a single bar - identical logic to BacktestRunner."""
         state.touch(ts)
         state.reset_tick_cache()
 
@@ -327,7 +327,7 @@ class RealtimeRunner(StrategyRunner):
         if state.last_ts is not None:
             start = state.last_ts
         else:
-            # First run — find earliest timestamp across all pairs
+            # First run - find earliest timestamp across all pairs
             earliest: Optional[datetime] = None
             for pair in self.pairs:
                 pair_min, _ = self.raw_store.get_time_bounds(pair)
@@ -498,11 +498,11 @@ class RealtimeRunner(StrategyRunner):
             for sig in (signal.SIGINT, signal.SIGTERM):
                 loop.add_signal_handler(sig, self._request_shutdown)
         except (NotImplementedError, RuntimeError):
-            # Windows or no running loop — signals handled elsewhere
+            # Windows or no running loop - signals handled elsewhere
             pass
 
     def _request_shutdown(self) -> None:
-        logger.info("Shutdown signal received — finishing current bar")
+        logger.info("Shutdown signal received - finishing current bar")
         self._shutdown.set()
 
     @property

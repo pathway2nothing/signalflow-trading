@@ -283,6 +283,6 @@ class StrategyStore(ABC):
         """Close storage connection and cleanup resources.
 
         Releases database connections, file handles, or other resources.
-        Idempotent — safe to call multiple times.
+        Idempotent - safe to call multiple times.
         """
         ...

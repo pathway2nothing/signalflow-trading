@@ -1,4 +1,4 @@
-"""Tests for signalflow.feature.examples — RSI, SMA, GlobalMeanRSI."""
+"""Tests for signalflow.feature.examples - RSI, SMA, GlobalMeanRSI."""
 
 import math
 from datetime import datetime, timedelta

@@ -151,18 +151,18 @@ def ohlcv_100_bars() -> pl.DataFrame:
 
 @pytest.fixture(params=["duckdb", "sqlite"])
 def raw_store(request, tmp_path):
-    """Parametrized RawDataStore fixture — runs tests against DuckDB and SQLite."""
+    """Parametrized RawDataStore fixture - runs tests against DuckDB and SQLite."""
     backend = request.param
     db_path = tmp_path / f"test_spot.{backend}"
 
     if backend == "duckdb":
-        from signalflow.data.raw_store import DuckDbSpotStore
+        from signalflow.data.raw_store import DuckDbRawStore
 
-        store = DuckDbSpotStore(db_path=db_path, timeframe="1m")
+        store = DuckDbRawStore(db_path=db_path, timeframe="1m")
     else:
-        from signalflow.data.raw_store import SqliteSpotStore
+        from signalflow.data.raw_store import SqliteRawStore
 
-        store = SqliteSpotStore(db_path=db_path, timeframe="1m")
+        store = SqliteRawStore(db_path=db_path, timeframe="1m")
 
     yield store
     store.close()
@@ -170,7 +170,7 @@ def raw_store(request, tmp_path):
 
 @pytest.fixture(params=["duckdb", "sqlite"])
 def strategy_store(request, tmp_path):
-    """Parametrized StrategyStore fixture — runs tests against DuckDB and SQLite."""
+    """Parametrized StrategyStore fixture - runs tests against DuckDB and SQLite."""
     backend = request.param
     db_path = tmp_path / f"test_strategy.{backend}"
 

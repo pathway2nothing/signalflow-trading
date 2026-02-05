@@ -1,4 +1,4 @@
-"""OKX data source — async REST client and loaders for spot & futures."""
+"""OKX data source - async REST client and loaders for spot & futures."""
 
 import asyncio
 from dataclasses import dataclass, field
@@ -86,9 +86,9 @@ class OkxClient(RawDataSource):
     Provides methods for fetching OHLCV kline data with retries,
     rate-limit handling, and backward pagination.
 
-    OKX returns candle **open** timestamps.  The ``/api/v5/market/candles``
-    endpoint serves recent data while ``/api/v5/market/history-candles``
-    covers older periods.
+    Returned timestamps are candle **close** times (open + 1 tf).
+    The ``/api/v5/market/candles`` endpoint serves recent data while
+    ``/api/v5/market/history-candles`` covers older periods.
 
     Attributes:
         base_url: OKX API base URL.
@@ -127,7 +127,7 @@ class OkxClient(RawDataSource):
     ) -> list[dict]:
         """Fetch OHLCV klines from OKX.
 
-        Returned ``timestamp`` is the candle **open** time (UTC-naive).
+        Returned ``timestamp`` is the candle **close** time (open + 1 tf, UTC-naive).
 
         Args:
             inst_id: OKX instrument ID (e.g. ``"BTC-USDT"``, ``"BTC-USDT-SWAP"``).
@@ -185,11 +185,12 @@ class OkxClient(RawDataSource):
 
                 rows = body.get("data", [])
 
+                tf_ms = _TIMEFRAME_MS.get(timeframe, 60_000)
                 out: list[dict] = []
-                for row in reversed(rows):  # OKX returns descending — reverse
+                for row in reversed(rows):  # OKX returns descending - reverse
                     out.append(
                         {
-                            "timestamp": _ms_to_dt_utc_naive(int(row[0])),
+                            "timestamp": _ms_to_dt_utc_naive(int(row[0]) + tf_ms),
                             "open": float(row[1]),
                             "high": float(row[2]),
                             "low": float(row[3]),
@@ -272,8 +273,8 @@ class OkxClient(RawDataSource):
                 if start_time <= ts <= end_time:
                     all_klines.append(k)
 
-            oldest_ts = klines[0]["timestamp"]
-            cursor_ms = _dt_to_ms_utc(oldest_ts)
+            oldest_ts = klines[0]["timestamp"]  # close time (open + tf)
+            cursor_ms = _dt_to_ms_utc(oldest_ts) - _TIMEFRAME_MS[timeframe]
 
             if len(all_klines) and len(all_klines) % 5000 == 0:
                 logger.info(f"{inst_id}: loaded {len(all_klines):,} candles...")
@@ -358,9 +359,13 @@ class OkxSpotLoader(RawDataLoader):
                 ranges_to_download.append((start, end))
             else:
                 if start < db_min:
-                    ranges_to_download.append((start, db_min - timedelta(minutes=tf_minutes)))
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
                 if end > db_max:
-                    ranges_to_download.append((db_max + timedelta(minutes=tf_minutes), end))
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
                 if fill_gaps:
                     overlap_start = max(start, db_min)
                     overlap_end = min(end, db_max)
@@ -494,9 +499,13 @@ class OkxFuturesLoader(RawDataLoader):
                 ranges_to_download.append((start, end))
             else:
                 if start < db_min:
-                    ranges_to_download.append((start, db_min - timedelta(minutes=tf_minutes)))
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
                 if end > db_max:
-                    ranges_to_download.append((db_max + timedelta(minutes=tf_minutes), end))
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
                 if fill_gaps:
                     overlap_start = max(start, db_min)
                     overlap_end = min(end, db_max)

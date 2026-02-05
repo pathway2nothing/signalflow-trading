@@ -1,4 +1,4 @@
-"""Bybit data source — async REST client and loaders for spot & futures."""
+"""Bybit data source - async REST client and loaders for spot & futures."""
 
 import asyncio
 from dataclasses import dataclass, field
@@ -68,7 +68,7 @@ class BybitClient(RawDataSource):
     Provides methods for fetching OHLCV kline data with automatic retries,
     rate-limit handling, and pagination.
 
-    Returned timestamps are candle **open** times, UTC-naive.
+    Returned timestamps are candle **close** times (open + 1 tf), UTC-naive.
 
     Attributes:
         base_url: Bybit API base URL.
@@ -106,11 +106,11 @@ class BybitClient(RawDataSource):
     ) -> list[dict]:
         """Fetch OHLCV klines from Bybit.
 
-        Returned ``timestamp`` is the candle **open** time (UTC-naive).
+        Returned ``timestamp`` is the candle **close** time (open + 1 tf, UTC-naive).
 
         Args:
             pair: Trading pair (e.g. ``"BTCUSDT"``).
-            category: Market category — ``"spot"``, ``"linear"`` or ``"inverse"``.
+            category: Market category - ``"spot"``, ``"linear"`` or ``"inverse"``.
             timeframe: Interval (1m, 5m, 1h, 1d, etc.).
             start_time: Range start (naive=UTC or aware).
             end_time: Range end (naive=UTC or aware).
@@ -163,11 +163,12 @@ class BybitClient(RawDataSource):
 
                 rows = body.get("result", {}).get("list", [])
 
+                tf_ms = _TIMEFRAME_MS.get(timeframe, 60_000)
                 out: list[dict] = []
-                for row in reversed(rows):  # Bybit returns descending — reverse
+                for row in reversed(rows):  # Bybit returns descending - reverse
                     out.append(
                         {
-                            "timestamp": _ms_to_dt_utc_naive(int(row[0])),
+                            "timestamp": _ms_to_dt_utc_naive(int(row[0]) + tf_ms),
                             "open": float(row[1]),
                             "high": float(row[2]),
                             "low": float(row[3]),
@@ -258,8 +259,8 @@ class BybitClient(RawDataSource):
                 if start_time <= ts <= end_time:
                     all_klines.append(k)
 
-            last_ts = klines[-1]["timestamp"]
-            next_start = last_ts + timedelta(milliseconds=tf_ms)
+            last_ts = klines[-1]["timestamp"]  # close time (open + tf)
+            next_start = last_ts  # close time = next candle's open time
 
             if next_start <= current_start:
                 current_start = current_start + timedelta(milliseconds=1)
@@ -345,9 +346,13 @@ class BybitSpotLoader(RawDataLoader):
                 ranges_to_download.append((start, end))
             else:
                 if start < db_min:
-                    ranges_to_download.append((start, db_min - timedelta(minutes=tf_minutes)))
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
                 if end > db_max:
-                    ranges_to_download.append((db_max + timedelta(minutes=tf_minutes), end))
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
                 if fill_gaps:
                     overlap_start = max(start, db_min)
                     overlap_end = min(end, db_max)
@@ -417,7 +422,7 @@ class BybitFuturesLoader(RawDataLoader):
     Attributes:
         store: Storage backend.
         timeframe: Fixed timeframe for all data.
-        category: Bybit market category — ``"linear"`` (USDT perps) or
+        category: Bybit market category - ``"linear"`` (USDT perps) or
             ``"inverse"`` (coin-margined).
     """
 
@@ -479,9 +484,13 @@ class BybitFuturesLoader(RawDataLoader):
                 ranges_to_download.append((start, end))
             else:
                 if start < db_min:
-                    ranges_to_download.append((start, db_min - timedelta(minutes=tf_minutes)))
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
                 if end > db_max:
-                    ranges_to_download.append((db_max + timedelta(minutes=tf_minutes), end))
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
                 if fill_gaps:
                     overlap_start = max(start, db_min)
                     overlap_end = min(end, db_max)

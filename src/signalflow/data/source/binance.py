@@ -373,9 +373,13 @@ class BinanceSpotLoader(RawDataLoader):
                 ranges_to_download.append((start, end))
             else:
                 if start < db_min:
-                    ranges_to_download.append((start, db_min - timedelta(minutes=tf_minutes)))
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
                 if end > db_max:
-                    ranges_to_download.append((db_max + timedelta(minutes=tf_minutes), end))
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
 
                 if fill_gaps:
                     overlap_start = max(start, db_min)
@@ -514,9 +518,13 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
                 ranges_to_download.append((start, end))
             else:
                 if start < db_min:
-                    ranges_to_download.append((start, db_min - timedelta(minutes=tf_minutes)))
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
                 if end > db_max:
-                    ranges_to_download.append((db_max + timedelta(minutes=tf_minutes), end))
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
                 if fill_gaps:
                     overlap_start = max(start, db_min)
                     overlap_end = min(end, db_max)
@@ -648,9 +656,13 @@ class BinanceFuturesCoinLoader(RawDataLoader):
                 ranges_to_download.append((start, end))
             else:
                 if start < db_min:
-                    ranges_to_download.append((start, db_min - timedelta(minutes=tf_minutes)))
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
                 if end > db_max:
-                    ranges_to_download.append((db_max + timedelta(minutes=tf_minutes), end))
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
                 if fill_gaps:
                     overlap_start = max(start, db_min)
                     overlap_end = min(end, db_max)
