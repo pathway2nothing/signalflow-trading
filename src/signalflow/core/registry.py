@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import importlib
+import pkgutil
+import sys
 from dataclasses import dataclass, field
-from typing import Any, Dict, Type
+from importlib.metadata import entry_points
+from typing import Any
+
 from loguru import logger
+
 from .enums import SfComponentType
 
-
-_BUILTIN_RAW_DATA_TYPES: Dict[str, set[str]] = {
+_BUILTIN_RAW_DATA_TYPES: dict[str, set[str]] = {
     "spot": {"pair", "timestamp", "open", "high", "low", "close", "volume"},
     "futures": {"pair", "timestamp", "open", "high", "low", "close", "volume", "open_interest"},
     "perpetual": {"pair", "timestamp", "open", "high", "low", "close", "volume", "funding_rate", "open_interest"},
@@ -68,10 +73,11 @@ class SignalFlowRegistry:
     See Also:
         sf_component: Decorator for automatic component registration.
     """
-    #TODO: Registry autodiscover
-
-    _items: Dict[SfComponentType, Dict[str, Type[Any]]] = field(default_factory=dict)
-    _raw_data_types: Dict[str, set[str]] = field(default_factory=lambda: {k: v.copy() for k, v in _BUILTIN_RAW_DATA_TYPES.items()})
+    _items: dict[SfComponentType, dict[str, type[Any]]] = field(default_factory=dict)
+    _raw_data_types: dict[str, set[str]] = field(
+        default_factory=lambda: {k: v.copy() for k, v in _BUILTIN_RAW_DATA_TYPES.items()}
+    )
+    _discovered: bool = field(default=False, repr=False)
 
     def _ensure(self, component_type: SfComponentType) -> None:
         """Ensure component type exists in registry.
@@ -83,7 +89,86 @@ class SignalFlowRegistry:
         """
         self._items.setdefault(component_type, {})
 
-    def register(self, component_type: SfComponentType, name: str, cls: Type[Any], *, override: bool = False) -> None:
+    # ── Autodiscovery ─────────────────────────────────────────────────
+
+    def _discover_if_needed(self) -> None:
+        """Trigger autodiscovery on first read access (lazy loading)."""
+        if not self._discovered:
+            self.autodiscover()
+
+    def autodiscover(self) -> None:
+        """Scan ``signalflow.*`` packages and entry-points for components.
+
+        Walks all sub-modules of the ``signalflow`` package using
+        :func:`pkgutil.walk_packages` and imports them.  Because
+        :func:`sf_component` registers classes at import time, importing
+        a module is sufficient to populate the registry.
+
+        External packages can expose components via the
+        ``signalflow.components`` entry-point group.  Each entry-point
+        should reference a module (not a callable); importing it triggers
+        registration through the ``@sf_component`` decorator.
+
+        This method is idempotent — subsequent calls are no-ops once
+        ``_discovered`` is ``True``.
+
+        Example:
+            ```python
+            from signalflow.core.registry import default_registry
+
+            # Explicit discovery (normally automatic on first get/list)
+            default_registry.autodiscover()
+
+            # All @sf_component-decorated classes are now registered
+            print(default_registry.snapshot())
+            ```
+        """
+        if self._discovered:
+            return
+        self._discovered = True
+
+        self._discover_internal_packages()
+        self._discover_entry_points()
+
+    def _discover_internal_packages(self) -> None:
+        """Import all ``signalflow.*`` sub-modules to trigger registration."""
+        try:
+            import signalflow as _sf_root
+        except ImportError:  # pragma: no cover
+            logger.warning("signalflow package not importable — skipping internal autodiscovery")
+            return
+
+        pkg_path = getattr(_sf_root, "__path__", None)
+        if pkg_path is None:  # pragma: no cover
+            return
+
+        for _importer, modname, _ispkg in pkgutil.walk_packages(
+            pkg_path, prefix="signalflow."
+        ):
+            if modname in sys.modules:
+                continue
+            try:
+                importlib.import_module(modname)
+            except Exception:
+                logger.debug(f"autodiscover: failed to import {modname}")
+
+    def _discover_entry_points(self) -> None:
+        """Load external plugins registered under ``signalflow.components``."""
+        eps = entry_points()
+
+        # Python 3.12+: entry_points() returns SelectableGroups
+        if hasattr(eps, "select"):
+            group = eps.select(group="signalflow.components")
+        else:  # pragma: no cover
+            group = eps.get("signalflow.components", [])
+
+        for ep in group:
+            try:
+                ep.load()
+            except Exception:
+                logger.warning(f"autodiscover: failed to load entry-point {ep.name!r}")
+
+    def register(self, component_type: SfComponentType, name: str, cls: type[Any], *, override: bool = False) -> None:
         """Register a class under (component_type, name).
 
         Stores class in registry for later lookup and instantiation.
@@ -134,7 +219,7 @@ class SignalFlowRegistry:
 
         self._items[component_type][key] = cls
 
-    def get(self, component_type: SfComponentType, name: str) -> Type[Any]:
+    def get(self, component_type: SfComponentType, name: str) -> type[Any]:
         """Get a registered class by key.
 
         Lookup is case-insensitive. Raises helpful error with available
@@ -169,6 +254,7 @@ class SignalFlowRegistry:
                 # Shows: "Component not found: DETECTOR:unknown. Available: [sma_cross, ...]"
             ```
         """
+        self._discover_if_needed()
         self._ensure(component_type)
         key = name.lower()
         try:
@@ -254,6 +340,7 @@ class SignalFlowRegistry:
                 print(f"{component_type.value}: {components}")
             ```
         """
+        self._discover_if_needed()
         self._ensure(component_type)
         return sorted(self._items[component_type])
 
@@ -348,7 +435,7 @@ class SignalFlowRegistry:
         Returns complete registry state organized by component type.
 
         Returns:
-            dict[str, list[str]]: Dictionary mapping component type names 
+            dict[str, list[str]]: Dictionary mapping component type names
                 to sorted lists of registered component names.
 
         Example:
@@ -375,6 +462,7 @@ class SignalFlowRegistry:
                 print("SMA detector is registered")
             ```
         """
+        self._discover_if_needed()
         return {t.value: sorted(v.keys()) for t, v in self._items.items()}
 
 
@@ -403,6 +491,6 @@ Example:
     ```
 """
 
-def get_component(type: SfComponentType, name: str  ) -> Type[Any]:
+def get_component(type: SfComponentType, name: str  ) -> type[Any]:
     """Get a registered component by type and name."""
-    return default_registry.get(type, name) 
+    return default_registry.get(type, name)

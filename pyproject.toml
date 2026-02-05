@@ -24,6 +24,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-timeout>=2.2",
+  "pre-commit>=3.7",
+  "ruff>=0.15",
+  "mypy>=1.19",
+]
 test = [
   "pytest>=8.0",
 ]
@@ -65,6 +72,48 @@ upload_to_release = true
 build_command = "pip install build && python -m build"
 commit_message = "chore(release): {version} [skip ci]"
 major_on_zero = false
+
+# --- Ruff Configuration ---
+[tool.ruff]
+target-version = "py312"
+src = ["src"]
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["signalflow"]
+
+# --- Mypy Configuration ---
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "loguru",
+    "pandas_ta.*",
+    "plotly.*",
+    "numba.*",
+    "optuna.*",
+    "lightning.*",
+    "duckdb.*",
+    "aiohttp.*",
+    "sklearn.*",
+]
+ignore_missing_imports = true
 
 # --- Pytest Configuration ---
 [tool.pytest.ini_options]

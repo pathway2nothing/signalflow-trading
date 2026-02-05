@@ -25,33 +25,77 @@ Close technical debt before the main work.
 
 **Files**: `core/registry.py`
 
-- [ ] Implement `SignalFlowRegistry.autodiscover()`:
+- [x] Implement `SignalFlowRegistry.autodiscover()`:
   - Scan `signalflow.*` packages via `importlib` + `pkgutil`
   - Find all classes decorated with `@sf_component`
   - Auto-register on first registry access
-- [ ] Support external packages via `entry_points` group `signalflow.components`
-- [ ] Lazy loading — import modules only on first `registry.get()` / `registry.list()`
-- [ ] Tests for autodiscovery
+- [x] Support external packages via `entry_points` group `signalflow.components`
+- [x] Lazy loading — import modules only on first `registry.get()` / `registry.list()`
+- [x] Tests for autodiscovery
 
 ### 0.3 Pre-commit Hooks
 
 **Files**: `.pre-commit-config.yaml` (new), `pyproject.toml` (ruff config)
 
-- [ ] Configure `.pre-commit-config.yaml`:
+- [x] Configure `.pre-commit-config.yaml`:
   - `ruff` — linter + formatter
   - `ruff format --check`
   - `mypy --strict` on core modules
   - `pytest tests/ -x --timeout=30` (quick smoke test)
-- [ ] Add ruff config to `pyproject.toml`
-- [ ] Add `py.typed` marker (PEP 561)
+- [x] Add ruff config to `pyproject.toml`
+- [x] Add `py.typed` marker (PEP 561)
 
 ---
 
-## Phase 1: Paper Trading (Real-Time Simulation)
+## Phase 1: Pluggable Data Store
+
+Add alternative storage backends so users can choose what fits their setup: local DuckDB (already done), local SQLite, or external PostgreSQL.
+
+### 1.1 SQLite Raw + Strategy Store
+
+**Files**: `data/raw_store/sqlite_stores.py` (new), `data/strategy_store/sqlite.py` (new)
+
+- [ ] `SqliteSpotStore(RawDataStore)` — same interface as `DuckDbSpotStore`:
+  - `load()`, `load_many()`, `load_many_pandas()`, `insert_klines()`, `close()`
+  - Schema: `ohlcv` table with `(pair, timestamp)` primary key
+  - Use `sqlite3` from stdlib — zero extra dependencies
+- [ ] `SqliteStrategyStore(StrategyStore)` — same interface as `DuckDbStrategyStore`:
+  - `init()`, `load_state()`, `save_state()`, `upsert_positions()`, `append_trade()`, `append_metrics()`
+  - Reuse `schema.py` SQL (SQLite-compatible subset)
+- [ ] Tests: mirror existing DuckDB test suite, parametrize over `[duckdb, sqlite]`
+
+### 1.2 PostgreSQL Raw + Strategy Store
+
+**Files**: `data/raw_store/pg_stores.py` (new), `data/strategy_store/pg.py` (new)
+
+- [ ] `PgSpotStore(RawDataStore)` — async via `asyncpg` or sync via `psycopg`:
+  - Same public interface as `DuckDbSpotStore`
+  - Connection string from config / env var `SIGNALFLOW_PG_DSN`
+  - Schema auto-creation on `init()` (idempotent `CREATE TABLE IF NOT EXISTS`)
+- [ ] `PgStrategyStore(StrategyStore)` — same interface as `DuckDbStrategyStore`:
+  - Reuse JSON-based serialization pattern
+  - Connection pooling for concurrent access
+- [ ] Add `psycopg[binary]` or `asyncpg` as optional dependency (`pip install signalflow[postgres]`)
+- [ ] Tests: use `pytest-postgresql` fixture or testcontainers; CI runs with `services: postgres`
+
+### 1.3 Store Factory & Configuration
+
+**Files**: `data/store_factory.py` (new), `core/config.py`
+
+- [ ] `StoreFactory.create_raw_store(backend=..., **kwargs) -> RawDataStore`
+  - `backend="duckdb"` (default), `"sqlite"`, `"postgres"`
+  - Raise clear error if optional deps missing (`asyncpg` / `psycopg`)
+- [ ] `StoreFactory.create_strategy_store(backend=..., **kwargs) -> StrategyStore`
+- [ ] Register all backends in `SignalFlowRegistry` for autodiscovery
+- [ ] Docs: `docs/guide/storage-backends.md` — comparison table (features, deps, use-case)
+
+---
+
+## Phase 2: Paper Trading (Real-Time Simulation)
 
 Real-time data via existing `BinanceSpotLoader.sync()` (REST polling), orders via `VirtualSpotExecutor`. Full pipeline with zero risk.
 
-### 1.1 RealtimeRunner
+### 2.1 RealtimeRunner
 
 **Files**: `strategy/runner/realtime_runner.py` (empty -> full implementation)
 
@@ -76,7 +120,7 @@ Real-time data via existing `BinanceSpotLoader.sync()` (REST polling), orders vi
   - `state.last_ts` for deduplication — skip already-processed bars
   - Safe restart from last checkpoint
 
-### 1.2 Data Sync Integration
+### 2.2 Data Sync Integration
 
 **Files**: `data/source/binance.py`, `data/raw_store/duckdb_spot.py`
 
@@ -84,13 +128,13 @@ Real-time data via existing `BinanceSpotLoader.sync()` (REST polling), orders vi
 - [ ] Method to fetch last N bars from DuckDB (for feature warmup)
 - [ ] Coordination: runner waits until sync writes a new candle
 
-### 1.3 Metrics & Monitoring
+### 2.3 Metrics & Monitoring
 
 - [ ] Per-bar logging: equity, PnL, open positions, signals
 - [ ] Periodic summary (every N bars): Sharpe, drawdown, win rate
 - [ ] Structured loguru output for parsing
 
-### 1.4 Tests
+### 2.4 Tests
 
 - [ ] Unit test: `RealtimeRunner.process_bar()` with mock data
 - [ ] Integration test: full cycle data -> features -> signals -> orders -> fills -> state
@@ -98,7 +142,7 @@ Real-time data via existing `BinanceSpotLoader.sync()` (REST polling), orders vi
 
 ---
 
-## Phase 2: WebSocket Streaming
+## Phase 3: WebSocket Streaming
 
 Replace REST polling with real-time WebSocket streams for lower latency.
 
@@ -117,7 +161,7 @@ Replace REST polling with real-time WebSocket streams for lower latency.
 
 ---
 
-## Phase 3: BinanceSpotExecutor (Real Orders)
+## Phase 4: BinanceSpotExecutor (Real Orders)
 
 Implement order submission and tracking on Binance Spot.
 
@@ -142,7 +186,7 @@ Implement order submission and tracking on Binance Spot.
 
 ---
 
-## Phase 4: RealtimeSpotBroker + Live Mode
+## Phase 5: RealtimeSpotBroker + Live Mode
 
 Connect `BinanceSpotExecutor` to the runner for production live trading.
 
@@ -156,7 +200,7 @@ Connect `BinanceSpotExecutor` to the runner for production live trading.
 
 ---
 
-## Phase 5: Risk Management
+## Phase 6: Risk Management
 
 **Files**: `strategy/risk/` (new module)
 
@@ -166,7 +210,7 @@ Connect `BinanceSpotExecutor` to the runner for production live trading.
 
 ---
 
-## Phase 6: Testnet & E2E Testing
+## Phase 7: Testnet & E2E Testing
 
 - [ ] Binance Testnet integration (`testnet.binance.vision`)
 - [ ] E2E test: data -> features -> signals -> orders -> fills -> state
@@ -176,7 +220,7 @@ Connect `BinanceSpotExecutor` to the runner for production live trading.
 
 ---
 
-## Phase 7: CLI / Operational Interface
+## Phase 8: CLI / Operational Interface
 
 - [ ] CLI entry point (`signalflow run`, `signalflow status`)
 - [ ] YAML/TOML strategy configuration
@@ -190,19 +234,21 @@ Connect `BinanceSpotExecutor` to the runner for production live trading.
 ```
 Phase 0 (housekeeping)     --- clean code, extensible RawDataType, autodiscovery
     |
-Phase 1 (paper trading)    --- full pipeline with polling + VirtualExecutor
+Phase 1 (data stores)      --- SQLite + PostgreSQL backends, store factory
     |
-Phase 2 (websocket)        --- real-time streaming replaces polling
+Phase 2 (paper trading)    --- full pipeline with polling + VirtualExecutor
     |
-Phase 3 (executor)         --- real orders on Binance
+Phase 3 (websocket)        --- real-time streaming replaces polling
     |
-Phase 4 (live broker)      --- production live trading
+Phase 4 (executor)         --- real orders on Binance
     |
-Phase 5 (risk)             --- loss protection
+Phase 5 (live broker)      --- production live trading
     |
-Phase 6 (testing)          --- testnet verification
+Phase 6 (risk)             --- loss protection
     |
-Phase 7 (CLI/ops)          --- operational convenience
+Phase 7 (testing)          --- testnet verification
+    |
+Phase 8 (CLI/ops)          --- operational convenience
 ```
 
 ## Key Files
@@ -211,21 +257,26 @@ Phase 7 (CLI/ops)          --- operational convenience
 |------|--------|-------|
 | `core/registry.py` | Autodiscovery via importlib + entry_points | 0 |
 | `.pre-commit-config.yaml` | New — ruff, mypy, pytest | 0 |
-| `strategy/runner/realtime_runner.py` | Full paper trading runner | 1 |
-| `data/source/binance_ws.py` | New — WebSocket manager | 2 |
-| `strategy/broker/executor/binance_spot.py` | Full executor implementation | 3 |
-| `data/source/binance.py` | Trading API endpoints | 3 |
-| `strategy/broker/realtime_spot.py` | Full live broker implementation | 4 |
-| `strategy/risk/` | New module | 5 |
+| `data/raw_store/sqlite_stores.py` | New — SQLite raw data store | 1 |
+| `data/strategy_store/sqlite.py` | New — SQLite strategy store | 1 |
+| `data/raw_store/pg_stores.py` | New — PostgreSQL raw data store | 1 |
+| `data/strategy_store/pg.py` | New — PostgreSQL strategy store | 1 |
+| `data/store_factory.py` | New — backend-agnostic store factory | 1 |
+| `strategy/runner/realtime_runner.py` | Full paper trading runner | 2 |
+| `data/source/binance_ws.py` | New — WebSocket manager | 3 |
+| `strategy/broker/executor/binance_spot.py` | Full executor implementation | 4 |
+| `data/source/binance.py` | Trading API endpoints | 4 |
+| `strategy/broker/realtime_spot.py` | Full live broker implementation | 5 |
+| `strategy/risk/` | New module | 6 |
 
 ## Code Reuse
 
 - `BacktestRunner._process_bar()` -> template for `RealtimeRunner.process_bar()`
 - `BacktestBroker` -> template for `RealtimeSpotBroker`
-- `VirtualSpotExecutor` -> executor for paper trading (Phase 1), interface for BinanceSpotExecutor
+- `VirtualSpotExecutor` -> executor for paper trading (Phase 2), interface for BinanceSpotExecutor
 - `BinanceClient` -> extend, don't rewrite
-- `BinanceSpotLoader.sync()` -> data ingestion for Phase 1
-- `DuckDbStrategyStore` -> persistence layer (production-ready)
+- `BinanceSpotLoader.sync()` -> data ingestion for Phase 2
+- `DuckDbStrategyStore` -> template for SQLite/PostgreSQL stores (Phase 1), persistence layer (production-ready)
 - `StrategyState.touch()` / `last_event_id` -> idempotency mechanism
 
 ## Verification
@@ -233,5 +284,5 @@ Phase 7 (CLI/ops)          --- operational convenience
 After each phase:
 1. `pytest tests/ -v` — all existing tests must pass
 2. New tests for all new code
-3. Phase 1 — paper trading on real data (manual verification)
-4. Phase 6 — full E2E on Binance Testnet
+3. Phase 2 — paper trading on real data (manual verification)
+4. Phase 7 — full E2E on Binance Testnet

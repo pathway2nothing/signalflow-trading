@@ -1,8 +1,10 @@
 """Tests for signalflow.core.registry.SignalFlowRegistry."""
 
+from unittest.mock import patch, MagicMock
+
 import pytest
 
-from signalflow.core.registry import SignalFlowRegistry
+from signalflow.core.registry import SignalFlowRegistry, default_registry
 from signalflow.core.enums import SfComponentType, RawDataType
 
 
@@ -204,3 +206,121 @@ class TestRawDataTypeRegistry:
         """RawDataType.SPOT.columns should return same as registry."""
         cols_enum = RawDataType.SPOT.columns
         assert cols_enum == {"pair", "timestamp", "open", "high", "low", "close", "volume"}
+
+
+class TestAutodiscovery:
+    """Tests for autodiscovery mechanism."""
+
+    def test_discovered_flag_starts_false(self):
+        reg = SignalFlowRegistry()
+        assert reg._discovered is False
+
+    def test_autodiscover_sets_flag(self):
+        reg = SignalFlowRegistry()
+        reg.autodiscover()
+        assert reg._discovered is True
+
+    def test_autodiscover_idempotent(self):
+        """Second call is a no-op."""
+        reg = SignalFlowRegistry()
+        reg.autodiscover()
+        # Manually register after discovery
+        reg.register(SfComponentType.DETECTOR, "post_discover", DummyDetector)
+        # Second autodiscover should not clear anything
+        reg.autodiscover()
+        assert reg.get(SfComponentType.DETECTOR, "post_discover") is DummyDetector
+
+    def test_get_triggers_lazy_discovery(self):
+        reg = SignalFlowRegistry()
+        reg.register(SfComponentType.DETECTOR, "lazy", DummyDetector)
+        assert reg._discovered is False
+        cls = reg.get(SfComponentType.DETECTOR, "lazy")
+        assert cls is DummyDetector
+        assert reg._discovered is True
+
+    def test_list_triggers_lazy_discovery(self):
+        reg = SignalFlowRegistry()
+        assert reg._discovered is False
+        reg.list(SfComponentType.DETECTOR)
+        assert reg._discovered is True
+
+    def test_snapshot_triggers_lazy_discovery(self):
+        reg = SignalFlowRegistry()
+        assert reg._discovered is False
+        reg.snapshot()
+        assert reg._discovered is True
+
+    def test_register_does_not_trigger_discovery(self):
+        """Write path should not trigger autodiscovery."""
+        reg = SignalFlowRegistry()
+        reg.register(SfComponentType.DETECTOR, "early", DummyDetector)
+        assert reg._discovered is False
+
+    def test_default_registry_finds_builtin_components(self):
+        """default_registry should find @sf_component-decorated classes after autodiscovery."""
+        default_registry.autodiscover()
+        snap = default_registry.snapshot()
+        # At minimum, built-in components decorated with @sf_component should be present
+        assert len(snap) > 0
+        all_components = [name for names in snap.values() for name in names]
+        assert len(all_components) > 0
+
+    def test_failed_module_import_is_logged_not_raised(self):
+        """Modules that fail to import should be skipped gracefully."""
+        reg = SignalFlowRegistry()
+
+        with patch("signalflow.core.registry.pkgutil.walk_packages") as mock_walk:
+            mock_walk.return_value = [
+                (None, "signalflow._fake_broken_module", False),
+            ]
+            with patch("signalflow.core.registry.importlib.import_module", side_effect=ImportError("boom")):
+                # Should not raise
+                reg.autodiscover()
+
+        assert reg._discovered is True
+
+    def test_failed_entry_point_is_logged_not_raised(self):
+        """Entry-points that fail to load should be skipped gracefully."""
+        reg = SignalFlowRegistry()
+
+        bad_ep = MagicMock()
+        bad_ep.name = "broken_plugin"
+        bad_ep.load.side_effect = ImportError("missing dep")
+
+        mock_eps = MagicMock()
+        mock_eps.select.return_value = [bad_ep]
+
+        with patch("signalflow.core.registry.entry_points", return_value=mock_eps):
+            # Should not raise
+            reg.autodiscover()
+
+        assert reg._discovered is True
+
+    def test_entry_points_loaded(self):
+        """Valid entry-points should be loaded."""
+        reg = SignalFlowRegistry()
+
+        good_ep = MagicMock()
+        good_ep.name = "good_plugin"
+        good_ep.load.return_value = MagicMock()  # Simulate successful load
+
+        mock_eps = MagicMock()
+        mock_eps.select.return_value = [good_ep]
+
+        with patch("signalflow.core.registry.entry_points", return_value=mock_eps):
+            reg.autodiscover()
+
+        good_ep.load.assert_called_once()
+
+    def test_already_imported_modules_skipped(self):
+        """Modules already in sys.modules should not be re-imported."""
+        reg = SignalFlowRegistry()
+
+        with patch("signalflow.core.registry.pkgutil.walk_packages") as mock_walk:
+            # Return a module that's already in sys.modules
+            mock_walk.return_value = [
+                (None, "signalflow.core.registry", False),
+            ]
+            with patch("signalflow.core.registry.importlib.import_module") as mock_import:
+                reg.autodiscover()
+                mock_import.assert_not_called()
