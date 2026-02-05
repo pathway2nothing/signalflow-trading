@@ -9,63 +9,46 @@ import pandas as pd
 import polars as pl
 from loguru import logger
 
-from signalflow.core import sf_component
+from signalflow.core import sf_component, SfComponentType
+from signalflow.core.registry import default_registry
 from signalflow.data.raw_store.base import RawDataStore
+from signalflow.data.raw_store._schema import (
+    CORE_COLUMNS,
+    normalize_ts,
+    polars_schema,
+    resolve_columns,
+)
 
 try:
     import psycopg
 except ImportError:
     psycopg = None  # type: ignore[assignment]
 
-_PG_MISSING_MSG = (
-    "psycopg is required for PostgreSQL stores. "
-    "Install with: pip install signalflow-trading[postgres]"
-)
+_PG_MISSING_MSG = "psycopg is required for PostgreSQL stores. Install with: pip install signalflow-trading[postgres]"
 
-_EMPTY_SCHEMA = {
-    "pair": pl.Utf8,
-    "timestamp": pl.Datetime,
-    "open": pl.Float64,
-    "high": pl.Float64,
-    "low": pl.Float64,
-    "close": pl.Float64,
-    "volume": pl.Float64,
-    "trades": pl.Int64,
+# PostgreSQL type mapping.
+_SQL_TYPES: dict[str, str] = {
+    "pair": "TEXT NOT NULL",
+    "timestamp": "TIMESTAMP NOT NULL",
+    "trades": "INTEGER",
 }
-
-_COLUMNS = ["pair", "timestamp", "open", "high", "low", "close", "volume", "trades"]
-
-
-def _rows_to_df(rows: list[tuple]) -> pl.DataFrame:
-    """Convert raw cursor rows to a Polars DataFrame with standard OHLCV schema."""
-    if not rows:
-        return pl.DataFrame(schema=_EMPTY_SCHEMA)
-    data = {col: [row[i] for row in rows] for i, col in enumerate(_COLUMNS)}
-    df = pl.DataFrame(data)
-    if "timestamp" in df.columns:
-        df = df.with_columns(pl.col("timestamp").cast(pl.Datetime).dt.replace_time_zone(None))
-    return df
-
-
-def _normalize_ts(ts: datetime) -> datetime:
-    """Normalize timestamp: strip tz, zero seconds/microseconds, round up if needed."""
-    if ts.second != 0 or ts.microsecond != 0:
-        return ts.replace(tzinfo=None, second=0, microsecond=0) + timedelta(minutes=1)
-    return ts.replace(tzinfo=None)
 
 
 @dataclass
 @sf_component(name="postgres/spot")
-class PgSpotStore(RawDataStore):
-    """PostgreSQL storage backend for OHLCV spot data.
+class PgRawStore(RawDataStore):
+    """PostgreSQL storage backend for raw market data.
 
+    Supports any registered raw data type (spot, futures, perpetual, custom).
     Requires psycopg. Install with: pip install signalflow-trading[postgres]
     Connection string from dsn param or SIGNALFLOW_PG_DSN env var.
     """
 
     dsn: str = ""
+    data_type: str = "spot"
     timeframe: str = "1m"
     _con: Any = field(init=False, repr=False)
+    _columns: list[str] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if psycopg is None:
@@ -73,24 +56,47 @@ class PgSpotStore(RawDataStore):
         resolved_dsn = self.dsn or os.environ.get("SIGNALFLOW_PG_DSN", "")
         if not resolved_dsn:
             raise ValueError("PostgreSQL DSN must be provided via dsn param or SIGNALFLOW_PG_DSN env var")
+        self._columns = resolve_columns(self.data_type)
         self._con = psycopg.connect(resolved_dsn, autocommit=False)
         self._ensure_tables()
 
+    # ── Schema management ─────────────────────────────────────────────
+
+    @property
+    def _all_column_names(self) -> list[str]:
+        return ["pair", "timestamp"] + self._columns
+
+    def _col_sql_type(self, col: str) -> str:
+        if col in _SQL_TYPES:
+            return _SQL_TYPES[col]
+        return "DOUBLE PRECISION NOT NULL" if col in CORE_COLUMNS else "DOUBLE PRECISION"
+
     def _ensure_tables(self) -> None:
         with self._con.cursor() as cur:
+            # Check existing columns
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS ohlcv (
-                    pair TEXT NOT NULL,
-                    timestamp TIMESTAMP NOT NULL,
-                    open DOUBLE PRECISION NOT NULL,
-                    high DOUBLE PRECISION NOT NULL,
-                    low DOUBLE PRECISION NOT NULL,
-                    close DOUBLE PRECISION NOT NULL,
-                    volume DOUBLE PRECISION NOT NULL,
-                    trades INTEGER,
-                    PRIMARY KEY (pair, timestamp)
-                )
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'ohlcv'
             """)
+            existing_cols = {row[0] for row in cur.fetchall()}
+
+            if not existing_cols:
+                col_defs = ", ".join(
+                    f"{c} {self._col_sql_type(c)}" for c in self._all_column_names
+                )
+                cur.execute(f"""
+                    CREATE TABLE ohlcv (
+                        {col_defs},
+                        PRIMARY KEY (pair, timestamp)
+                    )
+                """)
+            else:
+                for col in self._columns:
+                    if col not in existing_cols:
+                        sql_type = self._col_sql_type(col)
+                        cur.execute(f"ALTER TABLE ohlcv ADD COLUMN {col} {sql_type}")
+                        logger.info(f"Added column {col} ({sql_type}) to ohlcv table")
+
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_ohlcv_pair_ts
                 ON ohlcv(pair, timestamp DESC)
@@ -102,44 +108,46 @@ class PgSpotStore(RawDataStore):
                 )
             """)
             cur.execute(
-                "INSERT INTO meta(key, value) VALUES (%s, %s) "
-                "ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value",
-                (self.timeframe, self.timeframe),
+                "INSERT INTO meta(key, value) VALUES (%s, %s) ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value",
+                ("timeframe", self.timeframe),
+            )
+            cur.execute(
+                "INSERT INTO meta(key, value) VALUES (%s, %s) ON CONFLICT(key) DO UPDATE SET value = EXCLUDED.value",
+                ("data_type", self.data_type),
             )
         self._con.commit()
-        logger.info(f"PostgreSQL database initialized (timeframe={self.timeframe})")
+        logger.info(
+            f"PostgreSQL database initialized "
+            f"(data_type={self.data_type}, timeframe={self.timeframe})"
+        )
+
+    # ── Insert ────────────────────────────────────────────────────────
 
     def insert_klines(self, pair: str, klines: list[dict]) -> None:
-        """Upsert klines via INSERT ON CONFLICT DO UPDATE."""
         if not klines:
             return
+        col_names = ", ".join(self._all_column_names)
+        placeholders = ", ".join(["%s"] * len(self._all_column_names))
+        update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in self._columns)
+
         rows = [
-            (
-                pair,
-                _normalize_ts(k["timestamp"]),
-                k["open"],
-                k["high"],
-                k["low"],
-                k["close"],
-                k["volume"],
-                k.get("trades"),
-            )
+            (pair, normalize_ts(k["timestamp"])) + tuple(k.get(c) for c in self._columns)
             for k in klines
         ]
         with self._con.cursor() as cur:
             cur.executemany(
-                """
-                INSERT INTO ohlcv(pair, timestamp, open, high, low, close, volume, trades)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                f"""
+                INSERT INTO ohlcv({col_names})
+                VALUES ({placeholders})
                 ON CONFLICT(pair, timestamp) DO UPDATE SET
-                    open = EXCLUDED.open, high = EXCLUDED.high,
-                    low = EXCLUDED.low, close = EXCLUDED.close,
-                    volume = EXCLUDED.volume, trades = EXCLUDED.trades
+                    {update_set}
                 """,
                 rows,
             )
         self._con.commit()
         logger.debug(f"Inserted {len(klines):,} rows for {pair}")
+
+    # ── Queries ───────────────────────────────────────────────────────
 
     def get_time_bounds(self, pair: str) -> tuple[Optional[datetime], Optional[datetime]]:
         with self._con.cursor() as cur:
@@ -187,6 +195,18 @@ class PgSpotStore(RawDataStore):
 
         return gaps
 
+    # ── Load ──────────────────────────────────────────────────────────
+
+    def _rows_to_df(self, rows: list[tuple]) -> pl.DataFrame:
+        if not rows:
+            return pl.DataFrame(schema=polars_schema(self._columns))
+        all_cols = self._all_column_names
+        data = {col: [row[i] for row in rows] for i, col in enumerate(all_cols)}
+        df = pl.DataFrame(data)
+        if "timestamp" in df.columns:
+            df = df.with_columns(pl.col("timestamp").cast(pl.Datetime).dt.replace_time_zone(None))
+        return df
+
     def load(
         self,
         pair: str,
@@ -194,7 +214,8 @@ class PgSpotStore(RawDataStore):
         start: Optional[datetime] = None,
         end: Optional[datetime] = None,
     ) -> pl.DataFrame:
-        query = "SELECT pair, timestamp, open, high, low, close, volume, trades FROM ohlcv WHERE pair = %s"
+        col_list = ", ".join(self._all_column_names)
+        query = f"SELECT {col_list} FROM ohlcv WHERE pair = %s"
         params: list[object] = [pair]
 
         if hours is not None:
@@ -215,7 +236,7 @@ class PgSpotStore(RawDataStore):
         with self._con.cursor() as cur:
             cur.execute(query, params)
             rows = cur.fetchall()
-        return _rows_to_df(rows)
+        return self._rows_to_df(rows)
 
     def load_many(
         self,
@@ -226,10 +247,11 @@ class PgSpotStore(RawDataStore):
     ) -> pl.DataFrame:
         pairs = list(pairs)
         if not pairs:
-            return pl.DataFrame(schema=_EMPTY_SCHEMA)
+            return pl.DataFrame(schema=polars_schema(self._columns))
 
+        col_list = ", ".join(self._all_column_names)
         placeholders = ",".join(["%s"] * len(pairs))
-        query = f"SELECT pair, timestamp, open, high, low, close, volume, trades FROM ohlcv WHERE pair IN ({placeholders})"
+        query = f"SELECT {col_list} FROM ohlcv WHERE pair IN ({placeholders})"
         params: list[object] = [*pairs]
 
         if hours is not None:
@@ -250,7 +272,7 @@ class PgSpotStore(RawDataStore):
         with self._con.cursor() as cur:
             cur.execute(query, params)
             rows = cur.fetchall()
-        return _rows_to_df(rows)
+        return self._rows_to_df(rows)
 
     def load_many_pandas(
         self,
@@ -258,8 +280,9 @@ class PgSpotStore(RawDataStore):
         start: datetime | None = None,
         end: datetime | None = None,
     ) -> pd.DataFrame:
-        df_pl = self.load_many(pairs=pairs, start=start, end=end)
-        return df_pl.to_pandas()
+        return self.load_many(pairs=pairs, start=start, end=end).to_pandas()
+
+    # ── Stats / lifecycle ─────────────────────────────────────────────
 
     def get_stats(self) -> pl.DataFrame:
         with self._con.cursor() as cur:
@@ -291,3 +314,15 @@ class PgSpotStore(RawDataStore):
 
     def close(self) -> None:
         self._con.close()
+
+
+# Register for futures and perpetual.
+default_registry.register(
+    SfComponentType.RAW_DATA_STORE, "postgres/futures", PgRawStore, override=True
+)
+default_registry.register(
+    SfComponentType.RAW_DATA_STORE, "postgres/perpetual", PgRawStore, override=True
+)
+
+# Backward-compatible alias.
+PgSpotStore = PgRawStore
