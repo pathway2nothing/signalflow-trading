@@ -147,9 +147,7 @@ class TestVirtualDataProvider:
         provider.download(pairs=PAIRS, n_bars=10, start=START)
 
         # Run sync for a short time
-        task = asyncio.create_task(
-            provider.sync(PAIRS, update_interval_sec=0.01)
-        )
+        task = asyncio.create_task(provider.sync(PAIRS, update_interval_sec=0.01))
         await asyncio.sleep(0.1)
         task.cancel()
         try:
@@ -180,9 +178,7 @@ class TestPollNewBars:
         timestamps = runner._poll_new_bars(state)
         assert len(timestamps) == 5
 
-    def test_returns_only_new_bars(
-        self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider
-    ) -> None:
+    def test_returns_only_new_bars(self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider) -> None:
         virtual_provider.download(pairs=PAIRS, n_bars=10, start=START)
         state = StrategyState(strategy_id="test_rt")
         state.last_ts = START + timedelta(minutes=4)
@@ -191,9 +187,7 @@ class TestPollNewBars:
         assert len(timestamps) == 5
         assert all(t > state.last_ts for t in timestamps)
 
-    def test_returns_empty_when_caught_up(
-        self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider
-    ) -> None:
+    def test_returns_empty_when_caught_up(self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider) -> None:
         virtual_provider.download(pairs=PAIRS, n_bars=5, start=START)
         state = StrategyState(strategy_id="test_rt")
         state.last_ts = START + timedelta(minutes=4)
@@ -208,13 +202,9 @@ class TestDetectSignals:
         assert bar_df.height == 0
         assert signals.value.height == 0
 
-    def test_returns_signals_for_timestamp(
-        self, runner: RealtimeRunner, raw_db: DuckDbSpotStore
-    ) -> None:
+    def test_returns_signals_for_timestamp(self, runner: RealtimeRunner, raw_db: DuckDbSpotStore) -> None:
         # Generate crossover data with enough warmup
-        bars = generate_crossover_data(
-            PAIR, START, n_bars=100, crossover_at=70, seed=42
-        )
+        bars = generate_crossover_data(PAIR, START, n_bars=100, crossover_at=70, seed=42)
         raw_db.insert_klines(PAIR, bars)
 
         target_ts = START + timedelta(minutes=99)
@@ -237,9 +227,7 @@ class TestDetectSignals:
 
 
 class TestProcessBar:
-    def test_updates_state(
-        self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider
-    ) -> None:
+    def test_updates_state(self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider) -> None:
         virtual_provider.download(pairs=PAIRS, n_bars=5, start=START)
 
         state = StrategyState(strategy_id="test_rt")
@@ -254,9 +242,7 @@ class TestProcessBar:
 
         assert state.last_ts == START
 
-    def test_creates_entry_on_signal(
-        self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider
-    ) -> None:
+    def test_creates_entry_on_signal(self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider) -> None:
         virtual_provider.download(pairs=PAIRS, n_bars=5, start=START)
 
         state = StrategyState(strategy_id="test_rt")
@@ -298,9 +284,7 @@ class TestFullCycle:
         strategy_db: DuckDbStrategyStore,
     ) -> None:
         # Generate crossover data for signals
-        bars = generate_crossover_data(
-            PAIR, START, n_bars=80, crossover_at=55, seed=42
-        )
+        bars = generate_crossover_data(PAIR, START, n_bars=80, crossover_at=55, seed=42)
         raw_db.insert_klines(PAIR, bars)
 
         # Run with a shutdown after processing
@@ -466,6 +450,7 @@ class TestNoNewBars:
     @pytest.mark.asyncio
     async def test_sleeps_when_no_bars(self, runner: RealtimeRunner) -> None:
         """Runner should sleep and not crash when store is empty."""
+
         async def stop_quick():
             await asyncio.sleep(0.1)
             runner._request_shutdown()

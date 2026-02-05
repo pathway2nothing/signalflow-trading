@@ -57,6 +57,93 @@ def raw_data(sample_ohlcv_df) -> "RawData":
     )
 
 
+@pytest.fixture
+def strategy_state():
+    """Fresh StrategyState with 10k cash."""
+    from signalflow.core.containers.strategy_state import StrategyState
+
+    state = StrategyState(strategy_id="test")
+    state.portfolio.cash = 10000.0
+    return state
+
+
+@pytest.fixture
+def long_position():
+    """Open LONG position in BTCUSDT."""
+    from signalflow.core.containers.position import Position
+    from signalflow.core.enums import PositionType
+
+    return Position(
+        id="pos_long",
+        pair="BTCUSDT",
+        position_type=PositionType.LONG,
+        entry_price=100.0,
+        last_price=100.0,
+        qty=1.0,
+        entry_time=datetime(2024, 1, 1),
+        last_time=datetime(2024, 1, 1),
+    )
+
+
+@pytest.fixture
+def short_position():
+    """Open SHORT position in ETHUSDT."""
+    from signalflow.core.containers.position import Position
+    from signalflow.core.enums import PositionType
+
+    return Position(
+        id="pos_short",
+        pair="ETHUSDT",
+        position_type=PositionType.SHORT,
+        entry_price=100.0,
+        last_price=100.0,
+        qty=1.0,
+        entry_time=datetime(2024, 1, 1),
+        last_time=datetime(2024, 1, 1),
+    )
+
+
+@pytest.fixture
+def rise_signals_df():
+    """Signals DataFrame with a RISE signal for BTCUSDT."""
+    from signalflow.core.enums import SignalType
+
+    base = datetime(2024, 1, 1)
+    return pl.DataFrame(
+        {
+            "pair": ["BTCUSDT"],
+            "timestamp": [base],
+            "signal_type": [SignalType.RISE.value],
+            "signal": [1],
+            "probability": [0.9],
+        }
+    )
+
+
+@pytest.fixture
+def ohlcv_100_bars() -> pl.DataFrame:
+    """100 one-minute bars per pair for feature warmup tests."""
+    import math
+
+    base = datetime(2024, 1, 1)
+    rows = []
+    for pair in ["BTCUSDT", "ETHUSDT"]:
+        for i in range(100):
+            price = 100.0 + 10 * math.sin(i / 5.0) + i * 0.1
+            rows.append(
+                {
+                    "pair": pair,
+                    "timestamp": base + timedelta(minutes=i),
+                    "open": price - 0.5,
+                    "high": price + 1.0,
+                    "low": price - 1.0,
+                    "close": price,
+                    "volume": 1000.0 + i * 10,
+                }
+            )
+    return pl.DataFrame(rows)
+
+
 # ---------------------------------------------------------------------------
 # Store fixtures (parametrized over backends)
 # ---------------------------------------------------------------------------
