@@ -116,7 +116,15 @@ class TestProcessFillsExit:
         state, pos = self._state_with_position()
         order = Order(id="o1", pair="BTCUSDT", side="SELL", qty=1.0, position_id="pos1")
         fill = OrderFill(
-            id="f1", order_id="o1", pair="BTCUSDT", side="SELL", ts=TS, price=110.0, qty=1.0, fee=0.1, position_id="pos1"
+            id="f1",
+            order_id="o1",
+            pair="BTCUSDT",
+            side="SELL",
+            ts=TS,
+            price=110.0,
+            qty=1.0,
+            fee=0.1,
+            position_id="pos1",
         )
         trades = broker.process_fills([fill], [order], state)
         assert len(trades) == 1
@@ -129,7 +137,15 @@ class TestProcessFillsExit:
         initial_cash = state.portfolio.cash
         order = Order(id="o1", pair="BTCUSDT", side="SELL", qty=1.0, position_id="pos1")
         fill = OrderFill(
-            id="f1", order_id="o1", pair="BTCUSDT", side="SELL", ts=TS, price=110.0, qty=1.0, fee=0.1, position_id="pos1"
+            id="f1",
+            order_id="o1",
+            pair="BTCUSDT",
+            side="SELL",
+            ts=TS,
+            price=110.0,
+            qty=1.0,
+            fee=0.1,
+            position_id="pos1",
         )
         broker.process_fills([fill], [order], state)
         # cash += notional - fee = 110 - 0.1

@@ -132,7 +132,16 @@ class TestFixedHorizonLabeler:
         labeler = FixedHorizonLabeler(horizon=5, mask_to_signals=False)
         empty = pl.DataFrame(
             {"pair": [], "timestamp": [], "close": [], "open": [], "high": [], "low": [], "volume": []}
-        ).cast({"timestamp": pl.Datetime, "close": pl.Float64, "open": pl.Float64, "high": pl.Float64, "low": pl.Float64, "volume": pl.Float64})
+        ).cast(
+            {
+                "timestamp": pl.Datetime,
+                "close": pl.Float64,
+                "open": pl.Float64,
+                "high": pl.Float64,
+                "low": pl.Float64,
+                "volume": pl.Float64,
+            }
+        )
         # Empty group_by never calls compute_group, so "label" column is not produced
         with pytest.raises(Exception):
             labeler.compute(empty)
@@ -167,9 +176,7 @@ class TestFixedHorizonLabeler:
 
 class TestLabelerSignalFiltering:
     def test_filter_by_signal_type(self):
-        labeler = FixedHorizonLabeler(
-            horizon=5, filter_signal_type=SignalType.RISE, mask_to_signals=False
-        )
+        labeler = FixedHorizonLabeler(horizon=5, filter_signal_type=SignalType.RISE, mask_to_signals=False)
         df = _price_df(20)
         base = datetime(2024, 1, 1)
         signals = Signals(

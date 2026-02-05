@@ -71,9 +71,7 @@ def _make_empty_signals():
 class TestBuildPrices:
     def test_from_bar_data(self):
         runner = BacktestRunner()
-        bar = pl.DataFrame(
-            {"pair": ["BTCUSDT", "ETHUSDT"], "timestamp": [TS, TS], "close": [100.0, 50.0]}
-        )
+        bar = pl.DataFrame({"pair": ["BTCUSDT", "ETHUSDT"], "timestamp": [TS, TS], "close": [100.0, 50.0]})
         prices = runner._build_prices(bar)
         assert prices == {"BTCUSDT": 100.0, "ETHUSDT": 50.0}
 
@@ -166,7 +164,20 @@ class TestBacktestRunnerRun:
             datetime_start=TS,
             datetime_end=TS,
             pairs=PAIRS,
-            data={"spot": pl.DataFrame({"pair": [], "timestamp": [], "close": [], "open": [], "high": [], "low": [], "volume": []}).cast({"timestamp": pl.Datetime, "close": pl.Float64, "open": pl.Float64, "high": pl.Float64, "low": pl.Float64, "volume": pl.Float64})},
+            data={
+                "spot": pl.DataFrame(
+                    {"pair": [], "timestamp": [], "close": [], "open": [], "high": [], "low": [], "volume": []}
+                ).cast(
+                    {
+                        "timestamp": pl.Datetime,
+                        "close": pl.Float64,
+                        "open": pl.Float64,
+                        "high": pl.Float64,
+                        "low": pl.Float64,
+                        "volume": pl.Float64,
+                    }
+                )
+            },
         )
         state = runner.run(raw, _make_empty_signals())
         assert state.portfolio.cash == 10000.0
@@ -250,7 +261,20 @@ class TestOptimizedBacktestRunner:
             datetime_start=TS,
             datetime_end=TS,
             pairs=["BTCUSDT"],
-            data={"spot": pl.DataFrame({"pair": [], "timestamp": [], "close": [], "open": [], "high": [], "low": [], "volume": []}).cast({"timestamp": pl.Datetime, "close": pl.Float64, "open": pl.Float64, "high": pl.Float64, "low": pl.Float64, "volume": pl.Float64})},
+            data={
+                "spot": pl.DataFrame(
+                    {"pair": [], "timestamp": [], "close": [], "open": [], "high": [], "low": [], "volume": []}
+                ).cast(
+                    {
+                        "timestamp": pl.Datetime,
+                        "close": pl.Float64,
+                        "open": pl.Float64,
+                        "high": pl.Float64,
+                        "low": pl.Float64,
+                        "volume": pl.Float64,
+                    }
+                )
+            },
         )
         state = runner.run(raw, _make_empty_signals())
         assert state.portfolio.cash == 10000.0
