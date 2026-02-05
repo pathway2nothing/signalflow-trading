@@ -22,6 +22,7 @@ dependencies = [
     "numpy>=1.24.0",
     "pandas-ta>=0.3.14b",
     "plotly>=5.0.0",
+    "pyarrow>=14.0.0",
 ]
 
 [project.optional-dependencies]
