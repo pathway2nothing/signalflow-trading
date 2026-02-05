@@ -55,38 +55,38 @@ Add alternative storage backends so users can choose what fits their setup: loca
 
 **Files**: `data/raw_store/sqlite_stores.py` (new), `data/strategy_store/sqlite.py` (new)
 
-- [ ] `SqliteSpotStore(RawDataStore)` — same interface as `DuckDbSpotStore`:
+- [x] `SqliteSpotStore(RawDataStore)` — same interface as `DuckDbSpotStore`:
   - `load()`, `load_many()`, `load_many_pandas()`, `insert_klines()`, `close()`
   - Schema: `ohlcv` table with `(pair, timestamp)` primary key
   - Use `sqlite3` from stdlib — zero extra dependencies
-- [ ] `SqliteStrategyStore(StrategyStore)` — same interface as `DuckDbStrategyStore`:
+- [x] `SqliteStrategyStore(StrategyStore)` — same interface as `DuckDbStrategyStore`:
   - `init()`, `load_state()`, `save_state()`, `upsert_positions()`, `append_trade()`, `append_metrics()`
   - Reuse `schema.py` SQL (SQLite-compatible subset)
-- [ ] Tests: mirror existing DuckDB test suite, parametrize over `[duckdb, sqlite]`
+- [x] Tests: mirror existing DuckDB test suite, parametrize over `[duckdb, sqlite]`
 
 ### 1.2 PostgreSQL Raw + Strategy Store
 
 **Files**: `data/raw_store/pg_stores.py` (new), `data/strategy_store/pg.py` (new)
 
-- [ ] `PgSpotStore(RawDataStore)` — async via `asyncpg` or sync via `psycopg`:
+- [x] `PgSpotStore(RawDataStore)` — sync via `psycopg`:
   - Same public interface as `DuckDbSpotStore`
   - Connection string from config / env var `SIGNALFLOW_PG_DSN`
   - Schema auto-creation on `init()` (idempotent `CREATE TABLE IF NOT EXISTS`)
-- [ ] `PgStrategyStore(StrategyStore)` — same interface as `DuckDbStrategyStore`:
+- [x] `PgStrategyStore(StrategyStore)` — same interface as `DuckDbStrategyStore`:
   - Reuse JSON-based serialization pattern
   - Connection pooling for concurrent access
-- [ ] Add `psycopg[binary]` or `asyncpg` as optional dependency (`pip install signalflow[postgres]`)
-- [ ] Tests: use `pytest-postgresql` fixture or testcontainers; CI runs with `services: postgres`
+- [x] Add `psycopg[binary]` as optional dependency (`pip install signalflow-trading[postgres]`)
+- [x] Tests: skipped when `SIGNALFLOW_PG_DSN` not set; table cleanup between tests
 
 ### 1.3 Store Factory & Configuration
 
 **Files**: `data/store_factory.py` (new), `core/config.py`
 
-- [ ] `StoreFactory.create_raw_store(backend=..., **kwargs) -> RawDataStore`
+- [x] `StoreFactory.create_raw_store(backend=..., **kwargs) -> RawDataStore`
   - `backend="duckdb"` (default), `"sqlite"`, `"postgres"`
-  - Raise clear error if optional deps missing (`asyncpg` / `psycopg`)
-- [ ] `StoreFactory.create_strategy_store(backend=..., **kwargs) -> StrategyStore`
-- [ ] Register all backends in `SignalFlowRegistry` for autodiscovery
+  - Raise clear error if optional deps missing (`psycopg`)
+- [x] `StoreFactory.create_strategy_store(backend=..., **kwargs) -> StrategyStore`
+- [x] Register all backends in `SignalFlowRegistry` for autodiscovery
 - [ ] Docs: `docs/guide/storage-backends.md` — comparison table (features, deps, use-case)
 
 ---

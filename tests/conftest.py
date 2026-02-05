@@ -3,6 +3,7 @@
 import pytest
 import polars as pl
 from datetime import datetime, timedelta
+from pathlib import Path
 
 
 @pytest.fixture
@@ -54,3 +55,65 @@ def raw_data(sample_ohlcv_df) -> "RawData":
         pairs=["BTCUSDT", "ETHUSDT"],
         data={"spot": sample_ohlcv_df},
     )
+
+
+# ---------------------------------------------------------------------------
+# Store fixtures (parametrized over backends)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(params=["duckdb", "sqlite"])
+def raw_store(request, tmp_path):
+    """Parametrized RawDataStore fixture — runs tests against DuckDB and SQLite."""
+    backend = request.param
+    db_path = tmp_path / f"test_spot.{backend}"
+
+    if backend == "duckdb":
+        from signalflow.data.raw_store import DuckDbSpotStore
+
+        store = DuckDbSpotStore(db_path=db_path, timeframe="1m")
+    else:
+        from signalflow.data.raw_store import SqliteSpotStore
+
+        store = SqliteSpotStore(db_path=db_path, timeframe="1m")
+
+    yield store
+    store.close()
+
+
+@pytest.fixture(params=["duckdb", "sqlite"])
+def strategy_store(request, tmp_path):
+    """Parametrized StrategyStore fixture — runs tests against DuckDB and SQLite."""
+    backend = request.param
+    db_path = tmp_path / f"test_strategy.{backend}"
+
+    if backend == "duckdb":
+        from signalflow.data.strategy_store import DuckDbStrategyStore
+
+        store = DuckDbStrategyStore(str(db_path))
+    else:
+        from signalflow.data.strategy_store import SqliteStrategyStore
+
+        store = SqliteStrategyStore(str(db_path))
+
+    store.init()
+    yield store
+    store.close()
+
+
+@pytest.fixture
+def sample_klines():
+    """Sample klines for insert_klines tests (100 one-minute bars)."""
+    base = datetime(2024, 1, 1)
+    return [
+        {
+            "timestamp": base + timedelta(minutes=i),
+            "open": 100.0 + i,
+            "high": 105.0 + i,
+            "low": 95.0 + i,
+            "close": 102.0 + i,
+            "volume": 1000.0 + i * 10,
+            "trades": 50 + i,
+        }
+        for i in range(100)
+    ]

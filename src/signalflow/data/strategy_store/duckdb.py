@@ -1,71 +1,19 @@
 # src/signalflow/data/strategy_store/duckdb.py
 from __future__ import annotations
 
-import json
-from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from typing import Iterable, Optional
 
 import duckdb
 
-from signalflow.core import StrategyState, Position, Trade
+from signalflow.core import sf_component, StrategyState, Position, Trade
 
 from signalflow.data.strategy_store.base import StrategyStore
 from signalflow.data.strategy_store.schema import SCHEMA_SQL
+from signalflow.data.strategy_store._serialization import to_json as _to_json, state_from_json as _state_from_json
 
 
-def _to_json(obj) -> str:
-    """Convert object to JSON string.
-
-    Handles dataclasses by converting to dict first. Uses default=str
-    for non-serializable types (e.g., datetime).
-
-    Args:
-        obj: Object to serialize (dataclass, dict, or JSON-serializable).
-
-    Returns:
-        str: JSON string representation.
-
-    Example:
-        ```python
-        from dataclasses import dataclass
-        from datetime import datetime
-
-        @dataclass
-        class Example:
-            name: str
-            created: datetime
-
-        obj = Example(name="test", created=datetime.now())
-        json_str = _to_json(obj)
-        # '{"name": "test", "created": "2024-01-01 12:00:00"}'
-        ```
-    """
-    if is_dataclass(obj):
-        obj = asdict(obj)
-    return json.dumps(obj, default=str, ensure_ascii=False)
-
-
-def _state_from_json(payload: str) -> StrategyState:
-    """Deserialize StrategyState from JSON string.
-
-    Args:
-        payload (str): JSON string containing serialized StrategyState.
-
-    Returns:
-        StrategyState: Reconstructed strategy state.
-
-    Example:
-        ```python
-        json_str = '{"strategy_id": "test", "last_ts": null, ...}'
-        state = _state_from_json(json_str)
-        assert state.strategy_id == "test"
-        ```
-    """
-    data = json.loads(payload)
-    return StrategyState(**data)
-
-
+@sf_component(name="duckdb/strategy")
 class DuckDbStrategyStore(StrategyStore):
     """DuckDB implementation of strategy persistence.
 
@@ -407,3 +355,7 @@ class DuckDbStrategyStore(StrategyStore):
             """,
             rows,
         )
+
+    def close(self) -> None:
+        """Close database connection."""
+        self.con.close()
