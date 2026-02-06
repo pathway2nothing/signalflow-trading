@@ -1,288 +1,397 @@
 # SignalFlow Roadmap
 
-**Focus**: Production-ready live trading on Binance Spot
-**Current version**: v0.3.4 | **Target**: v1.0.0
-**Breaking changes**: allowed (pre-v1.0, documented in changelog)
+**Focus**: Strategy-level improvements, ML/RL-ready architecture, virtual trading validation
+**Current version**: v0.3.6 | **Target**: v1.0.0
 
 ---
 
-## Phase 0: Housekeeping
+## Vision
 
-Close technical debt before the main work.
+```
+Backtest → Virtual Trading → Live Trading
+    ↓           ↓               ↓
+  Signals   Validation      Production
+    ↓           ↓               ↓
+   ML/RL    Real-time        Capital
+  Models    Simulation       at Risk
+```
 
-### 0.1 Extensible RawDataType ~~(StrEnum + registry)~~
-
-> **Done** in `e368956` - `register_raw_data_type()`, `get_raw_data_columns()`, `list_raw_data_types()`
-
-- [x] Keep built-in types as `StrEnum`: `SPOT`, `FUTURES`, `PERPETUAL`
-- [x] Add column registry in `SignalFlowRegistry` with built-in defaults
-- [x] `RawDataType.columns` delegates to registry
-- [x] All components accept `RawDataType | str` for custom types
-- [x] 16 tests for registration, lookup, override, validation
-- [x] Documentation: `docs/guide/custom-data-types.md`
-
-### 0.2 Component Autodiscovery
-
-**Files**: `core/registry.py`
-
-- [x] Implement `SignalFlowRegistry.autodiscover()`:
-  - Scan `signalflow.*` packages via `importlib` + `pkgutil`
-  - Find all classes decorated with `@sf_component`
-  - Auto-register on first registry access
-- [x] Support external packages via `entry_points` group `signalflow.components`
-- [x] Lazy loading - import modules only on first `registry.get()` / `registry.list()`
-- [x] Tests for autodiscovery
-
-### 0.3 Pre-commit Hooks
-
-**Files**: `.pre-commit-config.yaml` (new), `pyproject.toml` (ruff config)
-
-- [x] Configure `.pre-commit-config.yaml`:
-  - `ruff` - linter + formatter
-  - `ruff format --check`
-  - `mypy --strict` on core modules
-  - `pytest tests/ -x --timeout=30` (quick smoke test)
-- [x] Add ruff config to `pyproject.toml`
-- [x] Add `py.typed` marker (PEP 561)
+**Principle**: No real money until virtual trading proves consistent profitability.
 
 ---
 
-## Phase 1: Pluggable Data Store
+## Phase 1: Advanced Exit Strategies
 
-Add alternative storage backends so users can choose what fits their setup: local DuckDB (already done), local SQLite, or external PostgreSQL.
+Improve exit logic beyond simple TP/SL. Enable dynamic exits based on market conditions.
 
-### 1.1 SQLite Raw + Strategy Store
+### 1.1 Trailing Stop Exit
 
-**Files**: `data/raw_store/sqlite_stores.py` (new), `data/strategy_store/sqlite.py` (new)
+**File**: `strategy/component/exit/trailing_stop.py`
 
-- [x] `SqliteSpotStore(RawDataStore)` - same interface as `DuckDbSpotStore`:
-  - `load()`, `load_many()`, `load_many_pandas()`, `insert_klines()`, `close()`
-  - Schema: `ohlcv` table with `(pair, timestamp)` primary key
-  - Use `sqlite3` from stdlib - zero extra dependencies
-- [x] `SqliteStrategyStore(StrategyStore)` - same interface as `DuckDbStrategyStore`:
-  - `init()`, `load_state()`, `save_state()`, `upsert_positions()`, `append_trade()`, `append_metrics()`
-  - Reuse `schema.py` SQL (SQLite-compatible subset)
-- [x] Tests: mirror existing DuckDB test suite, parametrize over `[duckdb, sqlite]`
+- [ ] `TrailingStopExit(ExitRule)`:
+  - `trail_pct`: Trailing distance as percentage (e.g., 0.02 = 2%)
+  - `activation_pct`: Optional - start trailing only after X% profit
+  - Track `highest_price` (LONG) / `lowest_price` (SHORT) in `position.meta`
+  - Exit when price retraces by `trail_pct` from peak
+- [ ] Support both percentage and ATR-based trailing distance
+- [ ] Tests with various market conditions (trending, choppy)
 
-### 1.2 PostgreSQL Raw + Strategy Store
+### 1.2 Volatility-Based Exit
 
-**Files**: `data/raw_store/pg_stores.py` (new), `data/strategy_store/pg.py` (new)
+**File**: `strategy/component/exit/volatility_exit.py`
 
-- [x] `PgSpotStore(RawDataStore)` - sync via `psycopg`:
-  - Same public interface as `DuckDbSpotStore`
-  - Connection string from config / env var `SIGNALFLOW_PG_DSN`
-  - Schema auto-creation on `init()` (idempotent `CREATE TABLE IF NOT EXISTS`)
-- [x] `PgStrategyStore(StrategyStore)` - same interface as `DuckDbStrategyStore`:
-  - Reuse JSON-based serialization pattern
-  - Connection pooling for concurrent access
-- [x] Add `psycopg[binary]` as optional dependency (`pip install signalflow-trading[postgres]`)
-- [x] Tests: skipped when `SIGNALFLOW_PG_DSN` not set; table cleanup between tests
+- [ ] `VolatilityExit(ExitRule)`:
+  - Dynamic TP/SL based on recent volatility (ATR, std dev)
+  - `tp_atr_mult`: TP = entry_price + N × ATR
+  - `sl_atr_mult`: SL = entry_price - N × ATR
+  - Recalculate levels on each bar or use entry-time levels
+- [ ] Integration with feature pipeline for ATR computation
 
-### 1.3 Store Factory & Configuration
+### 1.3 Composite Exit Manager
 
-**Files**: `data/store_factory.py` (new), `core/config.py`
+**File**: `strategy/component/exit/composite.py`
 
-- [x] `StoreFactory.create_raw_store(backend=..., **kwargs) -> RawDataStore`
-  - `backend="duckdb"` (default), `"sqlite"`, `"postgres"`
-  - Raise clear error if optional deps missing (`psycopg`)
-- [x] `StoreFactory.create_strategy_store(backend=..., **kwargs) -> StrategyStore`
-- [x] Register all backends in `SignalFlowRegistry` for autodiscovery
-- [ ] Docs: `docs/guide/storage-backends.md` - comparison table (features, deps, use-case)
+- [ ] `CompositeExit(ExitRule)`:
+  - Combine multiple exit rules with priority
+  - First triggered exit wins
+  - Example: TP/SL + Trailing + Time-based
+- [ ] `ExitPriority` enum: FIRST_TRIGGERED, HIGHEST_PRIORITY
+
+**Design constraint**: Position = atomic unit with fixed size. No partial exits. If scaling is needed, open multiple positions.
 
 ---
 
-## Phase 2: Paper Trading (Real-Time Simulation)
+## Phase 2: Advanced Entry & Position Sizing
 
-Real-time data via existing `BinanceSpotLoader.sync()` (REST polling), orders via `VirtualSpotExecutor`. Full pipeline with zero risk.
+Improve capital allocation and entry timing.
 
-### 2.1 RealtimeRunner
+### 2.1 Position Sizing Strategies
 
-**Files**: `strategy/runner/realtime_runner.py` (empty -> full implementation)
+**File**: `strategy/component/sizing/`
 
-- [ ] Async main loop driven by `BinanceSpotLoader.sync()`:
-  - Poll DuckDB for new bars since `state.last_ts`
-  - Process each new bar through strategy pipeline
-  - Persist state after each cycle
-- [ ] `process_bar()` - adapted from `BacktestRunner._process_bar()`:
-  - Mark positions to market
-  - Check exit rules -> submit exit orders
-  - Compute features -> detect signals -> check entry rules -> submit entry orders
-  - Process fills (`VirtualSpotExecutor` - instant fills)
-  - Compute metrics
-- [ ] Signal pipeline integration:
-  - `FeaturePipeline.compute()` -> `Detector.detect()` -> `Validator.validate()` (optional)
-  - Maintain rolling data window in memory for feature warmup
+- [ ] `PositionSizer` base class:
+  ```python
+  def compute_size(signal: Signal, state: StrategyState, prices: dict) -> float
+  ```
+
+- [ ] Implementations:
+  - `FixedFractionSizer`: Fixed % of equity per trade
+  - `KellyCriterionSizer`: Kelly formula based on win rate and payoff ratio
+  - `VolatilityTargetSizer`: Target specific portfolio volatility
+  - `RiskParitySizer`: Equal risk contribution across positions
+  - `SignalStrengthSizer`: Size proportional to signal probability
+
+- [ ] Integration with `SignalEntryRule` - inject `PositionSizer`
+
+### 2.2 Entry Filters
+
+**File**: `strategy/component/entry/filters.py`
+
+- [ ] `EntryFilter` protocol:
+  ```python
+  def allow_entry(signal: Signal, state: StrategyState, prices: dict) -> bool
+  ```
+
+- [ ] Implementations:
+  - `RegimeFilter`: Only enter in favorable market regime (trend/mean-reversion)
+  - `VolatilityFilter`: Skip entries in extreme volatility
+  - `DrawdownFilter`: Pause trading after X% drawdown
+  - `CorrelationFilter`: Avoid concentrated positions in correlated assets
+  - `TimeOfDayFilter`: Restrict trading hours
+
+### 2.3 Signal Aggregation
+
+**File**: `strategy/component/entry/aggregation.py`
+
+- [ ] `SignalAggregator`:
+  - Combine signals from multiple detectors
+  - Voting: majority, weighted, unanimous
+  - Meta-labeling integration: detector signal × validator probability
+
+---
+
+## Phase 3: External Model Integration
+
+**Note**: ML/RL models will be implemented in a separate repository. Here we only define integration interfaces.
+
+### 3.1 Strategy Model Protocol
+
+**File**: `strategy/model/protocol.py`
+
+**Design principle**: Strategy-level models do NOT see raw price features. They only see:
+- Signals from detector/validator (already price-derived)
+- Signal metrics (hit rate, accuracy, timing)
+- Strategy metrics (equity, drawdown, win rate, position stats)
+
+- [ ] `StrategyModel` protocol:
+  ```python
+  class StrategyModel(Protocol):
+      def decide(
+          self,
+          signals: Signals,
+          signal_metrics: dict,
+          strategy_metrics: dict,
+          state: StrategyState,
+      ) -> StrategyDecision: ...
+
+      def load(self, path: Path) -> None: ...
+  ```
+
+- [ ] `StrategyDecision` dataclass:
+  - `action`: ENTER, SKIP, REDUCE_SIZE, WAIT
+  - `size_multiplier`: 0.0 - 1.0
+  - `confidence`: model confidence
+
+### 3.2 Model-Aware Entry Rule
+
+**File**: `strategy/component/entry/model_entry.py`
+
+- [ ] `ModelEntryRule(EntryRule)`:
+  - Wraps `StrategyModel` and calls `decide()` before entry
+  - Respects model's `action` and `size_multiplier`
+  - Falls back to base entry if no model provided
+
+### 3.3 Metrics Export for Training
+
+**File**: `strategy/export/`
+
+- [ ] `BacktestExporter`:
+  - Export backtest results for external model training
+  - Format: Parquet with signals + metrics per bar
+  - No raw prices - only derived metrics
+  - `export(results, path)` → ready for external RL repo
+
+---
+
+## Phase 4: Virtual Trading (Paper Trading)
+
+Real-time simulation with virtual execution. **Must prove profitability before live trading.**
+
+### 4.1 RealtimeRunner Implementation
+
+**File**: `strategy/runner/realtime_runner.py` (currently stub)
+
+- [ ] Async main loop:
+  ```python
+  async def run(self):
+      while not self._shutdown:
+          await self._sync_new_bars()
+          for bar in new_bars:
+              self._process_bar(bar)
+          await self._persist_state()
+          await asyncio.sleep(poll_interval)
+  ```
+
+- [ ] Data ingestion:
+  - Poll DuckDB for new candles (from `BinanceSpotLoader.sync()`)
+  - Maintain rolling window for feature warmup
+  - Detect and handle gaps in data
+
+- [ ] Signal pipeline:
+  - `FeaturePipeline.compute()` → `Detector.detect()` → `Validator.validate()`
+  - Full backtest logic adapted for real-time
+
+- [ ] Idempotency:
+  - `state.last_ts` for deduplication
+  - Resume from last checkpoint after restart
+
 - [ ] Graceful shutdown:
   - SIGINT/SIGTERM handler
-  - Save state to DuckDB
-  - Log final portfolio state
-- [ ] Idempotency:
-  - `state.last_ts` for deduplication - skip already-processed bars
-  - Safe restart from last checkpoint
+  - Persist state before exit
 
-### 2.2 Data Sync Integration
+### 4.2 Data Sync Integration
 
-**Files**: `data/source/binance.py`, `data/raw_store/duckdb_spot.py`
+**File**: `data/source/binance.py`, `strategy/runner/realtime_runner.py`
 
-- [ ] Run `BinanceSpotLoader.sync()` as background asyncio task alongside runner
-- [ ] Method to fetch last N bars from DuckDB (for feature warmup)
-- [ ] Coordination: runner waits until sync writes a new candle
+- [ ] Run data sync as background task alongside runner
+- [ ] Wait for sync to write new candle before processing
+- [ ] Handle sync failures gracefully
 
-### 2.3 Metrics & Monitoring
+### 4.3 Virtual Execution Mode
 
-- [ ] Per-bar logging: equity, PnL, open positions, signals
-- [ ] Periodic summary (every N bars): Sharpe, drawdown, win rate
-- [ ] Structured loguru output for parsing
+**File**: `strategy/broker/virtual_broker.py`
 
-### 2.4 Tests
+- [ ] `VirtualRealtimeBroker`:
+  - Uses `VirtualSpotExecutor` for instant fills
+  - Simulates slippage (optional)
+  - Logs all orders/fills for analysis
 
-- [ ] Unit test: `RealtimeRunner.process_bar()` with mock data
-- [ ] Integration test: full cycle data -> features -> signals -> orders -> fills -> state
-- [ ] Restart/recovery test: save state -> create new runner -> verify continuation
+- [ ] Order logging:
+  - Save all orders to DB for post-analysis
+  - Compare virtual vs. actual market prices
 
----
+### 4.4 Monitoring & Alerts
 
-## Phase 3: WebSocket Streaming
+**File**: `strategy/monitoring/`
 
-Replace REST polling with real-time WebSocket streams for lower latency.
+- [ ] Per-bar metrics:
+  - Equity curve (current vs. expected)
+  - Open positions
+  - Signal hit rate
 
-**Files**: `data/source/binance_ws.py` (new)
+- [ ] Alert thresholds:
+  - Max drawdown exceeded
+  - No signals for N bars
+  - Position stuck (not exiting)
 
-- [ ] WebSocket manager with auto-reconnect:
-  - `aiohttp` or `websockets` library
-  - Heartbeat / ping-pong
-  - Exponential backoff on reconnect
-- [ ] Market data streams:
-  - `@kline_{interval}` - real-time OHLCV candles
-  - `@bookTicker` - best bid/ask (for future LIMIT orders)
-- [ ] Callback-based architecture: `on_kline()`, `on_tick()`
-- [ ] Integrate with `RealtimeRunner` - switch from polling to WS events
-- [ ] Fallback: if WS disconnects -> automatic switch to polling
+- [ ] Structured logging (JSON) for parsing
+- [ ] Optional: Telegram/Slack notifications
 
----
+### 4.5 Paper Trading Validation
 
-## Phase 4: BinanceSpotExecutor (Real Orders)
+**Criteria before going live:**
 
-Implement order submission and tracking on Binance Spot.
-
-**Files**: `strategy/broker/executor/binance_spot.py` (stub -> full), `data/source/binance.py`
-
-- [ ] Add Trading API methods to `BinanceClient`:
-  - `post_order()` - `POST /api/v3/order`
-  - `get_order()` - `GET /api/v3/order`
-  - `cancel_order()` - `DELETE /api/v3/order`
-  - `get_open_orders()`, `get_account()`
-- [ ] HMAC-SHA256 request signing (API key + secret)
-- [ ] `BinanceSpotExecutor.execute()`:
-  - `Order -> Binance API params` conversion
-  - MARKET / LIMIT orders
-  - Binance response -> `OrderFill`
-  - Partial fills, rejections
-- [ ] User Data Stream (WebSocket) for fills:
-  - `POST /api/v3/userDataStream` -> listenKey
-  - Auto-renew listenKey every 30 min
-  - `executionReport` -> `OrderFill`
-- [ ] Tests with mock server (aioresponses)
+- [ ] Minimum 2 weeks of virtual trading
+- [ ] Performance matches backtest expectations (±10%)
+- [ ] No bugs or unexpected behaviors
+- [ ] Successful restart/recovery test
+- [ ] Drawdown within acceptable limits
 
 ---
 
-## Phase 5: RealtimeSpotBroker + Live Mode
+## Phase 5: Risk Management Module
 
-Connect `BinanceSpotExecutor` to the runner for production live trading.
+**File**: `strategy/risk/`
 
-**Files**: `strategy/broker/realtime_spot.py` (stub -> full)
+### 5.1 Pre-Trade Checks
 
-- [ ] Lifecycle management: `async start()` / `async stop()` / context manager
-- [ ] Fill processing: WS `executionReport` -> `broker.add_pending_fill()`
-- [ ] Order reconciliation on startup (compare open orders with state)
-- [ ] Error handling: retry logic, circuit breaker, alerts
-- [ ] Runner mode switch: `mode="paper"` (VirtualExecutor) / `mode="live"` (BinanceExecutor)
+- [ ] `PreTradeValidator`:
+  - Max position size (% of equity)
+  - Max concentration per asset
+  - Daily loss limit (circuit breaker)
+  - Binance LOT_SIZE/MIN_NOTIONAL filters
 
----
+### 5.2 Runtime Guards
 
-## Phase 6: Risk Management
+- [ ] `RuntimeRiskManager`:
+  - Max drawdown circuit breaker (pause trading)
+  - Cooldown between trades
+  - Equity monitoring with alerts
+  - Position age limits
 
-**Files**: `strategy/risk/` (new module)
+### 5.3 Portfolio-Level Risk
 
-- [ ] **Pre-trade checks**: max position size, max exposure %, daily loss limit, Binance LOT_SIZE filter
-- [ ] **Runtime guards**: cooldown between orders, max drawdown circuit breaker, equity monitoring
-- [ ] **Position limits**: max concurrent positions, per-pair limits, concentration limits
-
----
-
-## Phase 7: Testnet & E2E Testing
-
-- [ ] Binance Testnet integration (`testnet.binance.vision`)
-- [ ] E2E test: data -> features -> signals -> orders -> fills -> state
-- [ ] Stress test: reconnect scenarios, partial fills, order rejections
-- [ ] State recovery test: kill process -> restart -> verify consistency
-- [ ] Paper trading minimum 48 hours before production
+- [ ] `PortfolioRiskManager`:
+  - Max total exposure
+  - Correlation-based limits
+  - Sector/market cap concentration
 
 ---
 
-## Phase 8: CLI / Operational Interface
+## Phase 6: Live Trading
 
-- [ ] CLI entry point (`signalflow run`, `signalflow status`)
-- [ ] YAML/TOML strategy configuration
-- [ ] Structured JSON logging for production
-- [ ] Health check endpoint (optional HTTP/webhook)
+**Only after Phase 4 validation is complete.**
+
+### 6.1 BinanceSpotExecutor
+
+**File**: `strategy/broker/executor/binance_spot.py` (currently stub)
+
+- [ ] Trading API methods:
+  - `post_order()` - MARKET/LIMIT orders
+  - `get_order()` - Order status
+  - `cancel_order()` - Cancel open orders
+  - HMAC-SHA256 signing
+
+- [ ] Order handling:
+  - Binance response → `OrderFill`
+  - Partial fills support
+  - Rejection handling
+
+- [ ] User Data Stream (WebSocket):
+  - Real-time order updates
+  - Auto-renew listenKey
+
+### 6.2 RealtimeSpotBroker
+
+**File**: `strategy/broker/realtime_spot.py` (currently stub)
+
+- [ ] Lifecycle: `async start()` / `async stop()`
+- [ ] Fill processing from WebSocket
+- [ ] Order reconciliation on startup
+- [ ] Retry logic with exponential backoff
+
+### 6.3 Production Safeguards
+
+- [ ] Testnet validation first (`testnet.binance.vision`)
+- [ ] Small position sizes initially
+- [ ] Kill switch (manual shutdown)
+- [ ] Daily reports and alerts
+
+---
+
+## Phase 7: WebSocket Streaming
+
+Optional optimization for lower latency.
+
+**File**: `data/source/binance_ws.py`
+
+- [ ] WebSocket manager with auto-reconnect
+- [ ] `@kline_{interval}` stream for real-time candles
+- [ ] `@bookTicker` for best bid/ask
+- [ ] Fallback to polling on disconnect
+- [ ] Integration with `RealtimeRunner`
 
 ---
 
 ## Priority Order
 
 ```
-Phase 0 (housekeeping)     --- clean code, extensible RawDataType, autodiscovery
-    |
-Phase 1 (data stores)      --- SQLite + PostgreSQL backends, store factory
-    |
-Phase 2 (paper trading)    --- full pipeline with polling + VirtualExecutor
-    |
-Phase 3 (websocket)        --- real-time streaming replaces polling
-    |
-Phase 4 (executor)         --- real orders on Binance
-    |
-Phase 5 (live broker)      --- production live trading
-    |
-Phase 6 (risk)             --- loss protection
-    |
-Phase 7 (testing)          --- testnet verification
-    |
-Phase 8 (CLI/ops)          --- operational convenience
+Phase 1 (exits)        --- Trailing stop, volatility exits
+    │
+Phase 2 (entries)      --- Position sizing, entry filters
+    │
+Phase 3 (integration)  --- Model protocol, metrics export
+    │
+Phase 4 (virtual)      --- Paper trading, validation ← GATE
+    │
+Phase 5 (risk)         --- Risk management module
+    │
+Phase 6 (live)         --- Real execution (only after Phase 4 ✓)
+    │
+Phase 7 (websocket)    --- Optional latency optimization
 ```
 
-## Key Files
+---
 
-| File | Action | Phase |
-|------|--------|-------|
-| `core/registry.py` | Autodiscovery via importlib + entry_points | 0 |
-| `.pre-commit-config.yaml` | New - ruff, mypy, pytest | 0 |
-| `data/raw_store/sqlite_stores.py` | New - SQLite raw data store | 1 |
-| `data/strategy_store/sqlite.py` | New - SQLite strategy store | 1 |
-| `data/raw_store/pg_stores.py` | New - PostgreSQL raw data store | 1 |
-| `data/strategy_store/pg.py` | New - PostgreSQL strategy store | 1 |
-| `data/store_factory.py` | New - backend-agnostic store factory | 1 |
-| `strategy/runner/realtime_runner.py` | Full paper trading runner | 2 |
-| `data/source/binance_ws.py` | New - WebSocket manager | 3 |
-| `strategy/broker/executor/binance_spot.py` | Full executor implementation | 4 |
-| `data/source/binance.py` | Trading API endpoints | 4 |
-| `strategy/broker/realtime_spot.py` | Full live broker implementation | 5 |
-| `strategy/risk/` | New module | 6 |
+## Completed Work
 
-## Code Reuse
+### v0.3.6
+- [x] Parallel backtest runners (isolated, unlimited modes)
+- [x] `create_backtest_runner(mode="isolated"|"unlimited")`
+- [x] Component registry with autodiscovery
 
-- `BacktestRunner._process_bar()` -> template for `RealtimeRunner.process_bar()`
-- `BacktestBroker` -> template for `RealtimeSpotBroker`
-- `VirtualSpotExecutor` -> executor for paper trading (Phase 2), interface for BinanceSpotExecutor
-- `BinanceClient` -> extend, don't rewrite
-- `BinanceSpotLoader.sync()` -> data ingestion for Phase 2
-- `DuckDbStrategyStore` -> template for SQLite/PostgreSQL stores (Phase 1), persistence layer (production-ready)
-- `StrategyState.touch()` / `last_event_id` -> idempotency mechanism
+### v0.3.5
+- [x] SQLite + PostgreSQL storage backends
+- [x] Store factory pattern
 
-## Verification
+### v0.3.4
+- [x] Extensible RawDataType with registry
+- [x] Pre-commit hooks (ruff, mypy)
 
-After each phase:
-1. `pytest tests/ -v` - all existing tests must pass
-2. New tests for all new code
-3. Phase 2 - paper trading on real data (manual verification)
-4. Phase 7 - full E2E on Binance Testnet
+---
+
+## Key Design Decisions
+
+1. **Virtual trading is mandatory** before live trading
+2. **Position = atomic unit** - fixed size, single exit point, no partial exits
+3. **Strategy models see signals, not prices** - detector/validator handles price prediction
+4. **Two-tier model architecture**:
+   - Detector/Validator → price prediction (sees raw OHLCV features)
+   - Strategy Model → execution decisions (sees signals + metrics only)
+5. **ML/RL models in separate repo** - signalflow provides Protocol interface only
+6. **Position sizing is separate from entry rules** for flexibility
+7. **Exit rules are composable** (combine trailing + TP/SL + time)
+8. **Risk management is a separate module** enforced at broker level
+
+---
+
+## Success Metrics
+
+| Phase | Metric | Target |
+|-------|--------|--------|
+| 1-2 | Backtest Sharpe improvement | +0.3 vs. simple TP/SL |
+| 3 | Protocol compatibility | Works with external models |
+| 4 | Virtual trading alignment | ±10% vs. backtest |
+| 4 | Virtual trading period | 14+ days |
+| 5 | Max drawdown | <15% |
+| 6 | Live trading PnL | Positive after 30 days |
