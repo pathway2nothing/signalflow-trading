@@ -15,10 +15,7 @@ try:
 except ImportError:
     psycopg = None  # type: ignore[assignment]
 
-_PG_MISSING_MSG = (
-    "psycopg is required for PostgreSQL stores. "
-    "Install with: pip install signalflow-trading[postgres]"
-)
+_PG_MISSING_MSG = "psycopg is required for PostgreSQL stores. Install with: pip install signalflow-trading[postgres]"
 
 
 @sf_component(name="postgres/strategy")

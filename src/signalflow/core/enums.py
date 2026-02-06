@@ -255,7 +255,7 @@ class RawDataType(str, Enum):
         spot_cols = RawDataType.SPOT.columns
         # {'pair', 'timestamp', 'open', 'high', 'low', 'close', 'volume'}
 
-        # Custom types — register via registry
+        # Custom types - register via registry
         from signalflow.core.registry import default_registry
 
         default_registry.register_raw_data_type(

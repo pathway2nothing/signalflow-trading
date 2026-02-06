@@ -1,8 +1,10 @@
 """Tests for RawDataStore implementations (DuckDB, SQLite)."""
 
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import polars as pl
+import pytest
 
 
 class TestRawStoreInsertAndLoad:
@@ -152,3 +154,142 @@ class TestRawStoreSchema:
         end = datetime(2024, 1, 1, 0, 10)
         df = raw_store.load("BTCUSDT", end=end)
         assert all(ts <= end for ts in df["timestamp"].to_list())
+
+
+class TestDuckDbRawStoreDataTypes:
+    """Tests for DuckDbRawStore data_type support (futures, perpetual)."""
+
+    def _make_kline(self, minute: int, **extra: float) -> dict:
+        base = datetime(2024, 1, 1)
+        k: dict = {
+            "timestamp": base + timedelta(minutes=minute),
+            "open": 100.0,
+            "high": 105.0,
+            "low": 95.0,
+            "close": 102.0,
+            "volume": 1000.0,
+            "trades": 50,
+        }
+        k.update(extra)
+        return k
+
+    def test_futures_insert_and_load(self, tmp_path: Path):
+        from signalflow.data.raw_store import DuckDbRawStore
+
+        store = DuckDbRawStore(db_path=tmp_path / "futures.duckdb", data_type="futures")
+        klines = [self._make_kline(i, open_interest=50000.0 + i) for i in range(20)]
+        store.insert_klines("BTCUSDT", klines)
+
+        df = store.load("BTCUSDT")
+        assert len(df) == 20
+        assert "open_interest" in df.columns
+        assert df["open_interest"][0] == pytest.approx(50000.0)
+        store.close()
+
+    def test_perpetual_insert_and_load(self, tmp_path: Path):
+        from signalflow.data.raw_store import DuckDbRawStore
+
+        store = DuckDbRawStore(db_path=tmp_path / "perp.duckdb", data_type="perpetual")
+        klines = [
+            self._make_kline(i, funding_rate=0.0001, open_interest=50000.0 + i)
+            for i in range(20)
+        ]
+        store.insert_klines("BTCUSDT", klines)
+
+        df = store.load("BTCUSDT")
+        assert len(df) == 20
+        assert "funding_rate" in df.columns
+        assert "open_interest" in df.columns
+        assert df["funding_rate"][0] == pytest.approx(0.0001)
+        store.close()
+
+    def test_futures_schema_columns(self, tmp_path: Path):
+        from signalflow.data.raw_store import DuckDbRawStore
+
+        store = DuckDbRawStore(db_path=tmp_path / "f.duckdb", data_type="futures")
+        klines = [self._make_kline(0, open_interest=50000.0)]
+        store.insert_klines("BTCUSDT", klines)
+
+        df = store.load("BTCUSDT")
+        expected = {"pair", "timestamp", "open", "high", "low", "close", "volume", "open_interest", "trades"}
+        assert set(df.columns) == expected
+        store.close()
+
+    def test_perpetual_schema_columns(self, tmp_path: Path):
+        from signalflow.data.raw_store import DuckDbRawStore
+
+        store = DuckDbRawStore(db_path=tmp_path / "p.duckdb", data_type="perpetual")
+        klines = [self._make_kline(0, funding_rate=0.0001, open_interest=50000.0)]
+        store.insert_klines("BTCUSDT", klines)
+
+        df = store.load("BTCUSDT")
+        expected = {
+            "pair", "timestamp", "open", "high", "low", "close", "volume",
+            "funding_rate", "open_interest", "trades",
+        }
+        assert set(df.columns) == expected
+        store.close()
+
+    def test_spot_backward_compat_alias(self, tmp_path: Path):
+        from signalflow.data.raw_store import DuckDbSpotStore
+
+        store = DuckDbSpotStore(db_path=tmp_path / "s.duckdb")
+        assert store.data_type == "spot"
+        store.close()
+
+    def test_schema_migration_spot_to_futures(self, tmp_path: Path):
+        """Opening a spot DB as futures adds missing columns with NULL."""
+        from signalflow.data.raw_store import DuckDbRawStore
+
+        db = tmp_path / "upgrade.duckdb"
+
+        # Create as spot and insert data
+        spot = DuckDbRawStore(db_path=db, data_type="spot")
+        klines = [self._make_kline(i) for i in range(5)]
+        spot.insert_klines("BTCUSDT", klines)
+        spot.close()
+
+        # Re-open as futures
+        futures = DuckDbRawStore(db_path=db, data_type="futures")
+        df = futures.load("BTCUSDT")
+        assert "open_interest" in df.columns
+        assert len(df) == 5
+        # Old rows should have NULL for open_interest
+        assert df["open_interest"][0] is None
+        futures.close()
+
+    def test_futures_load_many(self, tmp_path: Path):
+        from signalflow.data.raw_store import DuckDbRawStore
+
+        store = DuckDbRawStore(db_path=tmp_path / "f.duckdb", data_type="futures")
+        for pair in ["BTCUSDT", "ETHUSDT"]:
+            klines = [self._make_kline(i, open_interest=50000.0) for i in range(10)]
+            store.insert_klines(pair, klines)
+
+        df = store.load_many(["BTCUSDT", "ETHUSDT"])
+        assert len(df) == 20
+        assert "open_interest" in df.columns
+        assert set(df["pair"].unique().to_list()) == {"BTCUSDT", "ETHUSDT"}
+        store.close()
+
+    def test_futures_empty_load_many(self, tmp_path: Path):
+        from signalflow.data.raw_store import DuckDbRawStore
+
+        store = DuckDbRawStore(db_path=tmp_path / "f.duckdb", data_type="futures")
+        df = store.load_many([])
+        assert len(df) == 0
+        assert "open_interest" in df.columns
+        store.close()
+
+    def test_futures_bulk_insert(self, tmp_path: Path):
+        """Test bulk (>10 rows) Arrow-based insert for futures."""
+        from signalflow.data.raw_store import DuckDbRawStore
+
+        store = DuckDbRawStore(db_path=tmp_path / "f.duckdb", data_type="futures")
+        klines = [self._make_kline(i, open_interest=50000.0 + i) for i in range(100)]
+        store.insert_klines("BTCUSDT", klines)
+
+        df = store.load("BTCUSDT")
+        assert len(df) == 100
+        assert df["open_interest"].is_not_null().all()
+        store.close()

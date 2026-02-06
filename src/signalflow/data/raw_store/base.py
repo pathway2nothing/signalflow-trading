@@ -242,6 +242,19 @@ class RawDataStore(ABC):
         pass
 
     @abstractmethod
+    def get_time_bounds(self, pair: str) -> tuple[Optional[datetime], Optional[datetime]]:
+        """Return the earliest and latest timestamp for a pair.
+
+        Args:
+            pair (str): Trading pair (e.g., "BTCUSDT").
+
+        Returns:
+            tuple[Optional[datetime], Optional[datetime]]:
+                (min_timestamp, max_timestamp) or (None, None) if no data exists.
+        """
+        pass
+
+    @abstractmethod
     def close(self) -> None:
         """Close storage connection and cleanup resources.
 

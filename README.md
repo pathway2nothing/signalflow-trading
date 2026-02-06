@@ -16,7 +16,7 @@
 
 <p>
 <a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white" alt="Python 3.12+"></a>
-<a href="https://github.com/pathway2nothing/signalflow-trading/releases"><img src="https://img.shields.io/badge/version-0.3.4-orange" alt="Version 0.3.4"></a>
+<a href="https://github.com/pathway2nothing/signalflow-trading/releases"><img src="https://img.shields.io/badge/version-0.3.5-orange" alt="Version 0.3.5"></a>
 <a href="https://github.com/pathway2nothing/signalflow-trading/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
 <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-black" alt="Code style: ruff"></a>
 <a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/type%20checked-mypy-blue" alt="Type checked: mypy"></a>
@@ -66,21 +66,20 @@ The framework implements a modular three-stage processing logic:
 
 ```bash
 pip install signalflow-trading
-
+pip install signalflow-ta    # 199+ technical indicators (optional)
+pip install signalflow-nn    # neural network validators (optional)
 ```
 
 ### Signal Detection Example
 
 ```python
-from signalflow.core import RawDataView
-from signalflow.detector import SmaCrossSignalDetector
+from signalflow.detector import ExampleSmaCrossDetector
 
 # Initialize a detector (SMA 20/50 crossover)
-detector = SmaCrossSignalDetector(fast_period=20, slow_period=50)
+detector = ExampleSmaCrossDetector(fast_period=20, slow_period=50)
 
 # Run detection on a data snapshot
 signals = detector.run(raw_data_view)
-
 ```
 
 ### Signal Validation (Meta-Labeling)
@@ -88,15 +87,14 @@ signals = detector.run(raw_data_view)
 ```python
 from signalflow.validator import SklearnSignalValidator
 
-# Create a validator using LightGBM
-validator = SklearnSignalValidator(model_type="lightgbm")
+# Create a validator using Random Forest
+validator = SklearnSignalValidator(model_type="random_forest")
 
 # Fit the model on labeled historical signals
 validator.fit(X_train, y_train)
 
 # Validate new signals to get success probabilities
 validated_signals = validator.validate_signals(signals, features)
-
 ```
 
 ## Tech Stack
@@ -111,14 +109,17 @@ validated_signals = validator.validate_signals(signals, features)
 ## Package Structure
 
 * `signalflow.core`: Core data containers (`RawData`, `Signals`) and registries.
-
-* `signalflow.data`: Binance API loaders and DuckDB storage.
-
+* `signalflow.data`: Exchange loaders (Binance), virtual data, DuckDB/SQLite/PostgreSQL storage.
 * `signalflow.feature`: Feature extractors and technical indicator adapters.
+* `signalflow.target`: Advanced labeling techniques (Fixed Horizon, Triple Barrier).
+* `signalflow.detector`: Signal detection algorithms.
+* `signalflow.validator`: ML-based signal validation (scikit-learn, LightGBM, XGBoost).
+* `signalflow.strategy`: Backtesting and live trading with entry/exit rules.
 
-* `signalflow.target`: Advanced labeling techniques for machine learning.
+## Ecosystem
 
-* `signalflow.detector`: Ready-to-use signal detection algorithms.
+* **[signalflow-ta](https://github.com/pathway2nothing/signalflow-ta)**: 199+ technical analysis indicators (momentum, volatility, trend, statistics, physics-based).
+* **[signalflow-nn](https://github.com/pathway2nothing/signalflow-nn)**: Neural network validators (LSTM, GRU, Attention) via PyTorch Lightning.
 
 
 

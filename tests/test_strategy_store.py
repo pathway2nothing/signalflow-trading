@@ -48,12 +48,12 @@ class TestStrategyStorePositions:
         pos = Position(id="pos_1", pair="BTCUSDT", entry_price=45000.0, qty=0.5)
         ts = datetime(2024, 1, 1, 12, 0)
         strategy_store.upsert_positions("test_strat", ts, [pos])
-        # No error — positions persisted
+        # No error - positions persisted
 
     def test_upsert_empty_positions(self, strategy_store):
         ts = datetime(2024, 1, 1, 12, 0)
         strategy_store.upsert_positions("test_strat", ts, [])
-        # No error — silently returns
+        # No error - silently returns
 
     def test_position_requires_id(self, strategy_store):
         # Position has id by default (uuid), so this should work
@@ -68,7 +68,7 @@ class TestStrategyStorePositions:
 
         pos_updated = Position(id="pos_1", pair="BTCUSDT", entry_price=46000.0, qty=1.0)
         strategy_store.upsert_positions("test_strat", ts, [pos_updated])
-        # No error — upsert succeeded
+        # No error - upsert succeeded
 
 
 class TestStrategyStoreTrades:
@@ -83,7 +83,7 @@ class TestStrategyStoreTrades:
             fee=22.5,
         )
         strategy_store.append_trade("test_strat", trade)
-        # No error — trade persisted
+        # No error - trade persisted
 
     def test_append_trade_idempotent(self, strategy_store):
         trade = Trade(
@@ -95,7 +95,7 @@ class TestStrategyStoreTrades:
             qty=0.5,
         )
         strategy_store.append_trade("test_strat", trade)
-        strategy_store.append_trade("test_strat", trade)  # duplicate — should be ignored
+        strategy_store.append_trade("test_strat", trade)  # duplicate - should be ignored
 
     def test_trade_requires_id_and_ts(self, strategy_store):
         # Trade() has default id (uuid) and ts=None
@@ -109,15 +109,15 @@ class TestStrategyStoreMetrics:
         ts = datetime(2024, 1, 1, 12, 0)
         metrics = {"total_return": 0.05, "sharpe_ratio": 1.2, "max_drawdown": -0.03}
         strategy_store.append_metrics("test_strat", ts, metrics)
-        # No error — metrics persisted
+        # No error - metrics persisted
 
     def test_append_empty_metrics(self, strategy_store):
         ts = datetime(2024, 1, 1, 12, 0)
         strategy_store.append_metrics("test_strat", ts, {})
-        # No error — silently returns
+        # No error - silently returns
 
     def test_metrics_upsert_on_conflict(self, strategy_store):
         ts = datetime(2024, 1, 1, 12, 0)
         strategy_store.append_metrics("test_strat", ts, {"sharpe": 1.0})
         strategy_store.append_metrics("test_strat", ts, {"sharpe": 2.0})  # update
-        # No error — upsert succeeded
+        # No error - upsert succeeded

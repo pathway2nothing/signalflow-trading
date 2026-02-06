@@ -90,6 +90,7 @@ class BinanceClient(RawDataSource):
     """
 
     base_url: str = "https://api.binance.com"
+    klines_path: str = "/api/v3/klines"
     max_retries: int = 3
     timeout_sec: int = 30
     min_delay_sec: float = 0.05
@@ -144,7 +145,7 @@ class BinanceClient(RawDataSource):
         if end_time is not None:
             params["endTime"] = _dt_to_ms_utc(end_time)
 
-        url = f"{self.base_url}/api/v3/klines"
+        url = f"{self.base_url}{self.klines_path}"
         last_err: Optional[Exception] = None
 
         for attempt in range(self.max_retries):
@@ -372,9 +373,13 @@ class BinanceSpotLoader(RawDataLoader):
                 ranges_to_download.append((start, end))
             else:
                 if start < db_min:
-                    ranges_to_download.append((start, db_min - timedelta(minutes=tf_minutes)))
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
                 if end > db_max:
-                    ranges_to_download.append((db_max + timedelta(minutes=tf_minutes), end))
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
 
                 if fill_gaps:
                     overlap_start = max(start, db_min)
@@ -439,4 +444,281 @@ class BinanceSpotLoader(RawDataLoader):
             while True:
                 await asyncio.gather(*[fetch_and_store(client, pair) for pair in pairs])
                 logger.debug(f"Synced {len(pairs)} pairs")
+                await asyncio.sleep(update_interval_sec)
+
+
+@dataclass
+@sf_component(name="binance/futures-usdt")
+class BinanceFuturesUsdtLoader(RawDataLoader):
+    """Downloads and stores Binance USDT-M Futures OHLCV data.
+
+    Uses the ``fapi.binance.com`` endpoint for USDT-margined perpetual
+    and delivery contracts.  Follows the same pipeline as
+    ``BinanceSpotLoader`` (gap filling, incremental sync).
+
+    Attributes:
+        store (DuckDbSpotStore): Storage backend.
+        timeframe (str): Fixed timeframe for all data. Default: "1m".
+    """
+
+    store: DuckDbSpotStore = field(
+        default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_futures_usdt.duckdb"))
+    )
+    timeframe: str = "1m"
+
+    async def download(
+        self,
+        pairs: list[str],
+        days: Optional[int] = None,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        fill_gaps: bool = True,
+    ) -> None:
+        """Download historical USDT-M futures data.
+
+        Args:
+            pairs (list[str]): Trading pairs to download (e.g. ["BTCUSDT"]).
+            days (int | None): Number of days back from *end*. Default: 7.
+            start (datetime | None): Range start (overrides *days*).
+            end (datetime | None): Range end. Default: now.
+            fill_gaps (bool): Detect and fill gaps. Default: True.
+        """
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        if end is None:
+            end = now
+        else:
+            end = _ensure_utc_naive(end)
+
+        if start is None:
+            start = end - timedelta(days=days if days else 7)
+        else:
+            start = _ensure_utc_naive(start)
+
+        tf_minutes = {
+            "1m": 1,
+            "3m": 3,
+            "5m": 5,
+            "15m": 15,
+            "30m": 30,
+            "1h": 60,
+            "2h": 120,
+            "4h": 240,
+            "6h": 360,
+            "8h": 480,
+            "12h": 720,
+            "1d": 1440,
+        }.get(self.timeframe, 1)
+
+        async def download_pair(client: BinanceClient, pair: str) -> None:
+            logger.info(f"Processing {pair} (futures-usdt) from {start} to {end}")
+            db_min, db_max = self.store.get_time_bounds(pair)
+            ranges_to_download: list[tuple[datetime, datetime]] = []
+
+            if db_min is None:
+                ranges_to_download.append((start, end))
+            else:
+                if start < db_min:
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
+                if end > db_max:
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
+                if fill_gaps:
+                    overlap_start = max(start, db_min)
+                    overlap_end = min(end, db_max)
+                    if overlap_start < overlap_end:
+                        gaps = self.store.find_gaps(pair, overlap_start, overlap_end, tf_minutes)
+                        ranges_to_download.extend(gaps)
+
+            for range_start, range_end in ranges_to_download:
+                if range_start >= range_end:
+                    continue
+                logger.info(f"{pair}: downloading {range_start} -> {range_end}")
+                try:
+                    klines = await client.get_klines_range(
+                        pair=pair,
+                        timeframe=self.timeframe,
+                        start_time=range_start,
+                        end_time=range_end,
+                    )
+                    self.store.insert_klines(pair, klines)
+                except Exception as e:
+                    logger.error(f"Error downloading {pair}: {e}")
+
+        async with BinanceClient(
+            base_url="https://fapi.binance.com",
+            klines_path="/fapi/v1/klines",
+        ) as client:
+            await asyncio.gather(*[download_pair(client, pair) for pair in pairs])
+
+        self.store.close()
+
+    async def sync(
+        self,
+        pairs: list[str],
+        update_interval_sec: int = 60,
+    ) -> None:
+        """Continuously sync latest USDT-M futures data.
+
+        Args:
+            pairs (list[str]): Trading pairs to sync.
+            update_interval_sec (int): Update interval in seconds. Default: 60.
+        """
+        logger.info(f"Starting real-time sync (futures-usdt) for {pairs}")
+        logger.info(f"Update interval: {update_interval_sec}s (timeframe={self.timeframe})")
+
+        async def fetch_and_store(client: BinanceClient, pair: str) -> None:
+            try:
+                klines = await client.get_klines(pair=pair, timeframe=self.timeframe, limit=5)
+                self.store.insert_klines(pair, klines)
+            except Exception as e:
+                logger.error(f"Error syncing {pair}: {e}")
+
+        async with BinanceClient(
+            base_url="https://fapi.binance.com",
+            klines_path="/fapi/v1/klines",
+        ) as client:
+            while True:
+                await asyncio.gather(*[fetch_and_store(client, pair) for pair in pairs])
+                logger.debug(f"Synced {len(pairs)} pairs (futures-usdt)")
+                await asyncio.sleep(update_interval_sec)
+
+
+@dataclass
+@sf_component(name="binance/futures-coin")
+class BinanceFuturesCoinLoader(RawDataLoader):
+    """Downloads and stores Binance COIN-M Futures OHLCV data.
+
+    Uses the ``dapi.binance.com`` endpoint for coin-margined perpetual
+    and delivery contracts.
+
+    Attributes:
+        store (DuckDbSpotStore): Storage backend.
+        timeframe (str): Fixed timeframe for all data. Default: "1m".
+    """
+
+    store: DuckDbSpotStore = field(
+        default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_futures_coin.duckdb"))
+    )
+    timeframe: str = "1m"
+
+    async def download(
+        self,
+        pairs: list[str],
+        days: Optional[int] = None,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        fill_gaps: bool = True,
+    ) -> None:
+        """Download historical COIN-M futures data.
+
+        Args:
+            pairs (list[str]): Trading pairs to download (e.g. ["BTCUSD_PERP"]).
+            days (int | None): Number of days back from *end*. Default: 7.
+            start (datetime | None): Range start (overrides *days*).
+            end (datetime | None): Range end. Default: now.
+            fill_gaps (bool): Detect and fill gaps. Default: True.
+        """
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        if end is None:
+            end = now
+        else:
+            end = _ensure_utc_naive(end)
+
+        if start is None:
+            start = end - timedelta(days=days if days else 7)
+        else:
+            start = _ensure_utc_naive(start)
+
+        tf_minutes = {
+            "1m": 1,
+            "3m": 3,
+            "5m": 5,
+            "15m": 15,
+            "30m": 30,
+            "1h": 60,
+            "2h": 120,
+            "4h": 240,
+            "6h": 360,
+            "8h": 480,
+            "12h": 720,
+            "1d": 1440,
+        }.get(self.timeframe, 1)
+
+        async def download_pair(client: BinanceClient, pair: str) -> None:
+            logger.info(f"Processing {pair} (futures-coin) from {start} to {end}")
+            db_min, db_max = self.store.get_time_bounds(pair)
+            ranges_to_download: list[tuple[datetime, datetime]] = []
+
+            if db_min is None:
+                ranges_to_download.append((start, end))
+            else:
+                if start < db_min:
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
+                if end > db_max:
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
+                if fill_gaps:
+                    overlap_start = max(start, db_min)
+                    overlap_end = min(end, db_max)
+                    if overlap_start < overlap_end:
+                        gaps = self.store.find_gaps(pair, overlap_start, overlap_end, tf_minutes)
+                        ranges_to_download.extend(gaps)
+
+            for range_start, range_end in ranges_to_download:
+                if range_start >= range_end:
+                    continue
+                logger.info(f"{pair}: downloading {range_start} -> {range_end}")
+                try:
+                    klines = await client.get_klines_range(
+                        pair=pair,
+                        timeframe=self.timeframe,
+                        start_time=range_start,
+                        end_time=range_end,
+                    )
+                    self.store.insert_klines(pair, klines)
+                except Exception as e:
+                    logger.error(f"Error downloading {pair}: {e}")
+
+        async with BinanceClient(
+            base_url="https://dapi.binance.com",
+            klines_path="/dapi/v1/klines",
+        ) as client:
+            await asyncio.gather(*[download_pair(client, pair) for pair in pairs])
+
+        self.store.close()
+
+    async def sync(
+        self,
+        pairs: list[str],
+        update_interval_sec: int = 60,
+    ) -> None:
+        """Continuously sync latest COIN-M futures data.
+
+        Args:
+            pairs (list[str]): Trading pairs to sync.
+            update_interval_sec (int): Update interval in seconds. Default: 60.
+        """
+        logger.info(f"Starting real-time sync (futures-coin) for {pairs}")
+        logger.info(f"Update interval: {update_interval_sec}s (timeframe={self.timeframe})")
+
+        async def fetch_and_store(client: BinanceClient, pair: str) -> None:
+            try:
+                klines = await client.get_klines(pair=pair, timeframe=self.timeframe, limit=5)
+                self.store.insert_klines(pair, klines)
+            except Exception as e:
+                logger.error(f"Error syncing {pair}: {e}")
+
+        async with BinanceClient(
+            base_url="https://dapi.binance.com",
+            klines_path="/dapi/v1/klines",
+        ) as client:
+            while True:
+                await asyncio.gather(*[fetch_and_store(client, pair) for pair in pairs])
+                logger.debug(f"Synced {len(pairs)} pairs (futures-coin)")
                 await asyncio.sleep(update_interval_sec)
