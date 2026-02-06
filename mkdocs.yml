@@ -111,6 +111,7 @@ nav:
     - Quick Start: quickstart.md
   - User Guide:
     - Custom Data Types: guide/custom-data-types.md
+    - Advanced Strategies: guide/advanced-strategies.md
   - Ecosystem:
     - Overview: ecosystem/index.md
     - signalflow-ta: ecosystem/signalflow-ta.md

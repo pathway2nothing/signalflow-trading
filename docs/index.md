@@ -92,7 +92,9 @@ Filter signals using machine learning to predict success probability:
 Convert validated signals into trades with risk management:
 
 - Entry/exit rules with take-profit and stop-loss
-- Position sizing and risk controls
+- **Advanced position sizing**: Kelly Criterion, volatility targeting, risk parity, martingale/grid
+- **Entry filters**: Regime, volatility, drawdown, correlation, time-of-day
+- **Signal aggregation**: Combine multiple detectors with voting modes
 - Unified interface for backtesting and live trading
 
 ---
