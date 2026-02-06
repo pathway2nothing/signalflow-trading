@@ -112,6 +112,7 @@ nav:
   - User Guide:
     - Custom Data Types: guide/custom-data-types.md
     - Advanced Strategies: guide/advanced-strategies.md
+    - Model Integration: guide/model-integration.md
   - Ecosystem:
     - Overview: ecosystem/index.md
     - signalflow-ta: ecosystem/signalflow-ta.md

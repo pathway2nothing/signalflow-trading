@@ -531,8 +531,255 @@ spot_store.close()
 
 ---
 
+## External Model Integration
+
+SignalFlow supports integration with external ML/RL models via a Protocol-based interface. Models make trading decisions (entry, exit, hold) based on signals and metrics.
+
+### Architecture
+
+```mermaid
+flowchart TB
+    A[Signals + Metrics] --> B[ModelContext]
+    B --> C[StrategyModel.decide]
+    C --> D[list of StrategyDecision]
+    D --> E{Action Type}
+    E -->|ENTER| F[ModelEntryRule]
+    E -->|CLOSE/CLOSE_ALL| G[ModelExitRule]
+    F --> H[Entry Orders]
+    G --> I[Exit Orders]
+
+    style C fill:#7c3aed,stroke:#8b5cf6,color:#fff
+    style D fill:#059669,stroke:#10b981,color:#fff
+```
+
+**Design Principle**: Strategy models see signals and metrics only, NOT raw OHLCV prices.
+
+### StrategyAction
+
+::: signalflow.strategy.model.decision.StrategyAction
+    options:
+      show_root_heading: true
+
+| Action | Description |
+|--------|-------------|
+| `ENTER` | Open new position (uses `size_multiplier`) |
+| `SKIP` | Skip this signal |
+| `CLOSE` | Close specific position (requires `position_id`) |
+| `CLOSE_ALL` | Close all positions for a pair |
+| `HOLD` | Do nothing |
+
+### StrategyDecision
+
+::: signalflow.strategy.model.decision.StrategyDecision
+    options:
+      show_root_heading: true
+      show_source: true
+
+### ModelContext
+
+::: signalflow.strategy.model.context.ModelContext
+    options:
+      show_root_heading: true
+      show_source: true
+
+### StrategyModel Protocol
+
+::: signalflow.strategy.model.protocol.StrategyModel
+    options:
+      show_root_heading: true
+      show_source: true
+
+### ModelEntryRule
+
+::: signalflow.strategy.model.rules.ModelEntryRule
+    options:
+      show_root_heading: true
+      show_source: true
+
+### ModelExitRule
+
+::: signalflow.strategy.model.rules.ModelExitRule
+    options:
+      show_root_heading: true
+      show_source: true
+
+### Model Integration Example
+
+```python
+from signalflow.strategy.model import (
+    StrategyModel,
+    StrategyAction,
+    StrategyDecision,
+    ModelContext,
+    ModelEntryRule,
+    ModelExitRule,
+)
+from signalflow.strategy.runner import BacktestRunner
+from signalflow.strategy.broker import BacktestBroker
+from signalflow.strategy.broker.executor import VirtualSpotExecutor
+from signalflow.strategy.component.exit import TakeProfitStopLossExit
+
+
+# 1. Implement the StrategyModel protocol
+class MyRLModel:
+    """Example RL model for trading decisions."""
+
+    def __init__(self, model_path: str):
+        # Load your trained model
+        self.model = self._load_model(model_path)
+
+    def decide(self, context: ModelContext) -> list[StrategyDecision]:
+        decisions = []
+
+        # Risk management: skip during high drawdown
+        if context.metrics.get("max_drawdown", 0) > 0.15:
+            return decisions
+
+        # Process each signal
+        for row in context.signals.value.iter_rows(named=True):
+            pair = row["pair"]
+            prob = row.get("probability", 0.5)
+
+            # Get model prediction
+            features = self._build_features(row, context.metrics)
+            action, confidence = self.model.predict(features)
+
+            if action == "enter" and confidence > 0.6:
+                decisions.append(StrategyDecision(
+                    action=StrategyAction.ENTER,
+                    pair=pair,
+                    size_multiplier=min(confidence, 1.5),
+                    confidence=confidence,
+                    meta={"model": "rl_v1"},
+                ))
+
+        # Check if should close any positions
+        for pos in context.positions:
+            if self._should_close(pos, context):
+                decisions.append(StrategyDecision(
+                    action=StrategyAction.CLOSE,
+                    pair=pos.pair,
+                    position_id=pos.id,
+                    confidence=0.9,
+                    meta={"reason": "model_exit"},
+                ))
+
+        return decisions
+
+
+# 2. Create rules with the model
+model = MyRLModel("model.pt")
+
+entry_rule = ModelEntryRule(
+    model=model,
+    base_position_size=0.02,  # 2% base size
+    max_positions=5,
+    min_confidence=0.6,
+)
+
+exit_rule = ModelExitRule(
+    model=model,
+    min_confidence=0.7,  # Higher threshold for exits
+)
+
+# 3. Run backtest
+runner = BacktestRunner(
+    strategy_id="model_strategy",
+    broker=BacktestBroker(executor=VirtualSpotExecutor(fee_rate=0.001)),
+    entry_rules=[entry_rule],
+    exit_rules=[
+        exit_rule,
+        TakeProfitStopLossExit(take_profit_pct=0.03, stop_loss_pct=0.02),
+    ],
+    initial_capital=10_000.0,
+)
+
+state = runner.run(raw_data, signals)
+```
+
+---
+
+## Data Export
+
+Export backtest results for external ML model training.
+
+### BacktestExporter
+
+::: signalflow.strategy.exporter.parquet_exporter.BacktestExporter
+    options:
+      show_root_heading: true
+      show_source: true
+
+### Export Format
+
+**bars.parquet** - Per-bar signals and metrics:
+
+| Column | Description |
+|--------|-------------|
+| `timestamp` | Bar timestamp |
+| `pair` | Trading pair |
+| `signal_type` | Signal type (rise/fall/none) |
+| `probability` | Signal probability |
+| `metric_equity` | Portfolio equity |
+| `metric_max_drawdown` | Max drawdown |
+| `open_position_count` | Open positions count |
+
+**trades.parquet** - Completed trades:
+
+| Column | Description |
+|--------|-------------|
+| `position_id` | Position ID |
+| `pair` | Trading pair |
+| `entry_time`, `exit_time` | Trade timestamps |
+| `entry_price`, `exit_price` | Prices |
+| `realized_pnl` | Realized profit/loss |
+| `exit_reason` | Why trade closed |
+| `model_confidence` | Model confidence at entry |
+
+### Export Example
+
+```python
+from pathlib import Path
+from signalflow.strategy.exporter import BacktestExporter
+
+# Create exporter
+exporter = BacktestExporter()
+
+# Option 1: Manual export during custom backtest loop
+for ts in timestamps:
+    # ... process bar ...
+    exporter.export_bar(ts, signals, state.metrics, state)
+
+# Export when positions close
+for closed_position in newly_closed:
+    exporter.export_position_close(
+        position=closed_position,
+        exit_time=ts,
+        exit_price=prices[closed_position.pair],
+        exit_reason="take_profit",
+    )
+
+# Write to disk
+exporter.finalize(Path("./training_data"))
+
+# Option 2: Load for training
+import polars as pl
+
+bars_df = pl.read_parquet("./training_data/bars.parquet")
+trades_df = pl.read_parquet("./training_data/trades.parquet")
+
+# Prepare features for ML training
+features = bars_df.select([
+    "timestamp", "pair", "signal_type", "probability",
+    "metric_equity", "metric_max_drawdown",
+])
+```
+
+---
+
 ## See Also
 
+- **[Model Integration Guide](../guide/model-integration.md)**: Detailed ML/RL integration tutorial
 - **[Tutorial Notebook](../notebooks/strategy_tutorial.ipynb)**: Interactive examples
 - **[Quick Start](../quickstart.md)**: Basic strategy setup
 - **[Core API](core.md)**: `StrategyState`, `Portfolio`, `Position`

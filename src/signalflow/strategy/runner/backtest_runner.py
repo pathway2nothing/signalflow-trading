@@ -111,6 +111,10 @@ class BacktestRunner(StrategyRunner):
         state.metrics = all_metrics
         self._metrics_history.append(all_metrics.copy())
 
+        # Get bar signals and store in runtime for model exit rules
+        bar_signals = self._get_bar_signals(signals_df, ts)
+        state.runtime["_bar_signals"] = bar_signals
+
         exit_orders = []
         open_positions = state.portfolio.open_positions()
         for exit_rule in self.exit_rules:
@@ -121,8 +125,6 @@ class BacktestRunner(StrategyRunner):
             exit_fills = self.broker.submit_orders(exit_orders, prices, ts)
             exit_trades = self.broker.process_fills(exit_fills, exit_orders, state)
             self._trades.extend(exit_trades)
-
-        bar_signals = self._get_bar_signals(signals_df, ts)
 
         entry_orders = []
         for entry_rule in self.entry_rules:
