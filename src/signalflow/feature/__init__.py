@@ -3,6 +3,7 @@ from signalflow.feature.offset_feature import OffsetFeature
 from signalflow.feature.feature_pipeline import FeaturePipeline
 from signalflow.feature.lin_reg_forecast import LinRegForecastFeature
 from signalflow.feature.examples import ExampleGlobalMeanRsiFeature, ExampleRsiFeature, ExampleSmaFeature
+from signalflow.feature.atr import ATRFeature
 
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "ExampleRsiFeature",
     "ExampleSmaFeature",
     "ExampleGlobalMeanRsiFeature",
+    "ATRFeature",
 ]

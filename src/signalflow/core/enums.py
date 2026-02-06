@@ -93,6 +93,37 @@ class PositionType(str, Enum):
     SHORT = "short"
 
 
+class ExitPriority(str, Enum):
+    """Priority mode for composite exit rules.
+
+    Defines how multiple exit rules are combined in CompositeExit.
+
+    Values:
+        FIRST_TRIGGERED: First rule to generate exit wins per position.
+        HIGHEST_PRIORITY: All rules evaluated, lowest priority number wins.
+        ALL_MUST_AGREE: All rules must agree on exit (intersection).
+
+    Example:
+        ```python
+        from signalflow.core.enums import ExitPriority
+        from signalflow.strategy.component.exit import CompositeExit
+
+        composite = CompositeExit(
+            rules=[
+                (tp_sl_exit, 1),      # Priority 1 (highest)
+                (trailing_exit, 2),   # Priority 2
+                (time_exit, 3),       # Priority 3 (lowest)
+            ],
+            priority_mode=ExitPriority.HIGHEST_PRIORITY
+        )
+        ```
+    """
+
+    FIRST_TRIGGERED = "first_triggered"
+    HIGHEST_PRIORITY = "highest_priority"
+    ALL_MUST_AGREE = "all_must_agree"
+
+
 class SfComponentType(str, Enum):
     """Enumeration of SignalFlow component types.
 
