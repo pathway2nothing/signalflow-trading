@@ -32,9 +32,7 @@ class CompositeExit(ExitRule):
     rules: list[tuple[ExitRule, int]] = field(default_factory=list)
     priority_mode: ExitPriority = ExitPriority.FIRST_TRIGGERED
 
-    def check_exits(
-        self, positions: list[Position], prices: dict[str, float], state: StrategyState
-    ) -> list[Order]:
+    def check_exits(self, positions: list[Position], prices: dict[str, float], state: StrategyState) -> list[Order]:
         if not self.rules:
             return []
 
@@ -89,9 +87,7 @@ class CompositeExit(ExitRule):
 
         return orders
 
-    def _all_must_agree(
-        self, positions: list[Position], prices: dict[str, float], state: StrategyState
-    ) -> list[Order]:
+    def _all_must_agree(self, positions: list[Position], prices: dict[str, float], state: StrategyState) -> list[Order]:
         """Only exit if all rules agree (all return exit for same position)."""
         if not self.rules:
             return []

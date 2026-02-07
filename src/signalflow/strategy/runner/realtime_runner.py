@@ -47,8 +47,8 @@ class RealtimeRunner(StrategyRunner):
     ``BacktestRunner``.  State is checkpointed after every bar for
     crash recovery.
 
-    For paper trading, pair with ``BacktestBroker`` +
-    ``VirtualSpotExecutor``.
+    For paper trading, pair with ``VirtualRealtimeBroker`` (recommended)
+    or ``BacktestBroker`` + ``VirtualSpotExecutor``.
 
     Attributes:
         strategy_id: Unique identifier for this strategy run.
@@ -64,6 +64,7 @@ class RealtimeRunner(StrategyRunner):
         strategy_store: Store for state persistence.
         loader: Optional ``BinanceSpotLoader`` for built-in sync.
         sync_interval_sec: Interval for the loader sync task.
+        alert_manager: Optional ``AlertManager`` for monitoring alerts.
     """
 
     strategy_id: str = "realtime"
@@ -86,6 +87,9 @@ class RealtimeRunner(StrategyRunner):
     # Optional data sync
     loader: Any = None  # BinanceSpotLoader | None
     sync_interval_sec: int = 60
+
+    # Optional monitoring
+    alert_manager: Any = None  # AlertManager | None
 
     # Column config
     pair_col: str = "pair"
@@ -197,6 +201,9 @@ class RealtimeRunner(StrategyRunner):
                 self._persist_cycle(state, cycle_trades, ts)
                 self._log_bar_summary(ts, state, bar_df, cycle_trades, bar_signals)
 
+                if self.alert_manager is not None:
+                    self.alert_manager.check_all(state, bar_signals, ts)
+
         return state
 
     # ------------------------------------------------------------------ #
@@ -214,6 +221,7 @@ class RealtimeRunner(StrategyRunner):
         """Process a single bar - identical logic to BacktestRunner."""
         state.touch(ts)
         state.reset_tick_cache()
+        state.runtime["_bar_signals"] = signals
 
         prices = self._build_prices(bar_df)
         self.broker.mark_positions(state, prices, ts)
@@ -346,7 +354,25 @@ class RealtimeRunner(StrategyRunner):
         if state.last_ts is not None:
             timestamps = [t for t in timestamps if t > state.last_ts]
 
+        self._detect_gaps(timestamps)
         return timestamps
+
+    def _detect_gaps(self, timestamps: list[datetime]) -> None:
+        """Log warnings for missing bars in the timestamp sequence."""
+        if len(timestamps) < 2:
+            return
+
+        expected_delta = timedelta(minutes=_TIMEFRAME_MINUTES.get(self.timeframe, 1))
+
+        for i in range(1, len(timestamps)):
+            actual_delta = timestamps[i] - timestamps[i - 1]
+            if actual_delta > expected_delta:
+                missing_count = int(actual_delta / expected_delta) - 1
+                logger.warning(
+                    f"Gap detected: {missing_count} missing bar(s) "
+                    f"between {timestamps[i - 1]} and {timestamps[i]} "
+                    f"(expected={expected_delta}, actual={actual_delta})"
+                )
 
     # ------------------------------------------------------------------ #
     #  State management                                                   #

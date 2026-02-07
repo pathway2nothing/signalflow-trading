@@ -180,9 +180,7 @@ class IsolatedBalanceRunner(StrategyRunner):
     _trades: list[Trade] = field(default_factory=list, init=False)
     _metrics_history: list[dict] = field(default_factory=list, init=False)
 
-    def run(
-        self, raw_data: RawData, signals: Signals, state: StrategyState | None = None
-    ) -> IsolatedResults:
+    def run(self, raw_data: RawData, signals: Signals, state: StrategyState | None = None) -> IsolatedResults:
         """Run parallel backtest with isolated balance per pair.
 
         Args:

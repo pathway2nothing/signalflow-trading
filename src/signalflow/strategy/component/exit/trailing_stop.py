@@ -35,9 +35,7 @@ class TrailingStopExit(ExitRule):
     _trough_key: str = "_trailing_trough"
     _activated_key: str = "_trailing_activated"
 
-    def check_exits(
-        self, positions: list[Position], prices: dict[str, float], state: StrategyState
-    ) -> list[Order]:
+    def check_exits(self, positions: list[Position], prices: dict[str, float], state: StrategyState) -> list[Order]:
         orders: list[Order] = []
 
         for pos in positions:
@@ -82,9 +80,7 @@ class TrailingStopExit(ExitRule):
 
         return activated
 
-    def _check_long_exit(
-        self, pos: Position, price: float, state: StrategyState
-    ) -> Order | None:
+    def _check_long_exit(self, pos: Position, price: float, state: StrategyState) -> Order | None:
         """Check trailing stop for LONG position."""
         # Update peak
         current_peak = pos.meta.get(self._peak_key, pos.entry_price)
@@ -102,9 +98,7 @@ class TrailingStopExit(ExitRule):
 
         return None
 
-    def _check_short_exit(
-        self, pos: Position, price: float, state: StrategyState
-    ) -> Order | None:
+    def _check_short_exit(self, pos: Position, price: float, state: StrategyState) -> Order | None:
         """Check trailing stop for SHORT position."""
         # Update trough
         current_trough = pos.meta.get(self._trough_key, pos.entry_price)
@@ -122,9 +116,7 @@ class TrailingStopExit(ExitRule):
 
         return None
 
-    def _get_trail_distance(
-        self, pos: Position, reference_price: float, state: StrategyState
-    ) -> float:
+    def _get_trail_distance(self, pos: Position, reference_price: float, state: StrategyState) -> float:
         """Calculate trailing distance (percentage or ATR-based)."""
         if self.use_atr:
             atr = state.runtime.get("atr", {}).get(pos.pair)
@@ -137,9 +129,7 @@ class TrailingStopExit(ExitRule):
             # Final fallback to percentage
         return reference_price * self.trail_pct
 
-    def _create_exit_order(
-        self, pos: Position, price: float, peak_or_trough: float
-    ) -> Order:
+    def _create_exit_order(self, pos: Position, price: float, peak_or_trough: float) -> Order:
         """Create exit order with metadata."""
         side = "SELL" if pos.position_type == PositionType.LONG else "BUY"
         meta_key = "peak_price" if pos.position_type == PositionType.LONG else "trough_price"

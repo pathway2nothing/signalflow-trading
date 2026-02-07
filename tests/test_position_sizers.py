@@ -75,12 +75,8 @@ class TestFixedFractionSizer:
 
 class TestSignalStrengthSizer:
     def test_scales_by_probability(self, state_10k):
-        ctx_high = SignalContext(
-            pair="BTCUSDT", signal_type="rise", probability=0.9, price=100.0, timestamp=None
-        )
-        ctx_low = SignalContext(
-            pair="BTCUSDT", signal_type="rise", probability=0.6, price=100.0, timestamp=None
-        )
+        ctx_high = SignalContext(pair="BTCUSDT", signal_type="rise", probability=0.9, price=100.0, timestamp=None)
+        ctx_low = SignalContext(pair="BTCUSDT", signal_type="rise", probability=0.6, price=100.0, timestamp=None)
 
         sizer = SignalStrengthSizer(base_size=100.0, min_probability=0.5)
 
@@ -92,9 +88,7 @@ class TestSignalStrengthSizer:
         assert size_low == pytest.approx(60.0)
 
     def test_below_min_probability_returns_zero(self, state_10k):
-        ctx = SignalContext(
-            pair="BTCUSDT", signal_type="rise", probability=0.4, price=100.0, timestamp=None
-        )
+        ctx = SignalContext(pair="BTCUSDT", signal_type="rise", probability=0.4, price=100.0, timestamp=None)
         sizer = SignalStrengthSizer(base_size=100.0, min_probability=0.5)
         size = sizer.compute_size(ctx, state_10k, {"BTCUSDT": 100.0})
         assert size == 0.0
@@ -141,9 +135,7 @@ class TestKellyCriterionSizer:
 
     def test_returns_zero_for_negative_kelly(self, state_10k):
         # Low probability signal should result in negative Kelly -> 0
-        ctx = SignalContext(
-            pair="BTCUSDT", signal_type="rise", probability=0.3, price=100.0, timestamp=None
-        )
+        ctx = SignalContext(pair="BTCUSDT", signal_type="rise", probability=0.3, price=100.0, timestamp=None)
         sizer = KellyCriterionSizer(
             use_signal_probability=True,
             default_payoff_ratio=1.0,

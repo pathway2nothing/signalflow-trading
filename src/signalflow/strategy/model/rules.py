@@ -118,9 +118,7 @@ class ModelEntryRule(EntryRule):
 
         # Filter to ENTER decisions
         enter_decisions = [
-            d
-            for d in decisions
-            if d.action == StrategyAction.ENTER and d.confidence >= self.min_confidence
+            d for d in decisions if d.action == StrategyAction.ENTER and d.confidence >= self.min_confidence
         ]
 
         open_count = len(state.portfolio.open_positions())

@@ -90,9 +90,7 @@ class SignalEntryRule(EntryRule):
             elif isinstance(self.entry_filters, list):
                 self._composite_filter = CompositeEntryFilter(filters=self.entry_filters)
 
-    def check_entries(
-        self, signals: Signals, prices: dict[str, float], state: StrategyState
-    ) -> list[Order]:
+    def check_entries(self, signals: Signals, prices: dict[str, float], state: StrategyState) -> list[Order]:
         """Check signals and generate entry orders."""
         orders: list[Order] = []
 
@@ -187,11 +185,7 @@ class SignalEntryRule(EntryRule):
                     "signal_probability": probability,
                     "signal_ts": row.get(self.ts_col),
                     "requested_notional": notional,
-                    "sizer_used": (
-                        self.position_sizer.__class__.__name__
-                        if self.position_sizer
-                        else "legacy"
-                    ),
+                    "sizer_used": (self.position_sizer.__class__.__name__ if self.position_sizer else "legacy"),
                 },
             )
             orders.append(order)

@@ -80,9 +80,7 @@ class UnlimitedBalanceRunner(StrategyRunner):
 
     _trades: list[Trade] = field(default_factory=list, init=False)
 
-    def run(
-        self, raw_data: RawData, signals: Signals, state: StrategyState | None = None
-    ) -> UnlimitedResults:
+    def run(self, raw_data: RawData, signals: Signals, state: StrategyState | None = None) -> UnlimitedResults:
         """Run unlimited balance backtest.
 
         Args:
@@ -278,19 +276,21 @@ class UnlimitedBalanceRunner(StrategyRunner):
                 total_fees = entry.fee + exit_trade.fee
                 pnl -= total_fees
 
-                trade_rows.append({
-                    "pair": entry.pair,
-                    "side": "LONG" if is_long else "SHORT",
-                    "entry_time": entry.ts,
-                    "exit_time": exit_trade.ts,
-                    "entry_price": entry_price,
-                    "exit_price": exit_price,
-                    "qty": entry.qty,
-                    "pnl": pnl,
-                    "return_pct": return_pct,
-                    "exit_reason": exit_trade.meta.get("reason", "unknown"),
-                    "fees": total_fees,
-                })
+                trade_rows.append(
+                    {
+                        "pair": entry.pair,
+                        "side": "LONG" if is_long else "SHORT",
+                        "entry_time": entry.ts,
+                        "exit_time": exit_trade.ts,
+                        "entry_price": entry_price,
+                        "exit_price": exit_price,
+                        "qty": entry.qty,
+                        "pnl": pnl,
+                        "return_pct": return_pct,
+                        "exit_reason": exit_trade.meta.get("reason", "unknown"),
+                        "fees": total_fees,
+                    }
+                )
 
         trades_df = pl.DataFrame(trade_rows) if trade_rows else pl.DataFrame()
 

@@ -155,10 +155,7 @@ class SignalAggregator:
                     # Majority signal type (mode)
                     pl.col("signal_type").mode().first().alias("signal_type"),
                     # Weighted average probability
-                    (
-                        (pl.col("probability") * pl.col("_weight")).sum()
-                        / pl.col("_weight").sum()
-                    ).alias("probability"),
+                    ((pl.col("probability") * pl.col("_weight")).sum() / pl.col("_weight").sum()).alias("probability"),
                 ]
             )
             .with_columns(pl.lit(1).alias("signal"))
@@ -171,10 +168,7 @@ class SignalAggregator:
     def _aggregate_unanimous(self, signals_list: list[Signals]) -> Signals:
         """All detectors must agree on signal type."""
         # Get non-NONE signals from each detector
-        filtered = [
-            sig.value.filter(pl.col("signal_type") != SignalType.NONE.value)
-            for sig in signals_list
-        ]
+        filtered = [sig.value.filter(pl.col("signal_type") != SignalType.NONE.value) for sig in signals_list]
 
         # Check if any detector has no signals
         if any(df.height == 0 for df in filtered):
@@ -196,9 +190,7 @@ class SignalAggregator:
 
         # Average probabilities across all detectors
         prob_dfs = [
-            sig.value.select(
-                [self.pair_col, self.ts_col, pl.col("probability").alias(f"_prob_{i}")]
-            )
+            sig.value.select([self.pair_col, self.ts_col, pl.col("probability").alias(f"_prob_{i}")])
             for i, sig in enumerate(signals_list)
         ]
 
@@ -222,10 +214,7 @@ class SignalAggregator:
 
     def _aggregate_any(self, signals_list: list[Signals]) -> Signals:
         """Any non-NONE signal passes (union with highest probability)."""
-        dfs = [
-            sig.value.filter(pl.col("signal_type") != SignalType.NONE.value)
-            for sig in signals_list
-        ]
+        dfs = [sig.value.filter(pl.col("signal_type") != SignalType.NONE.value) for sig in signals_list]
 
         dfs = [df for df in dfs if df.height > 0]
         if not dfs:
@@ -235,9 +224,7 @@ class SignalAggregator:
 
         # Keep highest probability signal per (pair, ts)
         result = (
-            combined.sort(
-                [self.pair_col, self.ts_col, "probability"], descending=[False, False, True]
-            )
+            combined.sort([self.pair_col, self.ts_col, "probability"], descending=[False, False, True])
             .group_by([self.pair_col, self.ts_col], maintain_order=True)
             .first()
             .select([self.pair_col, self.ts_col, "signal_type", "signal", "probability"])
@@ -254,9 +241,7 @@ class SignalAggregator:
         if len(signals_list) < 2:
             return signals_list[0] if signals_list else Signals(pl.DataFrame())
 
-        detector = signals_list[0].value.filter(
-            pl.col("signal_type") != SignalType.NONE.value
-        )
+        detector = signals_list[0].value.filter(pl.col("signal_type") != SignalType.NONE.value)
         validator = signals_list[1].value
 
         if detector.height == 0:
@@ -277,11 +262,7 @@ class SignalAggregator:
 
         # Combine probabilities
         result = (
-            result.with_columns(
-                (pl.col("probability") * pl.col("_validator_prob").fill_null(1.0)).alias(
-                    "probability"
-                )
-            )
+            result.with_columns((pl.col("probability") * pl.col("_validator_prob").fill_null(1.0)).alias("probability"))
             .filter(pl.col("probability") >= self.probability_threshold)
             .select([self.pair_col, self.ts_col, "signal_type", "signal", "probability"])
         )

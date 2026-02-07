@@ -74,9 +74,7 @@ class UnlimitedBacktestBroker(Broker):
         )
         position.apply_trade(trade)
 
-    def process_fills(
-        self, fills: list[OrderFill], orders: list[Order], state: StrategyState
-    ) -> list[Trade]:
+    def process_fills(self, fills: list[OrderFill], orders: list[Order], state: StrategyState) -> list[Trade]:
         """Process fills WITHOUT modifying portfolio.cash.
 
         Only creates positions and tracks trades.
@@ -129,26 +127,20 @@ class UnlimitedBacktestBroker(Broker):
 
         return trades
 
-    def mark_positions(
-        self, state: StrategyState, prices: dict[str, float], ts: datetime
-    ) -> None:
+    def mark_positions(self, state: StrategyState, prices: dict[str, float], ts: datetime) -> None:
         """Mark all open positions to current prices."""
         for position in state.portfolio.open_positions():
             price = prices.get(position.pair)
             if price is not None and price > 0:
                 position.mark(ts=ts, price=price)
 
-    def get_open_position_for_pair(
-        self, state: StrategyState, pair: str
-    ) -> Position | None:
+    def get_open_position_for_pair(self, state: StrategyState, pair: str) -> Position | None:
         """Get open position for a specific pair, if any."""
         for pos in state.portfolio.open_positions():
             if pos.pair == pair:
                 return pos
         return None
 
-    def get_open_positions_by_pair(
-        self, state: StrategyState
-    ) -> dict[str, Position]:
+    def get_open_positions_by_pair(self, state: StrategyState) -> dict[str, Position]:
         """Get dict of pair -> open position."""
         return {pos.pair: pos for pos in state.portfolio.open_positions()}

@@ -81,9 +81,7 @@ class SqliteRawStore(RawDataStore):
         existing_cols = {row[1] for row in cur.fetchall()}
 
         if not existing_cols:
-            col_defs = ", ".join(
-                f"{c} {self._col_sql_type(c)}" for c in self._all_column_names
-            )
+            col_defs = ", ".join(f"{c} {self._col_sql_type(c)}" for c in self._all_column_names)
             self._con.executescript(f"""
                 CREATE TABLE ohlcv (
                     {col_defs},
@@ -114,10 +112,7 @@ class SqliteRawStore(RawDataStore):
             (self.data_type,),
         )
         self._con.commit()
-        logger.info(
-            f"Database initialized: {self.db_path} "
-            f"(data_type={self.data_type}, timeframe={self.timeframe})"
-        )
+        logger.info(f"Database initialized: {self.db_path} (data_type={self.data_type}, timeframe={self.timeframe})")
 
     # ── Insert ────────────────────────────────────────────────────────
 
@@ -126,10 +121,7 @@ class SqliteRawStore(RawDataStore):
             return
         n_cols = len(self._all_column_names)
         placeholders = ", ".join(["?"] * n_cols)
-        rows = [
-            (pair, normalize_ts(k["timestamp"])) + tuple(k.get(c) for c in self._columns)
-            for k in klines
-        ]
+        rows = [(pair, normalize_ts(k["timestamp"])) + tuple(k.get(c) for c in self._columns) for k in klines]
         self._con.executemany(
             f"INSERT OR REPLACE INTO ohlcv VALUES ({placeholders})",
             rows,
@@ -301,12 +293,8 @@ class SqliteRawStore(RawDataStore):
 
 
 # Register for futures and perpetual.
-default_registry.register(
-    SfComponentType.RAW_DATA_STORE, "sqlite/futures", SqliteRawStore, override=True
-)
-default_registry.register(
-    SfComponentType.RAW_DATA_STORE, "sqlite/perpetual", SqliteRawStore, override=True
-)
+default_registry.register(SfComponentType.RAW_DATA_STORE, "sqlite/futures", SqliteRawStore, override=True)
+default_registry.register(SfComponentType.RAW_DATA_STORE, "sqlite/perpetual", SqliteRawStore, override=True)
 
 # Backward-compatible alias.
 SqliteSpotStore = SqliteRawStore

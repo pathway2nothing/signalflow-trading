@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.3.6"
+version = "0.3.7"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -37,6 +37,7 @@ dev = [
 test = [
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
+  "pytest-cov>=6.0",
 ]
 docs = [
   "mkdocs>=1.6",
@@ -126,3 +127,14 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+addopts = "--cov=signalflow --cov-report=term-missing"
+
+# --- Coverage Configuration ---
+[tool.coverage.run]
+source = ["signalflow"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+fail_under = 76

@@ -81,9 +81,7 @@ class PgRawStore(RawDataStore):
             existing_cols = {row[0] for row in cur.fetchall()}
 
             if not existing_cols:
-                col_defs = ", ".join(
-                    f"{c} {self._col_sql_type(c)}" for c in self._all_column_names
-                )
+                col_defs = ", ".join(f"{c} {self._col_sql_type(c)}" for c in self._all_column_names)
                 cur.execute(f"""
                     CREATE TABLE ohlcv (
                         {col_defs},
@@ -116,10 +114,7 @@ class PgRawStore(RawDataStore):
                 ("data_type", self.data_type),
             )
         self._con.commit()
-        logger.info(
-            f"PostgreSQL database initialized "
-            f"(data_type={self.data_type}, timeframe={self.timeframe})"
-        )
+        logger.info(f"PostgreSQL database initialized (data_type={self.data_type}, timeframe={self.timeframe})")
 
     # ── Insert ────────────────────────────────────────────────────────
 
@@ -130,10 +125,7 @@ class PgRawStore(RawDataStore):
         placeholders = ", ".join(["%s"] * len(self._all_column_names))
         update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in self._columns)
 
-        rows = [
-            (pair, normalize_ts(k["timestamp"])) + tuple(k.get(c) for c in self._columns)
-            for k in klines
-        ]
+        rows = [(pair, normalize_ts(k["timestamp"])) + tuple(k.get(c) for c in self._columns) for k in klines]
         with self._con.cursor() as cur:
             cur.executemany(
                 f"""
@@ -317,12 +309,8 @@ class PgRawStore(RawDataStore):
 
 
 # Register for futures and perpetual.
-default_registry.register(
-    SfComponentType.RAW_DATA_STORE, "postgres/futures", PgRawStore, override=True
-)
-default_registry.register(
-    SfComponentType.RAW_DATA_STORE, "postgres/perpetual", PgRawStore, override=True
-)
+default_registry.register(SfComponentType.RAW_DATA_STORE, "postgres/futures", PgRawStore, override=True)
+default_registry.register(SfComponentType.RAW_DATA_STORE, "postgres/perpetual", PgRawStore, override=True)
 
 # Backward-compatible alias.
 PgSpotStore = PgRawStore

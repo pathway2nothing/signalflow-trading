@@ -126,13 +126,17 @@ class TestStrategyAction:
 
 class TestModelContext:
     def test_context_creation(self):
-        signals = Signals(pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [TS],
-            "signal_type": ["rise"],
-            "signal": [1],
-            "probability": [0.8],
-        }))
+        signals = Signals(
+            pl.DataFrame(
+                {
+                    "pair": ["BTCUSDT"],
+                    "timestamp": [TS],
+                    "signal_type": ["rise"],
+                    "signal": [1],
+                    "probability": [0.8],
+                }
+            )
+        )
         positions = [
             Position(id="p1", pair="BTCUSDT", position_type=PositionType.LONG, entry_price=50000.0, qty=0.1),
         ]

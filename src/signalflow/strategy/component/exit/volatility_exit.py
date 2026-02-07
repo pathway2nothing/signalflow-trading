@@ -32,9 +32,7 @@ class VolatilityExit(ExitRule):
     _sl_price_key: str = "_vol_sl_price"
     _atr_used_key: str = "_vol_atr_used"
 
-    def check_exits(
-        self, positions: list[Position], prices: dict[str, float], state: StrategyState
-    ) -> list[Order]:
+    def check_exits(self, positions: list[Position], prices: dict[str, float], state: StrategyState) -> list[Order]:
         orders: list[Order] = []
 
         for pos in positions:
@@ -91,9 +89,7 @@ class VolatilityExit(ExitRule):
 
         return orders
 
-    def _get_levels(
-        self, pos: Position, state: StrategyState
-    ) -> tuple[float | None, float | None, float | None]:
+    def _get_levels(self, pos: Position, state: StrategyState) -> tuple[float | None, float | None, float | None]:
         """Get or calculate TP/SL levels."""
         # Check if we have stored levels and should use them
         if self.use_entry_atr:

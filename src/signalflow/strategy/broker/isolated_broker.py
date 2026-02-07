@@ -73,9 +73,7 @@ class IsolatedBacktestBroker(Broker):
         )
         position.apply_trade(trade)
 
-    def process_fills(
-        self, fills: list[OrderFill], orders: list[Order], state: StrategyState
-    ) -> list[Trade]:
+    def process_fills(self, fills: list[OrderFill], orders: list[Order], state: StrategyState) -> list[Trade]:
         """Process fills and update cash balance.
 
         Same as BacktestBroker but validates all fills are for self.pair.
@@ -139,9 +137,7 @@ class IsolatedBacktestBroker(Broker):
 
         return trades
 
-    def mark_positions(
-        self, state: StrategyState, prices: dict[str, float], ts: datetime
-    ) -> None:
+    def mark_positions(self, state: StrategyState, prices: dict[str, float], ts: datetime) -> None:
         """Mark all open positions to current prices."""
         for position in state.portfolio.open_positions():
             price = prices.get(position.pair)

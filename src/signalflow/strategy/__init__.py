@@ -3,6 +3,7 @@ from signalflow.strategy.component import entry, exit, ExitRule, EntryRule
 import signalflow.strategy.runner as runner
 import signalflow.strategy.model as model
 import signalflow.strategy.exporter as exporter
+import signalflow.strategy.monitoring as monitoring
 
 __all__ = [
     "broker",
@@ -12,5 +13,6 @@ __all__ = [
     "exit",
     "exporter",
     "model",
+    "monitoring",
     "runner",
 ]

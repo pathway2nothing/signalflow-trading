@@ -217,9 +217,7 @@ class TestTimeOfDayFilter:
         assert "blocked" in reason
 
     def test_allows_when_no_timestamp(self, state):
-        ctx = SignalContext(
-            pair="BTCUSDT", signal_type="rise", probability=0.8, price=50000.0, timestamp=None
-        )
+        ctx = SignalContext(pair="BTCUSDT", signal_type="rise", probability=0.8, price=50000.0, timestamp=None)
         f = TimeOfDayFilter(allowed_hours=[12, 13])
         allowed, reason = f.allow_entry(ctx, state, {})
         assert allowed

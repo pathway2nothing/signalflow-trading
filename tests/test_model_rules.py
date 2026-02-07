@@ -119,10 +119,12 @@ class TestModelEntryRuleBasic:
         ]
         model = MockModel(decisions=decisions)
         rule = ModelEntryRule(model=model, max_positions=1, base_position_size=0.01)
-        sigs = _signals([
-            {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.9},
-            {"pair": "ETHUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.9},
-        ])
+        sigs = _signals(
+            [
+                {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.9},
+                {"pair": "ETHUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.9},
+            ]
+        )
 
         orders = rule.check_entries(sigs, {"BTCUSDT": 50000.0, "ETHUSDT": 3000.0}, _make_state())
 

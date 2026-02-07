@@ -15,18 +15,19 @@ def _make_ohlcv(n: int = 50) -> pl.DataFrame:
     low = close - np.abs(np.random.randn(n) * 0.3)
     open_ = close + np.random.randn(n) * 0.2
 
-    return pl.DataFrame({
-        "pair": ["BTCUSDT"] * n,
-        "timestamp": pl.datetime_range(
-            pl.datetime(2024, 1, 1), pl.datetime(2024, 1, 1) + pl.duration(hours=n - 1),
-            interval="1h", eager=True
-        ),
-        "open": open_,
-        "high": high,
-        "low": low,
-        "close": close,
-        "volume": np.random.rand(n) * 1000,
-    })
+    return pl.DataFrame(
+        {
+            "pair": ["BTCUSDT"] * n,
+            "timestamp": pl.datetime_range(
+                pl.datetime(2024, 1, 1), pl.datetime(2024, 1, 1) + pl.duration(hours=n - 1), interval="1h", eager=True
+            ),
+            "open": open_,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": np.random.rand(n) * 1000,
+        }
+    )
 
 
 class TestATRFeature:
@@ -84,18 +85,19 @@ class TestATRFeature:
     def test_true_range_calculation(self):
         """Verify TR = max(H-L, |H-prevC|, |L-prevC|)."""
         # Create known data where we can verify TR
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"] * 5,
-            "timestamp": pl.datetime_range(
-                pl.datetime(2024, 1, 1), pl.datetime(2024, 1, 1) + pl.duration(hours=4),
-                interval="1h", eager=True
-            ),
-            "open": [100.0, 102.0, 98.0, 105.0, 103.0],
-            "high": [103.0, 105.0, 102.0, 108.0, 106.0],
-            "low": [99.0, 100.0, 95.0, 102.0, 101.0],
-            "close": [102.0, 101.0, 100.0, 106.0, 104.0],
-            "volume": [1000.0] * 5,
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"] * 5,
+                "timestamp": pl.datetime_range(
+                    pl.datetime(2024, 1, 1), pl.datetime(2024, 1, 1) + pl.duration(hours=4), interval="1h", eager=True
+                ),
+                "open": [100.0, 102.0, 98.0, 105.0, 103.0],
+                "high": [103.0, 105.0, 102.0, 108.0, 106.0],
+                "low": [99.0, 100.0, 95.0, 102.0, 101.0],
+                "close": [102.0, 101.0, 100.0, 106.0, 104.0],
+                "volume": [1000.0] * 5,
+            }
+        )
 
         # For row 1 (index 1):
         # H-L = 105-100 = 5

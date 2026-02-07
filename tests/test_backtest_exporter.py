@@ -30,9 +30,11 @@ def _signals(rows: list[dict]) -> Signals:
 class TestBacktestExporterBar:
     def test_export_bar_with_signals(self):
         exporter = BacktestExporter()
-        signals = _signals([
-            {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8},
-        ])
+        signals = _signals(
+            [
+                {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8},
+            ]
+        )
         metrics = {"equity": 10000.0, "max_drawdown": 0.05}
         state = _make_state()
 
@@ -52,10 +54,12 @@ class TestBacktestExporterBar:
 
     def test_export_multiple_signals_per_bar(self):
         exporter = BacktestExporter()
-        signals = _signals([
-            {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8},
-            {"pair": "ETHUSDT", "timestamp": TS, "signal_type": "fall", "signal": -1, "probability": 0.7},
-        ])
+        signals = _signals(
+            [
+                {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8},
+                {"pair": "ETHUSDT", "timestamp": TS, "signal_type": "fall", "signal": -1, "probability": 0.7},
+            ]
+        )
         metrics = {"equity": 10000.0}
         state = _make_state()
 
@@ -104,9 +108,11 @@ class TestBacktestExporterFinalize:
         exporter = BacktestExporter()
 
         # Export some data
-        signals = _signals([
-            {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8},
-        ])
+        signals = _signals(
+            [
+                {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8},
+            ]
+        )
         exporter.export_bar(TS, signals, {"equity": 10000.0}, _make_state())
         exporter.export_trade({"position_id": "p1", "pair": "BTCUSDT", "pnl": 100.0})
 
@@ -120,9 +126,11 @@ class TestBacktestExporterFinalize:
     def test_finalize_parquet_readable(self, tmp_path: Path):
         exporter = BacktestExporter()
 
-        signals = _signals([
-            {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8},
-        ])
+        signals = _signals(
+            [
+                {"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8},
+            ]
+        )
         exporter.export_bar(TS, signals, {"equity": 10000.0, "max_drawdown": 0.05}, _make_state())
 
         exporter.finalize(tmp_path)
@@ -137,7 +145,9 @@ class TestBacktestExporterFinalize:
 
     def test_finalize_creates_directory(self, tmp_path: Path):
         exporter = BacktestExporter()
-        signals = _signals([{"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8}])
+        signals = _signals(
+            [{"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8}]
+        )
         exporter.export_bar(TS, signals, {"equity": 10000.0}, _make_state())
 
         nested_path = tmp_path / "nested" / "output"
@@ -158,7 +168,9 @@ class TestBacktestExporterFinalize:
 class TestBacktestExporterReset:
     def test_reset_clears_data(self):
         exporter = BacktestExporter()
-        signals = _signals([{"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8}])
+        signals = _signals(
+            [{"pair": "BTCUSDT", "timestamp": TS, "signal_type": "rise", "signal": 1, "probability": 0.8}]
+        )
         exporter.export_bar(TS, signals, {"equity": 10000.0}, _make_state())
         exporter.export_trade({"position_id": "p1"})
 

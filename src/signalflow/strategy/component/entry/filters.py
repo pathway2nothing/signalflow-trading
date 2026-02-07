@@ -114,12 +114,8 @@ class RegimeFilter(EntryFilter):
     """
 
     regime_key: str = "regime"
-    allowed_regimes_rise: list[str] = field(
-        default_factory=lambda: ["trend_up", "mean_reversion_oversold"]
-    )
-    allowed_regimes_fall: list[str] = field(
-        default_factory=lambda: ["trend_down", "mean_reversion_overbought"]
-    )
+    allowed_regimes_rise: list[str] = field(default_factory=lambda: ["trend_up", "mean_reversion_oversold"])
+    allowed_regimes_fall: list[str] = field(default_factory=lambda: ["trend_down", "mean_reversion_overbought"])
 
     def allow_entry(
         self,
@@ -353,23 +349,16 @@ class PriceDistanceFilter(EntryFilter):
                 # Price should be below last entry by min_distance_pct
                 if price_change_pct > -self.min_distance_pct:
                     return False, (
-                        f"price too close to last entry: "
-                        f"{price_change_pct:.2%} > -{self.min_distance_pct:.2%}"
+                        f"price too close to last entry: {price_change_pct:.2%} > -{self.min_distance_pct:.2%}"
                     )
             # SHORT: we want to sell higher
             elif signal.signal_type == "fall" and price_change_pct < self.min_distance_pct:
                 # Price should be above last entry by min_distance_pct
-                return False, (
-                    f"price too close to last entry: "
-                    f"{price_change_pct:.2%} < {self.min_distance_pct:.2%}"
-                )
+                return False, (f"price too close to last entry: {price_change_pct:.2%} < {self.min_distance_pct:.2%}")
         else:
             # Check absolute distance in either direction
             if abs(price_change_pct) < self.min_distance_pct:
-                return False, (
-                    f"price too close to last entry: "
-                    f"|{price_change_pct:.2%}| < {self.min_distance_pct:.2%}"
-                )
+                return False, (f"price too close to last entry: |{price_change_pct:.2%}| < {self.min_distance_pct:.2%}")
 
         return True, ""
 

@@ -29,24 +29,28 @@ def make_test_data(pairs: list[str], n_bars: int = 10) -> tuple[RawData, Signals
         for i in range(n_bars):
             ts = base_time + timedelta(hours=i)
             price = base_price * (1 + 0.001 * i)  # Slight uptrend
-            rows.append({
-                "pair": pair,
-                "timestamp": ts,
-                "open": price,
-                "high": price * 1.01,
-                "low": price * 0.99,
-                "close": price,
-                "volume": 1000.0,
-            })
-            # Add signal every 3rd bar
-            if i % 3 == 0:
-                signal_rows.append({
+            rows.append(
+                {
                     "pair": pair,
                     "timestamp": ts,
-                    "signal": 1.0,
-                    "signal_type": "long",
-                    "signal_strength": 0.8,
-                })
+                    "open": price,
+                    "high": price * 1.01,
+                    "low": price * 0.99,
+                    "close": price,
+                    "volume": 1000.0,
+                }
+            )
+            # Add signal every 3rd bar
+            if i % 3 == 0:
+                signal_rows.append(
+                    {
+                        "pair": pair,
+                        "timestamp": ts,
+                        "signal": 1.0,
+                        "signal_type": "long",
+                        "signal_strength": 0.8,
+                    }
+                )
 
     df = pl.DataFrame(rows)
     signals_df = pl.DataFrame(signal_rows)
@@ -220,7 +224,7 @@ class TestUnlimitedBalanceRunner:
         runner = UnlimitedBalanceRunner(
             entry_rules=[entry_rule],
             take_profit_pct=0.001,  # Very tight TP
-            stop_loss_pct=0.001,   # Very tight SL
+            stop_loss_pct=0.001,  # Very tight SL
             show_progress=False,
         )
 

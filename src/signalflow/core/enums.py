@@ -154,6 +154,7 @@ class SfComponentType(str, Enum):
         STRATEGY_EXIT_RULE: Position exit rules (e.g., take profit, stop loss).
         STRATEGY_ENTRY_RULE: Position entry rules (e.g., fixed size).
         STRATEGY_METRIC: Strategy performance metrics.
+        STRATEGY_ALERT: Strategy monitoring alerts (e.g., max drawdown, stuck positions).
 
     Example:
         ```python
@@ -213,6 +214,7 @@ class SfComponentType(str, Enum):
     STRATEGY_EXIT_RULE = "strategy/exit"
     STRATEGY_ENTRY_RULE = "strategy/entry"
     STRATEGY_METRIC = "strategy/metric"
+    STRATEGY_ALERT = "strategy/alert"
 
 
 class DataFrameType(str, Enum):
