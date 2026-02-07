@@ -1,11 +1,14 @@
-from signalflow.strategy.component.base import ExitRule, EntryRule
+"""Strategy components: entry rules, exit rules, position sizers."""
+
 import signalflow.strategy.component.entry as entry
 import signalflow.strategy.component.exit as exit
-
+import signalflow.strategy.component.sizing as sizing
+from signalflow.strategy.component.base import EntryRule, ExitRule
 
 __all__ = [
-    "ExitRule",
     "EntryRule",
+    "ExitRule",
     "entry",
     "exit",
+    "sizing",
 ]

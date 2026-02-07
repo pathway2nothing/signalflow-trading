@@ -190,10 +190,7 @@ class TestDuckDbRawStoreDataTypes:
         from signalflow.data.raw_store import DuckDbRawStore
 
         store = DuckDbRawStore(db_path=tmp_path / "perp.duckdb", data_type="perpetual")
-        klines = [
-            self._make_kline(i, funding_rate=0.0001, open_interest=50000.0 + i)
-            for i in range(20)
-        ]
+        klines = [self._make_kline(i, funding_rate=0.0001, open_interest=50000.0 + i) for i in range(20)]
         store.insert_klines("BTCUSDT", klines)
 
         df = store.load("BTCUSDT")
@@ -224,8 +221,16 @@ class TestDuckDbRawStoreDataTypes:
 
         df = store.load("BTCUSDT")
         expected = {
-            "pair", "timestamp", "open", "high", "low", "close", "volume",
-            "funding_rate", "open_interest", "trades",
+            "pair",
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "funding_rate",
+            "open_interest",
+            "trades",
         }
         assert set(df.columns) == expected
         store.close()

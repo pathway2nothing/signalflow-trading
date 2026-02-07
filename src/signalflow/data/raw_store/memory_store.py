@@ -69,13 +69,9 @@ class InMemoryRawStore(RawDataStore):
             return (None, None)
         return (subset["timestamp"].min(), subset["timestamp"].max())
 
-    def find_gaps(
-        self, pair: str, start: datetime, end: datetime, tf_minutes: int
-    ) -> list[tuple[datetime, datetime]]:
+    def find_gaps(self, pair: str, start: datetime, end: datetime, tf_minutes: int) -> list[tuple[datetime, datetime]]:
         subset = self._df.filter(
-            (pl.col("pair") == pair)
-            & (pl.col("timestamp") >= start)
-            & (pl.col("timestamp") <= end)
+            (pl.col("pair") == pair) & (pl.col("timestamp") >= start) & (pl.col("timestamp") <= end)
         )
         existing_times = set(subset["timestamp"].to_list())
         gaps: list[tuple[datetime, datetime]] = []
@@ -172,12 +168,8 @@ class InMemoryRawStore(RawDataStore):
 
 
 # Register for futures and perpetual.
-default_registry.register(
-    SfComponentType.RAW_DATA_STORE, "memory/futures", InMemoryRawStore, override=True
-)
-default_registry.register(
-    SfComponentType.RAW_DATA_STORE, "memory/perpetual", InMemoryRawStore, override=True
-)
+default_registry.register(SfComponentType.RAW_DATA_STORE, "memory/futures", InMemoryRawStore, override=True)
+default_registry.register(SfComponentType.RAW_DATA_STORE, "memory/perpetual", InMemoryRawStore, override=True)
 
 # Backward-compatible alias.
 InMemorySpotStore = InMemoryRawStore

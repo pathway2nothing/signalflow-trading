@@ -115,9 +115,7 @@ class DuckDbRawStore(RawDataStore):
 
         if not existing_cols:
             # Fresh database — create table with full schema
-            col_defs = ",\n                    ".join(
-                f"{c} {self._col_sql_type(c)}" for c in self._all_column_names
-            )
+            col_defs = ",\n                    ".join(f"{c} {self._col_sql_type(c)}" for c in self._all_column_names)
             self._con.execute(f"""
                 CREATE TABLE ohlcv (
                     {col_defs},
@@ -152,10 +150,7 @@ class DuckDbRawStore(RawDataStore):
             [self.data_type],
         )
 
-        logger.info(
-            f"Database initialized: {self.db_path} "
-            f"(data_type={self.data_type}, timeframe={self.timeframe})"
-        )
+        logger.info(f"Database initialized: {self.db_path} (data_type={self.data_type}, timeframe={self.timeframe})")
 
     def _migrate_legacy(self, existing_cols: set[str]) -> None:
         """Migrate from legacy schema (timeframe / open_time / quote_volume columns)."""
@@ -387,12 +382,8 @@ class DuckDbRawStore(RawDataStore):
 
 # Register the same class for futures and perpetual data types.
 # The factory passes data_type as a kwarg, overriding the default "spot".
-default_registry.register(
-    SfComponentType.RAW_DATA_STORE, "duckdb/futures", DuckDbRawStore, override=True
-)
-default_registry.register(
-    SfComponentType.RAW_DATA_STORE, "duckdb/perpetual", DuckDbRawStore, override=True
-)
+default_registry.register(SfComponentType.RAW_DATA_STORE, "duckdb/futures", DuckDbRawStore, override=True)
+default_registry.register(SfComponentType.RAW_DATA_STORE, "duckdb/perpetual", DuckDbRawStore, override=True)
 
 # Backward-compatible alias.
 DuckDbSpotStore = DuckDbRawStore

@@ -93,6 +93,37 @@ class PositionType(str, Enum):
     SHORT = "short"
 
 
+class ExitPriority(str, Enum):
+    """Priority mode for composite exit rules.
+
+    Defines how multiple exit rules are combined in CompositeExit.
+
+    Values:
+        FIRST_TRIGGERED: First rule to generate exit wins per position.
+        HIGHEST_PRIORITY: All rules evaluated, lowest priority number wins.
+        ALL_MUST_AGREE: All rules must agree on exit (intersection).
+
+    Example:
+        ```python
+        from signalflow.core.enums import ExitPriority
+        from signalflow.strategy.component.exit import CompositeExit
+
+        composite = CompositeExit(
+            rules=[
+                (tp_sl_exit, 1),      # Priority 1 (highest)
+                (trailing_exit, 2),   # Priority 2
+                (time_exit, 3),       # Priority 3 (lowest)
+            ],
+            priority_mode=ExitPriority.HIGHEST_PRIORITY
+        )
+        ```
+    """
+
+    FIRST_TRIGGERED = "first_triggered"
+    HIGHEST_PRIORITY = "highest_priority"
+    ALL_MUST_AGREE = "all_must_agree"
+
+
 class SfComponentType(str, Enum):
     """Enumeration of SignalFlow component types.
 
@@ -123,6 +154,7 @@ class SfComponentType(str, Enum):
         STRATEGY_EXIT_RULE: Position exit rules (e.g., take profit, stop loss).
         STRATEGY_ENTRY_RULE: Position entry rules (e.g., fixed size).
         STRATEGY_METRIC: Strategy performance metrics.
+        STRATEGY_ALERT: Strategy monitoring alerts (e.g., max drawdown, stuck positions).
 
     Example:
         ```python
@@ -182,6 +214,7 @@ class SfComponentType(str, Enum):
     STRATEGY_EXIT_RULE = "strategy/exit"
     STRATEGY_ENTRY_RULE = "strategy/entry"
     STRATEGY_METRIC = "strategy/metric"
+    STRATEGY_ALERT = "strategy/alert"
 
 
 class DataFrameType(str, Enum):

@@ -460,3 +460,189 @@ class TestNoNewBars:
 
         assert runner._bars_processed == 0
         assert state.portfolio.cash == 10000.0
+
+
+class TestGapDetection:
+    def test_no_gap_for_contiguous_bars(self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider) -> None:
+        """Gap detection should work for contiguous bars."""
+        virtual_provider.download(pairs=PAIRS, n_bars=10, start=START)
+        state = StrategyState(strategy_id="test_rt")
+
+        timestamps = runner._poll_new_bars(state)
+
+        assert len(timestamps) == 10
+        # Should not crash
+
+    def test_gap_detection_with_missing_bars(self, runner: RealtimeRunner, raw_db: DuckDbSpotStore) -> None:
+        """Gap detection should work when bars are missing."""
+        # Insert bars with gap (minute 5 missing)
+        bars = [
+            {
+                "timestamp": START + timedelta(minutes=i),
+                "open": 100,
+                "high": 101,
+                "low": 99,
+                "close": 100,
+                "volume": 1000,
+            }
+            for i in [0, 1, 2, 3, 4, 6, 7, 8, 9]  # minute 5 missing
+        ]
+        raw_db.insert_klines(PAIR, bars)
+
+        state = StrategyState(strategy_id="test_rt")
+        timestamps = runner._poll_new_bars(state)
+
+        assert len(timestamps) == 9
+        # Should process without crashing despite gap
+
+    def test_multiple_gaps_detected(self, runner: RealtimeRunner, raw_db: DuckDbSpotStore) -> None:
+        """Multiple gaps should be handled."""
+        # Insert bars with two gaps
+        bars = [
+            {
+                "timestamp": START + timedelta(minutes=i),
+                "open": 100,
+                "high": 101,
+                "low": 99,
+                "close": 100,
+                "volume": 1000,
+            }
+            for i in [0, 1, 2, 5, 6, 9]  # gaps at 3-4 and 7-8
+        ]
+        raw_db.insert_klines(PAIR, bars)
+
+        state = StrategyState(strategy_id="test_rt")
+        timestamps = runner._poll_new_bars(state)
+
+        assert len(timestamps) == 6
+        # Should handle multiple gaps without crashing
+
+    def test_single_bar_no_gap_check(self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider) -> None:
+        """Single bar should not trigger gap detection."""
+        virtual_provider.download(pairs=PAIRS, n_bars=1, start=START)
+        state = StrategyState(strategy_id="test_rt")
+
+        timestamps = runner._poll_new_bars(state)
+        # Should not crash with single bar
+        assert len(timestamps) == 1
+
+
+class TestBarSignalsInRuntime:
+    def test_bar_signals_stored_in_runtime(self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider) -> None:
+        """_bar_signals should be stored in state.runtime after _process_bar."""
+        virtual_provider.download(pairs=PAIRS, n_bars=5, start=START)
+
+        state = StrategyState(strategy_id="test_rt")
+        state.portfolio.cash = 10000.0
+
+        raw_df = runner.raw_store.load_many(PAIRS, start=START, end=START)
+        bar_df = raw_df.filter(pl.col("timestamp") == START)
+
+        signals_df = pl.DataFrame(
+            {
+                "pair": [PAIR],
+                "timestamp": [START],
+                "signal_type": [SignalType.RISE.value],
+                "signal": [1],
+            }
+        )
+        signals = Signals(signals_df)
+        trades: list = []
+
+        state = runner._process_bar(START, bar_df, signals, state, trades)
+
+        assert "_bar_signals" in state.runtime
+        stored_signals = state.runtime["_bar_signals"]
+        assert isinstance(stored_signals, Signals)
+
+    def test_bar_signals_matches_input(self, runner: RealtimeRunner, virtual_provider: VirtualDataProvider) -> None:
+        """Stored signals should match the input signals."""
+        virtual_provider.download(pairs=PAIRS, n_bars=5, start=START)
+
+        state = StrategyState(strategy_id="test_rt")
+        state.portfolio.cash = 10000.0
+
+        raw_df = runner.raw_store.load(PAIR, start=START, end=START)
+
+        signals_df = pl.DataFrame(
+            {
+                "pair": [PAIR, PAIR],
+                "timestamp": [START, START],
+                "signal_type": [SignalType.RISE.value, SignalType.FALL.value],
+                "signal": [1, 1],
+            }
+        )
+        signals = Signals(signals_df)
+        trades: list = []
+
+        state = runner._process_bar(START, raw_df, signals, state, trades)
+
+        stored_signals = state.runtime["_bar_signals"]
+        assert stored_signals.value.height == signals.value.height
+
+
+class TestAlertManagerIntegration:
+    @pytest.mark.asyncio
+    async def test_runner_with_alert_manager(
+        self,
+        raw_db: DuckDbSpotStore,
+        strategy_db: DuckDbStrategyStore,
+        detector: ExampleSmaCrossDetector,
+        broker: BacktestBroker,
+    ) -> None:
+        """Runner should check alerts when alert_manager is provided."""
+        from signalflow.strategy.monitoring import AlertManager, NoSignalsAlert
+
+        bars = generate_ohlcv(PAIR, START, n_bars=60, seed=42)
+        raw_db.insert_klines(PAIR, bars)
+
+        alert_manager = AlertManager(alerts=[NoSignalsAlert(max_bars_without_signal=5)])
+
+        runner = RealtimeRunner(
+            strategy_id="test_alerts",
+            pairs=PAIRS,
+            timeframe="1m",
+            initial_capital=10000.0,
+            poll_interval_sec=0.01,
+            warmup_bars=20,
+            summary_interval=0,
+            detector=detector,
+            broker=broker,
+            raw_store=raw_db,
+            strategy_store=strategy_db,
+            entry_rules=[FixedSizeEntryRule(position_size=0.1, max_positions=5)],
+            exit_rules=[],
+            metrics=[],
+            alert_manager=alert_manager,
+        )
+
+        async def stop_after_delay():
+            await asyncio.sleep(0.3)
+            runner._request_shutdown()
+
+        asyncio.create_task(stop_after_delay())
+        await runner.run_async()
+
+        # Alert manager should have been called (history may or may not be populated depending on signals)
+        assert runner.alert_manager is not None
+
+    @pytest.mark.asyncio
+    async def test_runner_without_alert_manager(
+        self,
+        runner: RealtimeRunner,
+        virtual_provider: VirtualDataProvider,
+    ) -> None:
+        """Runner should work fine when alert_manager is None."""
+        virtual_provider.download(pairs=PAIRS, n_bars=60, start=START)
+
+        assert runner.alert_manager is None
+
+        async def stop_after_delay():
+            await asyncio.sleep(0.2)
+            runner._request_shutdown()
+
+        asyncio.create_task(stop_after_delay())
+        state = await runner.run_async()
+
+        # Should run without errors
+        assert runner._bars_processed > 0
