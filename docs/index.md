@@ -91,11 +91,39 @@ Filter signals using machine learning to predict success probability:
 ### 4. Strategy Execution
 Convert validated signals into trades with risk management:
 
-- Entry/exit rules with take-profit and stop-loss
+- **Entry/exit rules**:
+  - Entry: Signal-based, model-driven, fixed-size
+  - Exit: Take-profit/stop-loss, trailing stops, volatility-based, composite
 - **Advanced position sizing**: Kelly Criterion, volatility targeting, risk parity, martingale/grid
-- **Entry filters**: Regime, volatility, drawdown, correlation, time-of-day
-- **Signal aggregation**: Combine multiple detectors with voting modes
-- Unified interface for backtesting and live trading
+- **Entry filters**: Regime, volatility, drawdown, correlation, time-of-day, price distance, signal accuracy
+- **Signal aggregation**: Combine multiple detectors with voting modes (majority, weighted, unanimous, meta-labeling)
+- **Real-time execution**: Paper trading with `RealtimeRunner` and monitoring/alerts
+- **ML/RL integration**: External model support via `StrategyModel` protocol
+- Unified interface for backtesting, paper trading, and live trading
+
+---
+
+## Real-Time Trading & Monitoring
+
+SignalFlow v0.3.7+ includes production-ready infrastructure for paper and live trading:
+
+### Paper Trading (Virtual Trading)
+- **RealtimeRunner**: Async event loop for real-time bar processing
+- **VirtualRealtimeBroker**: Simulated execution with order/fill logging
+- **Data Sync**: Automatic background data updates from exchanges
+- **State Persistence**: Crash recovery with checkpoint restoration
+
+### Monitoring & Alerts
+- **MaxDrawdownAlert**: Trigger on excessive drawdown
+- **NoSignalsAlert**: Detect signal generation failures
+- **StuckPositionAlert**: Alert on positions not exiting
+- **Custom Metrics**: Track equity, win rate, Sharpe ratio in real-time
+
+### External Model Integration
+- **StrategyModel Protocol**: Integrate ML/RL models for automated decisions
+- **ModelEntryRule / ModelExitRule**: Model-driven entry and exit logic
+- **BacktestExporter**: Export training data (Parquet) for model development
+- **Decision Caching**: Single model call per bar for consistent decisions
 
 ---
 
@@ -179,6 +207,22 @@ The [signalflow-ta](ecosystem/signalflow-ta.md) extension provides production-gr
 - Momentum, Overlap, Volatility, Volume, Trend, Statistics
 - Physics-based indicators (energy, viscosity, impedance analogs)
 - Preset pipeline factories for rapid feature engineering
+
+### :octicons-rocket-16: Paper Trading & Monitoring
+Production-ready infrastructure for risk-free validation:
+
+- **RealtimeRunner**: Async loop with automatic data sync and signal processing
+- **VirtualRealtimeBroker**: Simulated execution with comprehensive logging
+- **Alert System**: Real-time monitoring of drawdown, positions, and signal quality
+- **Crash Recovery**: State persistence and automatic restoration
+
+### :octicons-cpu-16: ML/RL Model Integration
+Protocol-based external model support:
+
+- **StrategyModel Protocol**: Clean interface for ML/RL decision models
+- **Model Rules**: `ModelEntryRule` and `ModelExitRule` for automated trading
+- **Training Export**: Parquet export of backtest data for model development
+- **Decision Caching**: Consistent model decisions across entry/exit phases
 
 ---
 
@@ -276,6 +320,18 @@ Ready to build your first trading strategy?
     ---
 
     Build your first signal detector and backtest a strategy
+
+-   :material-strategy:{ .lg .middle } **[Advanced Strategy Components](guide/advanced-strategies.md)**
+
+    ---
+
+    Position sizing, entry filters, signal aggregation, and exit rules
+
+-   :material-brain:{ .lg .middle } **[ML/RL Model Integration](guide/model-integration.md)**
+
+    ---
+
+    Integrate external ML/RL models with StrategyModel protocol
 
 -   :material-puzzle:{ .lg .middle } **[Ecosystem Extensions](ecosystem/index.md)**
 

@@ -16,11 +16,11 @@
 
 <p>
 <a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white" alt="Python 3.12+"></a>
-<a href="https://github.com/pathway2nothing/signalflow-trading/releases"><img src="https://img.shields.io/badge/version-0.3.5-orange" alt="Version 0.3.5"></a>
+<a href="https://github.com/pathway2nothing/signalflow-trading/releases"><img src="https://img.shields.io/badge/version-0.3.7-orange" alt="Version 0.3.7"></a>
 <a href="https://github.com/pathway2nothing/signalflow-trading/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
 <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-black" alt="Code style: ruff"></a>
 <a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/type%20checked-mypy-blue" alt="Type checked: mypy"></a>
-<a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/coverage-47%25-yellow" alt="Coverage: 47%"></a>
+<a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/coverage-76%25-brightgreen" alt="Coverage: 76%"></a>
 </p>
 
 <p>
@@ -52,8 +52,19 @@ The framework implements a modular three-stage processing logic:
 
 * **Production Ready**: Code written for research and backtesting is designed for direct deployment to live trading.
 
+* **Advanced Strategy Components**:
+  - **Position Sizing**: Kelly Criterion, volatility targeting, risk parity, martingale/grid strategies
+  - **Entry Filters**: Regime, volatility, drawdown, correlation, time-of-day filtering
+  - **Exit Rules**: Trailing stops, volatility-based exits, composite exit managers
+  - **Signal Aggregation**: Majority voting, weighted averaging, meta-labeling
+
+* **Paper Trading Ready**: Real-time `RealtimeRunner` with monitoring, alerts, and virtual execution for risk-free validation.
+
+* **ML/RL Integration**: Protocol-based external model integration with `ModelEntryRule` and `ModelExitRule` for automated decision-making.
+
 * **Advanced Labeling**: Native support for Triple-Barrier Method and Fixed-Horizon labeling for ML training.
 
+* **Strategy Monitoring**: Built-in alert system (drawdown, stuck positions, signal quality) for real-time oversight.
 
 * **Kedro Integration**: Fully compatible with Kedro for reproducible R&D and automated data pipelines.
 
@@ -114,7 +125,12 @@ validated_signals = validator.validate_signals(signals, features)
 * `signalflow.target`: Advanced labeling techniques (Fixed Horizon, Triple Barrier).
 * `signalflow.detector`: Signal detection algorithms.
 * `signalflow.validator`: ML-based signal validation (scikit-learn, LightGBM, XGBoost).
-* `signalflow.strategy`: Backtesting and live trading with entry/exit rules.
+* `signalflow.strategy`:
+  - **Runners**: `BacktestRunner`, `RealtimeRunner` for paper/live trading
+  - **Components**: Position sizing, entry filters, exit rules, signal aggregation
+  - **Model Integration**: Protocol-based ML/RL model integration
+  - **Monitoring**: Real-time alerts and performance tracking
+  - **Brokers**: Backtest, virtual, and live execution brokers
 
 ## Ecosystem
 
