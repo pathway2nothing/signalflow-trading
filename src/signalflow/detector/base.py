@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, SfComponentType, SignalType, RawDataType
+from signalflow.core import RawDataView, Signals, SfComponentType, SignalType, SignalCategory, RawDataType
 from signalflow.feature import FeaturePipeline
 from signalflow.utils import KwargsTolerantMixin
 
@@ -97,6 +97,9 @@ class SignalDetector(KwargsTolerantMixin, ABC):
     """
 
     component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
+
+    signal_category: SignalCategory = SignalCategory.PRICE_DIRECTION
+    """Signal category this detector produces. Default: PRICE_DIRECTION."""
 
     pair_col: str = "pair"
     ts_col: str = "timestamp"
@@ -334,10 +337,17 @@ class SignalDetector(KwargsTolerantMixin, ABC):
         if missing:
             raise ValueError(f"Signals missing required columns: {missing}")
 
-        allowed = {t.value for t in SignalType}
-        bad = s.select(pl.col("signal_type")).unique().filter(~pl.col("signal_type").is_in(list(allowed)))
-        if bad.height > 0:
-            raise ValueError(f"Signals contain unknown signal_type values: {bad.get_column('signal_type').to_list()}")
+        allowed = getattr(self, "allowed_signal_types", None)
+        if allowed is None:
+            # Default: accept values from SignalType enum (backward compat)
+            allowed = {t.value for t in SignalType}
+        if allowed:
+            non_null = s.filter(pl.col("signal_type").is_not_null())
+            bad = non_null.select(pl.col("signal_type")).unique().filter(~pl.col("signal_type").is_in(list(allowed)))
+            if bad.height > 0:
+                raise ValueError(
+                    f"Signals contain unknown signal_type values: {bad.get_column('signal_type').to_list()}"
+                )
 
         if self.require_probability and "probability" not in s.columns:
             raise ValueError("Signals must contain 'probability' column (require_probability=True)")

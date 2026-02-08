@@ -1,4 +1,4 @@
-"""Tests for TripleBarrierLabeler and StaticTripleBarrierLabeler."""
+"""Tests for TripleBarrierLabeler and TakeProfitLabeler."""
 
 from datetime import datetime, timedelta
 
@@ -7,8 +7,8 @@ import polars as pl
 import pytest
 
 from signalflow.core.enums import SignalType
-from signalflow.target.triple_barrier import TripleBarrierLabeler
-from signalflow.target.static_triple_barrier import StaticTripleBarrierLabeler
+from signalflow.target.triple_barrier_labeler import TripleBarrierLabeler
+from signalflow.target.take_profit_labeler import TakeProfitLabeler
 
 
 def _price_df(n=200, pair="BTCUSDT", trend=0.5):
@@ -45,9 +45,9 @@ class TestTripleBarrierValidation:
         with pytest.raises(ValueError, match="vol_window"):
             TripleBarrierLabeler(vol_window=1)
 
-    def test_lookforward_zero_raises(self):
-        with pytest.raises(ValueError, match="lookforward_window"):
-            TripleBarrierLabeler(lookforward_window=0)
+    def test_horizon_zero_raises(self):
+        with pytest.raises(ValueError, match="horizon"):
+            TripleBarrierLabeler(horizon=0)
 
     def test_negative_multiplier_raises(self):
         with pytest.raises(ValueError, match="profit_multiplier"):
@@ -69,7 +69,7 @@ class TestTripleBarrierValidation:
 
 class TestTripleBarrierCompute:
     def test_basic_labels_produced(self):
-        labeler = TripleBarrierLabeler(vol_window=20, lookforward_window=60, mask_to_signals=False)
+        labeler = TripleBarrierLabeler(vol_window=20, horizon=60, mask_to_signals=False)
         df = _price_df(200, trend=0.5)
         result = labeler.compute(df)
         assert "label" in result.columns
@@ -80,7 +80,7 @@ class TestTripleBarrierCompute:
     def test_rising_trend_mostly_rise(self):
         labeler = TripleBarrierLabeler(
             vol_window=20,
-            lookforward_window=60,
+            horizon=60,
             profit_multiplier=1.0,
             stop_loss_multiplier=1.0,
             mask_to_signals=False,
@@ -94,7 +94,7 @@ class TestTripleBarrierCompute:
     def test_falling_trend_mostly_fall(self):
         labeler = TripleBarrierLabeler(
             vol_window=20,
-            lookforward_window=60,
+            horizon=60,
             profit_multiplier=1.0,
             stop_loss_multiplier=1.0,
             mask_to_signals=False,
@@ -106,7 +106,7 @@ class TestTripleBarrierCompute:
         assert fall_count > rise_count
 
     def test_empty_df(self):
-        labeler = TripleBarrierLabeler(vol_window=5, lookforward_window=10, mask_to_signals=False)
+        labeler = TripleBarrierLabeler(vol_window=5, horizon=10, mask_to_signals=False)
         empty = pl.DataFrame(
             {
                 "pair": [],
@@ -133,7 +133,7 @@ class TestTripleBarrierCompute:
     def test_include_meta(self):
         labeler = TripleBarrierLabeler(
             vol_window=20,
-            lookforward_window=60,
+            horizon=60,
             include_meta=True,
             mask_to_signals=False,
         )
@@ -145,7 +145,7 @@ class TestTripleBarrierCompute:
     def test_multi_pair(self):
         labeler = TripleBarrierLabeler(
             vol_window=20,
-            lookforward_window=60,
+            horizon=60,
             mask_to_signals=False,
         )
         df = _multi_pair_df(200)
@@ -155,7 +155,7 @@ class TestTripleBarrierCompute:
     def test_length_preserved(self):
         labeler = TripleBarrierLabeler(
             vol_window=20,
-            lookforward_window=60,
+            horizon=60,
             mask_to_signals=False,
         )
         df = _price_df(200)
@@ -165,7 +165,7 @@ class TestTripleBarrierCompute:
     def test_signal_masking(self):
         labeler = TripleBarrierLabeler(
             vol_window=20,
-            lookforward_window=60,
+            horizon=60,
             mask_to_signals=True,
         )
         df = _price_df(200)
@@ -181,38 +181,37 @@ class TestTripleBarrierCompute:
         assert non_none.height <= 2
 
 
-# ── StaticTripleBarrierLabeler validation ────────────────────────────────
+# ── TakeProfitLabeler validation ────────────────────────────────
 
 
-class TestStaticTripleBarrierValidation:
-    def test_lookforward_zero_raises(self):
-        with pytest.raises(ValueError, match="lookforward_window"):
-            StaticTripleBarrierLabeler(lookforward_window=0)
+class TestTakeProfitValidation:
+    def test_horizon_zero_raises(self):
+        with pytest.raises(ValueError, match="horizon"):
+            TakeProfitLabeler(horizon=0)
 
     def test_negative_pct_raises(self):
-        with pytest.raises(ValueError, match="profit_pct"):
-            StaticTripleBarrierLabeler(profit_pct=-0.01)
+        with pytest.raises(ValueError, match="barrier_pct"):
+            TakeProfitLabeler(barrier_pct=-0.01)
 
-    def test_stop_loss_zero_raises(self):
-        with pytest.raises(ValueError, match="profit_pct"):
-            StaticTripleBarrierLabeler(stop_loss_pct=0)
+    def test_zero_pct_raises(self):
+        with pytest.raises(ValueError, match="barrier_pct"):
+            TakeProfitLabeler(barrier_pct=0)
 
     def test_missing_price_col(self):
-        labeler = StaticTripleBarrierLabeler(price_col="nonexistent", mask_to_signals=False)
+        labeler = TakeProfitLabeler(price_col="nonexistent", mask_to_signals=False)
         df = _price_df(50)
         with pytest.raises(BaseException, match="nonexistent"):
             labeler.compute(df)
 
 
-# ── StaticTripleBarrierLabeler compute ───────────────────────────────────
+# ── TakeProfitLabeler compute ───────────────────────────────────
 
 
-class TestStaticTripleBarrierCompute:
+class TestTakeProfitCompute:
     def test_basic_labels(self):
-        labeler = StaticTripleBarrierLabeler(
-            lookforward_window=30,
-            profit_pct=0.02,
-            stop_loss_pct=0.02,
+        labeler = TakeProfitLabeler(
+            horizon=30,
+            barrier_pct=0.02,
             mask_to_signals=False,
         )
         df = _price_df(100, trend=0.5)
@@ -221,10 +220,9 @@ class TestStaticTripleBarrierCompute:
         assert result.height == 100
 
     def test_rising_trend_rise_labels(self):
-        labeler = StaticTripleBarrierLabeler(
-            lookforward_window=30,
-            profit_pct=0.01,
-            stop_loss_pct=0.01,
+        labeler = TakeProfitLabeler(
+            horizon=30,
+            barrier_pct=0.01,
             mask_to_signals=False,
         )
         df = _price_df(100, trend=1.0)
@@ -234,10 +232,9 @@ class TestStaticTripleBarrierCompute:
         assert rise_count > fall_count
 
     def test_falling_trend_fall_labels(self):
-        labeler = StaticTripleBarrierLabeler(
-            lookforward_window=30,
-            profit_pct=0.01,
-            stop_loss_pct=0.01,
+        labeler = TakeProfitLabeler(
+            horizon=30,
+            barrier_pct=0.01,
             mask_to_signals=False,
         )
         df = _price_df(100, trend=-1.0)
@@ -247,10 +244,9 @@ class TestStaticTripleBarrierCompute:
         assert fall_count > rise_count
 
     def test_include_meta(self):
-        labeler = StaticTripleBarrierLabeler(
-            lookforward_window=30,
-            profit_pct=0.02,
-            stop_loss_pct=0.02,
+        labeler = TakeProfitLabeler(
+            horizon=30,
+            barrier_pct=0.02,
             include_meta=True,
             mask_to_signals=False,
         )
@@ -260,10 +256,9 @@ class TestStaticTripleBarrierCompute:
         assert "ret" in result.columns
 
     def test_multi_pair(self):
-        labeler = StaticTripleBarrierLabeler(
-            lookforward_window=30,
-            profit_pct=0.02,
-            stop_loss_pct=0.02,
+        labeler = TakeProfitLabeler(
+            horizon=30,
+            barrier_pct=0.02,
             mask_to_signals=False,
         )
         df = _multi_pair_df(100)
@@ -271,10 +266,9 @@ class TestStaticTripleBarrierCompute:
         assert result.height == 200
 
     def test_length_preserved(self):
-        labeler = StaticTripleBarrierLabeler(
-            lookforward_window=30,
-            profit_pct=0.02,
-            stop_loss_pct=0.02,
+        labeler = TakeProfitLabeler(
+            horizon=30,
+            barrier_pct=0.02,
             mask_to_signals=False,
         )
         df = _price_df(100)
@@ -282,8 +276,8 @@ class TestStaticTripleBarrierCompute:
         assert result.height == df.height
 
     def test_empty_df(self):
-        labeler = StaticTripleBarrierLabeler(
-            lookforward_window=10,
+        labeler = TakeProfitLabeler(
+            horizon=10,
             mask_to_signals=False,
         )
         empty = pl.DataFrame(
@@ -310,10 +304,9 @@ class TestStaticTripleBarrierCompute:
             labeler.compute(empty)
 
     def test_signal_masking(self):
-        labeler = StaticTripleBarrierLabeler(
-            lookforward_window=30,
-            profit_pct=0.02,
-            stop_loss_pct=0.02,
+        labeler = TakeProfitLabeler(
+            horizon=30,
+            barrier_pct=0.02,
             mask_to_signals=True,
         )
         df = _price_df(100)
@@ -329,10 +322,9 @@ class TestStaticTripleBarrierCompute:
         assert non_none.height <= 2
 
     def test_keep_input_columns(self):
-        labeler = StaticTripleBarrierLabeler(
-            lookforward_window=30,
-            profit_pct=0.02,
-            stop_loss_pct=0.02,
+        labeler = TakeProfitLabeler(
+            horizon=30,
+            barrier_pct=0.02,
             keep_input_columns=True,
             mask_to_signals=False,
         )

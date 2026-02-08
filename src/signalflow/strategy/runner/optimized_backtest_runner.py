@@ -98,6 +98,10 @@ class OptimizedBacktestRunner(StrategyRunner):
         state.metrics = all_metrics
         self._metrics_history.append(all_metrics.copy())
 
+        bar_signals_df = signal_lookup.get(ts, pl.DataFrame())
+        bar_signals = Signals(bar_signals_df)
+        state.runtime["_bar_signals"] = bar_signals
+
         exit_orders = []
         open_positions = state.portfolio.open_positions()
         for exit_rule in self.exit_rules:
@@ -108,9 +112,6 @@ class OptimizedBacktestRunner(StrategyRunner):
             exit_fills = self.broker.submit_orders(exit_orders, prices, ts)
             exit_trades = self.broker.process_fills(exit_fills, exit_orders, state)
             self._trades.extend(exit_trades)
-
-        bar_signals_df = signal_lookup.get(ts, pl.DataFrame())
-        bar_signals = Signals(bar_signals_df)
 
         entry_orders = []
         for entry_rule in self.entry_rules:

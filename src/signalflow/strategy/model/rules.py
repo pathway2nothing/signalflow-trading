@@ -172,9 +172,9 @@ class ModelEntryRule(EntryRule):
         elif signal_type == SignalType.FALL.value and self.allow_shorts:
             return "SELL"
         elif signal_type == SignalType.FALL.value:
-            return None  # Block shorts if not allowed
+            return None
 
-        return "BUY"  # Default
+        return "BUY"
 
 
 @dataclass

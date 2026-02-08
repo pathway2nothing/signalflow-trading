@@ -1,15 +1,56 @@
 from enum import Enum
 
 
-class SignalType(str, Enum):
-    """Enumeration of signal types.
+class SignalCategory(str, Enum):
+    """High-level signal category.
 
-    Represents the direction of a trading signal detected by signal detectors.
+    Each category groups related signal types. Detectors and labelers declare
+    which category they produce via ``signal_category`` class attribute.
+
+    The system uses a two-level signal model:
+        - ``signal_category``: broad category (this enum)
+        - ``signal_type``: specific value within category (free-form string)
 
     Values:
-        NONE: No signal detected or neutral state.
+        PRICE_DIRECTION: Price movement direction (rise, fall, flat).
+        PRICE_STRUCTURE: Price patterns and structure (local extrema, breakouts).
+        TREND_MOMENTUM: Trend state and momentum (trend start/reversal, overbought).
+        VOLATILITY: Volatility regime (high, low, expansion, contraction).
+        VOLUME_LIQUIDITY: Volume and liquidity patterns (spikes, accumulation).
+        MARKET_WIDE: Cross-pair market-wide events (crashes, correlation shifts).
+        ANOMALY: Anomalous events and black swans.
+
+    Example:
+        ```python
+        from signalflow.core.enums import SignalCategory
+
+        class MyDetector(SignalDetector):
+            signal_category = SignalCategory.VOLATILITY
+        ```
+    """
+
+    PRICE_DIRECTION = "price_direction"
+    PRICE_STRUCTURE = "price_structure"
+    TREND_MOMENTUM = "trend_momentum"
+    VOLATILITY = "volatility"
+    VOLUME_LIQUIDITY = "volume_liquidity"
+    MARKET_WIDE = "market_wide"
+    ANOMALY = "anomaly"
+
+
+class SignalType(str, Enum):
+    """Enumeration of price direction signal types.
+
+    Represents the direction of a trading signal detected by signal detectors.
+    This enum covers the ``PRICE_DIRECTION`` category. Other categories use
+    free-form string values for ``signal_type`` (see ``SignalCategory``).
+
+    Values:
+        NONE: No signal detected. Deprecated -- use ``null`` for unknown
+            or ``FLAT`` for sideways market.
         RISE: Bullish signal indicating potential price increase.
         FALL: Bearish signal indicating potential price decrease.
+        FLAT: Sideways market / range-bound price action.
 
     Example:
         ```python
@@ -20,8 +61,8 @@ class SignalType(str, Enum):
             print("Bullish signal detected")
         elif signal_type == SignalType.FALL:
             print("Bearish signal detected")
-        else:
-            print("No signal")
+        elif signal_type == SignalType.FLAT:
+            print("Sideways market")
 
         # Use in DataFrame
         import polars as pl
@@ -40,11 +81,14 @@ class SignalType(str, Enum):
     Note:
         Stored as string values in DataFrames for serialization.
         Use .value to get string representation.
+        For non-PRICE_DIRECTION categories, use string values directly
+        (e.g. "vol_high", "local_top") instead of this enum.
     """
 
     NONE = "none"
     RISE = "rise"
     FALL = "fall"
+    FLAT = "flat"
 
 
 class PositionType(str, Enum):
@@ -215,6 +259,8 @@ class SfComponentType(str, Enum):
     STRATEGY_ENTRY_RULE = "strategy/entry"
     STRATEGY_METRIC = "strategy/metric"
     STRATEGY_ALERT = "strategy/alert"
+
+    EVENT_DETECTOR = "target/event_detector"
 
 
 class DataFrameType(str, Enum):

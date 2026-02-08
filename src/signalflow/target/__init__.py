@@ -1,14 +1,37 @@
 from signalflow.target.base import Labeler
 from signalflow.target.fixed_horizon_labeler import FixedHorizonLabeler
-from signalflow.target.static_triple_barrier import StaticTripleBarrierLabeler
-from signalflow.target.triple_barrier import TripleBarrierLabeler
+from signalflow.target.take_profit_labeler import TakeProfitLabeler
+from signalflow.target.triple_barrier_labeler import TripleBarrierLabeler
+from signalflow.target.multi_target_generator import (
+    MultiTargetGenerator,
+    HorizonConfig,
+    TargetType,
+    DEFAULT_HORIZONS,
+    DEFAULT_TARGET_TYPES,
+)
+from signalflow.target.anomaly_labeler import AnomalyLabeler
+from signalflow.target.volatility_labeler import VolatilityRegimeLabeler
+from signalflow.target.trend_scanning import TrendScanningLabeler
+from signalflow.target.structure_labeler import StructureLabeler, ZigzagStructureLabeler
+from signalflow.target.volume_labeler import VolumeRegimeLabeler
 
 import signalflow.target.adapter as adapter
 
 __all__ = [
     "Labeler",
     "FixedHorizonLabeler",
-    "StaticTripleBarrierLabeler",
+    "TakeProfitLabeler",
     "TripleBarrierLabeler",
+    "MultiTargetGenerator",
+    "HorizonConfig",
+    "TargetType",
+    "DEFAULT_HORIZONS",
+    "DEFAULT_TARGET_TYPES",
+    "AnomalyLabeler",
+    "VolatilityRegimeLabeler",
+    "TrendScanningLabeler",
+    "StructureLabeler",
+    "ZigzagStructureLabeler",
+    "VolumeRegimeLabeler",
     "adapter",
 ]

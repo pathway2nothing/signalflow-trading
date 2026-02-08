@@ -465,7 +465,9 @@ class SklearnSignalValidator(SignalValidator):
     def _get_class_labels(self) -> list[str]:
         """Get class labels for probability columns.
 
-        Maps numeric classes to SignalType names.
+        Dynamically reads class labels from the fitted model. Falls back to
+        a legacy mapping for backward compatibility with models trained on
+        numeric labels (0/1/2).
         """
         if self.model is None:
             raise ValueError("Model not fitted.")
@@ -474,16 +476,10 @@ class SklearnSignalValidator(SignalValidator):
         if classes is None:
             return ["none", "rise", "fall"]
 
-        label_map = {
-            0: "none",
-            1: "rise",
-            2: "fall",
-            "none": "none",
-            "rise": "rise",
-            "fall": "fall",
-        }
+        # Legacy numeric class mapping (backward compat for old models)
+        _legacy_map = {0: "none", 1: "rise", 2: "fall"}
 
-        return [label_map.get(c, str(c)) for c in classes]
+        return [_legacy_map.get(c, str(c)) for c in classes]
 
     def save(self, path: str | Path) -> None:
         """Save validator to file."""

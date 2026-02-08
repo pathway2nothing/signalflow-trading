@@ -9,7 +9,15 @@ from signalflow.core.containers import (
     Order,
     OrderFill,
 )
-from signalflow.core.enums import SignalType, PositionType, SfComponentType, DataFrameType, RawDataType, ExitPriority
+from signalflow.core.enums import (
+    SignalType,
+    SignalCategory,
+    PositionType,
+    SfComponentType,
+    DataFrameType,
+    RawDataType,
+    ExitPriority,
+)
 from signalflow.core.decorators import sf_component
 from signalflow.core.registry import default_registry, SignalFlowRegistry, get_component
 from signalflow.core.signal_transforms import SignalsTransform
@@ -27,6 +35,7 @@ __all__ = [
     "Portfolio",
     "StrategyState",
     "SignalType",
+    "SignalCategory",
     "PositionType",
     "SfComponentType",
     "DataFrameType",

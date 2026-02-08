@@ -110,6 +110,7 @@ nav:
     - Installation: getting-started/installation.md
     - Quick Start: quickstart.md
   - User Guide:
+    - Signal Architecture & Meta-Labeling: guide/signal-architecture.md
     - Custom Data Types: guide/custom-data-types.md
     - Advanced Strategies: guide/advanced-strategies.md
     - Model Integration: guide/model-integration.md

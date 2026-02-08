@@ -203,7 +203,6 @@ class SignalEntryRule(EntryRule):
         actionable_types = [SignalType.RISE.value]
         if self.allow_shorts:
             actionable_types.append(SignalType.FALL.value)
-
         df = df.filter(pl.col("signal_type").is_in(actionable_types))
 
         if "probability" in df.columns:

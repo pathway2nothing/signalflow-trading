@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import RawDataType, SfComponentType, SignalType, Signals
+from signalflow.core import RawDataType, SfComponentType, SignalType, SignalCategory, Signals
 
 
 @dataclass
@@ -92,6 +90,9 @@ class Labeler(ABC):
 
     component_type: ClassVar[SfComponentType] = SfComponentType.LABELER
     raw_data_type: RawDataType | str = RawDataType.SPOT
+
+    signal_category: SignalCategory = SignalCategory.PRICE_DIRECTION
+    """Signal category this labeler produces. Default: PRICE_DIRECTION."""
 
     pair_col: str = "pair"
     ts_col: str = "timestamp"
@@ -358,7 +359,7 @@ class Labeler(ABC):
         signal_ts = signal_keys.filter(pl.col(self.pair_col) == pair_value).select(self.ts_col).unique()
 
         if signal_ts.height == 0:
-            df = df.with_columns(pl.lit(SignalType.NONE.value).alias(self.out_col))
+            df = df.with_columns(pl.lit(None, dtype=pl.Utf8).alias(self.out_col))
             if self.include_meta:
                 df = df.with_columns([pl.lit(None).alias(col) for col in self.meta_columns])
         else:
@@ -366,7 +367,7 @@ class Labeler(ABC):
             mask_exprs = [
                 pl.when(is_signal)
                 .then(pl.col(self.out_col))
-                .otherwise(pl.lit(SignalType.NONE.value))
+                .otherwise(pl.lit(None, dtype=pl.Utf8))
                 .alias(self.out_col),
             ]
             if self.include_meta:

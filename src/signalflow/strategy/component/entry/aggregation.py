@@ -93,7 +93,9 @@ class SignalAggregator:
         # Collect all non-NONE signals
         dfs = []
         for i, sig in enumerate(signals_list):
-            df = sig.value.filter(pl.col("signal_type") != SignalType.NONE.value)
+            df = sig.value.filter(
+                pl.col("signal_type").is_not_null() & (pl.col("signal_type") != SignalType.NONE.value)
+            )
             if df.height > 0:
                 df = df.with_columns(pl.lit(i).alias("_detector_idx"))
                 dfs.append(df)
@@ -137,7 +139,9 @@ class SignalAggregator:
 
         dfs = []
         for i, sig in enumerate(signals_list):
-            df = sig.value.filter(pl.col("signal_type") != SignalType.NONE.value)
+            df = sig.value.filter(
+                pl.col("signal_type").is_not_null() & (pl.col("signal_type") != SignalType.NONE.value)
+            )
             if df.height > 0:
                 df = df.with_columns(pl.lit(weights[i]).alias("_weight"))
                 dfs.append(df)
@@ -168,7 +172,10 @@ class SignalAggregator:
     def _aggregate_unanimous(self, signals_list: list[Signals]) -> Signals:
         """All detectors must agree on signal type."""
         # Get non-NONE signals from each detector
-        filtered = [sig.value.filter(pl.col("signal_type") != SignalType.NONE.value) for sig in signals_list]
+        filtered = [
+            sig.value.filter(pl.col("signal_type").is_not_null() & (pl.col("signal_type") != SignalType.NONE.value))
+            for sig in signals_list
+        ]
 
         # Check if any detector has no signals
         if any(df.height == 0 for df in filtered):
@@ -214,7 +221,10 @@ class SignalAggregator:
 
     def _aggregate_any(self, signals_list: list[Signals]) -> Signals:
         """Any non-NONE signal passes (union with highest probability)."""
-        dfs = [sig.value.filter(pl.col("signal_type") != SignalType.NONE.value) for sig in signals_list]
+        dfs = [
+            sig.value.filter(pl.col("signal_type").is_not_null() & (pl.col("signal_type") != SignalType.NONE.value))
+            for sig in signals_list
+        ]
 
         dfs = [df for df in dfs if df.height > 0]
         if not dfs:
@@ -241,7 +251,9 @@ class SignalAggregator:
         if len(signals_list) < 2:
             return signals_list[0] if signals_list else Signals(pl.DataFrame())
 
-        detector = signals_list[0].value.filter(pl.col("signal_type") != SignalType.NONE.value)
+        detector = signals_list[0].value.filter(
+            pl.col("signal_type").is_not_null() & (pl.col("signal_type") != SignalType.NONE.value)
+        )
         validator = signals_list[1].value
 
         if detector.height == 0:
