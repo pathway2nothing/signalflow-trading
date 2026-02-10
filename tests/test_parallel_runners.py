@@ -279,8 +279,8 @@ class TestBarSignalsInRuntime:
     """Test that _bar_signals is stored in state.runtime for ModelExitRule compatibility."""
 
     def test_optimized_runner_stores_bar_signals(self):
-        """OptimizedBacktestRunner should store _bar_signals in state.runtime."""
-        from signalflow.strategy.runner import OptimizedBacktestRunner
+        """BacktestRunner should store _bar_signals in state.runtime."""
+        from signalflow.strategy.runner import BacktestRunner
         from signalflow.strategy.broker import BacktestBroker
         from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
         from signalflow.data.strategy_store.memory import InMemoryStrategyStore
@@ -300,7 +300,7 @@ class TestBarSignalsInRuntime:
             store=InMemoryStrategyStore(),
         )
 
-        runner = OptimizedBacktestRunner(
+        runner = BacktestRunner(
             broker=broker,
             exit_rules=[TestExitRule()],
             show_progress=False,

@@ -1,4 +1,4 @@
-"""Tests for OptimizedBacktestRunner."""
+"""Tests for BacktestRunner."""
 
 from datetime import datetime, timedelta
 
@@ -7,7 +7,7 @@ import polars as pl
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
 from signalflow.core.enums import SignalType
-from signalflow.strategy.runner import OptimizedBacktestRunner
+from signalflow.strategy.runner import BacktestRunner
 
 
 TS = datetime(2024, 1, 1)
@@ -60,26 +60,26 @@ def _make_empty_signals():
     return Signals(pl.DataFrame())
 
 
-# ── OptimizedBacktestRunner ─────────────────────────────────────────────────
+# ── BacktestRunner ─────────────────────────────────────────────────
 
 
-class TestOptimizedBacktestRunner:
+class TestBacktestRunner:
     def test_build_price_lookup(self):
-        runner = OptimizedBacktestRunner()
+        runner = BacktestRunner()
         df = _make_ohlcv(5, pairs=["BTCUSDT"])
         lookup = runner._build_price_lookup(df)
         assert len(lookup) == 5
         assert lookup[TS]["BTCUSDT"] == 102.0
 
     def test_build_signal_lookup(self):
-        runner = OptimizedBacktestRunner()
+        runner = BacktestRunner()
         sigs = _make_signals(3).value
         lookup = runner._build_signal_lookup(sigs)
         assert len(lookup) == 3
         assert lookup[TS].height == 1
 
     def test_build_signal_lookup_empty(self):
-        runner = OptimizedBacktestRunner()
+        runner = BacktestRunner()
         lookup = runner._build_signal_lookup(pl.DataFrame())
         assert lookup == {}
 
@@ -94,7 +94,7 @@ class TestOptimizedBacktestRunner:
             executor=VirtualSpotExecutor(fee_rate=0.001, slippage_pct=0.0),
             store=store,
         )
-        runner = OptimizedBacktestRunner(broker=broker, show_progress=False)
+        runner = BacktestRunner(broker=broker, show_progress=False)
         raw = RawData(
             datetime_start=TS,
             datetime_end=TS,
@@ -129,7 +129,7 @@ class TestOptimizedBacktestRunner:
             executor=VirtualSpotExecutor(fee_rate=0.001, slippage_pct=0.0),
             store=store,
         )
-        runner = OptimizedBacktestRunner(broker=broker, show_progress=False)
+        runner = BacktestRunner(broker=broker, show_progress=False)
         raw = _make_raw_data(n=3, pairs=["BTCUSDT"])
         runner.run(raw, _make_empty_signals())
         results = runner.get_results()

@@ -10,8 +10,8 @@ import polars as pl
 
 
 @dataclass
-@sf_component(name="backtest/optimized", override=True)
-class OptimizedBacktestRunner(StrategyRunner):
+@sf_component(name="backtest", override=True)
+class BacktestRunner(StrategyRunner):
     component_type = SfComponentType.STRATEGY_RUNNER
     strategy_id: str = "backtest"
     broker: Any = None
