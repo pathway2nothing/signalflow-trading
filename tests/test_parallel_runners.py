@@ -8,8 +8,6 @@ import pytest
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
 from signalflow.strategy.runner import (
-    create_backtest_runner,
-    BacktestMode,
     IsolatedBalanceRunner,
     UnlimitedBalanceRunner,
     IsolatedResults,
@@ -64,45 +62,6 @@ def make_test_data(pairs: list[str], n_bars: int = 10) -> tuple[RawData, Signals
     )
 
     return raw_data, Signals(signals_df)
-
-
-class TestBacktestMode:
-    def test_enum_values(self):
-        assert BacktestMode.SEQUENTIAL.value == "sequential"
-        assert BacktestMode.OPTIMIZED.value == "optimized"
-        assert BacktestMode.ISOLATED.value == "isolated"
-        assert BacktestMode.UNLIMITED.value == "unlimited"
-
-
-class TestCreateBacktestRunner:
-    def test_sequential_mode(self):
-        from signalflow.strategy.runner import BacktestRunner
-        from signalflow.strategy.broker import BacktestBroker
-        from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
-        from signalflow.data.strategy_store.memory import InMemoryStrategyStore
-
-        broker = BacktestBroker(
-            executor=VirtualSpotExecutor(),
-            store=InMemoryStrategyStore(),
-        )
-        runner = create_backtest_runner(mode="sequential", broker=broker)
-        assert isinstance(runner, BacktestRunner)
-
-    def test_isolated_mode(self):
-        runner = create_backtest_runner(mode="isolated", initial_capital=10000)
-        assert isinstance(runner, IsolatedBalanceRunner)
-
-    def test_unlimited_mode(self):
-        runner = create_backtest_runner(mode="unlimited")
-        assert isinstance(runner, UnlimitedBalanceRunner)
-
-    def test_mode_enum(self):
-        runner = create_backtest_runner(mode=BacktestMode.ISOLATED)
-        assert isinstance(runner, IsolatedBalanceRunner)
-
-    def test_invalid_mode(self):
-        with pytest.raises(ValueError):
-            create_backtest_runner(mode="invalid")
 
 
 class TestIsolatedBalanceRunner:
@@ -255,7 +214,7 @@ class TestUnlimitedBalanceRunner:
 
 class TestIsolatedResults:
     def test_pair_metrics_df(self):
-        from signalflow.strategy.runner.parallel.results import PairResult, IsolatedResults
+        from signalflow.strategy.runner import PairResult, IsolatedResults
 
         pair_results = {
             "BTCUSDT": PairResult(
@@ -314,3 +273,69 @@ class TestUnlimitedResults:
         )
 
         assert result.loss_rate == 0.4
+
+
+class TestBarSignalsInRuntime:
+    """Test that _bar_signals is stored in state.runtime for ModelExitRule compatibility."""
+
+    def test_optimized_runner_stores_bar_signals(self):
+        """BacktestRunner should store _bar_signals in state.runtime."""
+        from signalflow.strategy.runner import BacktestRunner
+        from signalflow.strategy.broker import BacktestBroker
+        from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
+        from signalflow.data.strategy_store.memory import InMemoryStrategyStore
+        from signalflow.strategy.component.base import ExitRule
+
+        # Create a custom exit rule that checks for _bar_signals
+        bar_signals_captured = []
+
+        class TestExitRule(ExitRule):
+            def check_exits(self, positions, prices, state):
+                # Capture _bar_signals from state.runtime
+                bar_signals_captured.append(state.runtime.get("_bar_signals"))
+                return []
+
+        broker = BacktestBroker(
+            executor=VirtualSpotExecutor(),
+            store=InMemoryStrategyStore(),
+        )
+
+        runner = BacktestRunner(
+            broker=broker,
+            exit_rules=[TestExitRule()],
+            show_progress=False,
+        )
+
+        raw_data, signals = make_test_data(["BTCUSDT"], n_bars=5)
+        runner.run(raw_data, signals)
+
+        # Should have captured _bar_signals for each bar
+        assert len(bar_signals_captured) == 5
+        # All should be Signals instances
+        assert all(isinstance(bs, Signals) for bs in bar_signals_captured)
+
+    def test_isolated_runner_stores_bar_signals(self):
+        """IsolatedBalanceRunner should store _bar_signals in state.runtime."""
+        from signalflow.strategy.component.base import ExitRule
+
+        # Create a mock exit rule that tracks calls
+        call_states = []
+
+        class TestExitRule(ExitRule):
+            def check_exits(self, positions, prices, state):
+                call_states.append(state.runtime.get("_bar_signals"))
+                return []
+
+        runner = IsolatedBalanceRunner(
+            initial_capital=10000,
+            exit_rules=[TestExitRule()],
+            max_workers=1,
+            show_progress=False,
+        )
+
+        raw_data, signals = make_test_data(["BTCUSDT"], n_bars=5)
+        result = runner.run(raw_data, signals)
+
+        # Should have called exit rule with _bar_signals in runtime
+        assert len(call_states) == 5
+        assert all(isinstance(bs, Signals) for bs in call_states)

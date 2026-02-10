@@ -450,7 +450,7 @@ from signalflow.data import RawDataFactory
 from signalflow.detector import ExampleSmaCrossDetector
 from signalflow.strategy.broker import BacktestBroker
 from signalflow.strategy.broker.executor import VirtualSpotExecutor
-from signalflow.strategy.runner import OptimizedBacktestRunner
+from signalflow.strategy.runner import BacktestRunner
 from signalflow.strategy.component.entry import (
     SignalEntryRule,
     SignalAggregator,
@@ -510,7 +510,7 @@ entry_rule = SignalEntryRule(
 )
 
 # 6. Run backtest
-runner = OptimizedBacktestRunner(
+runner = BacktestRunner(
     strategy_id="advanced_strategy",
     broker=BacktestBroker(executor=VirtualSpotExecutor(fee_rate=0.001)),
     entry_rules=[entry_rule],
@@ -780,6 +780,5 @@ features = bars_df.select([
 ## See Also
 
 - **[Model Integration Guide](../guide/model-integration.md)**: Detailed ML/RL integration tutorial
-- **[Tutorial Notebook](../notebooks/strategy_tutorial.ipynb)**: Interactive examples
 - **[Quick Start](../quickstart.md)**: Basic strategy setup
 - **[Core API](core.md)**: `StrategyState`, `Portfolio`, `Position`

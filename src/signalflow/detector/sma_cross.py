@@ -6,7 +6,7 @@ import polars as pl
 
 from signalflow.core import Signals, SignalType, sf_component
 from signalflow.detector import SignalDetector
-from signalflow.feature import FeaturePipeline, ExampleSmaFeature
+from signalflow.feature import ExampleSmaFeature
 
 
 @dataclass
@@ -30,12 +30,10 @@ class ExampleSmaCrossDetector(SignalDetector):
         self.fast_col = f"sma_{self.fast_period}"
         self.slow_col = f"sma_{self.slow_period}"
 
-        self.feature_pipeline = FeaturePipeline(
-            features=[
-                ExampleSmaFeature(period=self.fast_period, price_col=self.price_col),
-                ExampleSmaFeature(period=self.slow_period, price_col=self.price_col),
-            ]
-        )
+        self.features = [
+            ExampleSmaFeature(period=self.fast_period, price_col=self.price_col),
+            ExampleSmaFeature(period=self.slow_period, price_col=self.price_col),
+        ]
 
     def detect(self, features: pl.DataFrame, context: dict[str, Any] | None = None) -> Signals:
         df = features.sort([self.pair_col, self.ts_col])

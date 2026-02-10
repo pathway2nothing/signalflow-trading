@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import polars as pl
-from signalflow.core.signal_transforms import SignalsTransform
+from signalflow.core.signal_transform import SignalsTransform
 from signalflow.core.enums import SignalType
 
 
@@ -113,12 +113,14 @@ class Signals:
         """Merge two Signals objects.
 
         Merge rules:
-            1. Key: (pair, timestamp)
+            1. Key: (pair, timestamp) or (pair, timestamp, signal_category)
+               if signal_category column is present.
             2. Signal type priority:
-               - SignalType.NONE has lowest priority
-               - Non-NONE always overrides NONE
-               - If both non-NONE, `other` wins
-            3. SignalType.NONE normalized to probability = 0
+               - null signal_type has lowest priority
+               - SignalType.NONE ("none") has lowest priority (backward compat)
+               - Non-null/non-NONE always overrides
+               - If both non-null, ``other`` wins
+            3. Low-priority signals normalized to probability = 0
             4. Merge is deterministic
 
         Args:
@@ -141,7 +143,7 @@ class Signals:
             # Merge with priority to signals2
             merged = signals1 + signals2
 
-            # NONE signals overridden by non-NONE
+            # NONE/null signals overridden by non-NONE
             # Non-NONE conflicts resolved by taking signals2
             ```
         """
@@ -161,31 +163,35 @@ class Signals:
 
         merged = pl.concat([a, b], how="vertical")
 
+        # Determine merge key: include signal_category if present
+        has_category = "signal_category" in all_cols
+        key_cols = ["pair", "timestamp"]
+        if has_category:
+            key_cols = ["pair", "timestamp", "signal_category"]
+
+        # Priority: null and "none" signal_type are lowest priority
         merged = merged.with_columns(
-            pl.when(pl.col("signal_type") == SignalType.NONE.value)
+            pl.when(pl.col("signal_type").is_null() | (pl.col("signal_type") == SignalType.NONE.value))
             .then(pl.lit(0))
             .otherwise(pl.col("probability"))
             .alias("probability")
         )
 
         merged = merged.with_columns(
-            pl.when(pl.col("signal_type") == SignalType.NONE.value)
+            pl.when(pl.col("signal_type").is_null() | (pl.col("signal_type") == SignalType.NONE.value))
             .then(pl.lit(0))
             .otherwise(pl.lit(1))
             .alias("_priority")
         )
 
+        sort_cols = key_cols + ["_priority", "_src"]
+        sort_desc = [False] * len(key_cols) + [True, True]
+
         merged = (
-            merged.sort(
-                ["pair", "timestamp", "_priority", "_src"],
-                descending=[False, False, True, True],
-            )
-            .unique(
-                subset=["pair", "timestamp"],
-                keep="first",
-            )
+            merged.sort(sort_cols, descending=sort_desc)
+            .unique(subset=key_cols, keep="first")
             .drop(["_priority", "_src"])
-            .sort(["pair", "timestamp"])
+            .sort(key_cols[:2])  # always sort output by pair, timestamp
         )
 
         return Signals(merged)

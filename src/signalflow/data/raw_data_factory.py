@@ -1,10 +1,39 @@
+"""Factory for creating RawData containers from storage backends.
+
+Provides methods to load, validate, and package market data from
+various storage backends into RawData containers for analysis.
+
+Example:
+    ```python
+    from signalflow.data import RawDataFactory, StoreFactory
+    from datetime import datetime
+
+    # From multiple stores
+    spot = StoreFactory.create_raw_store("duckdb", "spot", db_path="spot.duckdb")
+    futures = StoreFactory.create_raw_store("duckdb", "futures", db_path="fut.duckdb")
+
+    raw_data = RawDataFactory.from_stores(
+        stores=[spot, futures],
+        pairs=["BTCUSDT"],
+        start=datetime(2024, 1, 1),
+        end=datetime(2024, 12, 31),
+    )
+
+    # Access by type
+    spot_df = raw_data["spot"]
+    futures_df = raw_data["futures"]
+    ```
+"""
+
 from datetime import datetime
 from pathlib import Path
+from typing import Sequence
 
 import polars as pl
 
 from signalflow.core import RawData
 from signalflow.data.raw_store import DuckDbSpotStore
+from signalflow.data.raw_store.base import RawDataStore
 
 
 class RawDataFactory:
@@ -53,6 +82,83 @@ class RawDataFactory:
         RawData: Immutable container for raw market data.
         DuckDbSpotStore: DuckDB storage backend for spot data.
     """
+
+    @staticmethod
+    def from_stores(
+        stores: Sequence[RawDataStore],
+        pairs: list[str],
+        start: datetime,
+        end: datetime,
+    ) -> RawData:
+        """Create RawData from multiple stores.
+
+        Loads data from each store and merges into a single RawData container.
+        Each store's data_type becomes the key in RawData.data dict.
+
+        Args:
+            stores: Sequence of RawDataStore instances.
+            pairs: List of trading pairs to load.
+            start: Start datetime (inclusive).
+            end: End datetime (inclusive).
+
+        Returns:
+            RawData: Container with merged data from all stores.
+
+        Raises:
+            ValueError: If stores have duplicate data_type keys.
+
+        Example:
+            ```python
+            from signalflow.data import RawDataFactory, StoreFactory
+
+            # Create stores
+            spot_store = StoreFactory.create_raw_store(
+                backend="duckdb",
+                data_type="spot",
+                db_path="data/spot.duckdb",
+            )
+            futures_store = StoreFactory.create_raw_store(
+                backend="duckdb",
+                data_type="futures",
+                db_path="data/futures.duckdb",
+            )
+
+            # Load from multiple stores
+            raw_data = RawDataFactory.from_stores(
+                stores=[spot_store, futures_store],
+                pairs=["BTCUSDT", "ETHUSDT"],
+                start=datetime(2024, 1, 1),
+                end=datetime(2024, 12, 31),
+            )
+
+            # Access data by type
+            spot_df = raw_data["spot"]
+            futures_df = raw_data["futures"]
+            ```
+        """
+        if not stores:
+            return RawData(
+                datetime_start=start,
+                datetime_end=end,
+                pairs=pairs,
+                data={},
+            )
+
+        merged_data: dict[str, pl.DataFrame] = {}
+
+        for store in stores:
+            raw = store.to_raw_data(pairs=pairs, start=start, end=end)
+            for key, df in raw.data.items():
+                if key in merged_data:
+                    raise ValueError(f"Duplicate data key '{key}' from multiple stores")
+                merged_data[key] = df
+
+        return RawData(
+            datetime_start=start,
+            datetime_end=end,
+            pairs=pairs,
+            data=merged_data,
+        )
 
     @staticmethod
     def from_duckdb_spot_store(

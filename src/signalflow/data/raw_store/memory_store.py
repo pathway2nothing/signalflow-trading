@@ -9,6 +9,7 @@ import polars as pl
 
 from signalflow.core import sf_component, SfComponentType
 from signalflow.core.registry import default_registry
+from signalflow.core.containers.raw_data import RawData
 from signalflow.data.raw_store.base import RawDataStore
 from signalflow.data.raw_store._schema import polars_schema, resolve_columns
 
@@ -165,6 +166,61 @@ class InMemoryRawStore(RawDataStore):
 
     def close(self) -> None:
         self._df = pl.DataFrame(schema=polars_schema(self._columns))
+
+    def to_raw_data(
+        self,
+        pairs: list[str],
+        start: datetime,
+        end: datetime,
+        data_key: Optional[str] = None,
+    ) -> RawData:
+        """Convert store data to RawData container.
+
+        Args:
+            pairs: List of trading pairs to load.
+            start: Start datetime (inclusive).
+            end: End datetime (inclusive).
+            data_key: Key for data in RawData.data dict.
+                If None, uses store's data_type.
+
+        Returns:
+            RawData container with loaded and validated data.
+
+        Raises:
+            ValueError: If required columns missing or duplicates detected.
+        """
+        key = data_key if data_key is not None else self.data_type
+
+        df = self.load_many(pairs=pairs, start=start, end=end)
+
+        # Validate required columns
+        required = {"pair", "timestamp"}
+        missing = required - set(df.columns)
+        if missing:
+            raise ValueError(f"DataFrame missing columns: {sorted(missing)}")
+
+        # Normalize timestamps
+        df = df.with_columns(pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None))
+
+        # Check for duplicates
+        dup_count = df.group_by(["pair", "timestamp"]).len().filter(pl.col("len") > 1)
+        if dup_count.height > 0:
+            dups = (
+                df.join(dup_count.select(["pair", "timestamp"]), on=["pair", "timestamp"])
+                .select(["pair", "timestamp"])
+                .head(10)
+            )
+            raise ValueError(f"Duplicate (pair, timestamp) detected. Examples:\n{dups}")
+
+        # Sort by (pair, timestamp)
+        df = df.sort(["pair", "timestamp"])
+
+        return RawData(
+            datetime_start=start,
+            datetime_end=end,
+            pairs=pairs,
+            data={key: df},
+        )
 
 
 # Register for futures and perpetual.
