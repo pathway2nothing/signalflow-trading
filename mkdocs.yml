@@ -88,6 +88,10 @@ plugins:
       lang: en
   - macros:
       module_name: docs/hooks
+      include_yaml: []
+      on_error_fail: false
+      ignore_macros:
+        - "*.ipynb"
   - mkdocs-jupyter:
       include_source: true
       execute: false
@@ -117,15 +121,15 @@ nav:
     - Quick Start: quickstart.md
   - Tutorials:
     - notebooks/index.md
-    - Full Tutorial: notebooks/tutorial.ipynb
-    - Strategy Tutorial: notebooks/strategy_tutorial.ipynb
-    - Labeling Tutorial: notebooks/labeling_tutorial.ipynb
+    # Add notebooks here, e.g.:
+    # - My Tutorial: notebooks/my_tutorial.ipynb
   - User Guide:
     - Signal Architecture & Meta-Labeling: guide/signal-architecture.md
     - Data Sources: guide/data-sources.md
     - Data Stores: guide/data-stores.md
     - Custom Data Types: guide/custom-data-types.md
-    - Custom Detectors: guides/custom_detectors.md
+    - Custom Detectors: guide/custom-detectors.md
+    - Signal Validators: guide/validators.md
     - Advanced Strategies: guide/advanced-strategies.md
     - Model Integration: guide/model-integration.md
   - Ecosystem:

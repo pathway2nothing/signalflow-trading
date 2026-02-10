@@ -296,9 +296,9 @@ The secondary model (meta-labeler) predicts the **probability of success** for
 each signal from the primary model. It acts as a filter.
 
 ```python
-from signalflow.validator import SklearnSignalValidator
+from signalflow.validator import LightGBMValidator
 
-validator = SklearnSignalValidator(model_type="lightgbm")
+validator = LightGBMValidator(n_estimators=100)
 validator.fit(X_train=features, y_train=labels)
 
 validated = validator.validate_signals(signals, features)

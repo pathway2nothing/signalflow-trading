@@ -264,18 +264,14 @@ class TestTrendScanningLabeler:
     def test_small_window_edge_case(self):
         """Test with minimum valid window size."""
         df = _trend_df(50)
-        labeler = TrendScanningLabeler(
-            min_lookforward=3, max_lookforward=5, step=1, mask_to_signals=False
-        )
+        labeler = TrendScanningLabeler(min_lookforward=3, max_lookforward=5, step=1, mask_to_signals=False)
         result = labeler.compute(df)
         assert result.height == df.height
 
     def test_single_window_size(self):
         """Test when min_lookforward equals max_lookforward."""
         df = _trend_df(100)
-        labeler = TrendScanningLabeler(
-            min_lookforward=10, max_lookforward=10, step=1, mask_to_signals=False
-        )
+        labeler = TrendScanningLabeler(min_lookforward=10, max_lookforward=10, step=1, mask_to_signals=False)
         result = labeler.compute(df)
         assert result.height == df.height
 

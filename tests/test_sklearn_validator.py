@@ -1,17 +1,20 @@
-"""Tests for SklearnSignalValidator."""
+"""Tests for sklearn-based signal validators."""
 
-import tempfile
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import numpy as np
 import polars as pl
 import pytest
 
 from signalflow.core import Signals
-from signalflow.validator.sklearn_validator import (
+from signalflow.validator import (
+    RandomForestValidator,
+    LogisticRegressionValidator,
+    SVMValidator,
+    LightGBMValidator,
+    XGBoostValidator,
+    AutoSelectValidator,
     SklearnSignalValidator,
-    SKLEARN_MODELS,
 )
 
 
@@ -58,103 +61,28 @@ def _make_signals(n=50, n_features=5):
     return signals, X
 
 
-# ── Model config ─────────────────────────────────────────────────────────
+# ── RandomForestValidator ─────────────────────────────────────────────────
 
 
-class TestModelConfig:
-    def test_known_models(self):
-        assert "random_forest" in SKLEARN_MODELS
-        assert "logistic_regression" in SKLEARN_MODELS
-        assert "svm" in SKLEARN_MODELS
-
-    def test_unknown_model_raises(self):
-        v = SklearnSignalValidator(model_type="nonexistent")
-        with pytest.raises(ValueError, match="Unknown model_type"):
-            v._get_model_config("nonexistent")
-
-    def test_create_random_forest(self):
-        v = SklearnSignalValidator(model_type="random_forest")
-        model = v._create_model("random_forest")
-        assert hasattr(model, "fit")
-
-    def test_create_logistic_regression(self):
-        v = SklearnSignalValidator(model_type="logistic_regression")
-        model = v._create_model("logistic_regression")
+class TestRandomForestValidator:
+    def test_create_model(self):
+        v = RandomForestValidator()
+        model = v._create_model()
         assert hasattr(model, "fit")
 
     def test_create_with_custom_params(self):
-        v = SklearnSignalValidator(model_type="random_forest")
-        model = v._create_model("random_forest", {"n_estimators": 10})
+        v = RandomForestValidator(n_estimators=10)
+        model = v._create_model()
         assert model.n_estimators == 10
 
-
-# ── Feature extraction ───────────────────────────────────────────────────
-
-
-class TestFeatureExtraction:
-    def test_extract_features_fit_mode(self):
-        v = SklearnSignalValidator(model_type="random_forest")
-        X, _ = _make_data(n=20, n_features=3)
-        arr = v._extract_features(X, fit_mode=True)
-        assert arr.shape == (20, 3)
-        assert v.feature_columns == ["feat_0", "feat_1", "feat_2"]
-
-    def test_extract_features_no_fit_raises(self):
-        v = SklearnSignalValidator(model_type="random_forest")
-        X, _ = _make_data(n=20)
-        with pytest.raises(ValueError, match="feature_columns not set"):
-            v._extract_features(X)
-
-    def test_extract_features_missing_col_raises(self):
-        v = SklearnSignalValidator(model_type="random_forest")
-        v.feature_columns = ["nonexistent"]
-        X, _ = _make_data(n=20)
-        with pytest.raises(ValueError, match="Missing feature columns"):
-            v._extract_features(X)
-
-    def test_extract_labels_dataframe(self):
-        v = SklearnSignalValidator()
-        _, y = _make_data(n=20)
-        arr = v._extract_labels(y)
-        assert arr.shape == (20,)
-
-    def test_extract_labels_series(self):
-        v = SklearnSignalValidator()
-        _, y = _make_data(n=20)
-        arr = v._extract_labels(y["label"])
-        assert arr.shape == (20,)
-
-    def test_extract_labels_multi_col_with_label(self):
-        v = SklearnSignalValidator()
-        df = pl.DataFrame({"label": [0, 1, 0], "extra": [1.0, 2.0, 3.0]})
-        arr = v._extract_labels(df)
-        assert arr.shape == (3,)
-
-    def test_extract_labels_multi_col_no_label_raises(self):
-        v = SklearnSignalValidator()
-        df = pl.DataFrame({"a": [0, 1], "b": [2, 3]})
-        with pytest.raises(ValueError, match="label"):
-            v._extract_labels(df)
-
-
-# ── Fit and predict ──────────────────────────────────────────────────────
-
-
-class TestFitPredict:
-    def test_fit_random_forest(self):
-        v = SklearnSignalValidator(model_type="random_forest")
-        X, y = _make_data(n=100)
-        v.fit(X, y)
-        assert v.model is not None
-
-    def test_fit_logistic_regression(self):
-        v = SklearnSignalValidator(model_type="logistic_regression")
+    def test_fit(self):
+        v = RandomForestValidator(n_estimators=10)
         X, y = _make_data(n=100)
         v.fit(X, y)
         assert v.model is not None
 
     def test_predict(self):
-        v = SklearnSignalValidator(model_type="random_forest", model_params={"n_estimators": 10, "random_state": 42})
+        v = RandomForestValidator(n_estimators=10)
         X, y = _make_data(n=100)
         v.fit(X, y)
         signals, X_test = _make_signals(n=20)
@@ -163,29 +91,16 @@ class TestFitPredict:
         assert result.value.height == 20
 
     def test_predict_proba(self):
-        v = SklearnSignalValidator(model_type="random_forest", model_params={"n_estimators": 10, "random_state": 42})
+        v = RandomForestValidator(n_estimators=10)
         X, y = _make_data(n=100)
         v.fit(X, y)
         signals, X_test = _make_signals(n=20)
         result = v.predict_proba(signals, X_test)
-        # Should have probability columns
         prob_cols = [c for c in result.value.columns if c.startswith("probability_")]
         assert len(prob_cols) > 0
 
-    def test_predict_not_fitted_raises(self):
-        v = SklearnSignalValidator(model_type="random_forest")
-        signals, X_test = _make_signals(n=10)
-        with pytest.raises(ValueError, match="not fitted"):
-            v.predict(signals, X_test)
-
-    def test_predict_proba_not_fitted_raises(self):
-        v = SklearnSignalValidator(model_type="random_forest")
-        signals, X_test = _make_signals(n=10)
-        with pytest.raises(ValueError, match="not fitted"):
-            v.predict_proba(signals, X_test)
-
     def test_validate_signals(self):
-        v = SklearnSignalValidator(model_type="random_forest", model_params={"n_estimators": 10, "random_state": 42})
+        v = RandomForestValidator(n_estimators=10)
         X, y = _make_data(n=100)
         v.fit(X, y)
         signals, X_test = _make_signals(n=20)
@@ -193,8 +108,111 @@ class TestFitPredict:
         prob_cols = [c for c in result.value.columns if c.startswith("probability_")]
         assert len(prob_cols) > 0
 
+
+# ── LogisticRegressionValidator ───────────────────────────────────────────
+
+
+class TestLogisticRegressionValidator:
+    def test_create_model(self):
+        v = LogisticRegressionValidator()
+        model = v._create_model()
+        assert hasattr(model, "fit")
+
+    def test_fit(self):
+        v = LogisticRegressionValidator()
+        X, y = _make_data(n=100)
+        v.fit(X, y)
+        assert v.model is not None
+
+    def test_custom_C(self):
+        v = LogisticRegressionValidator(C=0.5)
+        model = v._create_model()
+        assert model.C == 0.5
+
+
+# ── SVMValidator ──────────────────────────────────────────────────────────
+
+
+class TestSVMValidator:
+    def test_create_model(self):
+        v = SVMValidator()
+        model = v._create_model()
+        assert hasattr(model, "fit")
+        assert model.probability is True  # Required for predict_proba
+
+    def test_custom_kernel(self):
+        v = SVMValidator(kernel="linear")
+        model = v._create_model()
+        assert model.kernel == "linear"
+
+
+# ── Feature extraction ───────────────────────────────────────────────────
+
+
+class TestFeatureExtraction:
+    def test_extract_features_fit_mode(self):
+        v = RandomForestValidator()
+        X, _ = _make_data(n=20, n_features=3)
+        arr = v._extract_features(X, fit_mode=True)
+        assert arr.shape == (20, 3)
+        assert v.feature_columns == ["feat_0", "feat_1", "feat_2"]
+
+    def test_extract_features_no_fit_raises(self):
+        v = RandomForestValidator()
+        X, _ = _make_data(n=20)
+        with pytest.raises(ValueError, match="feature_columns not set"):
+            v._extract_features(X)
+
+    def test_extract_features_missing_col_raises(self):
+        v = RandomForestValidator()
+        v.feature_columns = ["nonexistent"]
+        X, _ = _make_data(n=20)
+        with pytest.raises(ValueError, match="Missing feature columns"):
+            v._extract_features(X)
+
+    def test_extract_labels_dataframe(self):
+        v = RandomForestValidator()
+        _, y = _make_data(n=20)
+        arr = v._extract_labels(y)
+        assert arr.shape == (20,)
+
+    def test_extract_labels_series(self):
+        v = RandomForestValidator()
+        _, y = _make_data(n=20)
+        arr = v._extract_labels(y["label"])
+        assert arr.shape == (20,)
+
+    def test_extract_labels_multi_col_with_label(self):
+        v = RandomForestValidator()
+        df = pl.DataFrame({"label": [0, 1, 0], "extra": [1.0, 2.0, 3.0]})
+        arr = v._extract_labels(df)
+        assert arr.shape == (3,)
+
+    def test_extract_labels_multi_col_no_label_raises(self):
+        v = RandomForestValidator()
+        df = pl.DataFrame({"a": [0, 1], "b": [2, 3]})
+        with pytest.raises(ValueError, match="label"):
+            v._extract_labels(df)
+
+
+# ── Fit and predict errors ────────────────────────────────────────────────
+
+
+class TestFitPredictErrors:
+    def test_predict_not_fitted_raises(self):
+        v = RandomForestValidator()
+        signals, X_test = _make_signals(n=10)
+        with pytest.raises(ValueError, match="not fitted"):
+            v.predict(signals, X_test)
+
+    def test_predict_proba_not_fitted_raises(self):
+        v = RandomForestValidator()
+        signals, X_test = _make_signals(n=10)
+        with pytest.raises(ValueError, match="not fitted"):
+            v.predict_proba(signals, X_test)
+
     def test_get_class_labels(self):
-        v = SklearnSignalValidator(model_type="random_forest", model_params={"n_estimators": 10, "random_state": 42})
+        v = RandomForestValidator(n_estimators=10)
         X, y = _make_data(n=100)
         v.fit(X, y)
         labels = v._get_class_labels()
@@ -202,7 +220,7 @@ class TestFitPredict:
         assert len(labels) > 0
 
     def test_get_class_labels_not_fitted(self):
-        v = SklearnSignalValidator()
+        v = RandomForestValidator()
         with pytest.raises(ValueError, match="not fitted"):
             v._get_class_labels()
 
@@ -212,15 +230,14 @@ class TestFitPredict:
 
 class TestSaveLoad:
     def test_save_and_load(self, tmp_path):
-        v = SklearnSignalValidator(model_type="random_forest", model_params={"n_estimators": 10, "random_state": 42})
+        v = RandomForestValidator(n_estimators=10)
         X, y = _make_data(n=100)
         v.fit(X, y)
 
         path = tmp_path / "validator.pkl"
         v.save(path)
 
-        loaded = SklearnSignalValidator.load(path)
-        assert loaded.model_type == "random_forest"
+        loaded = RandomForestValidator.load(path)
         assert loaded.feature_columns == v.feature_columns
 
         signals, X_test = _make_signals(n=10)
@@ -233,41 +250,106 @@ class TestSaveLoad:
 
 class TestPostInit:
     def test_defaults(self):
-        v = SklearnSignalValidator()
-        assert v.model_params == {}
+        v = RandomForestValidator()
+        assert v.model_params is not None
         assert v.train_params == {}
         assert v.tune_params is not None
         assert "n_trials" in v.tune_params
 
 
-# ── Auto-select and tune ────────────────────────────────────────────────
+# ── AutoSelectValidator ────────────────────────────────────────────────
 
 
 class TestAutoSelect:
     def test_auto_select_model(self):
-        v = SklearnSignalValidator(model_type="auto")
+        v = AutoSelectValidator()
         X, y = _make_data(n=100)
         v.fit(X, y)
-        assert v.model_type in ["random_forest", "logistic_regression"]
+        assert v.selected_validator is not None
         assert v.model is not None
 
-    def test_auto_select_sets_params(self):
-        v = SklearnSignalValidator(model_type="auto")
+    def test_auto_select_predict(self):
+        v = AutoSelectValidator()
         X, y = _make_data(n=100)
         v.fit(X, y)
-        assert v.model_params is not None
+        signals, X_test = _make_signals(n=20)
+        result = v.predict(signals, X_test)
+        assert result.value.height == 20
+
+    def test_sklearn_signal_validator_alias(self):
+        """SklearnSignalValidator should be an alias for AutoSelectValidator."""
+        assert SklearnSignalValidator is AutoSelectValidator
+
+
+# ── Tune ────────────────────────────────────────────────────────────────
 
 
 class TestTune:
     def test_tune_with_rf(self):
-        v = SklearnSignalValidator(model_type="random_forest")
+        v = RandomForestValidator()
         X, y = _make_data(n=100)
         v.tune_params = {"n_trials": 2, "cv_folds": 2, "timeout": 10}
         best_params = v.tune(X, y)
         assert "n_estimators" in best_params
 
     def test_tune_auto_raises(self):
-        v = SklearnSignalValidator(model_type="auto")
+        v = AutoSelectValidator()
         X, y = _make_data(n=100)
-        with pytest.raises(ValueError, match="Set model_type"):
+        with pytest.raises(NotImplementedError):
             v.tune(X, y)
+
+
+# ── LightGBM (if available) ─────────────────────────────────────────────
+
+
+class TestLightGBMValidator:
+    @pytest.fixture(autouse=True)
+    def skip_if_no_lightgbm(self):
+        try:
+            import lightgbm  # noqa: F401
+        except ImportError:
+            pytest.skip("lightgbm not installed")
+
+    def test_create_model(self):
+        v = LightGBMValidator()
+        model = v._create_model()
+        assert hasattr(model, "fit")
+
+    def test_fit(self):
+        v = LightGBMValidator(n_estimators=10)
+        X, y = _make_data(n=100)
+        v.fit(X, y)
+        assert v.model is not None
+
+    def test_custom_params(self):
+        v = LightGBMValidator(n_estimators=50, learning_rate=0.05)
+        assert v.model_params["n_estimators"] == 50
+        assert v.model_params["learning_rate"] == 0.05
+
+
+# ── XGBoost (if available) ──────────────────────────────────────────────
+
+
+class TestXGBoostValidator:
+    @pytest.fixture(autouse=True)
+    def skip_if_no_xgboost(self):
+        try:
+            import xgboost  # noqa: F401
+        except ImportError:
+            pytest.skip("xgboost not installed")
+
+    def test_create_model(self):
+        v = XGBoostValidator()
+        model = v._create_model()
+        assert hasattr(model, "fit")
+
+    def test_fit(self):
+        v = XGBoostValidator(n_estimators=10)
+        X, y = _make_data(n=100)
+        v.fit(X, y)
+        assert v.model is not None
+
+    def test_custom_params(self):
+        v = XGBoostValidator(n_estimators=50, learning_rate=0.05)
+        assert v.model_params["n_estimators"] == 50
+        assert v.model_params["learning_rate"] == 0.05

@@ -98,9 +98,7 @@ class VolatilityRegimeLabeler(Labeler):
             raise ValueError(f"Missing required column '{self.price_col}'")
 
         # Step 1: Log returns
-        df = group_df.with_columns(
-            (pl.col(self.price_col) / pl.col(self.price_col).shift(1)).log().alias("_log_ret")
-        )
+        df = group_df.with_columns((pl.col(self.price_col) / pl.col(self.price_col).shift(1)).log().alias("_log_ret"))
 
         # Step 2: Forward realized volatility
         # To compute std of log_returns[t+1 : t+horizon+1], we:
@@ -173,12 +171,9 @@ class VolatilityRegimeLabeler(Labeler):
 
         # Create a struct with current value and row index
         # Then use rolling_map to compute percentile within each window
-        return (
-            pl.struct([col.alias("val"), pl.int_range(pl.len()).alias("idx")])
-            .map_batches(
-                lambda s: self._compute_percentile_series(s, window),
-                return_dtype=pl.Float64,
-            )
+        return pl.struct([col.alias("val"), pl.int_range(pl.len()).alias("idx")]).map_batches(
+            lambda s: self._compute_percentile_series(s, window),
+            return_dtype=pl.Float64,
         )
 
     @staticmethod

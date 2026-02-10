@@ -103,6 +103,7 @@ class TestSfTorchModuleMixin:
 
     def test_optuna_optimization(self):
         """Test integration with Optuna optimization loop."""
+
         def objective(trial):
             params = MockTorchModule.tune(trial, model_size="small")
             model = MockTorchModule(**params)

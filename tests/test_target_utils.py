@@ -75,9 +75,7 @@ class TestMaskTargetsBySignals:
     def test_empty_signals(self):
         """Test with empty signals DataFrame."""
         df = _make_labeled_df(50)
-        signals_df = pl.DataFrame(
-            {"pair": [], "timestamp": [], "signal_type": [], "value": []}
-        )
+        signals_df = pl.DataFrame({"pair": [], "timestamp": [], "signal_type": [], "value": []})
         signals = Signals(value=signals_df)
 
         result = mask_targets_by_signals(
@@ -95,9 +93,7 @@ class TestMaskTargetsBySignals:
         """Test when no signals match the specified types."""
         df = _make_labeled_df(50)
         base_ts = datetime(2024, 1, 1)
-        signals_df = _make_signals_df(
-            [base_ts + timedelta(minutes=25)], ["BTCUSDT"], ["other_type"]
-        )
+        signals_df = _make_signals_df([base_ts + timedelta(minutes=25)], ["BTCUSDT"], ["other_type"])
         signals = Signals(value=signals_df)
 
         result = mask_targets_by_signals(
@@ -138,9 +134,7 @@ class TestMaskTargetsBySignals:
         """Test auto-detection of target columns ending with _label."""
         df = _make_labeled_df(50)
         base_ts = datetime(2024, 1, 1)
-        signals_df = _make_signals_df(
-            [base_ts + timedelta(minutes=25)], ["BTCUSDT"], ["anomaly"]
-        )
+        signals_df = _make_signals_df([base_ts + timedelta(minutes=25)], ["BTCUSDT"], ["anomaly"])
         signals = Signals(value=signals_df)
 
         result = mask_targets_by_signals(
@@ -165,9 +159,7 @@ class TestMaskTargetsBySignals:
                 "close": [100.0] * 10,
             }
         )
-        signals_df = _make_signals_df(
-            [datetime(2024, 1, 1, 0, 5)], ["BTCUSDT"], ["anomaly"]
-        )
+        signals_df = _make_signals_df([datetime(2024, 1, 1, 0, 5)], ["BTCUSDT"], ["anomaly"])
         signals = Signals(value=signals_df)
 
         result = mask_targets_by_signals(
@@ -186,9 +178,7 @@ class TestMaskTargetsBySignals:
         """Test when specified columns don't exist."""
         df = _make_labeled_df(50)
         base_ts = datetime(2024, 1, 1)
-        signals_df = _make_signals_df(
-            [base_ts + timedelta(minutes=25)], ["BTCUSDT"], ["anomaly"]
-        )
+        signals_df = _make_signals_df([base_ts + timedelta(minutes=25)], ["BTCUSDT"], ["anomaly"])
         signals = Signals(value=signals_df)
 
         result = mask_targets_by_signals(
@@ -207,9 +197,7 @@ class TestMaskTargetsBySignals:
         """Test masking with multiple pairs - only affected pair should be masked."""
         df = _make_labeled_df(50, pairs=["BTCUSDT", "ETHUSDT"])
         base_ts = datetime(2024, 1, 1)
-        signals_df = _make_signals_df(
-            [base_ts + timedelta(minutes=25)], ["BTCUSDT"], ["anomaly"]
-        )
+        signals_df = _make_signals_df([base_ts + timedelta(minutes=25)], ["BTCUSDT"], ["anomaly"])
         signals = Signals(value=signals_df)
 
         result = mask_targets_by_signals(

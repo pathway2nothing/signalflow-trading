@@ -142,14 +142,10 @@ class StructureLabeler(Labeler):
         # Apply rolling_max to get max of next `lookforward` bars
         # Then shift back to align
         lookforward_max = (
-            price.shift(-1)
-            .rolling_max(window_size=self.lookforward, min_samples=1)
-            .shift(-(self.lookforward - 1))
+            price.shift(-1).rolling_max(window_size=self.lookforward, min_samples=1).shift(-(self.lookforward - 1))
         )
         lookforward_min = (
-            price.shift(-1)
-            .rolling_min(window_size=self.lookforward, min_samples=1)
-            .shift(-(self.lookforward - 1))
+            price.shift(-1).rolling_min(window_size=self.lookforward, min_samples=1).shift(-(self.lookforward - 1))
         )
 
         df = group_df.with_columns(
@@ -190,12 +186,8 @@ class StructureLabeler(Labeler):
             # Z-score mode: compute rolling mean/std of swings
             df = df.with_columns(
                 [
-                    pl.col("_swing")
-                    .rolling_mean(window_size=self.vol_window, min_samples=20)
-                    .alias("_swing_mean"),
-                    pl.col("_swing")
-                    .rolling_std(window_size=self.vol_window, min_samples=20)
-                    .alias("_swing_std"),
+                    pl.col("_swing").rolling_mean(window_size=self.vol_window, min_samples=20).alias("_swing_mean"),
+                    pl.col("_swing").rolling_std(window_size=self.vol_window, min_samples=20).alias("_swing_std"),
                 ]
             )
 
