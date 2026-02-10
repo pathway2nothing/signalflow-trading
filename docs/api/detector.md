@@ -85,7 +85,7 @@ df_masked = mask_targets_by_signals(
 
 ### Agreement-Based Detector
 
-::: signalflow.detector.market.agreement.AgreementDetector
+::: signalflow.detector.market.agreement_detector.AgreementDetector
     options:
       show_root_heading: true
       show_source: true
@@ -93,7 +93,7 @@ df_masked = mask_targets_by_signals(
 
 ### Z-Score Detector
 
-::: signalflow.detector.market.zscore.MarketZScoreDetector
+::: signalflow.detector.market.zscore_detector.MarketZScoreDetector
     options:
       show_root_heading: true
       show_source: true
@@ -101,7 +101,33 @@ df_masked = mask_targets_by_signals(
 
 ### CUSUM Detector
 
-::: signalflow.detector.market.cusum.MarketCusumDetector
+::: signalflow.detector.market.cusum_detector.MarketCusumDetector
+    options:
+      show_root_heading: true
+      show_source: true
+      members: true
+
+## Generic Detectors
+
+### Z-Score Anomaly Detector
+
+::: signalflow.detector.zscore_anomaly.ZScoreAnomalyDetector
+    options:
+      show_root_heading: true
+      show_source: true
+      members: true
+
+### Percentile Regime Detector
+
+::: signalflow.detector.percentile_regime.PercentileRegimeDetector
+    options:
+      show_root_heading: true
+      show_source: true
+      members: true
+
+### Local Extrema Detector
+
+::: signalflow.detector.local_extrema.LocalExtremaDetector
     options:
       show_root_heading: true
       show_source: true

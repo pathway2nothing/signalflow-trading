@@ -7,7 +7,8 @@ look-ahead labels (direction, return magnitude, volume regime) at various horizo
     The target functionality is implemented in the `signalflow.target` module.
 
 !!! tip "Event Detection"
-    Event detectors have been moved to the [`detector.event`](detector.md#event-detection) module.
+    Market-wide event detectors are in the [`detector.market`](detector.md#market-wide-detectors) module.
+    Use `mask_targets_by_signals()` to exclude labels around detected events.
 
 ## Base Class
 
@@ -107,6 +108,22 @@ look-ahead labels (direction, return magnitude, volume regime) at various horizo
       show_source: true
 
 ::: signalflow.target.multi_target_generator.TargetType
+    options:
+      show_root_heading: true
+      show_source: true
+
+## Utility Functions
+
+### mask_targets_by_signals
+
+::: signalflow.target.utils.mask_targets_by_signals
+    options:
+      show_root_heading: true
+      show_source: true
+
+### mask_targets_by_timestamps
+
+::: signalflow.target.utils.mask_targets_by_timestamps
     options:
       show_root_heading: true
       show_source: true

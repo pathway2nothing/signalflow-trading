@@ -34,6 +34,12 @@ Feature extraction for technical indicators and derived metrics.
       show_source: true
       members: true
 
+::: signalflow.feature.atr.ATRFeature
+    options:
+      show_root_heading: true
+      show_source: true
+      members: true
+
 ## Examples
 
 ::: signalflow.feature.examples.ExampleRsiFeature

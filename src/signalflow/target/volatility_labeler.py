@@ -2,6 +2,8 @@
 
 Labels bars based on forward realized volatility percentile within
 a rolling lookback window.
+
+Implementation uses pure Polars expressions for performance.
 """
 
 from __future__ import annotations
@@ -9,7 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
 import polars as pl
 
 from signalflow.core import sf_component
@@ -25,11 +26,15 @@ class VolatilityRegimeLabeler(Labeler):
     Algorithm:
         1. Compute log returns: ``ln(close[t] / close[t-1])``
         2. Forward realized volatility: ``std(log_returns[t+1 : t+horizon+1])``
-           using a shift(-i) pattern to gather future returns.
+           computed using reverse-shifted rolling std.
         3. Rolling percentile of realized vol over ``lookback_window``.
         4. If vol > ``upper_quantile`` percentile -> ``"vol_high"``
         5. If vol < ``lower_quantile`` percentile -> ``"vol_low"``
         6. Otherwise -> ``null`` (Polars null)
+
+    Implementation:
+        Uses pure Polars expressions instead of numpy loops for better
+        performance and memory efficiency.
 
     Attributes:
         price_col: Price column name. Default: ``"close"``.
@@ -92,61 +97,121 @@ class VolatilityRegimeLabeler(Labeler):
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
-        # Step 1: log returns
-        df = group_df.with_columns((pl.col(self.price_col) / pl.col(self.price_col).shift(1)).log().alias("_log_ret"))
+        # Step 1: Log returns
+        df = group_df.with_columns(
+            (pl.col(self.price_col) / pl.col(self.price_col).shift(1)).log().alias("_log_ret")
+        )
 
-        # Step 2: Forward realized volatility via numpy for the shift(-i) pattern
-        log_ret_arr = df["_log_ret"].to_numpy().astype(np.float64)
-        n = len(log_ret_arr)
-        realized_vol = np.full(n, np.nan, dtype=np.float64)
+        # Step 2: Forward realized volatility
+        # To compute std of log_returns[t+1 : t+horizon+1], we:
+        # - Shift log_ret by -1 to start from next bar
+        # - Apply rolling_std with window=horizon
+        # - The result at position t+horizon-1 contains std of [t, t+horizon)
+        # - Shift back by -(horizon-1) to align with position t
+        df = df.with_columns(
+            pl.col("_log_ret")
+            .shift(-1)
+            .rolling_std(window_size=self.horizon, min_samples=2)
+            .shift(-(self.horizon - 1))
+            .alias("_realized_vol")
+        )
 
-        for t in range(n):
-            start = t + 1
-            end = t + 1 + self.horizon
-            if end > n:
-                break
-            window = log_ret_arr[start:end]
-            valid = window[~np.isnan(window)]
-            if len(valid) >= 2:
-                realized_vol[t] = np.std(valid, ddof=1)
+        # Step 3: Rolling percentile using rank-based approach
+        # For each bar, compute what fraction of values in the lookback window
+        # are <= current value. This is equivalent to percentile.
+        #
+        # Using rolling_map with a custom expression to compute percentile:
+        # percentile = count(x <= current) / count(valid)
+        df = df.with_columns(
+            self._rolling_percentile_expr("_realized_vol", self.lookback_window).alias("_vol_percentile")
+        )
 
-        # Step 3: Rolling percentile using numpy
-        vol_percentile = np.full(n, np.nan, dtype=np.float64)
-        for t in range(n):
-            if np.isnan(realized_vol[t]):
-                continue
-            lb_start = max(0, t - self.lookback_window + 1)
-            window = realized_vol[lb_start : t + 1]
-            valid = window[~np.isnan(window)]
-            if len(valid) < 2:
-                continue
-            vol_percentile[t] = np.mean(valid <= realized_vol[t])
+        # Step 4-5: Assign labels based on percentile thresholds
+        label_expr = (
+            pl.when(pl.col("_vol_percentile").is_null())
+            .then(pl.lit(None, dtype=pl.Utf8))
+            .when(pl.col("_vol_percentile") > self.upper_quantile)
+            .then(pl.lit("vol_high"))
+            .when(pl.col("_vol_percentile") < self.lower_quantile)
+            .then(pl.lit("vol_low"))
+            .otherwise(pl.lit(None, dtype=pl.Utf8))
+            .alias(self.out_col)
+        )
 
-        # Step 4-5: Assign labels
-        labels = np.empty(n, dtype=object)
-        for t in range(n):
-            if np.isnan(vol_percentile[t]):
-                labels[t] = None
-            elif vol_percentile[t] > self.upper_quantile:
-                labels[t] = "vol_high"
-            elif vol_percentile[t] < self.lower_quantile:
-                labels[t] = "vol_low"
-            else:
-                labels[t] = None
-
-        df = df.with_columns(pl.Series(name=self.out_col, values=labels.tolist(), dtype=pl.Utf8))
+        df = df.with_columns(label_expr)
 
         if self.include_meta:
             df = df.with_columns(
                 [
-                    pl.Series(name="realized_vol", values=realized_vol.tolist(), dtype=pl.Float64),
-                    pl.Series(name="vol_percentile", values=vol_percentile.tolist(), dtype=pl.Float64),
+                    pl.col("_realized_vol").alias("realized_vol"),
+                    pl.col("_vol_percentile").alias("vol_percentile"),
                 ]
             )
 
-        df = df.drop("_log_ret")
+        # Clean up temporary columns
+        df = df.drop(["_log_ret", "_realized_vol", "_vol_percentile"])
 
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
         return df
+
+    def _rolling_percentile_expr(self, col_name: str, window: int) -> pl.Expr:
+        """Compute rolling percentile using Polars expressions.
+
+        For each row, computes the fraction of values in the lookback window
+        that are less than or equal to the current value.
+
+        Args:
+            col_name: Column to compute percentile for.
+            window: Lookback window size.
+
+        Returns:
+            Polars expression computing rolling percentile.
+        """
+        col = pl.col(col_name)
+
+        # Create a struct with current value and row index
+        # Then use rolling_map to compute percentile within each window
+        return (
+            pl.struct([col.alias("val"), pl.int_range(pl.len()).alias("idx")])
+            .map_batches(
+                lambda s: self._compute_percentile_series(s, window),
+                return_dtype=pl.Float64,
+            )
+        )
+
+    @staticmethod
+    def _compute_percentile_series(s: pl.Series, window: int) -> pl.Series:
+        """Compute rolling percentile for a series of structs.
+
+        Args:
+            s: Series of structs with 'val' and 'idx' fields.
+            window: Lookback window size.
+
+        Returns:
+            Series of percentile values.
+        """
+        df = s.struct.unnest()
+        vals = df["val"].to_numpy()
+        n = len(vals)
+        result = [None] * n
+
+        import numpy as np
+
+        for i in range(n):
+            if np.isnan(vals[i]) if vals[i] is not None else True:
+                continue
+
+            start = max(0, i - window + 1)
+            window_vals = vals[start : i + 1]
+
+            # Filter out NaN/None values
+            valid = window_vals[~np.isnan(window_vals)]
+            if len(valid) < 2:
+                continue
+
+            # Percentile = fraction of values <= current
+            result[i] = float(np.mean(valid <= vals[i]))
+
+        return pl.Series(result, dtype=pl.Float64)

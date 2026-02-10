@@ -3,8 +3,9 @@
 Two approaches:
 
 - **StructureLabeler**: Window-based — examines fixed-size windows around each bar.
+  Uses Polars expressions for swing/extrema detection.
 - **ZigzagStructureLabeler**: Global zigzag — scans the entire price series for
-  alternating swing highs/lows that exceed a threshold.
+  alternating swing highs/lows that exceed a threshold. Uses sequential algorithm.
 
 Both support fixed-percentage and rolling z-score swing filters.
 """
@@ -51,6 +52,10 @@ class StructureLabeler(Labeler):
            - Fixed: ``swing >= min_swing_pct``
            - Z-score: ``(swing - rolling_mean) / rolling_std >= min_swing_zscore``
         6. Otherwise -> ``null``.
+
+    Implementation:
+        Uses Polars rolling expressions for computing window max/min and
+        detecting extrema, reducing numpy loop overhead.
 
     Attributes:
         price_col: Price column. Default: ``"close"``.
@@ -114,61 +119,136 @@ class StructureLabeler(Labeler):
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
-        prices = group_df[self.price_col].to_numpy().astype(np.float64)
-        n = len(prices)
+        price = pl.col(self.price_col)
 
-        # Step 1: Compute window swing for every bar and detect extrema
-        swings = np.full(n, np.nan, dtype=np.float64)
-        is_max = np.zeros(n, dtype=bool)
-        is_min = np.zeros(n, dtype=bool)
+        # Step 1: Compute centered window max/min using rolling + shift
+        #
+        # For a centered window [t-lookback, t+lookforward]:
+        # - Lookback max/min: rolling_max/min with window=lookback+1 (includes current)
+        # - Lookforward max/min: shift(-lookforward), then rolling_max/min, shift back
+        #
+        # Full window max = max(lookback_max, lookforward_max)
+        # Full window min = min(lookback_min, lookforward_min)
 
-        for t in range(n):
-            win_start = max(0, t - self.lookback)
-            win_end = min(n, t + self.lookforward + 1)
-            window = prices[win_start:win_end]
+        lookback_window = self.lookback + 1  # Include current bar
+        lookforward_window = self.lookforward + 1  # Include current bar
 
-            win_max = np.max(window)
-            win_min = np.min(window)
+        # Lookback rolling (includes current bar, looks back)
+        lookback_max = price.rolling_max(window_size=lookback_window, min_samples=1)
+        lookback_min = price.rolling_min(window_size=lookback_window, min_samples=1)
 
-            if win_max == win_min or win_min <= 0:
-                continue
+        # Lookforward rolling (shift, apply rolling, shift back)
+        # After shift(-1), position t contains value from t+1
+        # Apply rolling_max to get max of next `lookforward` bars
+        # Then shift back to align
+        lookforward_max = (
+            price.shift(-1)
+            .rolling_max(window_size=self.lookforward, min_samples=1)
+            .shift(-(self.lookforward - 1))
+        )
+        lookforward_min = (
+            price.shift(-1)
+            .rolling_min(window_size=self.lookforward, min_samples=1)
+            .shift(-(self.lookforward - 1))
+        )
 
-            swings[t] = (win_max - win_min) / win_min
+        df = group_df.with_columns(
+            [
+                lookback_max.alias("_lb_max"),
+                lookback_min.alias("_lb_min"),
+                lookforward_max.alias("_lf_max"),
+                lookforward_min.alias("_lf_min"),
+            ]
+        )
 
-            if prices[t] == win_max:
-                is_max[t] = True
-            elif prices[t] == win_min:
-                is_min[t] = True
+        # Full window max/min (handle null in lookforward part at edges)
+        df = df.with_columns(
+            [
+                pl.max_horizontal("_lb_max", "_lf_max").alias("_win_max"),
+                pl.min_horizontal("_lb_min", "_lf_min").alias("_win_min"),
+            ]
+        )
 
-        # Step 2: Compute threshold mask
+        # Step 2: Compute swing = (win_max - win_min) / win_min
+        df = df.with_columns(
+            pl.when((pl.col("_win_min") > 0) & (pl.col("_win_max") != pl.col("_win_min")))
+            .then((pl.col("_win_max") - pl.col("_win_min")) / pl.col("_win_min"))
+            .otherwise(pl.lit(None))
+            .alias("_swing")
+        )
+
+        # Step 3: Detect if current price is the window max or min
+        df = df.with_columns(
+            [
+                (price == pl.col("_win_max")).alias("_is_max"),
+                (price == pl.col("_win_min")).alias("_is_min"),
+            ]
+        )
+
+        # Step 4: Apply threshold filter
         if self.min_swing_zscore is not None:
-            swing_series = pl.Series(swings)
-            rm = swing_series.rolling_mean(window_size=self.vol_window, min_samples=20).to_numpy()
-            rs = swing_series.rolling_std(window_size=self.vol_window, min_samples=20).to_numpy()
+            # Z-score mode: compute rolling mean/std of swings
+            df = df.with_columns(
+                [
+                    pl.col("_swing")
+                    .rolling_mean(window_size=self.vol_window, min_samples=20)
+                    .alias("_swing_mean"),
+                    pl.col("_swing")
+                    .rolling_std(window_size=self.vol_window, min_samples=20)
+                    .alias("_swing_std"),
+                ]
+            )
 
-            with np.errstate(divide="ignore", invalid="ignore"):
-                zscores = (swings - rm) / rs
-            threshold_mask = np.where(np.isnan(zscores), False, zscores >= self.min_swing_zscore)
+            # Z-score = (swing - mean) / std >= threshold
+            df = df.with_columns(
+                pl.when(pl.col("_swing_std") > 0)
+                .then((pl.col("_swing") - pl.col("_swing_mean")) / pl.col("_swing_std"))
+                .otherwise(pl.lit(None))
+                .alias("_zscore")
+            )
+
+            threshold_mask = pl.col("_zscore") >= self.min_swing_zscore
         else:
-            threshold_mask = np.where(np.isnan(swings), False, swings >= self.min_swing_pct)
+            # Fixed percentage mode
+            threshold_mask = pl.col("_swing") >= self.min_swing_pct
 
-        # Step 3: Assign labels (extremum AND passes threshold)
-        labels = [None] * n
-        swing_out = np.full(n, np.nan, dtype=np.float64)
+        # Step 5: Assign labels
+        label_expr = (
+            pl.when(threshold_mask & pl.col("_is_max"))
+            .then(pl.lit("local_top"))
+            .when(threshold_mask & pl.col("_is_min"))
+            .then(pl.lit("local_bottom"))
+            .otherwise(pl.lit(None, dtype=pl.Utf8))
+            .alias(self.out_col)
+        )
 
-        for t in range(n):
-            if threshold_mask[t]:
-                if is_max[t]:
-                    labels[t] = "local_top"
-                    swing_out[t] = swings[t]
-                elif is_min[t]:
-                    labels[t] = "local_bottom"
-                    swing_out[t] = swings[t]
+        df = df.with_columns(label_expr)
 
-        df = group_df.with_columns(pl.Series(name=self.out_col, values=labels, dtype=pl.Utf8))
-
+        # Meta: swing_pct only for labeled rows
         if self.include_meta:
-            df = df.with_columns(pl.Series(name="swing_pct", values=swing_out.tolist(), dtype=pl.Float64))
+            df = df.with_columns(
+                pl.when(pl.col(self.out_col).is_not_null())
+                .then(pl.col("_swing"))
+                .otherwise(pl.lit(None))
+                .alias("swing_pct")
+            )
+
+        # Clean up temporary columns
+        temp_cols = [
+            "_lb_max",
+            "_lb_min",
+            "_lf_max",
+            "_lf_min",
+            "_win_max",
+            "_win_min",
+            "_swing",
+            "_is_max",
+            "_is_min",
+        ]
+        if self.min_swing_zscore is not None:
+            temp_cols.extend(["_swing_mean", "_swing_std", "_zscore"])
+
+        df = df.drop([c for c in temp_cols if c in df.columns])
 
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
@@ -208,6 +288,11 @@ class ZigzagStructureLabeler(Labeler):
            - Mark the extreme as ``"local_top"`` or ``"local_bottom"``.
            - Switch direction and start tracking the new extreme.
         4. Result: alternating pivots across the full price series.
+
+    Implementation:
+        Uses a sequential state-machine algorithm. This is inherently
+        not parallelizable, so numpy/python loops are used. Polars is
+        used for rolling volatility computation in z-score mode.
 
     Attributes:
         price_col: Price column. Default: ``"close"``.
@@ -265,12 +350,13 @@ class ZigzagStructureLabeler(Labeler):
 
         prices = group_df[self.price_col].to_numpy().astype(np.float64)
 
-        # Compute per-bar thresholds
+        # Compute per-bar thresholds using Polars for rolling vol
         if self.min_swing_zscore is not None:
-            thresholds = self._adaptive_thresholds(prices)
+            thresholds = self._adaptive_thresholds(group_df, prices)
         else:
             thresholds = np.full(len(prices), self.min_swing_pct)
 
+        # Run sequential zigzag algorithm
         labels, swing_pcts = self._zigzag(prices, thresholds)
 
         df = group_df.with_columns(pl.Series(name=self.out_col, values=labels, dtype=pl.Utf8))
@@ -290,27 +376,30 @@ class ZigzagStructureLabeler(Labeler):
         return df
 
     # ------------------------------------------------------------------
-    # Adaptive thresholds via rolling volatility
+    # Adaptive thresholds via rolling volatility (Polars-based)
     # ------------------------------------------------------------------
 
-    def _adaptive_thresholds(self, prices: np.ndarray) -> np.ndarray:
-        """Compute per-bar thresholds: zscore × rolling_vol × sqrt(vol_window)."""
+    def _adaptive_thresholds(self, df: pl.DataFrame, prices: np.ndarray) -> np.ndarray:
+        """Compute per-bar thresholds: zscore × rolling_vol × sqrt(vol_window).
+
+        Uses Polars for rolling std computation.
+        """
         n = len(prices)
         if n < 2:
             return np.full(n, np.inf)
 
-        # Log-returns
-        with np.errstate(divide="ignore", invalid="ignore"):
-            log_ret = np.diff(np.log(prices))
-        log_ret = np.insert(log_ret, 0, 0.0)
+        # Compute log returns using Polars
+        price_col = pl.col(self.price_col)
+        log_ret = (price_col / price_col.shift(1)).log()
 
         # Rolling std of returns
-        ret_series = pl.Series(log_ret)
-        rolling_vol = ret_series.rolling_std(window_size=self.vol_window, min_samples=20).to_numpy()
+        rolling_vol = log_ret.rolling_std(window_size=self.vol_window, min_samples=20)
+
+        # Compute thresholds
+        vol_arr = df.select(rolling_vol.alias("vol"))["vol"].to_numpy()
 
         # threshold = zscore × vol × sqrt(vol_window)
-        # vol is per-bar std; scaling by sqrt(W) gives expected swing magnitude
-        thresholds = self.min_swing_zscore * rolling_vol * np.sqrt(self.vol_window)
+        thresholds = self.min_swing_zscore * vol_arr * np.sqrt(self.vol_window)
 
         # Before we have enough data, use infinity (don't create pivots)
         thresholds = np.where(np.isnan(thresholds), np.inf, thresholds)
@@ -318,11 +407,14 @@ class ZigzagStructureLabeler(Labeler):
         return thresholds
 
     # ------------------------------------------------------------------
-    # Core zigzag algorithm
+    # Core zigzag algorithm (sequential, cannot be vectorized)
     # ------------------------------------------------------------------
 
     def _zigzag(self, prices: np.ndarray, thresholds: np.ndarray) -> tuple[list[str | None], np.ndarray]:
         """Run zigzag algorithm with per-bar adaptive thresholds.
+
+        This is a state-machine algorithm that must process bars sequentially
+        to maintain alternating top/bottom structure.
 
         Returns:
             (labels, swing_pcts) — parallel arrays of length n.

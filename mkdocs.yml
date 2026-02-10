@@ -84,10 +84,16 @@ markdown_extensions:
 
 
 plugins:
-  - search: 
+  - search:
       lang: en
   - macros:
       module_name: docs/hooks
+  - mkdocs-jupyter:
+      include_source: true
+      execute: false
+      allow_errors: false
+      include_requirejs: true
+      theme: dark
   - mkdocstrings:
       default_handler: python
       handlers:
@@ -109,6 +115,11 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quick Start: quickstart.md
+  - Tutorials:
+    - notebooks/index.md
+    - Full Tutorial: notebooks/tutorial.ipynb
+    - Strategy Tutorial: notebooks/strategy_tutorial.ipynb
+    - Labeling Tutorial: notebooks/labeling_tutorial.ipynb
   - User Guide:
     - Signal Architecture & Meta-Labeling: guide/signal-architecture.md
     - Data Sources: guide/data-sources.md

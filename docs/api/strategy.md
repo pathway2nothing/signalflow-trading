@@ -24,7 +24,7 @@ flowchart LR
 
 ## Execution
 
-::: signalflow.strategy.runner.backtest_runner.BacktestRunner
+::: signalflow.strategy.runner.optimized_backtest_runner.OptimizedBacktestRunner
     options:
       show_root_heading: true
       show_source: true
@@ -345,7 +345,7 @@ combined = aggregator.aggregate([detector_1, detector_2, detector_3])
 Position sizers and entry filters can be injected into `SignalEntryRule`:
 
 ```python
-from signalflow.strategy.runner import BacktestRunner
+from signalflow.strategy.runner import OptimizedBacktestRunner
 from signalflow.strategy.component.entry import (
     SignalEntryRule,
     CompositeEntryFilter,
@@ -369,7 +369,7 @@ entry_rule = SignalEntryRule(
 )
 
 # Run backtest
-runner = BacktestRunner(
+runner = OptimizedBacktestRunner(
     strategy_id="advanced_strategy",
     broker=BacktestBroker(executor=VirtualSpotExecutor(fee_rate=0.001)),
     entry_rules=[entry_rule],
@@ -614,7 +614,7 @@ from signalflow.strategy.model import (
     ModelEntryRule,
     ModelExitRule,
 )
-from signalflow.strategy.runner import BacktestRunner
+from signalflow.strategy.runner import OptimizedBacktestRunner
 from signalflow.strategy.broker import BacktestBroker
 from signalflow.strategy.broker.executor import VirtualSpotExecutor
 from signalflow.strategy.component.exit import TakeProfitStopLossExit
@@ -683,7 +683,7 @@ exit_rule = ModelExitRule(
 )
 
 # 3. Run backtest
-runner = BacktestRunner(
+runner = OptimizedBacktestRunner(
     strategy_id="model_strategy",
     broker=BacktestBroker(executor=VirtualSpotExecutor(fee_rate=0.001)),
     entry_rules=[entry_rule],

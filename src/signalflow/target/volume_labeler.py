@@ -2,6 +2,8 @@
 
 Labels bars based on forward volume ratio relative to a rolling
 volume moving average.
+
+Implementation uses pure Polars expressions for performance.
 """
 
 from __future__ import annotations
@@ -9,7 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
 import polars as pl
 
 from signalflow.core import sf_component
@@ -32,6 +33,10 @@ class VolumeRegimeLabeler(Labeler):
         3. If ratio > ``spike_threshold`` -> ``"volume_spike"``
         4. If ratio < ``drought_threshold`` -> ``"volume_drought"``
         5. Otherwise -> ``null``
+
+    Implementation:
+        Uses pure Polars expressions instead of numpy loops for better
+        performance and memory efficiency.
 
     Attributes:
         volume_col: Volume column. Default: ``"volume"``.
@@ -95,48 +100,54 @@ class VolumeRegimeLabeler(Labeler):
         if self.volume_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.volume_col}'")
 
-        vol_arr = group_df[self.volume_col].to_numpy().astype(np.float64)
-        n = len(vol_arr)
+        vol = pl.col(self.volume_col)
 
-        # Step 1: Trailing volume SMA
-        trailing_sma = np.full(n, np.nan, dtype=np.float64)
-        cumsum = np.nancumsum(vol_arr)
-        for t in range(n):
-            lb_start = max(0, t - self.vol_sma_window + 1)
-            count = t - lb_start + 1
-            if lb_start == 0:
-                trailing_sma[t] = cumsum[t] / count
-            else:
-                trailing_sma[t] = (cumsum[t] - cumsum[lb_start - 1]) / count
+        # Step 1: Trailing volume SMA using Polars rolling_mean
+        # min_samples=1 allows SMA from the first bar (like original behavior)
+        df = group_df.with_columns(
+            vol.rolling_mean(window_size=self.vol_sma_window, min_samples=1).alias("_trailing_sma")
+        )
 
         # Step 2: Forward average volume
-        forward_avg = np.full(n, np.nan, dtype=np.float64)
-        for t in range(n):
-            start = t + 1
-            end = t + 1 + self.horizon
-            if end > n:
-                break
-            forward_avg[t] = np.mean(vol_arr[start:end])
+        # To compute mean(volume[t+1 : t+horizon+1]), we:
+        # - Shift volume by -1 to start from next bar
+        # - Apply rolling_mean with window=horizon
+        # - The result at position t+horizon-1 contains mean of [t, t+horizon)
+        # - Shift back by -(horizon-1) to align with position t
+        df = df.with_columns(
+            vol.shift(-1)
+            .rolling_mean(window_size=self.horizon, min_samples=1)
+            .shift(-(self.horizon - 1))
+            .alias("_forward_avg")
+        )
 
-        # Step 3: Volume ratio
-        volume_ratio = np.full(n, np.nan, dtype=np.float64)
-        valid_mask = (~np.isnan(forward_avg)) & (~np.isnan(trailing_sma)) & (trailing_sma > 0)
-        volume_ratio[valid_mask] = forward_avg[valid_mask] / trailing_sma[valid_mask]
+        # Step 3: Volume ratio = forward_avg / trailing_sma
+        df = df.with_columns(
+            pl.when(pl.col("_trailing_sma") > 0)
+            .then(pl.col("_forward_avg") / pl.col("_trailing_sma"))
+            .otherwise(pl.lit(None))
+            .alias("_volume_ratio")
+        )
 
-        # Step 4-5: Labels
-        labels = [None] * n
-        for t in range(n):
-            if np.isnan(volume_ratio[t]):
-                continue
-            if volume_ratio[t] > self.spike_threshold:
-                labels[t] = "volume_spike"
-            elif volume_ratio[t] < self.drought_threshold:
-                labels[t] = "volume_drought"
+        # Step 4-5: Assign labels based on thresholds
+        label_expr = (
+            pl.when(pl.col("_volume_ratio").is_null())
+            .then(pl.lit(None, dtype=pl.Utf8))
+            .when(pl.col("_volume_ratio") > self.spike_threshold)
+            .then(pl.lit("volume_spike"))
+            .when(pl.col("_volume_ratio") < self.drought_threshold)
+            .then(pl.lit("volume_drought"))
+            .otherwise(pl.lit(None, dtype=pl.Utf8))
+            .alias(self.out_col)
+        )
 
-        df = group_df.with_columns(pl.Series(name=self.out_col, values=labels, dtype=pl.Utf8))
+        df = df.with_columns(label_expr)
 
         if self.include_meta:
-            df = df.with_columns(pl.Series(name="volume_ratio", values=volume_ratio.tolist(), dtype=pl.Float64))
+            df = df.with_columns(pl.col("_volume_ratio").alias("volume_ratio"))
+
+        # Clean up temporary columns
+        df = df.drop(["_trailing_sma", "_forward_avg", "_volume_ratio"])
 
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
