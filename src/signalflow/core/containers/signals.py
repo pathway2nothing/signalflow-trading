@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import polars as pl
-from signalflow.core.signal_transforms import SignalsTransform
+from signalflow.core.signal_transform import SignalsTransform
 from signalflow.core.enums import SignalType
 
 

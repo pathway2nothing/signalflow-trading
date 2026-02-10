@@ -1,3 +1,7 @@
+"""Signal transformation protocol.
+
+Provides SignalsTransform protocol for composable signal processing.
+"""
 from typing import Protocol
 import polars as pl
 from signalflow.core.enums import SfComponentType

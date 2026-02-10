@@ -184,7 +184,7 @@ class SfComponentType(str, Enum):
         RAW_DATA_STORE: Raw data storage backends (e.g., DuckDB, Parquet).
         RAW_DATA_SOURCE: Raw data sources (e.g., Binance API).
         RAW_DATA_LOADER: Raw data loaders combining source + store.
-        FEATURE_EXTRACTOR: Feature extraction classes (e.g., RSI, SMA).
+        FEATURE: Feature extraction classes (e.g., RSI, SMA).
         SIGNALS_TRANSFORM: Signal transformation functions.
         LABELER: Signal labeling strategies (e.g., triple barrier).
         DETECTOR: Signal detection algorithms (e.g., SMA cross).
