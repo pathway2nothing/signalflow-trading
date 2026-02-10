@@ -2,6 +2,7 @@
 
 from signalflow.core.enums import (
     SignalType,
+    SignalCategory,
     PositionType,
     SfComponentType,
     DataFrameType,
@@ -14,13 +15,32 @@ class TestSignalType:
         assert SignalType.NONE.value == "none"
         assert SignalType.RISE.value == "rise"
         assert SignalType.FALL.value == "fall"
+        assert SignalType.FLAT.value == "flat"
 
     def test_is_str_enum(self):
         assert isinstance(SignalType.RISE, str)
         assert SignalType.RISE == "rise"
 
     def test_members_count(self):
-        assert len(SignalType) == 3
+        assert len(SignalType) == 4
+
+
+class TestSignalCategory:
+    def test_values(self):
+        assert SignalCategory.PRICE_DIRECTION.value == "price_direction"
+        assert SignalCategory.PRICE_STRUCTURE.value == "price_structure"
+        assert SignalCategory.TREND_MOMENTUM.value == "trend_momentum"
+        assert SignalCategory.VOLATILITY.value == "volatility"
+        assert SignalCategory.VOLUME_LIQUIDITY.value == "volume_liquidity"
+        assert SignalCategory.MARKET_WIDE.value == "market_wide"
+        assert SignalCategory.ANOMALY.value == "anomaly"
+
+    def test_is_str_enum(self):
+        assert isinstance(SignalCategory.PRICE_DIRECTION, str)
+        assert SignalCategory.PRICE_DIRECTION == "price_direction"
+
+    def test_members_count(self):
+        assert len(SignalCategory) == 7
 
 
 class TestPositionType:

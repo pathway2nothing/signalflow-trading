@@ -8,7 +8,7 @@ from typing import Optional, Iterable
 from loguru import logger
 import pandas as pd
 
-from signalflow.core import sf_component, SfComponentType
+from signalflow.core import sf_component, SfComponentType, RawData
 from signalflow.core.registry import default_registry
 from signalflow.data.raw_store.base import RawDataStore
 from signalflow.data.raw_store._schema import (
@@ -378,6 +378,77 @@ class DuckDbRawStore(RawDataStore):
     def close(self) -> None:
         """Close database connection."""
         self._con.close()
+
+    def to_raw_data(
+        self,
+        pairs: list[str],
+        start: datetime,
+        end: datetime,
+        data_key: Optional[str] = None,
+    ) -> RawData:
+        """Convert store data to RawData container.
+
+        Loads data for specified pairs and date range, validates schema,
+        and packages into immutable RawData container.
+
+        Args:
+            pairs: List of trading pairs to load.
+            start: Start datetime (inclusive).
+            end: End datetime (inclusive).
+            data_key: Key for data in RawData.data dict.
+                If None, uses store's data_type (e.g., "spot", "futures").
+
+        Returns:
+            RawData container with loaded and validated data.
+
+        Raises:
+            ValueError: If required columns missing or duplicates detected.
+
+        Example:
+            ```python
+            store = DuckDbRawStore(db_path="data/spot.duckdb", data_type="spot")
+
+            raw_data = store.to_raw_data(
+                pairs=["BTCUSDT", "ETHUSDT"],
+                start=datetime(2024, 1, 1),
+                end=datetime(2024, 12, 31),
+            )
+
+            spot_df = raw_data["spot"]
+            ```
+        """
+        key = data_key if data_key is not None else self.data_type
+
+        df = self.load_many(pairs=pairs, start=start, end=end)
+
+        # Validate required columns
+        required = {"pair", "timestamp"}
+        missing = required - set(df.columns)
+        if missing:
+            raise ValueError(f"DataFrame missing columns: {sorted(missing)}")
+
+        # Normalize timestamps
+        df = df.with_columns(pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None))
+
+        # Check for duplicates
+        dup_count = df.group_by(["pair", "timestamp"]).len().filter(pl.col("len") > 1)
+        if dup_count.height > 0:
+            dups = (
+                df.join(dup_count.select(["pair", "timestamp"]), on=["pair", "timestamp"])
+                .select(["pair", "timestamp"])
+                .head(10)
+            )
+            raise ValueError(f"Duplicate (pair, timestamp) detected. Examples:\n{dups}")
+
+        # Sort by (pair, timestamp)
+        df = df.sort(["pair", "timestamp"])
+
+        return RawData(
+            datetime_start=start,
+            datetime_end=end,
+            pairs=pairs,
+            data={key: df},
+        )
 
 
 # Register the same class for futures and perpetual data types.

@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar
-from signalflow.core import SfComponentType, StrategyState, Position, Order, RawData, Signals
-import plotly.graph_objects as go
+from signalflow.core import SfComponentType, StrategyState, Position, Order, Signals
 
 
 @dataclass

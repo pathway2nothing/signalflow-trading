@@ -1,4 +1,34 @@
-# IMPORTANT
+"""Binance data source - async REST client and loaders for spot & futures.
+
+Provides async clients and loaders for downloading historical OHLCV data
+from Binance Spot, USDT-M Futures, and COIN-M Futures markets.
+
+Timestamp Convention:
+    All returned timestamps represent candle CLOSE time (Binance k[6]),
+    normalized to UTC-naive datetime objects.
+
+Example:
+    ```python
+    from signalflow.data.source import BinanceClient, BinanceSpotLoader
+    from datetime import datetime
+
+    async with BinanceClient() as client:
+        klines = await client.get_klines(
+            pair="BTCUSDT",
+            interval="1h",
+            start_time=datetime(2024, 1, 1),
+            end_time=datetime(2024, 1, 2),
+        )
+
+    # Or use loader for automated sync
+    loader = BinanceSpotLoader(
+        store_path="data/binance_spot.duckdb",
+        pairs=["BTCUSDT", "ETHUSDT"],
+    )
+    await loader.sync(days_back=30)
+    ```
+"""
+
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -8,68 +38,15 @@ from typing import Optional
 import aiohttp
 from loguru import logger
 
-from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.core import sf_component
+from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.source.base import RawDataSource, RawDataLoader
-
-_TIMEFRAME_MS: dict[str, int] = {
-    "1m": 60_000,
-    "3m": 3 * 60_000,
-    "5m": 5 * 60_000,
-    "15m": 15 * 60_000,
-    "30m": 30 * 60_000,
-    "1h": 60 * 60_000,
-    "2h": 2 * 60 * 60_000,
-    "4h": 4 * 60 * 60_000,
-    "6h": 6 * 60 * 60_000,
-    "8h": 8 * 60 * 60_000,
-    "12h": 12 * 60 * 60_000,
-    "1d": 24 * 60 * 60_000,
-}
-
-
-def _dt_to_ms_utc(dt: datetime) -> int:
-    """Convert datetime to UNIX milliseconds in UTC.
-
-    Accepts naive (assumed UTC) or aware (converted to UTC) datetimes.
-
-    Args:
-        dt (datetime): Input datetime.
-
-    Returns:
-        int: UNIX timestamp in milliseconds (UTC).
-    """
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    else:
-        dt = dt.astimezone(timezone.utc)
-    return int(dt.timestamp() * 1000)
-
-
-def _ms_to_dt_utc_naive(ms: int) -> datetime:
-    """Convert UNIX milliseconds to UTC-naive datetime.
-
-    Args:
-        ms (int): UNIX timestamp in milliseconds.
-
-    Returns:
-        datetime: UTC datetime without timezone info.
-    """
-    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).replace(tzinfo=None)
-
-
-def _ensure_utc_naive(dt: datetime) -> datetime:
-    """Normalize to UTC-naive datetime.
-
-    Args:
-        dt (datetime): Input datetime (naive or aware).
-
-    Returns:
-        datetime: UTC-naive datetime.
-    """
-    if dt.tzinfo is None:
-        return dt
-    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+from signalflow.data.source._helpers import (
+    TIMEFRAME_MS,
+    dt_to_ms_utc,
+    ms_to_dt_utc_naive,
+    ensure_utc_naive,
+)
 
 
 @dataclass
@@ -141,9 +118,9 @@ class BinanceClient(RawDataSource):
 
         params: dict[str, object] = {"symbol": pair, "interval": timeframe, "limit": int(limit)}
         if start_time is not None:
-            params["startTime"] = _dt_to_ms_utc(start_time)
+            params["startTime"] = dt_to_ms_utc(start_time)
         if end_time is not None:
-            params["endTime"] = _dt_to_ms_utc(end_time)
+            params["endTime"] = dt_to_ms_utc(end_time)
 
         url = f"{self.base_url}{self.klines_path}"
         last_err: Optional[Exception] = None
@@ -168,7 +145,7 @@ class BinanceClient(RawDataSource):
                     close_ms = int(k[6])
                     out.append(
                         {
-                            "timestamp": _ms_to_dt_utc_naive(close_ms),
+                            "timestamp": ms_to_dt_utc_naive(close_ms),
                             "open": float(k[1]),
                             "high": float(k[2]),
                             "low": float(k[3]),
@@ -214,7 +191,7 @@ class BinanceClient(RawDataSource):
 
         Args:
             pair (str): Trading pair.
-            timeframe (str): Interval (must be in _TIMEFRAME_MS).
+            timeframe (str): Interval (must be in TIMEFRAME_MS).
             start_time (datetime): Range start (inclusive).
             end_time (datetime): Range end (inclusive).
             limit (int): Candles per request. Default: 1000.
@@ -226,16 +203,16 @@ class BinanceClient(RawDataSource):
             ValueError: If timeframe unsupported.
             RuntimeError: If pagination exceeds safety limit (2M loops).
         """
-        if timeframe not in _TIMEFRAME_MS:
+        if timeframe not in TIMEFRAME_MS:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
 
-        start_time = _ensure_utc_naive(start_time)
-        end_time = _ensure_utc_naive(end_time)
+        start_time = ensure_utc_naive(start_time)
+        end_time = ensure_utc_naive(end_time)
 
         if start_time >= end_time:
             return []
 
-        tf_ms = _TIMEFRAME_MS[timeframe]
+        tf_ms = TIMEFRAME_MS[timeframe]
         window = timedelta(milliseconds=tf_ms * limit)
 
         all_klines: list[dict] = []
@@ -341,12 +318,12 @@ class BinanceSpotLoader(RawDataLoader):
         if end is None:
             end = now
         else:
-            end = _ensure_utc_naive(end)
+            end = ensure_utc_naive(end)
 
         if start is None:
             start = end - timedelta(days=days if days else 7)
         else:
-            start = _ensure_utc_naive(start)
+            start = ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,
@@ -487,12 +464,12 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
         if end is None:
             end = now
         else:
-            end = _ensure_utc_naive(end)
+            end = ensure_utc_naive(end)
 
         if start is None:
             start = end - timedelta(days=days if days else 7)
         else:
-            start = _ensure_utc_naive(start)
+            start = ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,
@@ -625,12 +602,12 @@ class BinanceFuturesCoinLoader(RawDataLoader):
         if end is None:
             end = now
         else:
-            end = _ensure_utc_naive(end)
+            end = ensure_utc_naive(end)
 
         if start is None:
             start = end - timedelta(days=days if days else 7)
         else:
-            start = _ensure_utc_naive(start)
+            start = ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,

@@ -17,7 +17,6 @@ from signalflow.core import (
     get_component,
     default_registry,
     SfTorchModuleMixin,
-    RollingAggregator,
     SignalsTransform,
 )
 import signalflow.analytic as analytic
@@ -58,7 +57,6 @@ __all__ = [
     "get_component",
     "default_registry",
     "SfTorchModuleMixin",
-    "RollingAggregator",
     "SignalsTransform",
     "Feature",
     "FeaturePipeline",

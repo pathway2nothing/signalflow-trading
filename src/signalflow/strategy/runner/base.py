@@ -9,7 +9,14 @@ from signalflow.analytic import StrategyMetric
 
 
 class StrategyRunner(ABC):
-    """Base class for strategy runners."""
+    """Base class for strategy runners.
+
+    Attributes:
+        broker: Order execution broker.
+        entry_rules: List of entry rules to apply.
+        exit_rules: List of exit rules to apply.
+        metrics: List of metrics to compute per bar.
+    """
 
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_RUNNER
     broker: Broker
@@ -17,6 +24,16 @@ class StrategyRunner(ABC):
     exit_rules: list[ExitRule]
     metrics: list[StrategyMetric]
 
+    @abstractmethod
     def run(self, raw_data: RawData, signals: Signals, state: StrategyState) -> StrategyState:
-        """Run the strategy."""
+        """Run the strategy on historical or live data.
+
+        Args:
+            raw_data: OHLCV data container.
+            signals: Pre-computed signals.
+            state: Initial strategy state (or None for fresh start).
+
+        Returns:
+            Final strategy state after processing.
+        """
         ...

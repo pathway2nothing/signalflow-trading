@@ -84,10 +84,18 @@ markdown_extensions:
 
 
 plugins:
-  - search: 
+  - search:
       lang: en
   - macros:
       module_name: docs/hooks
+      include_yaml: []
+      on_error_fail: false
+  - mkdocs-jupyter:
+      include_source: true
+      execute: false
+      allow_errors: false
+      include_requirejs: true
+      theme: dark
   - mkdocstrings:
       default_handler: python
       handlers:
@@ -109,8 +117,17 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quick Start: quickstart.md
+  - Tutorials:
+    - notebooks/index.md
+    # Add notebooks here, e.g.:
+    # - My Tutorial: notebooks/my_tutorial.ipynb
   - User Guide:
+    - Signal Architecture & Meta-Labeling: guide/signal-architecture.md
+    - Data Sources: guide/data-sources.md
+    - Data Stores: guide/data-stores.md
     - Custom Data Types: guide/custom-data-types.md
+    - Custom Detectors: guide/custom-detectors.md
+    - Signal Validators: guide/validators.md
     - Advanced Strategies: guide/advanced-strategies.md
     - Model Integration: guide/model-integration.md
   - Ecosystem:

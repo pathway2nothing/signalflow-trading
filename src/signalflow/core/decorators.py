@@ -11,11 +11,11 @@ def sf_component(*, name: str, override: bool = True):
 
     The decorated class must have a `component_type` class attribute
     of type `SfComponentType` to indicate what kind of component it is
-    (e.g., DETECTOR, EXTRACTOR, LABELER, ENTRY_RULE, EXIT_RULE).
+    (e.g., DETECTOR, FEATURE, LABELER, STRATEGY_ENTRY_RULE, STRATEGY_EXIT_RULE).
 
     Args:
         name (str): Registry name for the component (case-insensitive).
-        override (bool): Allow overriding existing registration. Default: False.
+        override (bool): Allow overriding existing registration. Default: True.
 
     Returns:
         Callable: Decorator function that registers and returns the class unchanged.
@@ -65,17 +65,17 @@ def sf_component(*, name: str, override: bool = True):
 
         @sf_component(name="rsi")
         class RsiExtractor(FeatureExtractor):
-            component_type = SfComponentType.EXTRACTOR
+            component_type = SfComponentType.FEATURE
             # ...
 
         @sf_component(name="fixed_size")
         class FixedSizeEntry(SignalEntryRule):
-            component_type = SfComponentType.ENTRY_RULE
+            component_type = SfComponentType.STRATEGY_ENTRY_RULE
             # ...
 
         @sf_component(name="take_profit")
         class TakeProfitExit(ExitRule):
-            component_type = SfComponentType.EXIT_RULE
+            component_type = SfComponentType.STRATEGY_EXIT_RULE
             # ...
         ```
 

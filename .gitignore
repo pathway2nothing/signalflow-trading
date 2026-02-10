@@ -81,6 +81,8 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+TODO.md
+CLAUDE.md
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -166,4 +168,7 @@ about.txt
 .vscode
 src/*.png
 notebooks/*.png
+
+# Test/benchmark scripts
+scripts/
 notebooks/*.html

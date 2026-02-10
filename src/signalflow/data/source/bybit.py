@@ -9,24 +9,17 @@ from typing import Optional
 import aiohttp
 from loguru import logger
 
-from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.core import sf_component
+from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.source.base import RawDataSource, RawDataLoader
+from signalflow.data.source._helpers import (
+    TIMEFRAME_MS,
+    dt_to_ms_utc,
+    ms_to_dt_utc_naive,
+    ensure_utc_naive,
+)
 
-_TIMEFRAME_MS: dict[str, int] = {
-    "1m": 60_000,
-    "3m": 3 * 60_000,
-    "5m": 5 * 60_000,
-    "15m": 15 * 60_000,
-    "30m": 30 * 60_000,
-    "1h": 60 * 60_000,
-    "2h": 2 * 60 * 60_000,
-    "4h": 4 * 60 * 60_000,
-    "6h": 6 * 60 * 60_000,
-    "12h": 12 * 60 * 60_000,
-    "1d": 24 * 60 * 60_000,
-}
-
+# Bybit-specific interval mapping (their API uses different names).
 _BYBIT_INTERVAL_MAP: dict[str, str] = {
     "1m": "1",
     "3m": "3",
@@ -40,24 +33,6 @@ _BYBIT_INTERVAL_MAP: dict[str, str] = {
     "12h": "720",
     "1d": "D",
 }
-
-
-def _dt_to_ms_utc(dt: datetime) -> int:
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    else:
-        dt = dt.astimezone(timezone.utc)
-    return int(dt.timestamp() * 1000)
-
-
-def _ms_to_dt_utc_naive(ms: int) -> datetime:
-    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).replace(tzinfo=None)
-
-
-def _ensure_utc_naive(dt: datetime) -> datetime:
-    if dt.tzinfo is None:
-        return dt
-    return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 @dataclass
@@ -136,9 +111,9 @@ class BybitClient(RawDataSource):
             "limit": int(limit),
         }
         if start_time is not None:
-            params["start"] = _dt_to_ms_utc(start_time)
+            params["start"] = dt_to_ms_utc(start_time)
         if end_time is not None:
-            params["end"] = _dt_to_ms_utc(end_time)
+            params["end"] = dt_to_ms_utc(end_time)
 
         url = f"{self.base_url}/v5/market/kline"
         last_err: Optional[Exception] = None
@@ -163,12 +138,12 @@ class BybitClient(RawDataSource):
 
                 rows = body.get("result", {}).get("list", [])
 
-                tf_ms = _TIMEFRAME_MS.get(timeframe, 60_000)
+                tf_ms = TIMEFRAME_MS.get(timeframe, 60_000)
                 out: list[dict] = []
                 for row in reversed(rows):  # Bybit returns descending - reverse
                     out.append(
                         {
-                            "timestamp": _ms_to_dt_utc_naive(int(row[0]) + tf_ms),
+                            "timestamp": ms_to_dt_utc_naive(int(row[0]) + tf_ms),
                             "open": float(row[1]),
                             "high": float(row[2]),
                             "low": float(row[3]),
@@ -205,7 +180,7 @@ class BybitClient(RawDataSource):
         Args:
             pair: Trading pair.
             category: Market category.
-            timeframe: Interval (must be in ``_TIMEFRAME_MS``).
+            timeframe: Interval (must be in ``TIMEFRAME_MS``).
             start_time: Range start (inclusive).
             end_time: Range end (inclusive).
             limit: Candles per request.
@@ -213,16 +188,16 @@ class BybitClient(RawDataSource):
         Returns:
             Deduplicated, ascending OHLCV dicts.
         """
-        if timeframe not in _TIMEFRAME_MS:
+        if timeframe not in TIMEFRAME_MS:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
 
-        start_time = _ensure_utc_naive(start_time)
-        end_time = _ensure_utc_naive(end_time)
+        start_time = ensure_utc_naive(start_time)
+        end_time = ensure_utc_naive(end_time)
 
         if start_time >= end_time:
             return []
 
-        tf_ms = _TIMEFRAME_MS[timeframe]
+        tf_ms = TIMEFRAME_MS[timeframe]
         window = timedelta(milliseconds=tf_ms * limit)
 
         all_klines: list[dict] = []
@@ -315,12 +290,12 @@ class BybitSpotLoader(RawDataLoader):
         if end is None:
             end = now
         else:
-            end = _ensure_utc_naive(end)
+            end = ensure_utc_naive(end)
 
         if start is None:
             start = end - timedelta(days=days if days else 7)
         else:
-            start = _ensure_utc_naive(start)
+            start = ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,
@@ -453,12 +428,12 @@ class BybitFuturesLoader(RawDataLoader):
         if end is None:
             end = now
         else:
-            end = _ensure_utc_naive(end)
+            end = ensure_utc_naive(end)
 
         if start is None:
             start = end - timedelta(days=days if days else 7)
         else:
-            start = _ensure_utc_naive(start)
+            start = ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,

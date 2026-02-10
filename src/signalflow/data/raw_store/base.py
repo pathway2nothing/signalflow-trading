@@ -2,10 +2,13 @@ from abc import ABC, abstractmethod
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, ClassVar
+from typing import TYPE_CHECKING, Optional, ClassVar
 from signalflow.core import SfComponentType
 import polars as pl
 import pandas as pd
+
+if TYPE_CHECKING:
+    from signalflow.core import RawData
 
 
 @dataclass
@@ -292,5 +295,51 @@ class RawDataStore(ABC):
         Note:
             Idempotent - safe to call multiple times.
             After close(), store should not be used for loading.
+        """
+        pass
+
+    @abstractmethod
+    def to_raw_data(
+        self,
+        pairs: list[str],
+        start: datetime,
+        end: datetime,
+        data_key: Optional[str] = None,
+    ) -> "RawData":
+        """Convert store data to RawData container.
+
+        Loads data for specified pairs and date range, validates schema,
+        and packages into immutable RawData container.
+
+        Args:
+            pairs: List of trading pairs to load.
+            start: Start datetime (inclusive).
+            end: End datetime (inclusive).
+            data_key: Key for data in RawData.data dict.
+                If None, uses store's data_type (e.g., "spot", "futures").
+
+        Returns:
+            RawData container with loaded and validated data.
+
+        Raises:
+            ValueError: If required columns missing or duplicates detected.
+
+        Example:
+            ```python
+            from signalflow.data.raw_store import DuckDbRawStore
+            from datetime import datetime
+
+            store = DuckDbRawStore(db_path="data/spot.duckdb", data_type="spot")
+
+            raw_data = store.to_raw_data(
+                pairs=["BTCUSDT", "ETHUSDT"],
+                start=datetime(2024, 1, 1),
+                end=datetime(2024, 12, 31),
+            )
+
+            # Access data
+            spot_df = raw_data["spot"]
+            print(f"Loaded {len(spot_df)} bars")
+            ```
         """
         pass

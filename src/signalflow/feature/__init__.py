@@ -4,6 +4,12 @@ from signalflow.feature.feature_pipeline import FeaturePipeline
 from signalflow.feature.lin_reg_forecast import LinRegForecastFeature
 from signalflow.feature.examples import ExampleGlobalMeanRsiFeature, ExampleRsiFeature, ExampleSmaFeature
 from signalflow.feature.atr import ATRFeature
+from signalflow.feature.informativeness import (
+    FeatureInformativenessAnalyzer,
+    InformativenessReport,
+    RollingMIConfig,
+    CompositeWeights,
+)
 
 
 __all__ = [
@@ -16,4 +22,8 @@ __all__ = [
     "ExampleSmaFeature",
     "ExampleGlobalMeanRsiFeature",
     "ATRFeature",
+    "FeatureInformativenessAnalyzer",
+    "InformativenessReport",
+    "RollingMIConfig",
+    "CompositeWeights",
 ]

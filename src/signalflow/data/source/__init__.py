@@ -1,3 +1,32 @@
+"""Exchange data sources and loaders.
+
+Provides async clients and loaders for downloading historical OHLCV data
+from cryptocurrency exchanges.
+
+Supported Exchanges:
+    - Binance: Spot, USDT-M Futures, COIN-M Futures
+    - Bybit: Spot, Linear Futures
+    - OKX: Spot, Perpetual Swaps
+
+Base Classes:
+    RawDataSource: Abstract base for exchange API clients.
+    RawDataLoader: Abstract base for data loaders with download/sync.
+
+Virtual Data:
+    VirtualDataProvider: Synthetic OHLCV data for testing.
+    generate_ohlcv: Random walk price series.
+    generate_crossover_data: SMA crossover patterns.
+
+Example:
+    ```python
+    from signalflow.data.source import BinanceClient
+    from datetime import datetime
+
+    async with BinanceClient() as client:
+        klines = await client.get_klines("BTCUSDT", "1h")
+    ```
+"""
+
 from signalflow.data.source.base import RawDataSource, RawDataLoader
 from signalflow.data.source.binance import (
     BinanceClient,
