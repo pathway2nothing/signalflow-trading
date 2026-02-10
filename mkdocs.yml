@@ -111,6 +111,8 @@ nav:
     - Quick Start: quickstart.md
   - User Guide:
     - Signal Architecture & Meta-Labeling: guide/signal-architecture.md
+    - Data Sources: guide/data-sources.md
+    - Data Stores: guide/data-stores.md
     - Custom Data Types: guide/custom-data-types.md
     - Advanced Strategies: guide/advanced-strategies.md
     - Model Integration: guide/model-integration.md

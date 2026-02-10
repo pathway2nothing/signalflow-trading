@@ -17,10 +17,9 @@ from signalflow.data.source.okx import (
     OkxFuturesLoader,
     OkxSpotLoader,
     _OKX_BAR_MAP,
-    _dt_to_ms_utc,
-    _ms_to_dt_utc_naive,
     _to_okx_inst_id,
 )
+from signalflow.data.source._helpers import dt_to_ms_utc, ms_to_dt_utc_naive
 
 START = datetime(2024, 1, 1)
 PAIR = "BTCUSDT"
@@ -114,9 +113,9 @@ class TestOkxClient:
         asyncio.run(_run())
 
     def test_get_klines_parses_response(self) -> None:
-        ts1 = _dt_to_ms_utc(START)
-        ts2 = _dt_to_ms_utc(START + timedelta(minutes=1))
-        ts3 = _dt_to_ms_utc(START + timedelta(minutes=2))
+        ts1 = dt_to_ms_utc(START)
+        ts2 = dt_to_ms_utc(START + timedelta(minutes=1))
+        ts3 = dt_to_ms_utc(START + timedelta(minutes=2))
 
         body = _make_okx_response([ts1, ts2, ts3])
         mock_resp = _mock_response(body)
@@ -146,7 +145,7 @@ class TestOkxClient:
         t2 = START + timedelta(minutes=1)
         t3 = START + timedelta(minutes=2)
 
-        body = _make_okx_response([_dt_to_ms_utc(t1), _dt_to_ms_utc(t2), _dt_to_ms_utc(t3)])
+        body = _make_okx_response([dt_to_ms_utc(t1), dt_to_ms_utc(t2), dt_to_ms_utc(t3)])
         mock_resp = _mock_response(body)
 
         async def _run():

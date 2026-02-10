@@ -156,6 +156,75 @@ class TestRawStoreSchema:
         assert all(ts <= end for ts in df["timestamp"].to_list())
 
 
+class TestRawStoreToRawData:
+    """Tests for RawDataStore.to_raw_data() method."""
+
+    def test_to_raw_data_returns_raw_data(self, raw_store, sample_klines):
+        """to_raw_data returns RawData container with correct data."""
+        from signalflow.core import RawData
+
+        raw_store.insert_klines("BTCUSDT", sample_klines)
+        raw_store.insert_klines("ETHUSDT", sample_klines[:50])
+
+        start = datetime(2024, 1, 1, 0, 0)
+        end = datetime(2024, 1, 1, 1, 39)
+
+        raw_data = raw_store.to_raw_data(
+            pairs=["BTCUSDT", "ETHUSDT"],
+            start=start,
+            end=end,
+        )
+
+        assert isinstance(raw_data, RawData)
+        assert raw_data.datetime_start == start
+        assert raw_data.datetime_end == end
+        assert raw_data.pairs == ["BTCUSDT", "ETHUSDT"]
+        assert "spot" in raw_data.data
+
+    def test_to_raw_data_custom_key(self, raw_store, sample_klines):
+        """to_raw_data with custom data_key."""
+        raw_store.insert_klines("BTCUSDT", sample_klines)
+
+        raw_data = raw_store.to_raw_data(
+            pairs=["BTCUSDT"],
+            start=datetime(2024, 1, 1),
+            end=datetime(2024, 1, 1, 1, 39),
+            data_key="custom_key",
+        )
+
+        assert "custom_key" in raw_data.data
+        assert "spot" not in raw_data.data
+
+    def test_to_raw_data_sorted_by_pair_timestamp(self, raw_store, sample_klines):
+        """to_raw_data returns data sorted by (pair, timestamp)."""
+        raw_store.insert_klines("BTCUSDT", sample_klines)
+        raw_store.insert_klines("ETHUSDT", sample_klines)
+
+        raw_data = raw_store.to_raw_data(
+            pairs=["BTCUSDT", "ETHUSDT"],
+            start=datetime(2024, 1, 1),
+            end=datetime(2024, 1, 1, 1, 39),
+        )
+
+        df = raw_data["spot"]
+        # Check sorted
+        pairs_sorted = df["pair"].to_list()
+        btc_count = pairs_sorted.count("BTCUSDT")
+        assert all(p == "BTCUSDT" for p in pairs_sorted[:btc_count])
+        assert all(p == "ETHUSDT" for p in pairs_sorted[btc_count:])
+
+    def test_to_raw_data_empty(self, raw_store):
+        """to_raw_data with no data returns empty DataFrame in RawData."""
+        raw_data = raw_store.to_raw_data(
+            pairs=["BTCUSDT"],
+            start=datetime(2024, 1, 1),
+            end=datetime(2024, 1, 2),
+        )
+
+        assert "spot" in raw_data.data
+        assert len(raw_data["spot"]) == 0
+
+
 class TestDuckDbRawStoreDataTypes:
     """Tests for DuckDbRawStore data_type support (futures, perpetual)."""
 
