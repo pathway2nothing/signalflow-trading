@@ -18,6 +18,7 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 import polars as pl
@@ -31,8 +32,6 @@ from signalflow.feature.mutual_information import (
     mutual_information_discrete,
     normalized_mutual_information,
 )
-from signalflow.detector.event.base import EventDetectorBase
-from signalflow.detector.event.global_detector import GlobalEventDetector
 from signalflow.target.multi_target_generator import (
     DEFAULT_HORIZONS,
     DEFAULT_TARGET_TYPES,
@@ -40,6 +39,51 @@ from signalflow.target.multi_target_generator import (
     MultiTargetGenerator,
     TargetType,
 )
+from signalflow.target.utils import mask_targets_by_signals
+
+if TYPE_CHECKING:
+    from signalflow.core import RawDataView
+    from signalflow.detector.base import SignalDetector
+
+
+def _default_event_detector() -> "SignalDetector":
+    """Deferred import to avoid circular dependency."""
+    from signalflow.detector.market import AgreementDetector
+
+    return AgreementDetector()
+
+
+def _df_to_raw_data_view(
+    df: pl.DataFrame,
+    pair_col: str = "pair",
+    ts_col: str = "timestamp",
+) -> "RawDataView":
+    """Convert a DataFrame to RawDataView for detector usage.
+
+    Creates a minimal RawDataView from an OHLCV DataFrame.
+
+    Args:
+        df: DataFrame with OHLCV columns.
+        pair_col: Pair column name.
+        ts_col: Timestamp column name.
+
+    Returns:
+        RawDataView wrapping the DataFrame.
+    """
+    from signalflow.core import RawData, RawDataView
+
+    pairs = df.get_column(pair_col).unique().sort().to_list()
+    timestamps = df.get_column(ts_col).sort()
+    datetime_start = timestamps.min()
+    datetime_end = timestamps.max()
+
+    raw_data = RawData(
+        datetime_start=datetime_start,
+        datetime_end=datetime_end,
+        pairs=pairs,
+        data={"spot": df},
+    )
+    return RawDataView(raw_data)
 
 
 @dataclass
@@ -125,7 +169,7 @@ class FeatureInformativenessAnalyzer:
     """
 
     target_generator: MultiTargetGenerator = field(default_factory=MultiTargetGenerator)
-    event_detector: EventDetectorBase | None = field(default_factory=GlobalEventDetector)
+    event_detector: SignalDetector | None = field(default_factory=_default_event_detector)
     rolling_mi: RollingMIConfig = field(default_factory=RollingMIConfig)
     weights: CompositeWeights = field(default_factory=CompositeWeights)
     bins: int = 20
@@ -161,17 +205,26 @@ class FeatureInformativenessAnalyzer:
         global_events = None
         if self.event_detector is not None:
             logger.info("Detecting global events...")
-            global_events = self.event_detector.detect(df)
+            # Convert DataFrame to RawDataView for SignalDetector
+            raw_view = _df_to_raw_data_view(df, self.pair_col, self.ts_col)
+            signals = self.event_detector.run(raw_view)
+            global_events = signals.value
 
-            cols_by_horizon: dict[str, list[str]] = {}
-            for meta in target_meta:
-                cols_by_horizon.setdefault(meta["horizon"], []).append(meta["column"])
+            # Get all target columns
+            target_columns = [meta["column"] for meta in target_meta]
 
-            df = self.event_detector.mask_targets(
+            # Mask targets using the maximum horizon
+            max_horizon = max(h.horizon for h in self.target_generator.horizons)
+
+            df = mask_targets_by_signals(
                 df=df,
-                event_timestamps=global_events,
-                horizon_configs=self.target_generator.horizons,
-                target_columns_by_horizon=cols_by_horizon,
+                signals=signals,
+                mask_signal_types=self.event_detector.allowed_signal_types or set(),
+                horizon_bars=max_horizon,
+                cooldown_bars=60,
+                target_columns=target_columns,
+                pair_col=self.pair_col,
+                ts_col=self.ts_col,
             )
 
         # 3-4. Compute MI and rolling stability
@@ -186,7 +239,7 @@ class FeatureInformativenessAnalyzer:
 
         n_events = 0
         if global_events is not None:
-            n_events = global_events.filter(pl.col("_is_global_event")).height
+            n_events = global_events.height
 
         metadata = {
             "n_features": len(feature_columns),

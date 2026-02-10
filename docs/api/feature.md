@@ -63,10 +63,10 @@ horizons. Combines MI magnitude with temporal stability into a composite score.
 
 ```python
 from signalflow.feature.informativeness import FeatureInformativenessAnalyzer
-from signalflow.detector.event import ZScoreEventDetector
+from signalflow.detector.market import MarketZScoreDetector
 
 analyzer = FeatureInformativenessAnalyzer(
-    event_detector=ZScoreEventDetector(z_threshold=3.0),
+    event_detector=MarketZScoreDetector(z_threshold=3.0),
 )
 report = analyzer.analyze(df, feature_columns=["rsi_14", "sma_20", "volume_ratio"])
 

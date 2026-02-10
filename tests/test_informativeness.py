@@ -18,7 +18,7 @@ from signalflow.target.multi_target_generator import (
     MultiTargetGenerator,
     TargetType,
 )
-from signalflow.detector.event.global_detector import GlobalEventDetector
+from signalflow.detector.market import GlobalEventDetector
 
 
 def _make_ohlcv_with_features(
@@ -174,7 +174,6 @@ class TestFeatureInformativenessAnalyzer:
             event_detector=GlobalEventDetector(
                 agreement_threshold=0.8,
                 min_pairs=3,
-                cooldown_bars=10,
             ),
             rolling_mi=RollingMIConfig(window_size=500),
             bins=10,
@@ -183,7 +182,8 @@ class TestFeatureInformativenessAnalyzer:
         report = analyzer.analyze(df, ["feat_informative", "feat_noise"])
 
         assert report.global_events is not None
-        assert "_is_global_event" in report.global_events.columns
+        assert "signal_type" in report.global_events.columns
+        assert report.global_events.height > 0
         assert report.composite_scores.height == 2
 
     def test_disable_global_event_detection(self):

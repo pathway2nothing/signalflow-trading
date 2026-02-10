@@ -14,6 +14,7 @@ from signalflow.target.volatility_labeler import VolatilityRegimeLabeler
 from signalflow.target.trend_scanning import TrendScanningLabeler
 from signalflow.target.structure_labeler import StructureLabeler, ZigzagStructureLabeler
 from signalflow.target.volume_labeler import VolumeRegimeLabeler
+from signalflow.target.utils import mask_targets_by_signals, mask_targets_by_timestamps
 
 import signalflow.target.adapter as adapter
 
@@ -33,5 +34,8 @@ __all__ = [
     "StructureLabeler",
     "ZigzagStructureLabeler",
     "VolumeRegimeLabeler",
+    # Utilities
+    "mask_targets_by_signals",
+    "mask_targets_by_timestamps",
     "adapter",
 ]

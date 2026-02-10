@@ -287,8 +287,8 @@ class TestSmaCrossDetector:
         assert d.fast_period == 5
         assert d.slow_period == 10
 
-    def test_has_feature_pipeline(self):
+    def test_has_features(self):
         from signalflow.detector.sma_cross import ExampleSmaCrossDetector
 
         d = ExampleSmaCrossDetector(fast_period=5, slow_period=10)
-        assert d.feature_pipeline is not None
+        assert d.features is not None

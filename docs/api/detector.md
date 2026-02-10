@@ -45,54 +45,47 @@ Signal detectors and event detectors for real-time market analysis.
       show_source: true
       members: true
 
-## Event Detection
+## Market-Wide Detection
 
-Exogenous events (regulatory news, rate decisions, black swans) cause correlated price moves
-that no feature could predict. Event detectors identify these timestamps so that labels near
+Exogenous market-wide signals (regulatory news, rate decisions, black swans) cause correlated price moves
+that no feature could predict. Market-wide detectors identify these timestamps so that labels near
 them can be masked (set to null), preventing MI estimate pollution.
 
-All detectors share the same base class and masking logic — only the detection algorithm differs.
+All detectors extend SignalDetector with `signal_category=MARKET_WIDE`.
 
 ```
-EventDetectorBase (ABC)
-    ├── GlobalEventDetector      @sf_component("event_detector/agreement")
-    ├── ZScoreEventDetector      @sf_component("event_detector/zscore")
-    └── CusumEventDetector       @sf_component("event_detector/cusum")
+SignalDetector (signal_category=MARKET_WIDE)
+    ├── AgreementDetector         @sf_component("market/agreement")
+    ├── MarketZScoreDetector      @sf_component("market/zscore")
+    └── MarketCusumDetector       @sf_component("market/cusum")
 ```
 
 ### Usage
 
 ```python
-from signalflow.detector.event import ZScoreEventDetector, CusumEventDetector
+from signalflow.detector.market import MarketZScoreDetector, MarketCusumDetector
+from signalflow.target.utils import mask_targets_by_signals
 
 # Z-Score: detects sudden shocks (z-score of aggregate cross-pair return)
-zscore_det = ZScoreEventDetector(z_threshold=6.0, rolling_window=500)
-events = zscore_det.detect(df)
+zscore_det = MarketZScoreDetector(z_threshold=6.0, rolling_window=500)
+signals = zscore_det.run(raw_data_view)
 
 # CUSUM: detects sustained regime shifts (cumulative sum of deviations)
-cusum_det = CusumEventDetector(drift=0.005, cusum_threshold=0.05)
-events = cusum_det.detect(df)
+cusum_det = MarketCusumDetector(drift=0.005, cusum_threshold=0.05)
+signals = cusum_det.run(raw_data_view)
 
-# Mask labels near detected events
-df_masked = zscore_det.mask_targets(
+# Mask labels near detected signals
+df_masked = mask_targets_by_signals(
     df=df,
-    event_timestamps=events,
-    horizon_configs=horizons,
-    target_columns_by_horizon=cols_by_horizon,
+    signals=signals,
+    mask_signal_types={"global_event"},
+    horizon_bars=60,
 )
 ```
 
-### Base Class
-
-::: signalflow.detector.event.base.EventDetectorBase
-    options:
-      show_root_heading: true
-      show_source: true
-      members: true
-
 ### Agreement-Based Detector
 
-::: signalflow.detector.event.global_detector.GlobalEventDetector
+::: signalflow.detector.market.agreement.AgreementDetector
     options:
       show_root_heading: true
       show_source: true
@@ -100,7 +93,7 @@ df_masked = zscore_det.mask_targets(
 
 ### Z-Score Detector
 
-::: signalflow.detector.event.zscore_detector.ZScoreEventDetector
+::: signalflow.detector.market.zscore.MarketZScoreDetector
     options:
       show_root_heading: true
       show_source: true
@@ -108,7 +101,7 @@ df_masked = zscore_det.mask_targets(
 
 ### CUSUM Detector
 
-::: signalflow.detector.event.cusum_detector.CusumEventDetector
+::: signalflow.detector.market.cusum.MarketCusumDetector
     options:
       show_root_heading: true
       show_source: true

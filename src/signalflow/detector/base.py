@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 import polars as pl
 
 from signalflow.core import RawDataView, Signals, SfComponentType, SignalType, SignalCategory, RawDataType
-from signalflow.feature import FeaturePipeline
+from signalflow.feature import Feature, FeaturePipeline
 from signalflow.utils import KwargsTolerantMixin
 
 
@@ -37,7 +37,9 @@ class SignalDetector(KwargsTolerantMixin, ABC):
         pair_col (str): Trading pair column name. Default: "pair".
         ts_col (str): Timestamp column name. Default: "timestamp".
         raw_data_type (RawDataType): Type of raw data to process. Default: SPOT.
-        features (FeaturePipeline | None): Feature extractor. Default: None.
+        features (Feature | list[Feature] | FeaturePipeline | None): Features to compute.
+            Can be a single Feature, list of Features, or FeaturePipeline.
+            If None, preprocess() returns raw OHLCV data. Default: None.
         require_probability (bool): Require probability column in signals. Default: False.
         keep_only_latest_per_pair (bool): Keep only latest signal per pair. Default: False.
 
@@ -54,6 +56,7 @@ class SignalDetector(KwargsTolerantMixin, ABC):
                 super().__init__()
                 # Auto-generate features
                 from signalflow.feature import FeaturePipeline, SmaExtractor
+                # Can be FeaturePipeline, list of features, or single feature
                 self.features = FeaturePipeline([
                     SmaExtractor(window=fast_window, column="close"),
                     SmaExtractor(window=slow_window, column="close")
@@ -106,7 +109,10 @@ class SignalDetector(KwargsTolerantMixin, ABC):
 
     raw_data_type: RawDataType | str = RawDataType.SPOT
 
-    features: FeaturePipeline | None = None
+    # Features for computing indicators (RSI, SMA, etc.)
+    # Can be: Feature, list[Feature], FeaturePipeline, or None
+    # If None, preprocess() returns raw OHLCV data
+    features: Feature | list[Feature] | FeaturePipeline | None = None
 
     require_probability: bool = False
     keep_only_latest_per_pair: bool = False
@@ -168,8 +174,11 @@ class SignalDetector(KwargsTolerantMixin, ABC):
     def preprocess(self, raw_data_view: RawDataView, context: dict[str, Any] | None = None) -> pl.DataFrame:
         """Extract features from raw data.
 
-        Default implementation delegates to FeaturePipeline. Override for custom
-        feature extraction logic.
+        Base implementation:
+            1. Load raw OHLCV data from raw_data_view
+            2. Apply features_pipe if provided
+
+        Subclasses can override to add helper columns for their detection method.
 
         Args:
             raw_data_view (RawDataView): View to raw market data.
@@ -178,30 +187,57 @@ class SignalDetector(KwargsTolerantMixin, ABC):
         Returns:
             pl.DataFrame: Features with at minimum pair and timestamp columns.
 
-        Raises:
-            NotImplementedError: If feature_pipeline is None and not overridden.
-            TypeError: If FeaturePipeline doesn't return pl.DataFrame.
-
         Example:
             ```python
-            # Default: uses FeaturePipeline
-            features = detector.preprocess(raw_data_view)
+            # Base: returns OHLCV (if features is None)
+            # or OHLCV + computed features (if features is provided)
+            feats = detector.preprocess(raw_data_view)
 
-            # Custom override
-            class CustomDetector(SignalDetector):
+            # Custom override to add helper columns
+            class ZScoreDetector(SignalDetector):
+                target_feature: str = "RSI_14"
+                rolling_window: int = 100
+
                 def preprocess(self, raw_data_view, context=None):
-                    df = raw_data_view.to_polars("spot")
-                    return df.with_columns([
-                        pl.col("close").rolling_mean(10).alias("sma_10")
+                    # 1. Base preprocessing (OHLCV + features)
+                    df = super().preprocess(raw_data_view, context)
+
+                    # 2. Add helper columns for z-score method
+                    df = df.with_columns([
+                        pl.col(self.target_feature)
+                            .rolling_mean(window_size=self.rolling_window)
+                            .over(self.pair_col)
+                            .alias("_target_rol_mean"),
+                        pl.col(self.target_feature)
+                            .rolling_std(window_size=self.rolling_window)
+                            .over(self.pair_col)
+                            .alias("_target_rol_std"),
                     ])
+                    return df
             ```
         """
-        if self.feature_pipeline is None:
-            raise NotImplementedError(f"{self.__class__.__name__}.preprocess is not implemented and features is None")
-        out = self.feature_pipeline.run(raw_data_view, context=context)
-        if not isinstance(out, pl.DataFrame):
-            raise TypeError(f"{self.__class__.__name__}.features.extract must return pl.DataFrame, got {type(out)}")
-        return out
+        # 1. Load raw OHLCV data
+        key = self.raw_data_type.value if hasattr(self.raw_data_type, "value") else str(self.raw_data_type)
+        df = raw_data_view.to_polars(key).sort([self.pair_col, self.ts_col])
+
+        # 2. Apply features if provided
+        if self.features is not None:
+            if isinstance(self.features, FeaturePipeline):
+                df = self.features.compute(df, context=context)
+            elif isinstance(self.features, list):
+                for feat in self.features:
+                    df = feat.compute(df, context=context)
+            elif isinstance(self.features, Feature):
+                df = self.features.compute(df, context=context)
+            else:
+                raise TypeError(
+                    f"features must be Feature, list[Feature], or FeaturePipeline, got {type(self.features)}"
+                )
+
+            if not isinstance(df, pl.DataFrame):
+                raise TypeError(f"{self.__class__.__name__}.features.compute must return pl.DataFrame, got {type(df)}")
+
+        return df
 
     @abstractmethod
     def detect(self, features: pl.DataFrame, context: dict[str, Any] | None = None) -> Signals:
