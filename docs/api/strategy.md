@@ -780,6 +780,5 @@ features = bars_df.select([
 ## See Also
 
 - **[Model Integration Guide](../guide/model-integration.md)**: Detailed ML/RL integration tutorial
-- **[Tutorial Notebook](../notebooks/strategy_tutorial.ipynb)**: Interactive examples
 - **[Quick Start](../quickstart.md)**: Basic strategy setup
 - **[Core API](core.md)**: `StrategyState`, `Portfolio`, `Position`

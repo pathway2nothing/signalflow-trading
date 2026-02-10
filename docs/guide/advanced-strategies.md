@@ -324,5 +324,4 @@ print(f"Allowed: {allowed}, Reason: {reason}")
 ## See Also
 
 - **[API Reference](../api/strategy.md)**: Detailed component documentation
-- **[Tutorial Notebook](../notebooks/strategy_tutorial.ipynb)**: Interactive examples
 - **[Quick Start](../quickstart.md)**: Basic strategy setup

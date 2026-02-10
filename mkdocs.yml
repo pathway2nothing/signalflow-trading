@@ -90,8 +90,6 @@ plugins:
       module_name: docs/hooks
       include_yaml: []
       on_error_fail: false
-      ignore_macros:
-        - "*.ipynb"
   - mkdocs-jupyter:
       include_source: true
       execute: false

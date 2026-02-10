@@ -574,5 +574,4 @@ class TestMyDetector:
 ## See Also
 
 - [SignalDetector API Reference](../api/detector.md)
-- [Feature Extraction Guide](./custom_features.md)
 - [Market-Wide Detectors](../api/detector.md#market-wide-detection)

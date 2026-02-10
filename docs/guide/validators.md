@@ -355,4 +355,4 @@ print(f"Val AUC: {roc_auc_score(y_val_np, val_preds):.3f}")
 
 - **[API Reference](../api/validator.md)**: Detailed class documentation
 - **[Signal Architecture](signal-architecture.md)**: Meta-labeling theory
-- **[Custom Detectors](../guides/custom_detectors.md)**: Building primary models
+- **[Custom Detectors](./custom-detectors.md)**: Building primary models
