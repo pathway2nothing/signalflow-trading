@@ -102,20 +102,25 @@ class RegimeFilter(EntryFilter):
     """Filter entries based on market regime.
 
     Only allow entries when market regime matches signal type:
-    - RISE signals in trend-up or mean-reversion-oversold regimes
-    - FALL signals in trend-down or mean-reversion-overbought regimes
+    - Bullish signals in trend-up or mean-reversion-oversold regimes
+    - Bearish signals in trend-down or mean-reversion-overbought regimes
 
     Regime detected via state.runtime["regime"][pair] or global regime.
 
     Args:
+        signal_regime_map: Mapping signal_type -> "bullish"/"bearish".
+            When set, overrides legacy "rise"/"fall" hardcoding.
+            None = legacy behavior (only "rise" and "fall" are regime-checked).
         regime_key: Key in state.runtime for regime data.
-        allowed_regimes_rise: Regimes allowing RISE entries.
-        allowed_regimes_fall: Regimes allowing FALL entries.
+        allowed_regimes_bullish: Regimes allowing bullish entries.
+        allowed_regimes_bearish: Regimes allowing bearish entries.
     """
 
+    signal_regime_map: dict[str, str] | None = None  # signal_type -> "bullish"/"bearish"
+
     regime_key: str = "regime"
-    allowed_regimes_rise: list[str] = field(default_factory=lambda: ["trend_up", "mean_reversion_oversold"])
-    allowed_regimes_fall: list[str] = field(default_factory=lambda: ["trend_down", "mean_reversion_overbought"])
+    allowed_regimes_bullish: list[str] = field(default_factory=lambda: ["trend_up", "mean_reversion_oversold"])
+    allowed_regimes_bearish: list[str] = field(default_factory=lambda: ["trend_down", "mean_reversion_overbought"])
 
     def allow_entry(
         self,
@@ -131,15 +136,25 @@ class RegimeFilter(EntryFilter):
         if regime is None:
             return True, ""  # No regime data, allow
 
-        if signal.signal_type == "rise":
-            if regime in self.allowed_regimes_rise:
-                return True, ""
-            return False, f"regime={regime} not in {self.allowed_regimes_rise}"
+        # Determine regime category for this signal_type
+        if self.signal_regime_map is not None:
+            category = self.signal_regime_map.get(signal.signal_type)
+        else:
+            # Legacy behavior
+            category = {"rise": "bullish", "fall": "bearish"}.get(signal.signal_type)
 
-        if signal.signal_type == "fall":
-            if regime in self.allowed_regimes_fall:
+        if category is None:
+            return True, ""  # Unknown signal type, allow
+
+        if category == "bullish":
+            if regime in self.allowed_regimes_bullish:
                 return True, ""
-            return False, f"regime={regime} not in {self.allowed_regimes_fall}"
+            return False, f"regime={regime} not in {self.allowed_regimes_bullish}"
+
+        if category == "bearish":
+            if regime in self.allowed_regimes_bearish:
+                return True, ""
+            return False, f"regime={regime} not in {self.allowed_regimes_bearish}"
 
         return True, ""
 
@@ -307,6 +322,9 @@ class PriceDistanceFilter(EntryFilter):
     existing positions in the same pair.
 
     Args:
+        signal_direction_map: Mapping signal_type -> "long"/"short".
+            When set, overrides legacy "rise"/"fall" hardcoding.
+            None = legacy behavior (only "rise" and "fall" are direction-aware).
         min_distance_pct: Minimum price difference as percentage (e.g., 0.02 = 2%).
         direction_aware: If True, check distance based on position direction.
             - LONG: new entry must be below existing entry by min_distance_pct
@@ -317,6 +335,8 @@ class PriceDistanceFilter(EntryFilter):
         >>> # Grid strategy: only buy when price drops 2% from last position
         >>> filter = PriceDistanceFilter(min_distance_pct=0.02, direction_aware=True)
     """
+
+    signal_direction_map: dict[str, str] | None = None  # signal_type -> "long"/"short"
 
     min_distance_pct: float = 0.02
     direction_aware: bool = True
@@ -344,17 +364,25 @@ class PriceDistanceFilter(EntryFilter):
         price_change_pct = (signal.price - last_entry_price) / last_entry_price
 
         if self.direction_aware:
-            # LONG: we want to buy lower (DCA)
-            if signal.signal_type == "rise":
-                # Price should be below last entry by min_distance_pct
+            # Determine direction for this signal_type
+            if self.signal_direction_map is not None:
+                direction = self.signal_direction_map.get(signal.signal_type)
+            else:
+                # Legacy behavior
+                direction = {"rise": "long", "fall": "short"}.get(signal.signal_type)
+
+            if direction == "long":
+                # LONG: we want to buy lower (DCA)
                 if price_change_pct > -self.min_distance_pct:
                     return False, (
                         f"price too close to last entry: {price_change_pct:.2%} > -{self.min_distance_pct:.2%}"
                     )
-            # SHORT: we want to sell higher
-            elif signal.signal_type == "fall" and price_change_pct < self.min_distance_pct:
-                # Price should be above last entry by min_distance_pct
-                return False, (f"price too close to last entry: {price_change_pct:.2%} < {self.min_distance_pct:.2%}")
+            elif direction == "short":
+                # SHORT: we want to sell higher
+                if price_change_pct < self.min_distance_pct:
+                    return False, (
+                        f"price too close to last entry: {price_change_pct:.2%} < {self.min_distance_pct:.2%}"
+                    )
         else:
             # Check absolute distance in either direction
             if abs(price_change_pct) < self.min_distance_pct:

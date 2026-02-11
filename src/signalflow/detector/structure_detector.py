@@ -29,11 +29,11 @@ class StructureDetector(SignalDetector):
     Algorithm:
         1. For each bar t, look back ``lookback`` bars
         2. Find the max and min in the lookback window
-        3. A LOCAL_TOP is confirmed when:
+        3. A local_max is confirmed when:
            - The max occurred at bar (t - confirmation_bars) or earlier
            - Price has dropped >= min_swing_pct from the max
            - Current price < max price
-        4. A LOCAL_BOTTOM is confirmed when:
+        4. A local_min is confirmed when:
            - The min occurred at bar (t - confirmation_bars) or earlier
            - Price has risen >= min_swing_pct from the min
            - Current price > min price
@@ -64,7 +64,7 @@ class StructureDetector(SignalDetector):
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
-    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"local_top", "local_bottom"})
+    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"local_max", "local_min"})
 
     price_col: str = "close"
     lookback: int = 60
@@ -100,7 +100,7 @@ class StructureDetector(SignalDetector):
             context: Additional context (unused).
 
         Returns:
-            Signals with local_top/local_bottom signal types.
+            Signals with local_max/local_min signal types.
         """
         results = []
 
@@ -137,25 +137,25 @@ class StructureDetector(SignalDetector):
                 max_val = np.max(valid_prices)
                 min_val = np.min(valid_prices)
 
-                # Check LOCAL_TOP: max in search window, price dropped since
+                # Check local_max: max in search window, price dropped since
                 if max_val > 0 and p_current < max_val:
                     swing = (max_val - p_current) / max_val
                     if swing >= self.min_swing_pct:
-                        if last_emitted_type != "local_top" or (t - last_emitted_idx) > self.lookback:
-                            signal_types[t] = "local_top"
+                        if last_emitted_type != "local_max" or (t - last_emitted_idx) > self.lookback:
+                            signal_types[t] = "local_max"
                             probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
-                            last_emitted_type = "local_top"
+                            last_emitted_type = "local_max"
                             last_emitted_idx = t
                             continue
 
-                # Check LOCAL_BOTTOM: min in search window, price risen since
+                # Check local_min: min in search window, price risen since
                 if min_val > 0 and p_current > min_val:
                     swing = (p_current - min_val) / min_val
                     if swing >= self.min_swing_pct:
-                        if last_emitted_type != "local_bottom" or (t - last_emitted_idx) > self.lookback:
-                            signal_types[t] = "local_bottom"
+                        if last_emitted_type != "local_min" or (t - last_emitted_idx) > self.lookback:
+                            signal_types[t] = "local_min"
                             probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
-                            last_emitted_type = "local_bottom"
+                            last_emitted_type = "local_min"
                             last_emitted_idx = t
 
             group = group.with_columns(

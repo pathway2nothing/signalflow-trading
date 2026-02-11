@@ -53,8 +53,8 @@ class ZScoreAnomalyDetector(SignalDetector):
         detector = ZScoreAnomalyDetector(
             target_feature="close",  # Will compute on raw close prices
             threshold=4.0,
-            signal_high="black_swan",
-            signal_low="flash_crash",
+            signal_high="extreme_positive_anomaly",
+            signal_low="extreme_negative_anomaly",
         )
         ```
 
@@ -64,7 +64,7 @@ class ZScoreAnomalyDetector(SignalDetector):
     """
 
     signal_category: SignalCategory = SignalCategory.ANOMALY
-    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"anomaly_high", "anomaly_low"})
+    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"positive_anomaly", "negative_anomaly"})
 
     # Target feature to analyze
     target_feature: str = "close"
@@ -74,8 +74,8 @@ class ZScoreAnomalyDetector(SignalDetector):
     threshold: float = 4.0
 
     # Signal type names
-    signal_high: str = "anomaly_high"  # value > mean + threshold * std
-    signal_low: str = "anomaly_low"  # value < mean - threshold * std
+    signal_high: str = "positive_anomaly"  # value > mean + threshold * std
+    signal_low: str = "negative_anomaly"  # value < mean - threshold * std
 
     def __post_init__(self) -> None:
         # Update allowed_signal_types based on configured signal names
@@ -127,7 +127,7 @@ class ZScoreAnomalyDetector(SignalDetector):
             context: Additional context (unused).
 
         Returns:
-            Signals with anomaly_high/anomaly_low signal types.
+            Signals with positive_anomaly/negative_anomaly signal types.
         """
         target = pl.col(self.target_feature)
         mean = pl.col("_target_rol_mean")

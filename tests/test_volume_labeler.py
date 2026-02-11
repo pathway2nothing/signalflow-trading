@@ -29,7 +29,7 @@ def _ohlcv_df(n=2000, pair="BTCUSDT", base_vol=1000.0, seed=42):
     )
 
 
-def _inject_volume_spike(df, start_idx, length, multiplier=5.0):
+def _inject_abnormal_volume(df, start_idx, length, multiplier=5.0):
     """Inject a volume spike period."""
     vol = df["volume"].to_list()
     for i in range(start_idx, min(start_idx + length, len(vol))):
@@ -37,7 +37,7 @@ def _inject_volume_spike(df, start_idx, length, multiplier=5.0):
     return df.with_columns(pl.Series(name="volume", values=vol))
 
 
-def _inject_volume_drought(df, start_idx, length, multiplier=0.1):
+def _inject_illiquidity(df, start_idx, length, multiplier=0.1):
     """Inject a volume drought period."""
     vol = df["volume"].to_list()
     for i in range(start_idx, min(start_idx + length, len(vol))):
@@ -65,35 +65,35 @@ class TestVolumeRegimeLabeler:
         non_null = [l for l in labels if l is not None]
         assert len(non_null) == 0, "Constant volume should have no extreme labels"
 
-    def test_volume_spike_detected(self):
+    def test_abnormal_volume_detected(self):
         df = _ohlcv_df(2000)
-        df = _inject_volume_spike(df, 800, 200, multiplier=5.0)
+        df = _inject_abnormal_volume(df, 800, 200, multiplier=5.0)
         labeler = VolumeRegimeLabeler(
             horizon=30, vol_sma_window=500, spike_threshold=2.0, drought_threshold=0.3, mask_to_signals=False
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        # Bars before the spike looking forward into it should see "volume_spike"
-        has_spike = any(l == "volume_spike" for l in labels)
-        assert has_spike, "Expected volume_spike labels before high-volume period"
+        # Bars before the spike looking forward into it should see "abnormal_volume"
+        has_spike = any(l == "abnormal_volume" for l in labels)
+        assert has_spike, "Expected abnormal_volume labels before high-volume period"
 
-    def test_volume_drought_detected(self):
+    def test_illiquidity_detected(self):
         df = _ohlcv_df(2000)
-        df = _inject_volume_drought(df, 800, 200, multiplier=0.05)
+        df = _inject_illiquidity(df, 800, 200, multiplier=0.05)
         labeler = VolumeRegimeLabeler(
             horizon=30, vol_sma_window=500, spike_threshold=2.0, drought_threshold=0.3, mask_to_signals=False
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        has_drought = any(l == "volume_drought" for l in labels)
-        assert has_drought, "Expected volume_drought labels before low-volume period"
+        has_drought = any(l == "illiquidity" for l in labels)
+        assert has_drought, "Expected illiquidity labels before low-volume period"
 
     def test_labels_are_valid_values(self):
         df = _ohlcv_df(500)
-        df = _inject_volume_spike(df, 200, 100, multiplier=3.0)
+        df = _inject_abnormal_volume(df, 200, 100, multiplier=3.0)
         labeler = VolumeRegimeLabeler(horizon=30, vol_sma_window=200, mask_to_signals=False)
         result = labeler.compute(df)
-        valid = {"volume_spike", "volume_drought", None}
+        valid = {"abnormal_volume", "illiquidity", None}
         unique = set(result["label"].to_list())
         assert unique <= valid
 

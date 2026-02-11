@@ -22,7 +22,7 @@ RawDataView → preprocess() → detect() → Signals
 from dataclasses import dataclass
 import polars as pl
 
-from signalflow.core import Signals, SignalType, sf_component
+from signalflow.core import Signals, sf_component
 from signalflow.detector import SignalDetector
 
 
@@ -47,7 +47,7 @@ class RsiOversoldDetector(SignalDetector):
             .select([
                 self.pair_col,
                 self.ts_col,
-                pl.lit(SignalType.RISE.value).alias("signal_type"),
+                pl.lit("rise").alias("signal_type"),
                 pl.lit(1).alias("signal"),
             ])
         )
@@ -77,32 +77,35 @@ Available categories:
 | Category | Description | Example signal_type values |
 |----------|-------------|---------------------------|
 | `PRICE_DIRECTION` | Price movement direction | `rise`, `fall`, `flat` |
-| `PRICE_STRUCTURE` | Price patterns | `local_top`, `local_bottom`, `breakout` |
+| `PRICE_STRUCTURE` | Price patterns | `local_max`, `local_min`, `breakout_up` |
 | `TREND_MOMENTUM` | Trend state | `trend_start`, `trend_reversal`, `overbought` |
-| `VOLATILITY` | Volatility regime | `vol_high`, `vol_low`, `vol_expansion` |
-| `VOLUME_LIQUIDITY` | Volume patterns | `volume_spike`, `accumulation` |
-| `MARKET_WIDE` | Cross-pair events | `market_crash`, `correlation_shift` |
-| `ANOMALY` | Anomalous events | `black_swan`, `flash_crash` |
+| `VOLATILITY` | Volatility regime | `high_volatility`, `low_volatility`, `volatility_expansion` |
+| `VOLUME_LIQUIDITY` | Volume patterns | `abnormal_volume`, `illiquidity`, `accumulation` |
+| `MARKET_WIDE` | Cross-pair events | `market_crash`, `synchronization`, `structural_break` |
+| `ANOMALY` | Anomalous events | `extreme_positive_anomaly`, `extreme_negative_anomaly` |
 
 ### Signal Types
 
-For `PRICE_DIRECTION` category, use the `SignalType` enum:
+Use plain string values for all `signal_type` values:
 
 ```python
-from signalflow.core import SignalType
+# Price direction
+pl.lit("rise").alias("signal_type")
+pl.lit("fall").alias("signal_type")
+pl.lit("flat").alias("signal_type")
 
-pl.lit(SignalType.RISE.value).alias("signal_type")  # "rise"
-pl.lit(SignalType.FALL.value).alias("signal_type")  # "fall"
-pl.lit(SignalType.FLAT.value).alias("signal_type")  # "flat"
+# Volatility regime
+pl.lit("high_volatility").alias("signal_type")
+pl.lit("low_volatility").alias("signal_type")
+
+# No signal: use null (not "none")
+pl.lit(None, dtype=pl.Utf8).alias("signal_type")
 ```
 
-For other categories, use string values:
-
-```python
-# Custom signal types for VOLATILITY category
-pl.lit("vol_high").alias("signal_type")
-pl.lit("vol_low").alias("signal_type")
-```
+!!! note "SignalType enum is deprecated"
+    The `SignalType` enum (`SignalType.RISE`, `SignalType.FALL`, etc.) still
+    works for backward compatibility but is deprecated. Use plain strings
+    instead.
 
 ### Allowed Signal Types
 
@@ -117,7 +120,7 @@ class MyVolatilityDetector(SignalDetector):
 
     # Declare allowed values (for validation)
     allowed_signal_types: set[str] | None = field(
-        default_factory=lambda: {"vol_high", "vol_low"}
+        default_factory=lambda: {"high_volatility", "low_volatility"}
     )
 ```
 
@@ -205,8 +208,8 @@ class ZScoreDetector(SignalDetector):
                 self.pair_col,
                 self.ts_col,
                 pl.when(z_score > self.threshold)
-                    .then(pl.lit("anomaly_high"))
-                    .otherwise(pl.lit("anomaly_low"))
+                    .then(pl.lit("positive_anomaly"))
+                    .otherwise(pl.lit("negative_anomaly"))
                     .alias("signal_type"),
                 pl.lit(1).alias("signal"),
                 (z_score.abs() / self.threshold).clip(0, 1).alias("probability"),
@@ -287,8 +290,8 @@ def detect(self, features: pl.DataFrame, context=None) -> Signals:
             self.pair_col,
             self.ts_col,
             pl.when(rsi < 30)
-                .then(pl.lit(SignalType.RISE.value))
-                .otherwise(pl.lit(SignalType.FALL.value))
+                .then(pl.lit("rise"))
+                .otherwise(pl.lit("fall"))
                 .alias("signal_type"),
             pl.lit(1).alias("signal"),
             # Probability: distance from threshold normalized
@@ -400,7 +403,7 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, SignalType, sf_component
+from signalflow.core import RawDataView, Signals, sf_component
 from signalflow.core.enums import SignalCategory
 from signalflow.detector import SignalDetector
 
@@ -472,8 +475,8 @@ class BollingerBandsDetector(SignalDetector):
                 self.pair_col,
                 self.ts_col,
                 pl.when(touch_lower)
-                    .then(pl.lit(SignalType.RISE.value))
-                    .otherwise(pl.lit(SignalType.FALL.value))
+                    .then(pl.lit("rise"))
+                    .otherwise(pl.lit("fall"))
                     .alias("signal_type"),
                 pl.when(touch_lower)
                     .then(pl.lit(1))
@@ -497,7 +500,7 @@ detector = BollingerBandsDetector(window=20, num_std=2.5)
 signals = detector.run(raw_data_view)
 
 # Filter for bullish signals
-bullish = signals.value.filter(pl.col("signal_type") == SignalType.RISE.value)
+bullish = signals.value.filter(pl.col("signal_type") == "rise")
 ```
 
 ## Testing Your Detector

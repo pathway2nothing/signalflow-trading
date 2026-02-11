@@ -4,7 +4,7 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import Signals, SignalType, sf_component
+from signalflow.core import Signals, sf_component
 from signalflow.detector import SignalDetector
 from signalflow.feature import ExampleSmaFeature
 
@@ -15,9 +15,11 @@ class ExampleSmaCrossDetector(SignalDetector):
     """SMA crossover signal detector.
 
     Signals:
-      - RISE: fast crosses above slow
-      - FALL: fast crosses below slow
+      - "rise": fast crosses above slow
+      - "fall": fast crosses below slow
     """
+
+    allowed_signal_types: set[str] | None = None  # set in __post_init__
 
     fast_period: int = 20
     slow_period: int = 50
@@ -29,6 +31,7 @@ class ExampleSmaCrossDetector(SignalDetector):
 
         self.fast_col = f"sma_{self.fast_period}"
         self.slow_col = f"sma_{self.slow_period}"
+        self.allowed_signal_types = {"rise", "fall"}
 
         self.features = [
             ExampleSmaFeature(period=self.fast_period, price_col=self.price_col),
@@ -53,13 +56,13 @@ class ExampleSmaCrossDetector(SignalDetector):
                 self.pair_col,
                 self.ts_col,
                 pl.when(cross_up)
-                .then(pl.lit(SignalType.RISE.value))
+                .then(pl.lit("rise"))
                 .when(cross_down)
-                .then(pl.lit(SignalType.FALL.value))
-                .otherwise(pl.lit(SignalType.NONE.value))
+                .then(pl.lit("fall"))
+                .otherwise(pl.lit(None, dtype=pl.Utf8))
                 .alias("signal_type"),
                 pl.when(cross_up).then(1).when(cross_down).then(-1).otherwise(0).alias("signal"),
             ]
-        )
+        ).filter(pl.col("signal_type").is_not_null())
 
         return Signals(out)

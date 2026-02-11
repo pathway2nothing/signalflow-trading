@@ -51,6 +51,11 @@ def _valid_signals(n=3, pair="BTCUSDT"):
 # Concrete dummy detector for direct method testing
 @dataclass
 class DummyDetector(SignalDetector):
+    allowed_signal_types: set[str] | None = None  # set in __post_init__
+
+    def __post_init__(self):
+        self.allowed_signal_types = {"rise", "fall"}
+
     def detect(self, features, context=None):
         return _valid_signals(features.height)
 

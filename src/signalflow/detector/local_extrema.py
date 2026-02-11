@@ -28,11 +28,11 @@ class LocalExtremaDetector(SignalDetector):
     Algorithm:
         1. For each bar t, look back lookback bars
         2. Find the max and min in the lookback window
-        3. A local_top is confirmed when:
+        3. A local_max is confirmed when:
            - The max occurred at bar (t - confirmation_bars) or earlier
            - Price has dropped >= min_swing_pct from the max
            - Current price < max price
-        4. A local_bottom is confirmed when:
+        4. A local_min is confirmed when:
            - The min occurred at bar (t - confirmation_bars) or earlier
            - Price has risen >= min_swing_pct from the min
            - Current price > min price
@@ -43,8 +43,8 @@ class LocalExtremaDetector(SignalDetector):
         lookback: Backward window for extrema search. Default: 60.
         confirmation_bars: Bars of reversal needed for confirmation. Default: 10.
         min_swing_pct: Minimum swing percentage. Default: 0.02.
-        signal_top: Signal type for local top. Default: "local_top".
-        signal_bottom: Signal type for local bottom. Default: "local_bottom".
+        signal_top: Signal type for local max. Default: "local_max".
+        signal_bottom: Signal type for local min. Default: "local_min".
 
     Example:
         ```python
@@ -63,7 +63,7 @@ class LocalExtremaDetector(SignalDetector):
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
-    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"local_top", "local_bottom"})
+    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"local_max", "local_min"})
 
     # Price column
     price_col: str = "close"
@@ -74,8 +74,8 @@ class LocalExtremaDetector(SignalDetector):
     min_swing_pct: float = 0.02
 
     # Signal type names
-    signal_top: str = "local_top"
-    signal_bottom: str = "local_bottom"
+    signal_top: str = "local_max"
+    signal_bottom: str = "local_min"
 
     def __post_init__(self) -> None:
         if self.confirmation_bars >= self.lookback:
@@ -95,7 +95,7 @@ class LocalExtremaDetector(SignalDetector):
             context: Additional context (unused).
 
         Returns:
-            Signals with local_top/local_bottom signal types.
+            Signals with local_max/local_min signal types.
         """
         results = []
 

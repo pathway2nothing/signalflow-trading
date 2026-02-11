@@ -23,9 +23,9 @@ class AnomalyLabeler(Labeler):
         1. Compute log returns: log(close[t] / close[t-1])
         2. Compute rolling std of returns over ``vol_window`` bars
         3. Compute forward return magnitude: |log(close[t+horizon] / close[t])|
-        4. If forward return > threshold_return_std * rolling_std -> "black_swan"
+        4. If forward return > threshold_return_std * rolling_std -> "extreme_positive_anomaly"
         5. If additionally the return is negative AND happened in < flash_horizon
-           bars -> "flash_crash"
+           bars -> "extreme_negative_anomaly"
         6. Otherwise -> null (no label)
 
     Attributes:
@@ -92,7 +92,7 @@ class AnomalyLabeler(Labeler):
 
         Returns:
             pl.DataFrame: Same length as input with anomaly label column added.
-                Labels are "black_swan", "flash_crash", or null.
+                Labels are "extreme_positive_anomaly", "extreme_negative_anomaly", or null.
         """
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
@@ -148,9 +148,9 @@ class AnomalyLabeler(Labeler):
 
         label_expr = (
             pl.when(is_flash_crash)
-            .then(pl.lit("flash_crash"))
+            .then(pl.lit("extreme_negative_anomaly"))
             .when(is_anomaly)
-            .then(pl.lit("black_swan"))
+            .then(pl.lit("extreme_positive_anomaly"))
             .otherwise(pl.lit(None, dtype=pl.Utf8))
             .alias(self.out_col)
         )

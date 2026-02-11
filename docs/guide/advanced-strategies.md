@@ -99,7 +99,7 @@ Entry filters validate signals before opening positions.
 
 | Filter | Blocks When | Key Params |
 |--------|-------------|------------|
-| `RegimeFilter` | Signal doesn't match regime | `allowed_regimes_rise/fall` |
+| `RegimeFilter` | Signal doesn't match regime | `signal_regime_map`, `allowed_regimes_bullish/bearish` |
 | `VolatilityFilter` | Vol outside range | `min_volatility`, `max_volatility` |
 | `DrawdownFilter` | Drawdown exceeds limit | `max_drawdown`, `recovery_threshold` |
 | `CorrelationFilter` | Too many correlated positions | `max_correlation` |

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 from signalflow.core import Order, Position, Signals, SignalType, StrategyState, sf_component
+from signalflow.core.signal_registry import DIRECTIONAL_SIGNAL_MAP
 from signalflow.strategy.component.base import EntryRule
 from signalflow.strategy.component.sizing.base import PositionSizer, SignalContext
 
@@ -56,6 +57,9 @@ class SignalEntryRule(EntryRule):
         ...     use_probability_sizing=True,
         ... )
     """
+
+    # === Signal type mapping ===
+    signal_type_map: dict[str, str] | None = None  # signal_type -> "BUY"/"SELL"; None = legacy behavior
 
     # === New injectable components ===
     position_sizer: PositionSizer | None = None
@@ -200,9 +204,13 @@ class SignalEntryRule(EntryRule):
 
     def _filter_signals(self, df: pl.DataFrame) -> pl.DataFrame:
         """Filter signals by type and probability."""
-        actionable_types = [SignalType.RISE.value]
-        if self.allow_shorts:
-            actionable_types.append(SignalType.FALL.value)
+        if self.signal_type_map is not None:
+            actionable_types = list(self.signal_type_map.keys())
+        else:
+            # Legacy behavior
+            actionable_types = [SignalType.RISE.value]
+            if self.allow_shorts:
+                actionable_types.append(SignalType.FALL.value)
         df = df.filter(pl.col("signal_type").is_in(actionable_types))
 
         if "probability" in df.columns:
@@ -213,11 +221,23 @@ class SignalEntryRule(EntryRule):
 
     def _determine_side(self, signal_type: str) -> str | None:
         """Determine order side from signal type."""
+        if self.signal_type_map is not None:
+            return self.signal_type_map.get(signal_type)
+        # Legacy behavior
         if signal_type == SignalType.RISE.value:
             return "BUY"
         elif signal_type == SignalType.FALL.value and self.allow_shorts:
             return "SELL"
         return None
+
+    @classmethod
+    def from_directional_map(cls, **kwargs) -> SignalEntryRule:
+        """Create entry rule using the global DIRECTIONAL_SIGNAL_MAP.
+
+        Example:
+            >>> entry = SignalEntryRule.from_directional_map(base_position_size=200.0)
+        """
+        return cls(signal_type_map=dict(DIRECTIONAL_SIGNAL_MAP), **kwargs)
 
     def _compute_legacy_size(self, probability: float) -> float:
         """Legacy sizing for backward compatibility."""

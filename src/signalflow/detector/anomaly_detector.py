@@ -1,4 +1,4 @@
-"""Real-time anomaly detector for black swan and flash crash events."""
+"""Real-time anomaly detector for extreme price movement events."""
 
 from __future__ import annotations
 
@@ -25,8 +25,8 @@ class AnomalyDetector(SignalDetector):
         1. Compute log returns: log(close[t] / close[t-1])
         2. Compute rolling std of returns over ``vol_window`` bars
         3. Current bar return magnitude: |log_return[t]|
-        4. If magnitude > threshold_return_std * rolling_std[t] -> "black_swan"
-        5. If magnitude > threshold AND return is negative -> "flash_crash"
+        4. If magnitude > threshold_return_std * rolling_std[t] -> "extreme_positive_anomaly"
+        5. If magnitude > threshold AND return is negative -> "extreme_negative_anomaly"
         6. Otherwise: row is skipped (no signal emitted)
 
     Attributes:
@@ -53,7 +53,9 @@ class AnomalyDetector(SignalDetector):
     """
 
     signal_category: SignalCategory = SignalCategory.ANOMALY
-    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"black_swan", "flash_crash"})
+    allowed_signal_types: set[str] | None = field(
+        default_factory=lambda: {"extreme_positive_anomaly", "extreme_negative_anomaly"}
+    )
 
     price_col: str = "close"
     vol_window: int = 1440
@@ -128,9 +130,9 @@ class AnomalyDetector(SignalDetector):
 
         signal_type_expr = (
             pl.when(is_flash_crash)
-            .then(pl.lit("flash_crash"))
+            .then(pl.lit("extreme_negative_anomaly"))
             .when(is_anomaly)
-            .then(pl.lit("black_swan"))
+            .then(pl.lit("extreme_positive_anomaly"))
             .otherwise(pl.lit(None, dtype=pl.Utf8))
             .alias("signal_type")
         )

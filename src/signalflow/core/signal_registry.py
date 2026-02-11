@@ -14,8 +14,8 @@ from signalflow.core.enums import SignalCategory
 KNOWN_SIGNALS: dict[str, set[str]] = {
     SignalCategory.PRICE_DIRECTION.value: {"rise", "fall", "flat"},
     SignalCategory.PRICE_STRUCTURE.value: {
-        "local_top",
-        "local_bottom",
+        "local_max",
+        "local_min",
         "breakout_up",
         "breakout_down",
         "range_bound",
@@ -31,40 +31,48 @@ KNOWN_SIGNALS: dict[str, set[str]] = {
         "overbought",
     },
     SignalCategory.VOLATILITY.value: {
-        "vol_high",
-        "vol_low",
-        "vol_expansion",
-        "vol_contraction",
-        "vol_regime_shift",
+        "high_volatility",
+        "low_volatility",
+        "volatility_expansion",
+        "volatility_contraction",
+        "volatility_regime_shift",
     },
     SignalCategory.VOLUME_LIQUIDITY.value: {
-        "volume_spike",
-        "volume_drought",
+        "abnormal_volume",
+        "illiquidity",
         "volume_divergence",
         "accumulation",
         "distribution",
     },
     SignalCategory.MARKET_WIDE.value: {
+        "positive_market_event",
+        "negative_market_event",
+        "market_event",
         "market_crash",
         "market_rally",
         "correlation_spike",
         "decorrelation",
-        "sector_divergence",
         "regime_shift",
+        "synchronization",
+        "aggregate_outlier",
+        "structural_break",
     },
     SignalCategory.ANOMALY.value: {
-        "black_swan",
-        "flash_crash",
-        "manipulation",
+        "extreme_positive_anomaly",
+        "positive_anomaly",
+        "anomaly",
+        "negative_anomaly",
+        "extreme_negative_anomaly",
     },
 }
 
-# Mapping: signal_type -> order side for directional trading
+# Mapping: signal_type -> order side for directional trading.
+# Minimal by design -- each strategy configures its own mapping via signal_type_map.
 DIRECTIONAL_SIGNAL_MAP: dict[str, str] = {
     "rise": "BUY",
     "fall": "SELL",
-    "local_bottom": "BUY",
-    "local_top": "SELL",
+    "local_min": "BUY",
+    "local_max": "SELL",
     "breakout_up": "BUY",
     "breakout_down": "SELL",
     "oversold": "BUY",

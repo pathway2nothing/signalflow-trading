@@ -56,7 +56,7 @@ class MarketZScoreDetector(SignalDetector):
         labeled_df = mask_targets_by_signals(
             df=labeled_df,
             signals=signals,
-            mask_signal_types={"market_zscore"},
+            mask_signal_types={"aggregate_outlier"},
             horizon_bars=60,
         )
         ```
@@ -70,14 +70,14 @@ class MarketZScoreDetector(SignalDetector):
     component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
 
     signal_category: SignalCategory = SignalCategory.MARKET_WIDE
-    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"market_zscore"})
+    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"aggregate_outlier"})
 
     z_threshold: float = 3.0
     rolling_window: int = 100
     min_pairs: int = 5
     return_window: int = 1
     price_col: str = "close"
-    signal_type_name: str = "market_zscore"
+    signal_type_name: str = "aggregate_outlier"
 
     def __post_init__(self) -> None:
         self.allowed_signal_types = {self.signal_type_name}
@@ -114,9 +114,9 @@ class MarketZScoreDetector(SignalDetector):
             context: Additional context (unused).
 
         Returns:
-            Signals with market_zscore signal type for detected timestamps.
+            Signals with aggregate_outlier signal type for detected timestamps.
         """
-        min_periods = self.rolling_window
+        min_samples = self.rolling_window
 
         # Cross-pair mean return per timestamp
         agg_return = (
@@ -135,10 +135,10 @@ class MarketZScoreDetector(SignalDetector):
             agg_return.with_columns(
                 [
                     pl.col("_agg_return")
-                    .rolling_mean(window_size=self.rolling_window, min_periods=min_periods)
+                    .rolling_mean(window_size=self.rolling_window, min_samples=min_samples)
                     .alias("_rolling_mean"),
                     pl.col("_agg_return")
-                    .rolling_std(window_size=self.rolling_window, min_periods=min_periods)
+                    .rolling_std(window_size=self.rolling_window, min_samples=min_samples)
                     .alias("_rolling_std"),
                 ]
             )

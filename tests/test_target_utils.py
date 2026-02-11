@@ -223,14 +223,14 @@ class TestMaskTargetsBySignals:
         signals_df = _make_signals_df(
             [base_ts + timedelta(minutes=25), base_ts + timedelta(minutes=75)],
             ["BTCUSDT", "BTCUSDT"],
-            ["anomaly", "flash_crash"],
+            ["anomaly", "extreme_negative_anomaly"],
         )
         signals = Signals(value=signals_df)
 
         result = mask_targets_by_signals(
             df=df,
             signals=signals,
-            mask_signal_types={"anomaly", "flash_crash"},
+            mask_signal_types={"anomaly", "extreme_negative_anomaly"},
             horizon_bars=3,
             cooldown_bars=3,
         )

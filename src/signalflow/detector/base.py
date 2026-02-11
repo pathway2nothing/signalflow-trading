@@ -374,9 +374,6 @@ class SignalDetector(KwargsTolerantMixin, ABC):
             raise ValueError(f"Signals missing required columns: {missing}")
 
         allowed = getattr(self, "allowed_signal_types", None)
-        if allowed is None:
-            # Default: accept values from SignalType enum (backward compat)
-            allowed = {t.value for t in SignalType}
         if allowed:
             non_null = s.filter(pl.col("signal_type").is_not_null())
             bad = non_null.select(pl.col("signal_type")).unique().filter(~pl.col("signal_type").is_in(list(allowed)))

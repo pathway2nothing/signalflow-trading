@@ -718,7 +718,7 @@ Export backtest results for external ML model training.
 |--------|-------------|
 | `timestamp` | Bar timestamp |
 | `pair` | Trading pair |
-| `signal_type` | Signal type (rise/fall/none) |
+| `signal_type` | Signal type (e.g. `rise`, `fall`, `local_max`) |
 | `probability` | Signal probability |
 | `metric_equity` | Portfolio equity |
 | `metric_max_drawdown` | Max drawdown |

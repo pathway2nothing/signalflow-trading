@@ -87,6 +87,8 @@ class ModelEntryRule(EntryRule):
         ... )
     """
 
+    signal_type_map: dict[str, str] | None = None  # signal_type -> "BUY"/"SELL"
+
     model: StrategyModel = None  # type: ignore[assignment]
     base_position_size: float = 0.01
     max_positions: int = 10
@@ -167,6 +169,10 @@ class ModelEntryRule(EntryRule):
 
         signal_type = signal_row.item(0, "signal_type")
 
+        if self.signal_type_map is not None:
+            return self.signal_type_map.get(signal_type)
+
+        # Legacy behavior
         if signal_type == SignalType.RISE.value:
             return "BUY"
         elif signal_type == SignalType.FALL.value and self.allow_shorts:

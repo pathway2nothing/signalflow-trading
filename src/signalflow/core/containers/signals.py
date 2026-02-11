@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import polars as pl
 from signalflow.core.signal_transform import SignalsTransform
-from signalflow.core.enums import SignalType
+
+_NONE_SIGNAL = "none"  # Legacy inactive signal type (deprecated; prefer null)
 
 
 @dataclass(frozen=True)
@@ -171,14 +172,14 @@ class Signals:
 
         # Priority: null and "none" signal_type are lowest priority
         merged = merged.with_columns(
-            pl.when(pl.col("signal_type").is_null() | (pl.col("signal_type") == SignalType.NONE.value))
+            pl.when(pl.col("signal_type").is_null() | (pl.col("signal_type") == _NONE_SIGNAL))
             .then(pl.lit(0))
             .otherwise(pl.col("probability"))
             .alias("probability")
         )
 
         merged = merged.with_columns(
-            pl.when(pl.col("signal_type").is_null() | (pl.col("signal_type") == SignalType.NONE.value))
+            pl.when(pl.col("signal_type").is_null() | (pl.col("signal_type") == _NONE_SIGNAL))
             .then(pl.lit(0))
             .otherwise(pl.lit(1))
             .alias("_priority")

@@ -24,8 +24,8 @@ class TestKnownSignals:
 
     def test_anomaly_signals(self):
         signals = KNOWN_SIGNALS[SignalCategory.ANOMALY.value]
-        assert "black_swan" in signals
-        assert "flash_crash" in signals
+        assert "extreme_positive_anomaly" in signals
+        assert "extreme_negative_anomaly" in signals
 
     def test_no_duplicate_signals_across_categories(self):
         """Signal values should be unique across categories (except intentional reuse)."""
@@ -54,12 +54,12 @@ class TestDirectionalSignalMap:
 class TestGetKnownSignals:
     def test_with_enum(self):
         signals = get_known_signals(SignalCategory.VOLATILITY)
-        assert "vol_high" in signals
-        assert "vol_low" in signals
+        assert "high_volatility" in signals
+        assert "low_volatility" in signals
 
     def test_with_string(self):
         signals = get_known_signals("anomaly")
-        assert "black_swan" in signals
+        assert "extreme_positive_anomaly" in signals
 
     def test_unknown_category_returns_empty(self):
         signals = get_known_signals("nonexistent")
@@ -70,8 +70,8 @@ class TestGetAllKnownSignals:
     def test_returns_all(self):
         all_signals = get_all_known_signals()
         assert "rise" in all_signals
-        assert "black_swan" in all_signals
-        assert "vol_high" in all_signals
+        assert "extreme_positive_anomaly" in all_signals
+        assert "high_volatility" in all_signals
         assert len(all_signals) > 20
 
 
@@ -83,7 +83,7 @@ class TestGetDirectionalSide:
         assert get_directional_side("fall") == "SELL"
 
     def test_unknown(self):
-        assert get_directional_side("vol_high") is None
+        assert get_directional_side("high_volatility") is None
 
     def test_local_bottom(self):
-        assert get_directional_side("local_bottom") == "BUY"
+        assert get_directional_side("local_min") == "BUY"

@@ -30,8 +30,8 @@ class VolumeRegimeLabeler(Labeler):
         1. Compute trailing volume SMA: ``rolling_mean(volume, vol_sma_window)``.
         2. Compute forward volume ratio:
            ``mean(volume[t+1 : t+horizon+1]) / trailing_sma[t]``
-        3. If ratio > ``spike_threshold`` -> ``"volume_spike"``
-        4. If ratio < ``drought_threshold`` -> ``"volume_drought"``
+        3. If ratio > ``spike_threshold`` -> ``"abnormal_volume"``
+        4. If ratio < ``drought_threshold`` -> ``"illiquidity"``
         5. Otherwise -> ``null``
 
     Implementation:
@@ -134,9 +134,9 @@ class VolumeRegimeLabeler(Labeler):
             pl.when(pl.col("_volume_ratio").is_null())
             .then(pl.lit(None, dtype=pl.Utf8))
             .when(pl.col("_volume_ratio") > self.spike_threshold)
-            .then(pl.lit("volume_spike"))
+            .then(pl.lit("abnormal_volume"))
             .when(pl.col("_volume_ratio") < self.drought_threshold)
-            .then(pl.lit("volume_drought"))
+            .then(pl.lit("illiquidity"))
             .otherwise(pl.lit(None, dtype=pl.Utf8))
             .alias(self.out_col)
         )
