@@ -29,8 +29,8 @@ class VolatilityDetector(SignalDetector):
         1. Compute log returns: log(close[t] / close[t-1])
         2. Backward realized volatility: std of last ``vol_window`` returns
         3. Rolling percentile of realized vol over ``lookback_window``
-        4. If percentile > upper_quantile -> "vol_high"
-        5. If percentile < lower_quantile -> "vol_low"
+        4. If percentile > upper_quantile -> "high_volatility"
+        5. If percentile < lower_quantile -> "low_volatility"
         6. Otherwise: no signal emitted
 
     Attributes:
@@ -58,7 +58,7 @@ class VolatilityDetector(SignalDetector):
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
-    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"vol_high", "vol_low"})
+    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"high_volatility", "low_volatility"})
 
     price_col: str = "close"
     vol_window: int = 60
@@ -95,7 +95,7 @@ class VolatilityDetector(SignalDetector):
             context: Additional context (unused).
 
         Returns:
-            Signals with vol_high/vol_low signal types.
+            Signals with high_volatility/low_volatility signal types.
         """
         price = pl.col(self.price_col)
 
@@ -135,10 +135,10 @@ class VolatilityDetector(SignalDetector):
                 percentile = float(np.mean(valid <= vol_arr[t]))
 
                 if percentile > self.upper_quantile:
-                    signal_types[t] = "vol_high"
+                    signal_types[t] = "high_volatility"
                     probabilities[t] = percentile
                 elif percentile < self.lower_quantile:
-                    signal_types[t] = "vol_low"
+                    signal_types[t] = "low_volatility"
                     probabilities[t] = 1.0 - percentile
 
             group = group.with_columns(

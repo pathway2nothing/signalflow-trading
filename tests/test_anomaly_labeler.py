@@ -1,7 +1,7 @@
 """Tests for AnomalyLabeler and AnomalyDetector.
 
 Uses synthetic data: normal random walk with injected extreme returns
-to test black swan / flash crash detection.
+to test extreme positive anomaly / extreme negative anomaly detection.
 """
 
 import math
@@ -167,11 +167,11 @@ class TestAnomalyLabelerNormalMarket:
         assert non_null.height == 0, f"Expected no anomaly labels in normal market, got {non_null.height}"
 
 
-class TestAnomalyLabelerBlackSwan:
-    """Test that extreme positive spikes get labeled as black_swan."""
+class TestAnomalyLabelerExtremePositive:
+    """Test that extreme positive spikes get labeled as extreme_positive_anomaly."""
 
-    def test_large_positive_spike_labeled_black_swan(self):
-        """A 5-sigma positive forward return should be labeled black_swan."""
+    def test_large_positive_spike_labeled(self):
+        """A 5-sigma positive forward return should be labeled extreme_positive_anomaly."""
         df = _random_walk_df(n=3000, seed=42)
         # Inject a massive upward spike: +15% over 60 bars
         # With vol ~0.001 per bar, 60-bar vol ~0.001*sqrt(60) ~0.0077
@@ -191,14 +191,14 @@ class TestAnomalyLabelerBlackSwan:
         row = result.filter(pl.col("timestamp") == ts_at_2000)
         assert row.height == 1
         label_val = row["label"][0]
-        assert label_val == "black_swan", f"Expected 'black_swan', got '{label_val}'"
+        assert label_val == "extreme_positive_anomaly", f"Expected 'extreme_positive_anomaly', got '{label_val}'"
 
 
-class TestAnomalyLabelerFlashCrash:
-    """Test that sharp negative spikes get labeled as flash_crash."""
+class TestAnomalyLabelerExtremeNegative:
+    """Test that sharp negative spikes get labeled as extreme_negative_anomaly."""
 
-    def test_sharp_negative_spike_labeled_flash_crash(self):
-        """A large negative return within flash_horizon should be flash_crash."""
+    def test_sharp_negative_spike_labeled(self):
+        """A large negative return within flash_horizon should be extreme_negative_anomaly."""
         df = _random_walk_df(n=3000, seed=42)
         # Inject a crash: -15% happening within 5 bars (< flash_horizon=10)
         df = _inject_forward_spike(df, start_index=2000, magnitude=0.85, over_bars=5)
@@ -216,7 +216,7 @@ class TestAnomalyLabelerFlashCrash:
         row = result.filter(pl.col("timestamp") == ts_at_2000)
         assert row.height == 1
         label_val = row["label"][0]
-        assert label_val == "flash_crash", f"Expected 'flash_crash', got '{label_val}'"
+        assert label_val == "extreme_negative_anomaly", f"Expected 'extreme_negative_anomaly', got '{label_val}'"
 
 
 class TestAnomalyLabelerOutputSchema:
@@ -426,7 +426,7 @@ class TestAnomalyDetector:
         ts_at_2000 = df["timestamp"][2000]
         spike_row = s.filter(pl.col("timestamp") == ts_at_2000)
         assert spike_row.height == 1, "Spike bar should be detected"
-        assert spike_row["signal_type"][0] == "flash_crash"
+        assert spike_row["signal_type"][0] == "extreme_negative_anomaly"
 
     def test_detector_no_signals_in_normal_market(self):
         """Normal random walk should produce no anomaly signals."""
@@ -458,8 +458,8 @@ class TestAnomalyDetector:
         assert "signal" in s.columns
         assert "probability" in s.columns
 
-    def test_detector_positive_spike_is_black_swan(self):
-        """A positive single-bar spike should be labeled black_swan."""
+    def test_detector_positive_spike_is_extreme_positive(self):
+        """A positive single-bar spike should be labeled extreme_positive_anomaly."""
         df = _random_walk_df(n=3000, seed=42)
         df = _inject_spike(df, index=2000, magnitude=1.15)
 
@@ -471,7 +471,7 @@ class TestAnomalyDetector:
         ts_at_2000 = df["timestamp"][2000]
         spike_row = s.filter(pl.col("timestamp") == ts_at_2000)
         assert spike_row.height == 1
-        assert spike_row["signal_type"][0] == "black_swan"
+        assert spike_row["signal_type"][0] == "extreme_positive_anomaly"
 
     def test_detector_signal_category(self):
         """Detector signal_category should be ANOMALY."""
@@ -479,9 +479,9 @@ class TestAnomalyDetector:
         assert detector.signal_category == SignalCategory.ANOMALY
 
     def test_detector_allowed_signal_types(self):
-        """Detector should only allow black_swan and flash_crash signal types."""
+        """Detector should allow extreme_positive_anomaly and extreme_negative_anomaly signal types."""
         detector = AnomalyDetector()
-        assert detector.allowed_signal_types == {"black_swan", "flash_crash"}
+        assert detector.allowed_signal_types == {"extreme_positive_anomaly", "extreme_negative_anomaly"}
 
     def test_detector_probability_between_0_and_1(self):
         """Probability values should be between 0 and 1."""

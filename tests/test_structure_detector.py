@@ -63,7 +63,7 @@ class TestStructureDetector:
         result = d.detect(df)
         assert result.value.height > 0, "Sine wave should produce structure signals"
         types = set(result.value["signal_type"].to_list())
-        assert types <= {"local_top", "local_bottom"}
+        assert types <= {"local_max", "local_min"}
 
     def test_flat_market_no_signals(self):
         df = _flat_df(300)

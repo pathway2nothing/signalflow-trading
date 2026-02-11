@@ -65,16 +65,16 @@ class TestVolatilityDetector:
         result = d.detect(df)
         if result.value.height > 0:
             types = set(result.value["signal_type"].to_list())
-            assert types <= {"vol_high", "vol_low"}
+            assert types <= {"high_volatility", "low_volatility"}
 
-    def test_volatile_period_emits_vol_high(self):
+    def test_volatile_period_emits_high_volatility(self):
         df = _ohlcv_df(2000)
         df = _inject_volatile_period(df, 800, 300, vol_mult=15.0)
         d = VolatilityDetector(vol_window=60, lookback_window=500, upper_quantile=0.7, lower_quantile=0.3)
         result = d.detect(df)
         if result.value.height > 0:
             types = result.value["signal_type"].to_list()
-            assert "vol_high" in types, "Expected vol_high during volatile period"
+            assert "high_volatility" in types, "Expected high_volatility during volatile period"
 
     def test_signals_have_required_columns(self):
         df = _ohlcv_df(2000)

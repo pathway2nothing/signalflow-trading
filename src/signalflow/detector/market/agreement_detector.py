@@ -54,7 +54,7 @@ class AgreementDetector(SignalDetector):
         labeled_df = mask_targets_by_signals(
             df=labeled_df,
             signals=signals,
-            mask_signal_types={"market_agreement"},
+            mask_signal_types={"synchronization"},
             horizon_bars=60,
         )
         ```
@@ -68,13 +68,13 @@ class AgreementDetector(SignalDetector):
     component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
 
     signal_category: SignalCategory = SignalCategory.MARKET_WIDE
-    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"market_agreement"})
+    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"synchronization"})
 
     agreement_threshold: float = 0.8
     min_pairs: int = 5
     return_window: int = 1
     price_col: str = "close"
-    signal_type_name: str = "market_agreement"
+    signal_type_name: str = "synchronization"
 
     def __post_init__(self) -> None:
         self.allowed_signal_types = {self.signal_type_name}
@@ -111,7 +111,7 @@ class AgreementDetector(SignalDetector):
             context: Additional context (unused).
 
         Returns:
-            Signals with market_agreement signal type for detected timestamps.
+            Signals with synchronization signal type for detected timestamps.
         """
         agreement = (
             features.filter(pl.col("_ret").is_not_null() & pl.col("_ret").is_finite())

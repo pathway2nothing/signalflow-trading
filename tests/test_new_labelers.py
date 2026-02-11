@@ -60,8 +60,8 @@ def _step_prices(n: int = 300, low: float = 100.0, high: float = 200.0, step_at:
 class TestVolatilityRegimeLabeler:
     """Tests for VolatilityRegimeLabeler."""
 
-    def test_high_vol_gets_vol_high(self):
-        """A period of wild swings should produce 'vol_high' labels."""
+    def test_high_vol_gets_high_volatility(self):
+        """A period of wild swings should produce 'high_volatility' labels."""
         n = 600
         base = 100.0
         close = []
@@ -85,14 +85,14 @@ class TestVolatilityRegimeLabeler:
         result = labeler.compute(df)
 
         assert result.height == n
-        # Bars just before the volatile period (fwd vol captures it) should be vol_high
-        vol_high = result.filter(pl.col("label") == "vol_high")
-        assert vol_high.height > 0, "Expected at least some vol_high labels"
+        # Bars just before the volatile period (fwd vol captures it) should be high_volatility
+        high_volatility = result.filter(pl.col("label") == "high_volatility")
+        assert high_volatility.height > 0, "Expected at least some high_volatility labels"
         assert "realized_vol" in result.columns
         assert "vol_percentile" in result.columns
 
-    def test_calm_period_gets_vol_low(self):
-        """A flat series in a mixed dataset should produce 'vol_low' labels."""
+    def test_calm_period_gets_low_volatility(self):
+        """A flat series in a mixed dataset should produce 'low_volatility' labels."""
         n = 600
         close = []
         for i in range(n):
@@ -113,8 +113,8 @@ class TestVolatilityRegimeLabeler:
         )
         result = labeler.compute(df)
 
-        vol_low = result.filter(pl.col("label") == "vol_low")
-        assert vol_low.height > 0, "Expected at least some vol_low labels"
+        low_volatility = result.filter(pl.col("label") == "low_volatility")
+        assert low_volatility.height > 0, "Expected at least some low_volatility labels"
 
     def test_length_preserving(self):
         """Output must have the same row count as input."""
@@ -223,8 +223,8 @@ class TestTrendScanningLabeler:
 class TestStructureLabeler:
     """Tests for StructureLabeler."""
 
-    def test_peak_gets_local_top(self):
-        """The peak of a sine wave should be labeled 'local_top'."""
+    def test_peak_gets_local_max(self):
+        """The peak of a sine wave should be labeled 'local_max'."""
         # sine with period 100 => peak at i=25 (sin(pi/2)=1)
         close = _sine_prices(n=200, amplitude=30.0, period=100, base_price=100.0)
         df = _make_df(close)
@@ -237,12 +237,12 @@ class TestStructureLabeler:
         )
         result = labeler.compute(df)
 
-        tops = result.filter(pl.col("label") == "local_top")
-        assert tops.height > 0, "Expected at least one local_top at sine peak"
+        tops = result.filter(pl.col("label") == "local_max")
+        assert tops.height > 0, "Expected at least one local_max at sine peak"
         assert "swing_pct" in result.columns
 
-    def test_trough_gets_local_bottom(self):
-        """The trough of a sine wave should be labeled 'local_bottom'."""
+    def test_trough_gets_local_min(self):
+        """The trough of a sine wave should be labeled 'local_min'."""
         close = _sine_prices(n=200, amplitude=30.0, period=100, base_price=100.0)
         df = _make_df(close)
         labeler = StructureLabeler(
@@ -253,8 +253,8 @@ class TestStructureLabeler:
         )
         result = labeler.compute(df)
 
-        bottoms = result.filter(pl.col("label") == "local_bottom")
-        assert bottoms.height > 0, "Expected at least one local_bottom at sine trough"
+        bottoms = result.filter(pl.col("label") == "local_min")
+        assert bottoms.height > 0, "Expected at least one local_min at sine trough"
 
     def test_multi_pair(self):
         """Structure labeler should work independently per pair."""
@@ -273,8 +273,8 @@ class TestStructureLabeler:
         result = labeler.compute(df)
 
         assert result.height == 400
-        btc_tops = result.filter((pl.col("pair") == "BTCUSDT") & (pl.col("label") == "local_top"))
-        eth_tops = result.filter((pl.col("pair") == "ETHUSDT") & (pl.col("label") == "local_top"))
+        btc_tops = result.filter((pl.col("pair") == "BTCUSDT") & (pl.col("label") == "local_max"))
+        eth_tops = result.filter((pl.col("pair") == "ETHUSDT") & (pl.col("label") == "local_max"))
         assert btc_tops.height > 0
         assert eth_tops.height > 0
 
@@ -310,7 +310,7 @@ class TestVolumeRegimeLabeler:
     """Tests for VolumeRegimeLabeler."""
 
     def test_high_volume_gets_spike(self):
-        """A sudden volume spike should produce 'volume_spike' labels."""
+        """A sudden volume spike should produce 'abnormal_volume' labels."""
         n = 400
         volume = [100.0] * n
         # Inject a spike in the forward window of bars around index 150
@@ -330,12 +330,12 @@ class TestVolumeRegimeLabeler:
         )
         result = labeler.compute(df)
 
-        spikes = result.filter(pl.col("label") == "volume_spike")
-        assert spikes.height > 0, "Expected 'volume_spike' labels during spike period"
+        spikes = result.filter(pl.col("label") == "abnormal_volume")
+        assert spikes.height > 0, "Expected 'abnormal_volume' labels during spike period"
         assert "volume_ratio" in result.columns
 
     def test_low_volume_gets_drought(self):
-        """A sudden volume drop should produce 'volume_drought' labels."""
+        """A sudden volume drop should produce 'illiquidity' labels."""
         n = 400
         volume = [1000.0] * n
         # Inject drought in the forward window of bars around index 150
@@ -354,8 +354,8 @@ class TestVolumeRegimeLabeler:
         )
         result = labeler.compute(df)
 
-        droughts = result.filter(pl.col("label") == "volume_drought")
-        assert droughts.height > 0, "Expected 'volume_drought' labels during drought period"
+        droughts = result.filter(pl.col("label") == "illiquidity")
+        assert droughts.height > 0, "Expected 'illiquidity' labels during drought period"
 
     def test_length_preserving(self):
         """Output must have the same row count as input."""

@@ -49,8 +49,8 @@ class PercentileRegimeDetector(SignalDetector):
             target_feature="_realized_vol",
             upper_quantile=0.67,
             lower_quantile=0.33,
-            signal_high="vol_high",
-            signal_low="vol_low",
+            signal_high="high_volatility",
+            signal_low="low_volatility",
         )
         signals = detector.run(raw_data_view)
         ```
@@ -61,7 +61,7 @@ class PercentileRegimeDetector(SignalDetector):
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
-    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"regime_high", "regime_low"})
+    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"high_volatility", "low_volatility"})
 
     # Target feature to analyze
     target_feature: str = "_realized_vol"
@@ -72,8 +72,8 @@ class PercentileRegimeDetector(SignalDetector):
     lower_quantile: float = 0.33
 
     # Signal type names
-    signal_high: str = "regime_high"
-    signal_low: str = "regime_low"
+    signal_high: str = "high_volatility"
+    signal_low: str = "low_volatility"
 
     def __post_init__(self) -> None:
         if not 0 < self.lower_quantile < self.upper_quantile < 1:
@@ -96,7 +96,7 @@ class PercentileRegimeDetector(SignalDetector):
             context: Additional context (unused).
 
         Returns:
-            Signals with regime_high/regime_low signal types.
+            Signals with high_volatility/low_volatility signal types.
         """
         results = []
 

@@ -61,7 +61,7 @@ class MarketCusumDetector(SignalDetector):
         labeled_df = mask_targets_by_signals(
             df=labeled_df,
             signals=signals,
-            mask_signal_types={"market_cusum"},
+            mask_signal_types={"structural_break"},
             horizon_bars=60,
         )
         ```
@@ -78,7 +78,7 @@ class MarketCusumDetector(SignalDetector):
     component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
 
     signal_category: SignalCategory = SignalCategory.MARKET_WIDE
-    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"market_cusum"})
+    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"structural_break"})
 
     drift: float = 0.005
     cusum_threshold: float = 0.05
@@ -86,7 +86,7 @@ class MarketCusumDetector(SignalDetector):
     min_pairs: int = 5
     return_window: int = 1
     price_col: str = "close"
-    signal_type_name: str = "market_cusum"
+    signal_type_name: str = "structural_break"
 
     def __post_init__(self) -> None:
         self.allowed_signal_types = {self.signal_type_name}
@@ -123,9 +123,9 @@ class MarketCusumDetector(SignalDetector):
             context: Additional context (unused).
 
         Returns:
-            Signals with market_cusum signal type for detected timestamps.
+            Signals with structural_break signal type for detected timestamps.
         """
-        min_periods = self.rolling_window
+        min_samples = self.rolling_window
 
         # Cross-pair mean return per timestamp
         agg_return = (
@@ -141,7 +141,7 @@ class MarketCusumDetector(SignalDetector):
 
         # Compute rolling mean (expected return mu)
         agg_return = agg_return.with_columns(
-            pl.col("_agg_return").rolling_mean(window_size=self.rolling_window, min_periods=min_periods).alias("_mu")
+            pl.col("_agg_return").rolling_mean(window_size=self.rolling_window, min_samples=min_samples).alias("_mu")
         )
 
         # CUSUM with reset (sequential — inherently stateful)

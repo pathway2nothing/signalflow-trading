@@ -56,7 +56,7 @@ class TestVolatilityRegimeLabeler:
         df = _ohlcv_df(2000)
         labeler = VolatilityRegimeLabeler(horizon=30, lookback_window=200, mask_to_signals=False)
         result = labeler.compute(df)
-        valid = {"vol_high", "vol_low", None}
+        valid = {"high_volatility", "low_volatility", None}
         labels = result["label"].to_list()
         unique_labels = set(labels)
         assert unique_labels <= valid
@@ -88,7 +88,7 @@ class TestVolatilityRegimeLabeler:
         result = labeler.compute(df)
         # Before the volatile period, some bars should get labeled
         labels = result["label"].to_list()
-        assert any(l == "vol_high" for l in labels), "Expected at least one vol_high label"
+        assert any(l == "high_volatility" for l in labels), "Expected at least one high_volatility label"
 
     def test_invalid_quantiles_raises(self):
         with pytest.raises(ValueError, match="lower_quantile"):

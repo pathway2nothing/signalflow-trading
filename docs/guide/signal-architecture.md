@@ -66,20 +66,20 @@ This design allows the system to:
 - **Extend** signal types without modifying core code (any string is valid as a
   `signal_type`)
 - Keep **multiple signal categories per timestamp** (e.g., a bar can
-  simultaneously have a `price_direction=rise` signal and a `volatility=vol_high`
-  signal)
+  simultaneously have a `price_direction=rise` signal and a
+  `volatility=high_volatility` signal)
 
 ### Signal Categories
 
 | Category | Description | Example Types |
 |----------|-------------|---------------|
 | `PRICE_DIRECTION` | Price movement direction | `rise`, `fall`, `flat` |
-| `PRICE_STRUCTURE` | Price patterns and extrema | `local_top`, `local_bottom`, `breakout_up` |
-| `TREND_MOMENTUM` | Trend state and momentum | `rise`, `fall`, `trend_reversal` |
-| `VOLATILITY` | Volatility regime | `vol_high`, `vol_low`, `vol_expansion` |
-| `VOLUME_LIQUIDITY` | Volume and liquidity patterns | `volume_spike`, `accumulation` |
-| `MARKET_WIDE` | Cross-pair market events | `market_crash`, `regime_shift` |
-| `ANOMALY` | Black swans and anomalies | `black_swan`, `flash_crash` |
+| `PRICE_STRUCTURE` | Price patterns and extrema | `local_max`, `local_min`, `breakout_up` |
+| `TREND_MOMENTUM` | Trend state and momentum | `trend_start`, `trend_reversal`, `overbought` |
+| `VOLATILITY` | Volatility regime | `high_volatility`, `low_volatility`, `volatility_expansion` |
+| `VOLUME_LIQUIDITY` | Volume and liquidity patterns | `abnormal_volume`, `illiquidity`, `accumulation` |
+| `MARKET_WIDE` | Cross-pair market events | `market_crash`, `regime_shift`, `synchronization` |
+| `ANOMALY` | Anomalous events | `extreme_positive_anomaly`, `extreme_negative_anomaly` |
 
 The full registry of known signal types is in
 `signalflow.core.signal_registry.KNOWN_SIGNALS`. This registry is **advisory** --
@@ -129,7 +129,7 @@ labeler = AnomalyLabeler(
     mask_to_signals=False,
 )
 labeled_df = labeler.compute(ohlcv_df)
-# Each row gets a label: "black_swan", "flash_crash", or null
+# Each row gets a label: "extreme_positive_anomaly", "extreme_negative_anomaly", or null
 ```
 
 ### Detector (Real-Time, Backward-Looking)
@@ -202,16 +202,16 @@ The most basic signal category. Predicts whether price will rise or fall.
 | `TripleBarrierLabeler` | Triple barrier method (De Prado) | `rise`, `fall`, `null` |
 | `TakeProfitLabeler` | Symmetric TP/SL barrier | `rise`, `fall`, `null` |
 | `TrendScanningLabeler` | OLS t-statistic across windows (De Prado) | `rise`, `fall`, `null` |
-| `ExampleSmaCrossDetector` | SMA crossover (real-time) | `rise`, `fall`, `none` |
+| `ExampleSmaCrossDetector` | SMA crossover (real-time) | `rise`, `fall` |
 
-### Anomaly / Black Swan
+### Anomaly
 
-Detects extreme, unexpected market events.
+Detects extreme, unexpected market events (anomalous returns).
 
 | Component | Algorithm | Signal Types |
 |-----------|-----------|--------------|
-| `AnomalyLabeler` | Forward return magnitude vs rolling vol | `black_swan`, `flash_crash`, `null` |
-| `AnomalyDetector` | Current return magnitude vs rolling vol | `black_swan`, `flash_crash` |
+| `AnomalyLabeler` | Forward return magnitude vs rolling vol | `extreme_positive_anomaly`, `extreme_negative_anomaly`, `null` |
+| `AnomalyDetector` | Current return magnitude vs rolling vol | `extreme_positive_anomaly`, `extreme_negative_anomaly` |
 
 ### Volatility Regime
 
@@ -219,17 +219,17 @@ Classifies current volatility state.
 
 | Component | Algorithm | Signal Types |
 |-----------|-----------|--------------|
-| `VolatilityRegimeLabeler` | Forward realized vol percentile | `vol_high`, `vol_low`, `null` |
-| `VolatilityDetector` | Backward realized vol percentile | `vol_high`, `vol_low` |
+| `VolatilityRegimeLabeler` | Forward realized vol percentile | `high_volatility`, `low_volatility`, `null` |
+| `VolatilityDetector` | Backward realized vol percentile | `high_volatility`, `low_volatility` |
 
 ### Price Structure
 
-Identifies local price extrema (tops and bottoms).
+Identifies local price extrema.
 
 | Component | Algorithm | Signal Types |
 |-----------|-----------|--------------|
-| `StructureLabeler` | Symmetric window extrema (look-ahead) | `local_top`, `local_bottom`, `null` |
-| `StructureDetector` | Backward zigzag with confirmation delay | `local_top`, `local_bottom` |
+| `StructureLabeler` | Symmetric window extrema (look-ahead) | `local_max`, `local_min`, `null` |
+| `StructureDetector` | Backward zigzag with confirmation delay | `local_max`, `local_min` |
 
 ### Volume Regime
 
@@ -237,7 +237,7 @@ Classifies volume patterns.
 
 | Component | Algorithm | Signal Types |
 |-----------|-----------|--------------|
-| `VolumeRegimeLabeler` | Forward volume ratio vs SMA | `volume_spike`, `volume_drought`, `null` |
+| `VolumeRegimeLabeler` | Forward volume ratio vs SMA | `abnormal_volume`, `illiquidity`, `null` |
 
 ---
 
@@ -327,36 +327,61 @@ combined = aggregator.aggregate([detector_signals, validator_signals])
 
 ## From Signals to Actions
 
-Not all signals map directly to buy/sell decisions. A `vol_high` signal doesn't
-mean "buy" or "sell" -- it means "volatility is high", which might affect
-position sizing or risk management.
+Not all signals map directly to buy/sell decisions. A `high_volatility` signal
+doesn't mean "buy" or "sell" -- it means "volatility is high", which might
+affect position sizing or risk management.
 
 The decision of **what to do** with a signal is the strategy layer's
 responsibility. This logic can range from simple rules to complex RL policies:
 
 - **Simple**: `rise -> BUY`, `fall -> SELL` (built into entry rules)
-- **Contextual**: `vol_high + local_bottom -> BUY with larger size`
+- **Configurable**: `local_min -> BUY`, `overbought -> SELL` (via `signal_type_map`)
+- **Contextual**: `high_volatility + local_min -> BUY with larger size`
 - **Learned**: RL model that optimizes actions over signal combinations
 
-For simple directional trading, the entry rules (`SignalEntryRule`,
-`FixedSizeEntryRule`) handle `rise`/`fall` signals directly. For complex
-multi-signal strategies, use the `StrategyModel` protocol
-([Model Integration](model-integration.md)) where a model receives the full
-signal context and makes decisions.
+### Configurable Signal-to-Action Mapping
 
-The `DIRECTIONAL_SIGNAL_MAP` in `signalflow.core.signal_registry` provides an
-advisory mapping of which signal types are inherently directional:
+Entry rules (`SignalEntryRule`, `FixedSizeEntryRule`, `ModelEntryRule`) support
+a `signal_type_map` parameter that maps any `signal_type` to an order side:
+
+```python
+from signalflow.strategy.component.entry import SignalEntryRule
+
+# Custom mapping: trade structure signals
+entry = SignalEntryRule(
+    signal_type_map={
+        "local_min": "BUY",
+        "local_max": "SELL",
+        "oversold": "BUY",
+        "overbought": "SELL",
+    },
+    base_position_size=200.0,
+)
+```
+
+When `signal_type_map=None` (default), legacy behavior is used: only `"rise"`
+and `"fall"` signals are recognized.
+
+### DIRECTIONAL_SIGNAL_MAP
+
+The `DIRECTIONAL_SIGNAL_MAP` in `signalflow.core.signal_registry` provides a
+global registry of inherently directional signal types. Use the
+`from_directional_map()` classmethod to create an entry rule that trades all
+known directional signals:
 
 ```python
 from signalflow.core.signal_registry import DIRECTIONAL_SIGNAL_MAP
 
-# Advisory reference -- not enforced by the system
+# Global registry of directional signal types
 DIRECTIONAL_SIGNAL_MAP = {
     "rise": "BUY", "fall": "SELL",
-    "local_bottom": "BUY", "local_top": "SELL",
+    "local_min": "BUY", "local_max": "SELL",
     "breakout_up": "BUY", "breakout_down": "SELL",
     "oversold": "BUY", "overbought": "SELL",
 }
+
+# Create entry rule that trades all directional signals
+entry = SignalEntryRule.from_directional_map(base_position_size=200.0)
 ```
 
 ---
@@ -451,12 +476,12 @@ flowchart TB
     subgraph Signals ["Signal Categories"]
         direction TB
         PD["Price Direction<br/>rise, fall, flat"]
-        PS["Price Structure<br/>local_top, local_bottom"]
-        TM["Trend Momentum<br/>rise, fall, trend_reversal"]
-        VOL["Volatility<br/>vol_high, vol_low"]
-        VL["Volume Liquidity<br/>volume_spike, accumulation"]
-        MW["Market Wide<br/>market_crash, regime_shift"]
-        AN["Anomaly<br/>black_swan, flash_crash"]
+        PS["Price Structure<br/>local_max, local_min"]
+        TM["Trend Momentum<br/>trend_start, trend_reversal"]
+        VOL["Volatility<br/>high_volatility, low_volatility"]
+        VL["Volume Liquidity<br/>abnormal_volume, illiquidity"]
+        MW["Market Wide<br/>market_crash, synchronization"]
+        AN["Anomaly<br/>extreme_positive_anomaly"]
     end
 
     subgraph Pipeline ["Processing Pipeline"]

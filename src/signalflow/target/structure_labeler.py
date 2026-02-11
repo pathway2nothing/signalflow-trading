@@ -207,9 +207,9 @@ class StructureLabeler(Labeler):
         # Step 5: Assign labels
         label_expr = (
             pl.when(threshold_mask & pl.col("_is_max"))
-            .then(pl.lit("local_top"))
+            .then(pl.lit("local_max"))
             .when(threshold_mask & pl.col("_is_min"))
-            .then(pl.lit("local_bottom"))
+            .then(pl.lit("local_min"))
             .otherwise(pl.lit(None, dtype=pl.Utf8))
             .alias(self.out_col)
         )
@@ -277,7 +277,7 @@ class ZigzagStructureLabeler(Labeler):
         1. Find first significant swing to determine initial direction.
         2. Track the running extreme (highest high or lowest low).
         3. When price reverses from the extreme by > threshold:
-           - Mark the extreme as ``"local_top"`` or ``"local_bottom"``.
+           - Mark the extreme as ``"local_max"`` or ``"local_min"``.
            - Switch direction and start tracking the new extreme.
         4. Result: alternating pivots across the full price series.
 
@@ -435,12 +435,12 @@ class ZigzagStructureLabeler(Labeler):
                 if swing >= thresholds[i]:
                     if high_idx > low_idx:
                         # Went down first then up → bottom confirmed
-                        labels[low_idx] = "local_bottom"
+                        labels[low_idx] = "local_min"
                         swing_pcts[low_idx] = swing
                         direction = 1  # now going up, seeking top
                     else:
                         # Went up first then down → top confirmed
-                        labels[high_idx] = "local_top"
+                        labels[high_idx] = "local_max"
                         swing_pcts[high_idx] = swing
                         direction = -1  # now going down, seeking bottom
                     init_end = i
@@ -469,7 +469,7 @@ class ZigzagStructureLabeler(Labeler):
                     reversal = (candidate_price - prices[i]) / candidate_price
                     if reversal >= threshold:
                         # Confirm top
-                        labels[candidate_idx] = "local_top"
+                        labels[candidate_idx] = "local_max"
                         swing_pcts[candidate_idx] = reversal
                         direction = -1
                         candidate_idx = i
@@ -483,7 +483,7 @@ class ZigzagStructureLabeler(Labeler):
                     reversal = (prices[i] - candidate_price) / candidate_price
                     if reversal >= threshold:
                         # Confirm bottom
-                        labels[candidate_idx] = "local_bottom"
+                        labels[candidate_idx] = "local_min"
                         swing_pcts[candidate_idx] = reversal
                         direction = 1
                         candidate_idx = i

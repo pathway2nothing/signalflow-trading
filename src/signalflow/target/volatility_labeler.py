@@ -28,8 +28,8 @@ class VolatilityRegimeLabeler(Labeler):
         2. Forward realized volatility: ``std(log_returns[t+1 : t+horizon+1])``
            computed using reverse-shifted rolling std.
         3. Rolling percentile of realized vol over ``lookback_window``.
-        4. If vol > ``upper_quantile`` percentile -> ``"vol_high"``
-        5. If vol < ``lower_quantile`` percentile -> ``"vol_low"``
+        4. If vol > ``upper_quantile`` percentile -> ``"high_volatility"``
+        5. If vol < ``lower_quantile`` percentile -> ``"low_volatility"``
         6. Otherwise -> ``null`` (Polars null)
 
     Implementation:
@@ -129,9 +129,9 @@ class VolatilityRegimeLabeler(Labeler):
             pl.when(pl.col("_vol_percentile").is_null())
             .then(pl.lit(None, dtype=pl.Utf8))
             .when(pl.col("_vol_percentile") > self.upper_quantile)
-            .then(pl.lit("vol_high"))
+            .then(pl.lit("high_volatility"))
             .when(pl.col("_vol_percentile") < self.lower_quantile)
-            .then(pl.lit("vol_low"))
+            .then(pl.lit("low_volatility"))
             .otherwise(pl.lit(None, dtype=pl.Utf8))
             .alias(self.out_col)
         )

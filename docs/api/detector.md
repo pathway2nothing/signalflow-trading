@@ -69,16 +69,18 @@ from signalflow.target.utils import mask_targets_by_signals
 # Z-Score: detects sudden shocks (z-score of aggregate cross-pair return)
 zscore_det = MarketZScoreDetector(z_threshold=6.0, rolling_window=500)
 signals = zscore_det.run(raw_data_view)
+# Default signal_type_name: "aggregate_outlier"
 
 # CUSUM: detects sustained regime shifts (cumulative sum of deviations)
 cusum_det = MarketCusumDetector(drift=0.005, cusum_threshold=0.05)
 signals = cusum_det.run(raw_data_view)
+# Default signal_type_name: "structural_break"
 
 # Mask labels near detected signals
 df_masked = mask_targets_by_signals(
     df=df,
     signals=signals,
-    mask_signal_types={"global_event"},
+    mask_signal_types={"aggregate_outlier", "structural_break"},
     horizon_bars=60,
 )
 ```

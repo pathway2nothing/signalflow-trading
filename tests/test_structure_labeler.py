@@ -88,8 +88,8 @@ class TestStructureLabeler:
         labeler = StructureLabeler(lookforward=30, lookback=30, min_swing_pct=0.01, mask_to_signals=False)
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        has_top = any(l == "local_top" for l in labels)
-        has_bottom = any(l == "local_bottom" for l in labels)
+        has_top = any(l == "local_max" for l in labels)
+        has_bottom = any(l == "local_min" for l in labels)
         assert has_top, "Sine wave should have local tops"
         assert has_bottom, "Sine wave should have local bottoms"
 
@@ -105,7 +105,7 @@ class TestStructureLabeler:
         df = _sine_wave_df(300)
         labeler = StructureLabeler(lookforward=30, lookback=30, mask_to_signals=False)
         result = labeler.compute(df)
-        valid = {"local_top", "local_bottom", None}
+        valid = {"local_max", "local_min", None}
         unique = set(result["label"].to_list())
         assert unique <= valid
 
@@ -146,8 +146,8 @@ class TestStructureLabelerZScore:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        has_top = any(l == "local_top" for l in labels)
-        has_bottom = any(l == "local_bottom" for l in labels)
+        has_top = any(l == "local_max" for l in labels)
+        has_bottom = any(l == "local_min" for l in labels)
         assert has_top or has_bottom, "Z-score mode should detect extrema in sine wave"
 
     def test_zscore_flat_no_labels(self):
@@ -242,8 +242,8 @@ class TestZigzagStructureLabeler:
         pivots = [(i, l) for i, l in enumerate(labels) if l is not None]
         assert len(pivots) >= 2, "Should find at least 2 pivots"
 
-        has_top = any(l == "local_top" for _, l in pivots)
-        has_bottom = any(l == "local_bottom" for _, l in pivots)
+        has_top = any(l == "local_max" for _, l in pivots)
+        has_bottom = any(l == "local_min" for _, l in pivots)
         assert has_top and has_bottom
 
         # Verify strict alternation
@@ -265,7 +265,7 @@ class TestZigzagStructureLabeler:
         df = _sine_wave_df(300)
         labeler = ZigzagStructureLabeler(min_swing_pct=0.01, mask_to_signals=False)
         result = labeler.compute(df)
-        valid = {"local_top", "local_bottom", None}
+        valid = {"local_max", "local_min", None}
         unique = set(result["label"].to_list())
         assert unique <= valid
 
@@ -318,8 +318,8 @@ class TestZigzagStructureLabeler:
         )
         result = labeler.compute(df)
 
-        tops = result.filter(pl.col("label") == "local_top")
-        bottoms = result.filter(pl.col("label") == "local_bottom")
+        tops = result.filter(pl.col("label") == "local_max")
+        bottoms = result.filter(pl.col("label") == "local_min")
 
         if tops.height > 0 and bottoms.height > 0:
             avg_top = tops["close"].mean()
@@ -337,8 +337,8 @@ class TestZigzagZScore:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        has_top = any(l == "local_top" for l in labels)
-        has_bottom = any(l == "local_bottom" for l in labels)
+        has_top = any(l == "local_max" for l in labels)
+        has_bottom = any(l == "local_min" for l in labels)
         assert has_top or has_bottom
 
     def test_zscore_alternation(self):

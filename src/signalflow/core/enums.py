@@ -41,6 +41,14 @@ class SignalCategory(str, Enum):
 class SignalType(str, Enum):
     """Enumeration of price direction signal types.
 
+    .. deprecated::
+        ``SignalType`` is deprecated and will be removed in a future version.
+        Use plain string values instead (e.g. ``"rise"``, ``"fall"``, ``"flat"``).
+        Use ``null`` (Polars null) instead of ``SignalType.NONE`` for unknown/no signal.
+
+        For configuring which signal types to trade, use ``signal_type_map`` on
+        entry rules or ``DIRECTIONAL_SIGNAL_MAP`` from ``core.signal_registry``.
+
     Represents the direction of a trading signal detected by signal detectors.
     This enum covers the ``PRICE_DIRECTION`` category. Other categories use
     free-form string values for ``signal_type`` (see ``SignalCategory``).
@@ -54,35 +62,21 @@ class SignalType(str, Enum):
 
     Example:
         ```python
-        from signalflow.core.enums import SignalType
-
-        # Check signal type
-        if signal_type == SignalType.RISE:
+        # Preferred: use plain strings
+        signal_type = "rise"
+        if signal_type == "rise":
             print("Bullish signal detected")
-        elif signal_type == SignalType.FALL:
-            print("Bearish signal detected")
-        elif signal_type == SignalType.FLAT:
-            print("Sideways market")
 
-        # Use in DataFrame
-        import polars as pl
-        signals_df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime.now()],
-            "signal_type": [SignalType.RISE.value]
-        })
-
-        # Compare with enum
-        is_rise = signals_df.filter(
-            pl.col("signal_type") == SignalType.RISE.value
-        )
+        # Legacy (deprecated):
+        from signalflow.core.enums import SignalType
+        if signal_type == SignalType.RISE.value:
+            print("Bullish signal detected")
         ```
 
     Note:
         Stored as string values in DataFrames for serialization.
-        Use .value to get string representation.
         For non-PRICE_DIRECTION categories, use string values directly
-        (e.g. "vol_high", "local_top") instead of this enum.
+        (e.g. ``"high_volatility"``, ``"local_max"``) instead of this enum.
     """
 
     NONE = "none"
