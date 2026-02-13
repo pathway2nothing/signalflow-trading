@@ -1,7 +1,7 @@
 """Shared utilities for exchange data sources.
 
 Common datetime conversion functions and constants used across
-Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, and other exchange data loaders.
+Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT, and other exchange data loaders.
 """
 
 from datetime import datetime, timezone
@@ -349,4 +349,52 @@ def to_hyperliquid_coin(pair: str) -> str:
     for suffix in ("USDT", "USDC", "USD"):
         if pair.endswith(suffix):
             return pair[: -len(suffix)]
+    return pair
+
+
+# ---------------------------------------------------------------------------
+# WhiteBIT pair normalization
+# ---------------------------------------------------------------------------
+
+
+def normalize_whitebit_pair(symbol: str) -> str:
+    """Convert WhiteBIT symbol to internal compact format.
+
+    WhiteBIT uses underscore-separated pairs: BTC_USDT, ETH_USDT.
+
+    Args:
+        symbol: WhiteBIT symbol (e.g., "BTC_USDT", "ETH_USDT").
+
+    Returns:
+        Internal format (e.g., "BTCUSDT", "ETHUSDT").
+
+    Example:
+        >>> normalize_whitebit_pair("BTC_USDT")
+        'BTCUSDT'
+        >>> normalize_whitebit_pair("eth_usdt")
+        'ETHUSDT'
+    """
+    return symbol.upper().replace("_", "")
+
+
+def to_whitebit_symbol(pair: str) -> str:
+    """Convert internal format to WhiteBIT symbol.
+
+    Args:
+        pair: Internal format (e.g., "BTCUSDT", "ETHUSDT").
+
+    Returns:
+        WhiteBIT symbol (e.g., "BTC_USDT", "ETH_USDT").
+
+    Example:
+        >>> to_whitebit_symbol("BTCUSDT")
+        'BTC_USDT'
+        >>> to_whitebit_symbol("ETHUSDC")
+        'ETH_USDC'
+    """
+    pair = pair.upper()
+    for quote in ("USDT", "USDC", "USD", "UAH", "EUR", "BTC", "ETH"):
+        if pair.endswith(quote):
+            base = pair[: -len(quote)]
+            return f"{base}_{quote}"
     return pair

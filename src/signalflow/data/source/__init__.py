@@ -10,6 +10,7 @@ Supported Exchanges:
     - Deribit: Futures/Perpetuals
     - Kraken: Spot, Futures
     - Hyperliquid: Perpetuals (DEX)
+    - WhiteBIT: Spot
 
 Base Classes:
     RawDataSource: Abstract base for exchange API clients.
@@ -60,6 +61,10 @@ from signalflow.data.source.hyperliquid import (
     HyperliquidClient,
     HyperliquidFuturesLoader,
 )
+from signalflow.data.source.whitebit import (
+    WhitebitClient,
+    WhitebitSpotLoader,
+)
 from signalflow.data.source.virtual import VirtualDataProvider, generate_ohlcv, generate_crossover_data
 
 
@@ -89,6 +94,9 @@ __all__ = [
     # Hyperliquid
     "HyperliquidClient",
     "HyperliquidFuturesLoader",
+    # WhiteBIT
+    "WhitebitClient",
+    "WhitebitSpotLoader",
     # Virtual
     "VirtualDataProvider",
     "generate_ohlcv",
