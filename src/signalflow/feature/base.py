@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
-from typing import ClassVar, Any
+from typing import TYPE_CHECKING, ClassVar, Any
 import polars as pl
 from signalflow.core import SfComponentType, sf_component
 from signalflow.utils import KwargsTolerantMixin
+
+if TYPE_CHECKING:
+    from signalflow.core import RawData
 
 
 @dataclass
@@ -61,8 +64,84 @@ class GlobalFeature(Feature):
     """Base class for features computed across all pairs.
 
     Override compute() with custom aggregation logic.
+
+    For multi-source features, set `sources` to specify which exchanges to use.
+    Use `get_source_data()` to retrieve data from RawData with proper handling.
+
+    Attributes:
+        sources: List of source names to use (e.g., ["binance", "okx"]).
+            If None, uses default source or all available sources.
+
+    Example:
+        ```python
+        @dataclass
+        class AggregatedOI(GlobalFeature):
+            sources: list[str] | None = None
+
+            def compute_from_raw(self, raw: RawData, context=None) -> pl.DataFrame:
+                # Get data from specified sources
+                for source, df in self.iter_sources(raw, "perpetual"):
+                    ...
+        ```
     """
+
+    sources: list[str] | None = field(default=None)
 
     def compute(self, df: pl.DataFrame, context: dict[str, Any] | None = None) -> pl.DataFrame:
         """Must override - compute global feature across all pairs."""
         raise NotImplementedError(f"{self.__class__.__name__} must implement compute()")
+
+    def get_source_data(
+        self,
+        raw: "RawData",
+        data_type: str,
+        source: str | None = None,
+    ) -> pl.DataFrame:
+        """Get DataFrame from RawData for a specific source.
+
+        Args:
+            raw: RawData container.
+            data_type: Data type key (e.g., "perpetual", "spot").
+            source: Specific source name. If None, uses default.
+
+        Returns:
+            pl.DataFrame: Data for the specified source.
+        """
+        if source is not None:
+            return raw.get(data_type, source=source)
+        return raw.get(data_type)
+
+    def iter_sources(
+        self,
+        raw: "RawData",
+        data_type: str,
+    ):
+        """Iterate over source DataFrames from RawData.
+
+        If `self.sources` is set, iterates only those sources.
+        Otherwise, iterates all available sources.
+
+        Args:
+            raw: RawData container.
+            data_type: Data type key (e.g., "perpetual").
+
+        Yields:
+            tuple[str, pl.DataFrame]: (source_name, DataFrame) pairs.
+
+        Example:
+            ```python
+            for source, df in self.iter_sources(raw, "perpetual"):
+                print(f"{source}: {df.shape}")
+            ```
+        """
+        if data_type not in raw:
+            return
+
+        accessor = getattr(raw, data_type)
+
+        # Determine which sources to iterate
+        sources_to_use = self.sources if self.sources else accessor.sources
+
+        for source in sources_to_use:
+            if source in accessor:
+                yield source, getattr(accessor, source)
