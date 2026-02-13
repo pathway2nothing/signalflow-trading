@@ -70,8 +70,8 @@ signal validation, and strategy execution with risk management.
 ### 1. Data & Features
 Load and process market data with efficient storage and feature engineering:
 
-- Flexible data loaders (Binance Spot, Futures, custom sources)
-- DuckDB and Parquet storage backends
+- **7 Exchange Sources**: Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT
+- DuckDB, SQLite, PostgreSQL storage backends
 - Technical indicators via pandas-ta and custom Polars extractors
 
 ### 2. Signal Detection
@@ -267,7 +267,7 @@ SignalFlow is a multi-repository ecosystem with specialized extensions:
 The main library with foundational components:
 
 - Core data containers and abstractions (`RawData`, `Signals`, `RawDataView`)
-- Exchange connectors (Binance Spot) and virtual data generation
+- **7 Exchange Sources**: Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT
 - DuckDB, SQLite, and PostgreSQL storage backends
 - Backtesting infrastructure with modular entry/exit rules
 - Component registry system (`@sf_component`)

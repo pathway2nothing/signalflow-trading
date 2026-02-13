@@ -94,10 +94,11 @@ async with BybitClient() as client:
     )
 ```
 
-| Loader | Category |
-|--------|----------|
-| `BybitSpotLoader` | `spot` |
-| `BybitFuturesLoader` | `linear` |
+| Loader | Category | Symbols |
+|--------|----------|---------|
+| `BybitSpotLoader` | `spot` | BTCUSDT, ETHUSDT |
+| `BybitFuturesLoader` | `linear` | BTCUSDT, ETHUSDT |
+| `BybitFuturesInverseLoader` | `inverse` | BTCUSD, ETHUSD |
 
 ### OKX
 
@@ -113,6 +114,85 @@ async with OkxClient() as client:
 |--------|------------------|
 | `OkxSpotLoader` | (none) |
 | `OkxFuturesLoader` | `-SWAP` |
+
+### Deribit
+
+```python
+from signalflow.data.source import DeribitClient, DeribitFuturesLoader
+
+async with DeribitClient() as client:
+    # Deribit uses BTC-PERPETUAL format
+    klines = await client.get_klines("BTC-PERPETUAL", timeframe="1h")
+
+    # Get available instruments
+    pairs = await client.get_pairs(currency="BTC", kind="future")
+```
+
+| Loader | Instruments |
+|--------|-------------|
+| `DeribitFuturesLoader` | BTC-PERPETUAL, ETH-PERPETUAL |
+
+### Kraken
+
+```python
+from signalflow.data.source import KrakenClient, KrakenSpotLoader
+
+async with KrakenClient() as client:
+    # Kraken spot uses XXBTZUSD format (auto-converted)
+    klines = await client.get_spot_klines("XXBTZUSD", timeframe="1h")
+
+    # Kraken futures uses pi_xbtusd format
+    klines = await client.get_futures_klines("PI_XBTUSD", timeframe="1h")
+```
+
+| Loader | Market Type | Symbols |
+|--------|-------------|---------|
+| `KrakenSpotLoader` | Spot | XXBTZUSD, XETHZUSD |
+| `KrakenFuturesLoader` | Futures | PI_XBTUSD, PI_ETHUSD |
+
+!!! note "Kraken timestamps"
+    Kraken uses **seconds** for timestamps (not milliseconds like most exchanges).
+
+### Hyperliquid
+
+```python
+from signalflow.data.source import HyperliquidClient, HyperliquidFuturesLoader
+
+async with HyperliquidClient() as client:
+    # Hyperliquid uses simple coin names: BTC, ETH
+    klines = await client.get_klines("BTC", timeframe="1h")
+
+    # Get all available coins
+    coins = await client.get_pairs()
+```
+
+| Loader | Market Type |
+|--------|-------------|
+| `HyperliquidFuturesLoader` | Perpetuals (DEX) |
+
+!!! note "Hyperliquid limits"
+    Maximum 5000 historical candles available.
+
+### WhiteBIT
+
+```python
+from signalflow.data.source import WhitebitClient, WhitebitSpotLoader, WhitebitFuturesLoader
+
+async with WhitebitClient() as client:
+    # WhiteBIT uses BTC_USDT format
+    klines = await client.get_klines("BTC_USDT", timeframe="1h")
+
+    # Futures use BTC_PERP format
+    futures_pairs = await client.get_futures_pairs()
+```
+
+| Loader | Market Type | Symbols |
+|--------|-------------|---------|
+| `WhitebitSpotLoader` | Spot | BTC_USDT, ETH_USDT |
+| `WhitebitFuturesLoader` | Futures | BTC_PERP, ETH_PERP |
+
+!!! note "WhiteBIT timestamps"
+    WhiteBIT uses **seconds** for timestamps (not milliseconds).
 
 ---
 
@@ -153,11 +233,11 @@ from signalflow.data.source._helpers import dt_to_ms_utc, ms_to_dt_utc_naive
 
 
 @dataclass
-@sf_component(name="kraken")
-class KrakenClient(RawDataSource):
-    """Async client for Kraken REST API."""
+@sf_component(name="myexchange")
+class MyExchangeClient(RawDataSource):
+    """Async client for custom exchange REST API."""
 
-    base_url: str = "https://api.kraken.com"
+    base_url: str = "https://api.myexchange.com"
     max_retries: int = 3
     _session: Optional[aiohttp.ClientSession] = field(default=None, repr=False)
 
@@ -174,131 +254,117 @@ class KrakenClient(RawDataSource):
         self,
         pair: str,
         timeframe: str = "1m",
-        since: Optional[datetime] = None,
+        start_time: Optional[datetime] = None,
     ) -> list[dict]:
-        """Fetch OHLCV data from Kraken."""
+        """Fetch OHLCV data from exchange."""
         if self._session is None:
-            raise RuntimeError("KrakenClient must be used as async context manager")
+            raise RuntimeError("Must be used as async context manager")
 
-        # Kraken uses different pair format (XXBTZUSD)
-        kraken_pair = self._to_kraken_pair(pair)
-
-        # Kraken interval in minutes
-        interval_map = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240, "1d": 1440}
+        interval_map = {"1m": "1", "5m": "5", "15m": "15", "1h": "60", "4h": "240", "1d": "1440"}
         interval = interval_map.get(timeframe)
         if interval is None:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
 
-        params = {"pair": kraken_pair, "interval": interval}
-        if since:
-            params["since"] = int(since.timestamp())
+        params = {"symbol": pair, "interval": interval}
+        if start_time:
+            params["startTime"] = dt_to_ms_utc(start_time)
 
         async with self._session.get(
-            f"{self.base_url}/0/public/OHLC",
+            f"{self.base_url}/api/v1/klines",
             params=params,
         ) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"API error: {resp.status}")
+
             data = await resp.json()
 
-            if data.get("error"):
-                raise RuntimeError(f"Kraken API error: {data['error']}")
-
-            result_key = list(data["result"].keys())[0]
-            if result_key == "last":
-                result_key = list(data["result"].keys())[1]
-
-            rows = data["result"][result_key]
-
-        # Transform to canonical format
+        # Transform to canonical format (close time convention)
         klines = []
-        for row in rows:
+        for row in data:
+            # Assuming response: [open_time_ms, o, h, l, c, volume]
+            open_time_ms = int(row[0])
+            tf_ms = int(interval) * 60 * 1000
+            close_time_ms = open_time_ms + tf_ms
+
             klines.append({
-                "timestamp": datetime.fromtimestamp(row[0]),
+                "timestamp": ms_to_dt_utc_naive(close_time_ms),
                 "open": float(row[1]),
                 "high": float(row[2]),
                 "low": float(row[3]),
                 "close": float(row[4]),
-                "volume": float(row[6]),
-                "trades": int(row[7]) if len(row) > 7 else 0,
+                "volume": float(row[5]),
+                "trades": 0,  # Not provided
             })
 
         return klines
-
-    def _to_kraken_pair(self, pair: str) -> str:
-        """Convert BTCUSDT to XXBTZUSD format."""
-        # Simplified mapping
-        mapping = {
-            "BTCUSDT": "XXBTZUSD",
-            "ETHUSDT": "XETHZUSD",
-            "BTCUSD": "XXBTZUSD",
-        }
-        return mapping.get(pair, pair)
 ```
 
 ### Step 2: Implement RawDataLoader
 
 ```python
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
 from signalflow.core import sf_component
 from signalflow.data.source.base import RawDataLoader
-from signalflow.data.raw_store import DuckDbRawStore
+from signalflow.data.raw_store import DuckDbSpotStore
 
 
 @dataclass
-@sf_component(name="kraken/spot")
-class KrakenSpotLoader(RawDataLoader):
-    """Loader for Kraken spot data."""
+@sf_component(name="myexchange/spot")
+class MyExchangeSpotLoader(RawDataLoader):
+    """Loader for custom exchange spot data."""
 
-    store_path: Path
+    store: DuckDbSpotStore = field(
+        default_factory=lambda: DuckDbSpotStore(db_path=Path("data/myexchange.duckdb"))
+    )
     timeframe: str = "1m"
-    _store: Optional[DuckDbRawStore] = None
 
-    def __post_init__(self):
-        self._store = DuckDbRawStore(db_path=self.store_path, data_type="spot")
+    async def get_pairs(self) -> list[str]:
+        """Get available trading pairs."""
+        async with MyExchangeClient() as client:
+            # Implement pair fetching
+            return ["BTCUSDT", "ETHUSDT"]
 
     async def download(
         self,
         pairs: list[str],
-        start: datetime,
-        end: datetime,
+        days: Optional[int] = None,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        fill_gaps: bool = True,
     ):
         """Download historical data."""
-        async with KrakenClient() as client:
+        if end is None:
+            end = datetime.utcnow()
+        if start is None:
+            start = end - timedelta(days=days or 7)
+
+        async with MyExchangeClient() as client:
             for pair in pairs:
                 klines = await client.get_klines(
                     pair=pair,
                     timeframe=self.timeframe,
-                    since=start,
+                    start_time=start,
                 )
 
                 # Filter by end date
                 klines = [k for k in klines if k["timestamp"] <= end]
 
                 if klines:
-                    self._store.insert_klines(pair, klines)
+                    self.store.insert_klines(pair, klines)
                     print(f"Downloaded {len(klines)} klines for {pair}")
 
     async def sync(
         self,
         pairs: list[str],
-        days: int = 7,
+        update_interval_sec: int = 60,
     ):
-        """Sync latest data."""
-        end = datetime.now()
-
-        for pair in pairs:
-            # Get last timestamp
-            _, max_ts = self._store.get_time_bounds(pair)
-
-            if max_ts:
-                start = max_ts
-            else:
-                start = end - timedelta(days=days)
-
-            await self.download(pairs=[pair], start=start, end=end)
+        """Continuously sync latest data."""
+        # Implementation...
+        pass
 ```
 
 ### Step 3: Register and Use
@@ -311,19 +377,19 @@ from signalflow.core.enums import SfComponentType
 # Or register manually:
 default_registry.register(
     SfComponentType.RAW_DATA_SOURCE,
-    "kraken",
-    KrakenClient,
+    "myexchange",
+    MyExchangeClient,
 )
 
 default_registry.register(
     SfComponentType.RAW_DATA_LOADER,
-    "kraken/spot",
-    KrakenSpotLoader,
+    "myexchange/spot",
+    MyExchangeSpotLoader,
 )
 
 # Usage
-loader = KrakenSpotLoader(store_path=Path("data/kraken.duckdb"))
-await loader.sync(pairs=["BTCUSDT", "ETHUSDT"], days=30)
+loader = MyExchangeSpotLoader()
+await loader.download(pairs=["BTCUSDT", "ETHUSDT"], days=30)
 ```
 
 ---
@@ -338,6 +404,9 @@ from signalflow.data.source._helpers import (
     dt_to_ms_utc,        # datetime -> milliseconds
     ms_to_dt_utc_naive,  # milliseconds -> datetime (UTC naive)
     ensure_utc_naive,    # normalize timezone
+    # Seconds-based helpers (for Kraken, WhiteBIT)
+    dt_to_sec_utc,       # datetime -> seconds
+    sec_to_dt_utc_naive, # seconds -> datetime (UTC naive)
 )
 
 # Convert datetime to milliseconds
@@ -346,8 +415,33 @@ ms = dt_to_ms_utc(datetime(2024, 1, 1))  # 1704067200000
 # Convert back
 dt = ms_to_dt_utc_naive(1704067200000)  # datetime(2024, 1, 1, 0, 0)
 
+# For seconds-based exchanges (Kraken, WhiteBIT)
+sec = dt_to_sec_utc(datetime(2024, 1, 1))  # 1704067200
+dt = sec_to_dt_utc_naive(1704067200)  # datetime(2024, 1, 1, 0, 0)
+
 # Normalize timezone
 dt_naive = ensure_utc_naive(datetime(2024, 1, 1, tzinfo=timezone.utc))
+```
+
+### Pair Normalization Helpers
+
+Each exchange has pair normalization utilities:
+
+```python
+from signalflow.data.source._helpers import (
+    # Kraken
+    normalize_kraken_spot_pair,    # XXBTZUSD -> BTCUSD
+    normalize_kraken_futures_pair, # pi_xbtusd -> BTCUSD
+    # Deribit
+    normalize_deribit_pair,        # BTC-PERPETUAL -> BTCUSD
+    to_deribit_instrument,         # BTCUSD -> BTC-PERPETUAL
+    # Hyperliquid
+    normalize_hyperliquid_pair,    # BTC -> BTCUSD
+    to_hyperliquid_coin,           # BTCUSD -> BTC
+    # WhiteBIT
+    normalize_whitebit_pair,       # BTC_USDT -> BTCUSDT
+    normalize_whitebit_futures_pair, # BTC_PERP -> BTCUSD
+)
 ```
 
 ---
@@ -426,3 +520,7 @@ See the full API documentation:
 - [`BinanceClient`](../api/data.md) - Binance API client
 - [`BybitClient`](../api/data.md) - Bybit API client
 - [`OkxClient`](../api/data.md) - OKX API client
+- [`DeribitClient`](../api/data.md) - Deribit API client
+- [`KrakenClient`](../api/data.md) - Kraken API client
+- [`HyperliquidClient`](../api/data.md) - Hyperliquid API client
+- [`WhitebitClient`](../api/data.md) - WhiteBIT API client

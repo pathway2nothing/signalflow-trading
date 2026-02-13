@@ -1,4 +1,4 @@
-"""WhiteBIT data source - async REST client and loaders for spot trading."""
+"""WhiteBIT data source - async REST client and loaders for spot and futures trading."""
 
 import asyncio
 from dataclasses import dataclass, field
@@ -19,6 +19,8 @@ from signalflow.data.source._helpers import (
     ensure_utc_naive,
     normalize_whitebit_pair,
     to_whitebit_symbol,
+    normalize_whitebit_futures_pair,
+    to_whitebit_futures_symbol,
 )
 
 # WhiteBIT interval mapping.
@@ -146,6 +148,57 @@ class WhitebitClient(RawDataSource):
                     await asyncio.sleep(wait)
                 else:
                     raise RuntimeError(f"Failed to get pairs: {e}") from e
+
+        return []
+
+    async def get_futures_pairs(self) -> list[str]:
+        """Get list of available futures/perpetual pairs from WhiteBIT.
+
+        Returns:
+            list[str]: List of futures symbols (e.g., ["BTC_PERP", "ETH_PERP"]).
+
+        Example:
+            ```python
+            async with WhitebitClient() as client:
+                pairs = await client.get_futures_pairs()
+                # ['BTC_PERP', 'ETH_PERP', ...]
+            ```
+        """
+        if self._session is None:
+            raise RuntimeError("WhitebitClient must be used as an async context manager.")
+
+        url = f"{self.base_url}/api/v4/public/futures"
+
+        for attempt in range(self.max_retries):
+            try:
+                async with self._session.get(url) as resp:
+                    if resp.status == 429:
+                        retry_after = int(resp.headers.get("Retry-After", 10))
+                        logger.warning(f"Rate limited, waiting {retry_after}s")
+                        await asyncio.sleep(retry_after)
+                        continue
+
+                    if resp.status != 200:
+                        text = await resp.text()
+                        raise RuntimeError(f"WhiteBIT API HTTP {resp.status}: {text}")
+
+                    body = await resp.json()
+
+                pairs: list[str] = []
+                for market in body:
+                    ticker_id = market.get("ticker_id", "")
+                    if ticker_id and "_PERP" in ticker_id.upper():
+                        pairs.append(ticker_id.upper())
+
+                return sorted(pairs)
+
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if attempt < self.max_retries - 1:
+                    wait = 2**attempt
+                    logger.warning(f"Request failed, retrying in {wait}s: {e}")
+                    await asyncio.sleep(wait)
+                else:
+                    raise RuntimeError(f"Failed to get futures pairs: {e}") from e
 
         return []
 
@@ -508,4 +561,163 @@ class WhitebitSpotLoader(RawDataLoader):
             while True:
                 await asyncio.gather(*[fetch_and_store(client, pair) for pair in pairs])
                 logger.debug(f"Synced {len(pairs)} pairs (whitebit/spot)")
+                await asyncio.sleep(update_interval_sec)
+
+
+@dataclass
+@sf_component(name="whitebit/futures")
+class WhitebitFuturesLoader(RawDataLoader):
+    """Downloads and stores WhiteBIT futures/perpetual OHLCV data.
+
+    Pairs are provided in compact format (e.g., "BTCUSD") and
+    automatically converted to WhiteBIT symbols (e.g., "BTC_PERP").
+
+    Attributes:
+        store: Storage backend.
+        timeframe: Fixed timeframe for all data.
+    """
+
+    store: DuckDbSpotStore = field(
+        default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_whitebit_futures.duckdb"))
+    )
+    timeframe: str = "1m"
+
+    async def get_pairs(self) -> list[str]:
+        """Get list of available WhiteBIT futures pairs.
+
+        Returns:
+            list[str]: List of futures symbols (e.g., ["BTC_PERP", "ETH_PERP"]).
+
+        Example:
+            ```python
+            loader = WhitebitFuturesLoader(store=store)
+            pairs = await loader.get_pairs()
+            # ['BTC_PERP', 'ETH_PERP', ...]
+            ```
+        """
+        async with WhitebitClient() as client:
+            return await client.get_futures_pairs()
+
+    async def download(
+        self,
+        pairs: list[str],
+        days: Optional[int] = None,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        fill_gaps: bool = True,
+    ) -> None:
+        """Download historical WhiteBIT futures data.
+
+        Args:
+            pairs: Trading pairs (e.g., ["BTCUSD", "BTC_PERP"]).
+            days: Number of days back from *end*. Default: 30.
+            start: Range start (overrides *days*).
+            end: Range end. Default: now.
+            fill_gaps: Detect and fill gaps. Default: True.
+        """
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        if end is None:
+            end = now
+        else:
+            end = ensure_utc_naive(end)
+
+        if start is None:
+            start = end - timedelta(days=days if days else 30)
+        else:
+            start = ensure_utc_naive(start)
+
+        tf_minutes = {
+            "1m": 1,
+            "3m": 3,
+            "5m": 5,
+            "15m": 15,
+            "30m": 30,
+            "1h": 60,
+            "2h": 120,
+            "4h": 240,
+            "6h": 360,
+            "8h": 480,
+            "12h": 720,
+            "1d": 1440,
+        }.get(self.timeframe, 1)
+
+        async def download_pair(client: WhitebitClient, pair: str) -> None:
+            # Convert compact pair to WhiteBIT futures symbol if needed
+            market = to_whitebit_futures_symbol(pair)
+            store_pair = normalize_whitebit_futures_pair(market)
+
+            logger.info(f"Processing {pair} -> {market} (whitebit/futures) from {start} to {end}")
+
+            db_min, db_max = self.store.get_time_bounds(store_pair)
+            ranges_to_download: list[tuple[datetime, datetime]] = []
+
+            if db_min is None:
+                ranges_to_download.append((start, end))
+            else:
+                if start < db_min:
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
+                if end > db_max:
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
+                if fill_gaps:
+                    overlap_start = max(start, db_min)
+                    overlap_end = min(end, db_max)
+                    if overlap_start < overlap_end:
+                        gaps = self.store.find_gaps(store_pair, overlap_start, overlap_end, tf_minutes)
+                        ranges_to_download.extend(gaps)
+
+            for range_start, range_end in ranges_to_download:
+                if range_start >= range_end:
+                    continue
+                logger.info(f"{store_pair}: downloading {range_start} -> {range_end}")
+                try:
+                    klines = await client.get_klines_range(
+                        market=market,
+                        timeframe=self.timeframe,
+                        start_time=range_start,
+                        end_time=range_end,
+                    )
+                    self.store.insert_klines(store_pair, klines)
+                except Exception as e:
+                    logger.error(f"Error downloading {store_pair}: {e}")
+
+        async with WhitebitClient() as client:
+            await asyncio.gather(*[download_pair(client, pair) for pair in pairs])
+
+        self.store.close()
+
+    async def sync(
+        self,
+        pairs: list[str],
+        update_interval_sec: int = 60,
+    ) -> None:
+        """Continuously sync latest WhiteBIT futures data.
+
+        Args:
+            pairs: Trading pairs to sync.
+            update_interval_sec: Update interval in seconds.
+        """
+        logger.info(f"Starting real-time sync (whitebit/futures) for {pairs}")
+        logger.info(f"Update interval: {update_interval_sec}s (timeframe={self.timeframe})")
+
+        async def fetch_and_store(client: WhitebitClient, pair: str) -> None:
+            market = to_whitebit_futures_symbol(pair)
+            store_pair = normalize_whitebit_futures_pair(market)
+            try:
+                klines = await client.get_klines(
+                    market=market,
+                    timeframe=self.timeframe,
+                    limit=5,
+                )
+                self.store.insert_klines(store_pair, klines)
+            except Exception as e:
+                logger.error(f"Error syncing {store_pair}: {e}")
+
+        async with WhitebitClient() as client:
+            while True:
+                await asyncio.gather(*[fetch_and_store(client, pair) for pair in pairs])
+                logger.debug(f"Synced {len(pairs)} pairs (whitebit/futures)")
                 await asyncio.sleep(update_interval_sec)

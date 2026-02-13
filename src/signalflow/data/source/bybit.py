@@ -639,3 +639,157 @@ class BybitFuturesLoader(RawDataLoader):
                 await asyncio.gather(*[fetch_and_store(client, pair) for pair in pairs])
                 logger.debug(f"Synced {len(pairs)} pairs (bybit/futures)")
                 await asyncio.sleep(update_interval_sec)
+
+
+@dataclass
+@sf_component(name="bybit/futures-inverse")
+class BybitFuturesInverseLoader(RawDataLoader):
+    """Downloads and stores Bybit inverse (coin-margined) perpetual OHLCV data.
+
+    Convenience wrapper for inverse perpetuals with symbols like BTCUSD, ETHUSD.
+    Uses coin (BTC, ETH) as collateral instead of USDT.
+
+    Attributes:
+        store: Storage backend.
+        timeframe: Fixed timeframe for all data.
+    """
+
+    store: DuckDbSpotStore = field(
+        default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_bybit_futures_inverse.duckdb"))
+    )
+    timeframe: str = "1m"
+
+    async def get_pairs(self) -> list[str]:
+        """Get list of available Bybit inverse perpetual pairs.
+
+        Returns:
+            list[str]: List of symbols (e.g., ["BTCUSD", "ETHUSD"]).
+
+        Example:
+            ```python
+            loader = BybitFuturesInverseLoader(store=store)
+            pairs = await loader.get_pairs()
+            # ['BTCUSD', 'ETHUSD', ...]
+            ```
+        """
+        async with BybitClient() as client:
+            return await client.get_pairs(category="inverse")
+
+    async def download(
+        self,
+        pairs: list[str],
+        days: Optional[int] = None,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        fill_gaps: bool = True,
+    ) -> None:
+        """Download historical Bybit inverse perpetual data.
+
+        Args:
+            pairs: Trading pairs to download (e.g., ["BTCUSD", "ETHUSD"]).
+            days: Number of days back from *end*. Default: 7.
+            start: Range start (overrides *days*).
+            end: Range end. Default: now.
+            fill_gaps: Detect and fill gaps. Default: True.
+        """
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        if end is None:
+            end = now
+        else:
+            end = ensure_utc_naive(end)
+
+        if start is None:
+            start = end - timedelta(days=days if days else 7)
+        else:
+            start = ensure_utc_naive(start)
+
+        tf_minutes = {
+            "1m": 1,
+            "3m": 3,
+            "5m": 5,
+            "15m": 15,
+            "30m": 30,
+            "1h": 60,
+            "2h": 120,
+            "4h": 240,
+            "6h": 360,
+            "8h": 480,
+            "12h": 720,
+            "1d": 1440,
+        }.get(self.timeframe, 1)
+
+        async def download_pair(client: BybitClient, pair: str) -> None:
+            logger.info(f"Processing {pair} (bybit/futures-inverse) from {start} to {end}")
+            db_min, db_max = self.store.get_time_bounds(pair)
+            ranges_to_download: list[tuple[datetime, datetime]] = []
+
+            if db_min is None:
+                ranges_to_download.append((start, end))
+            else:
+                if start < db_min:
+                    pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
+                    if start < pre_end:
+                        ranges_to_download.append((start, pre_end))
+                if end > db_max:
+                    post_start = max(start, db_max + timedelta(minutes=tf_minutes))
+                    if post_start < end:
+                        ranges_to_download.append((post_start, end))
+                if fill_gaps:
+                    overlap_start = max(start, db_min)
+                    overlap_end = min(end, db_max)
+                    if overlap_start < overlap_end:
+                        gaps = self.store.find_gaps(pair, overlap_start, overlap_end, tf_minutes)
+                        ranges_to_download.extend(gaps)
+
+            for range_start, range_end in ranges_to_download:
+                if range_start >= range_end:
+                    continue
+                logger.info(f"{pair}: downloading {range_start} -> {range_end}")
+                try:
+                    klines = await client.get_klines_range(
+                        pair=pair,
+                        category="inverse",
+                        timeframe=self.timeframe,
+                        start_time=range_start,
+                        end_time=range_end,
+                    )
+                    self.store.insert_klines(pair, klines)
+                except Exception as e:
+                    logger.error(f"Error downloading {pair}: {e}")
+
+        async with BybitClient() as client:
+            await asyncio.gather(*[download_pair(client, pair) for pair in pairs])
+
+        self.store.close()
+
+    async def sync(
+        self,
+        pairs: list[str],
+        update_interval_sec: int = 60,
+    ) -> None:
+        """Continuously sync latest Bybit inverse perpetual data.
+
+        Args:
+            pairs: Trading pairs to sync.
+            update_interval_sec: Update interval in seconds.
+        """
+        logger.info(f"Starting real-time sync (bybit/futures-inverse) for {pairs}")
+        logger.info(f"Update interval: {update_interval_sec}s (timeframe={self.timeframe})")
+
+        async def fetch_and_store(client: BybitClient, pair: str) -> None:
+            try:
+                klines = await client.get_klines(
+                    pair=pair,
+                    category="inverse",
+                    timeframe=self.timeframe,
+                    limit=5,
+                )
+                self.store.insert_klines(pair, klines)
+            except Exception as e:
+                logger.error(f"Error syncing {pair}: {e}")
+
+        async with BybitClient() as client:
+            while True:
+                await asyncio.gather(*[fetch_and_store(client, pair) for pair in pairs])
+                logger.debug(f"Synced {len(pairs)} pairs (bybit/futures-inverse)")
+                await asyncio.sleep(update_interval_sec)

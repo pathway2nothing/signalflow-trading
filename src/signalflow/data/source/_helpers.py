@@ -398,3 +398,96 @@ def to_whitebit_symbol(pair: str) -> str:
             base = pair[: -len(quote)]
             return f"{base}_{quote}"
     return pair
+
+
+def normalize_whitebit_futures_pair(symbol: str) -> str:
+    """Convert WhiteBIT futures symbol to internal compact format.
+
+    WhiteBIT futures use _PERP suffix: BTC_PERP, ETH_PERP.
+
+    Args:
+        symbol: WhiteBIT futures symbol (e.g., "BTC_PERP", "ETH_PERP").
+
+    Returns:
+        Internal format (e.g., "BTCUSD", "ETHUSD").
+
+    Example:
+        >>> normalize_whitebit_futures_pair("BTC_PERP")
+        'BTCUSD'
+        >>> normalize_whitebit_futures_pair("eth_perp")
+        'ETHUSD'
+    """
+    symbol = symbol.upper().replace("_", "")
+    if symbol.endswith("PERP"):
+        return symbol[:-4] + "USD"
+    return symbol
+
+
+def to_whitebit_futures_symbol(pair: str) -> str:
+    """Convert internal format to WhiteBIT futures symbol.
+
+    Args:
+        pair: Internal format (e.g., "BTCUSD", "ETHUSD").
+
+    Returns:
+        WhiteBIT futures symbol (e.g., "BTC_PERP", "ETH_PERP").
+
+    Example:
+        >>> to_whitebit_futures_symbol("BTCUSD")
+        'BTC_PERP'
+        >>> to_whitebit_futures_symbol("ETHUSDT")
+        'ETH_PERP'
+    """
+    pair = pair.upper()
+    for suffix in ("USDT", "USDC", "USD"):
+        if pair.endswith(suffix):
+            base = pair[: -len(suffix)]
+            return f"{base}_PERP"
+    return f"{pair}_PERP"
+
+
+# ---------------------------------------------------------------------------
+# Bybit pair normalization
+# ---------------------------------------------------------------------------
+
+
+def normalize_bybit_inverse_pair(symbol: str) -> str:
+    """Convert Bybit inverse symbol to internal compact format.
+
+    Bybit inverse perpetuals use USD suffix: BTCUSD, ETHUSD.
+
+    Args:
+        symbol: Bybit inverse symbol (e.g., "BTCUSD", "ETHUSD").
+
+    Returns:
+        Internal format (same as input for inverse).
+
+    Example:
+        >>> normalize_bybit_inverse_pair("BTCUSD")
+        'BTCUSD'
+        >>> normalize_bybit_inverse_pair("ethusd")
+        'ETHUSD'
+    """
+    return symbol.upper()
+
+
+def to_bybit_inverse_symbol(pair: str) -> str:
+    """Convert internal format to Bybit inverse symbol.
+
+    Args:
+        pair: Internal format (e.g., "BTCUSD", "BTCUSDT").
+
+    Returns:
+        Bybit inverse symbol (e.g., "BTCUSD").
+
+    Example:
+        >>> to_bybit_inverse_symbol("BTCUSD")
+        'BTCUSD'
+        >>> to_bybit_inverse_symbol("BTCUSDT")
+        'BTCUSD'
+    """
+    pair = pair.upper()
+    # Convert USDT pairs to USD for inverse
+    if pair.endswith("USDT"):
+        return pair[:-1]  # Remove T
+    return pair

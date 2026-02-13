@@ -1,4 +1,4 @@
-"""Tests for Bybit data source - BybitClient, BybitSpotLoader, BybitFuturesLoader."""
+"""Tests for Bybit data source - BybitClient, BybitSpotLoader, BybitFuturesLoader, BybitFuturesInverseLoader."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from signalflow.core.registry import default_registry
 from signalflow.data.source.bybit import (
     BybitClient,
     BybitFuturesLoader,
+    BybitFuturesInverseLoader,
     BybitSpotLoader,
     _BYBIT_INTERVAL_MAP,
 )
@@ -348,3 +349,21 @@ class TestBybitLoaderGetPairs:
 
         asyncio.run(_run())
         mock_get_pairs.assert_called_once_with(category="inverse", quote=None)
+
+    @patch.object(BybitClient, "get_pairs")
+    def test_futures_inverse_loader_get_pairs(self, mock_get_pairs: AsyncMock) -> None:
+        mock_get_pairs.return_value = ["BTCUSD", "ETHUSD"]
+
+        async def _run():
+            loader = BybitFuturesInverseLoader()
+            pairs = await loader.get_pairs()
+            assert pairs == ["BTCUSD", "ETHUSD"]
+
+        asyncio.run(_run())
+        mock_get_pairs.assert_called_once_with(category="inverse")
+
+
+class TestBybitFuturesInverseLoaderRegistration:
+    def test_bybit_futures_inverse_loader_registered(self) -> None:
+        cls = default_registry.get(SfComponentType.RAW_DATA_LOADER, "bybit/futures-inverse")
+        assert cls is BybitFuturesInverseLoader

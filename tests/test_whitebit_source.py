@@ -1,4 +1,4 @@
-"""Tests for WhiteBIT data source - WhitebitClient, WhitebitSpotLoader."""
+"""Tests for WhiteBIT data source - WhitebitClient, WhitebitSpotLoader, WhitebitFuturesLoader."""
 
 from __future__ import annotations
 
@@ -14,11 +14,14 @@ from signalflow.core.registry import default_registry
 from signalflow.data.source.whitebit import (
     WhitebitClient,
     WhitebitSpotLoader,
+    WhitebitFuturesLoader,
     _WHITEBIT_INTERVAL_MAP,
 )
 from signalflow.data.source._helpers import (
     normalize_whitebit_pair,
     to_whitebit_symbol,
+    normalize_whitebit_futures_pair,
+    to_whitebit_futures_symbol,
     dt_to_sec_utc,
 )
 
@@ -54,6 +57,11 @@ def _make_whitebit_klines_response(timestamps_sec: list[int], base_price: float 
 def _make_whitebit_markets_response(markets: list[str]) -> list[dict]:
     """Build WhiteBIT markets response."""
     return [{"name": m} for m in markets]
+
+
+def _make_whitebit_futures_response(tickers: list[str]) -> list[dict]:
+    """Build WhiteBIT futures response."""
+    return [{"ticker_id": t} for t in tickers]
 
 
 def _mock_response(body, status: int = 200):
@@ -93,6 +101,23 @@ class TestWhitebitPairNormalization:
 
     def test_btcusd_to_btc_usd(self) -> None:
         assert to_whitebit_symbol("BTCUSD") == "BTC_USD"
+
+
+class TestWhitebitFuturesPairNormalization:
+    def test_btc_perp_to_btcusd(self) -> None:
+        assert normalize_whitebit_futures_pair("BTC_PERP") == "BTCUSD"
+
+    def test_eth_perp_to_ethusd(self) -> None:
+        assert normalize_whitebit_futures_pair("ETH_PERP") == "ETHUSD"
+
+    def test_lowercase_btc_perp(self) -> None:
+        assert normalize_whitebit_futures_pair("btc_perp") == "BTCUSD"
+
+    def test_btcusd_to_btc_perp(self) -> None:
+        assert to_whitebit_futures_symbol("BTCUSD") == "BTC_PERP"
+
+    def test_ethusdt_to_eth_perp(self) -> None:
+        assert to_whitebit_futures_symbol("ETHUSDT") == "ETH_PERP"
 
 
 # ---------------------------------------------------------------------------
@@ -231,6 +256,30 @@ class TestWhitebitClientGetPairs:
         asyncio.run(_run())
 
 
+class TestWhitebitClientGetFuturesPairs:
+    def test_get_futures_pairs_raises_without_context_manager(self) -> None:
+        client = WhitebitClient()
+        with pytest.raises(RuntimeError, match="async context manager"):
+            asyncio.run(client.get_futures_pairs())
+
+    def test_get_futures_pairs_parses_response(self) -> None:
+        body = _make_whitebit_futures_response(["BTC_PERP", "ETH_PERP", "SOL_PERP"])
+        mock_resp = _mock_response(body)
+
+        async def _run():
+            async with WhitebitClient() as client:
+                mock_session = AsyncMock()
+                mock_session.get = MagicMock(return_value=mock_resp)
+                client._session = mock_session
+
+                pairs = await client.get_futures_pairs()
+                assert "BTC_PERP" in pairs
+                assert "ETH_PERP" in pairs
+                assert "SOL_PERP" in pairs
+
+        asyncio.run(_run())
+
+
 class TestWhitebitTimeframeMapping:
     def test_supported_timeframes(self) -> None:
         expected = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"}
@@ -251,6 +300,10 @@ class TestWhitebitRegistration:
         cls = default_registry.get(SfComponentType.RAW_DATA_LOADER, "whitebit/spot")
         assert cls is WhitebitSpotLoader
 
+    def test_whitebit_futures_loader_registered(self) -> None:
+        cls = default_registry.get(SfComponentType.RAW_DATA_LOADER, "whitebit/futures")
+        assert cls is WhitebitFuturesLoader
+
 
 # ---------------------------------------------------------------------------
 # Loader tests
@@ -269,3 +322,15 @@ class TestWhitebitLoaderGetPairs:
 
         asyncio.run(_run())
         mock_get_pairs.assert_called_once_with(quote="USDT")
+
+    @patch.object(WhitebitClient, "get_futures_pairs")
+    def test_futures_loader_get_pairs(self, mock_get_pairs: AsyncMock) -> None:
+        mock_get_pairs.return_value = ["BTC_PERP", "ETH_PERP"]
+
+        async def _run():
+            loader = WhitebitFuturesLoader()
+            pairs = await loader.get_pairs()
+            assert pairs == ["BTC_PERP", "ETH_PERP"]
+
+        asyncio.run(_run())
+        mock_get_pairs.assert_called_once()
