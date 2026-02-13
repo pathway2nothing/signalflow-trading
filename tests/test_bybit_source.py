@@ -73,6 +73,11 @@ class TestBybitClient:
         with pytest.raises(RuntimeError, match="async context manager"):
             asyncio.run(client.get_klines(PAIR))
 
+    def test_get_pairs_raises_without_context_manager(self) -> None:
+        client = BybitClient()
+        with pytest.raises(RuntimeError, match="async context manager"):
+            asyncio.run(client.get_pairs())
+
     def test_unsupported_timeframe(self) -> None:
         async def _run():
             async with BybitClient() as client:
@@ -213,3 +218,133 @@ class TestBybitRegistration:
 
     def test_futures_loader_default_category(self) -> None:
         assert BybitFuturesLoader.category == "linear"
+
+
+# ---------------------------------------------------------------------------
+# get_pairs() tests
+# ---------------------------------------------------------------------------
+
+
+def _make_bybit_instruments_response(instruments: list[dict]) -> dict:
+    """Build Bybit instruments response."""
+    return {"retCode": 0, "retMsg": "OK", "result": {"list": instruments}}
+
+
+class TestBybitClientGetPairs:
+    def test_get_pairs_spot(self) -> None:
+        instruments = [
+            {"symbol": "BTCUSDT", "quoteCoin": "USDT", "status": "Trading"},
+            {"symbol": "ETHUSDT", "quoteCoin": "USDT", "status": "Trading"},
+            {"symbol": "ETHBTC", "quoteCoin": "BTC", "status": "Trading"},
+            {"symbol": "OLDUSDT", "quoteCoin": "USDT", "status": "Closed"},
+        ]
+        body = _make_bybit_instruments_response(instruments)
+        mock_resp = _mock_response(body)
+
+        async def _run():
+            async with BybitClient() as client:
+                mock_session = AsyncMock()
+                mock_session.get = MagicMock(return_value=mock_resp)
+                client._session = mock_session
+
+                # All pairs
+                pairs = await client.get_pairs(category="spot")
+                assert pairs == ["BTCUSDT", "ETHBTC", "ETHUSDT"]
+                assert "OLDUSDT" not in pairs  # Closed
+
+        asyncio.run(_run())
+
+    def test_get_pairs_spot_quote_filter(self) -> None:
+        instruments = [
+            {"symbol": "BTCUSDT", "quoteCoin": "USDT", "status": "Trading"},
+            {"symbol": "ETHUSDT", "quoteCoin": "USDT", "status": "Trading"},
+            {"symbol": "ETHBTC", "quoteCoin": "BTC", "status": "Trading"},
+        ]
+        body = _make_bybit_instruments_response(instruments)
+        mock_resp = _mock_response(body)
+
+        async def _run():
+            async with BybitClient() as client:
+                mock_session = AsyncMock()
+                mock_session.get = MagicMock(return_value=mock_resp)
+                client._session = mock_session
+
+                pairs = await client.get_pairs(category="spot", quote="USDT")
+                assert pairs == ["BTCUSDT", "ETHUSDT"]
+                assert "ETHBTC" not in pairs
+
+        asyncio.run(_run())
+
+    def test_get_pairs_linear(self) -> None:
+        instruments = [
+            {"symbol": "BTCUSDT", "settleCoin": "USDT", "status": "Trading"},
+            {"symbol": "ETHUSDT", "settleCoin": "USDT", "status": "Trading"},
+            {"symbol": "BTCPERP", "settleCoin": "USDC", "status": "Trading"},
+        ]
+        body = _make_bybit_instruments_response(instruments)
+        mock_resp = _mock_response(body)
+
+        async def _run():
+            async with BybitClient() as client:
+                mock_session = AsyncMock()
+                mock_session.get = MagicMock(return_value=mock_resp)
+                client._session = mock_session
+
+                # Filter by USDT settlement
+                pairs = await client.get_pairs(category="linear", quote="USDT")
+                assert pairs == ["BTCUSDT", "ETHUSDT"]
+
+        asyncio.run(_run())
+
+    def test_get_pairs_api_error(self) -> None:
+        body = {"retCode": 10001, "retMsg": "Service unavailable"}
+        mock_resp = _mock_response(body)
+
+        async def _run():
+            async with BybitClient(max_retries=1) as client:
+                mock_session = AsyncMock()
+                mock_session.get = MagicMock(return_value=mock_resp)
+                client._session = mock_session
+
+                with pytest.raises(RuntimeError, match="Bybit API error"):
+                    await client.get_pairs()
+
+        asyncio.run(_run())
+
+
+class TestBybitLoaderGetPairs:
+    @patch.object(BybitClient, "get_pairs")
+    def test_spot_loader_get_pairs(self, mock_get_pairs: AsyncMock) -> None:
+        mock_get_pairs.return_value = ["BTCUSDT", "ETHUSDT"]
+
+        async def _run():
+            loader = BybitSpotLoader()
+            pairs = await loader.get_pairs(quote="USDT")
+            assert pairs == ["BTCUSDT", "ETHUSDT"]
+
+        asyncio.run(_run())
+        mock_get_pairs.assert_called_once_with(category="spot", quote="USDT")
+
+    @patch.object(BybitClient, "get_pairs")
+    def test_futures_loader_get_pairs_linear(self, mock_get_pairs: AsyncMock) -> None:
+        mock_get_pairs.return_value = ["BTCUSDT", "ETHUSDT"]
+
+        async def _run():
+            loader = BybitFuturesLoader(category="linear")
+            pairs = await loader.get_pairs(quote="USDT")
+            assert pairs == ["BTCUSDT", "ETHUSDT"]
+
+        asyncio.run(_run())
+        mock_get_pairs.assert_called_once_with(category="linear", quote="USDT")
+
+    @patch.object(BybitClient, "get_pairs")
+    def test_futures_loader_get_pairs_inverse(self, mock_get_pairs: AsyncMock) -> None:
+        mock_get_pairs.return_value = ["BTCUSD", "ETHUSD"]
+
+        async def _run():
+            loader = BybitFuturesLoader(category="inverse")
+            pairs = await loader.get_pairs()
+            assert pairs == ["BTCUSD", "ETHUSD"]
+
+        asyncio.run(_run())
+        mock_get_pairs.assert_called_once_with(category="inverse", quote=None)

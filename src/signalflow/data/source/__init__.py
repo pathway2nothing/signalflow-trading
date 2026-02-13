@@ -7,6 +7,9 @@ Supported Exchanges:
     - Binance: Spot, USDT-M Futures, COIN-M Futures
     - Bybit: Spot, Linear Futures
     - OKX: Spot, Perpetual Swaps
+    - Deribit: Futures/Perpetuals
+    - Kraken: Spot, Futures
+    - Hyperliquid: Perpetuals (DEX)
 
 Base Classes:
     RawDataSource: Abstract base for exchange API clients.
@@ -44,22 +47,49 @@ from signalflow.data.source.okx import (
     OkxSpotLoader,
     OkxFuturesLoader,
 )
+from signalflow.data.source.deribit import (
+    DeribitClient,
+    DeribitFuturesLoader,
+)
+from signalflow.data.source.kraken import (
+    KrakenClient,
+    KrakenSpotLoader,
+    KrakenFuturesLoader,
+)
+from signalflow.data.source.hyperliquid import (
+    HyperliquidClient,
+    HyperliquidFuturesLoader,
+)
 from signalflow.data.source.virtual import VirtualDataProvider, generate_ohlcv, generate_crossover_data
 
 
 __all__ = [
     "RawDataSource",
     "RawDataLoader",
+    # Binance
     "BinanceClient",
     "BinanceSpotLoader",
     "BinanceFuturesUsdtLoader",
     "BinanceFuturesCoinLoader",
+    # Bybit
     "BybitClient",
     "BybitSpotLoader",
     "BybitFuturesLoader",
+    # OKX
     "OkxClient",
     "OkxSpotLoader",
     "OkxFuturesLoader",
+    # Deribit
+    "DeribitClient",
+    "DeribitFuturesLoader",
+    # Kraken
+    "KrakenClient",
+    "KrakenSpotLoader",
+    "KrakenFuturesLoader",
+    # Hyperliquid
+    "HyperliquidClient",
+    "HyperliquidFuturesLoader",
+    # Virtual
     "VirtualDataProvider",
     "generate_ohlcv",
     "generate_crossover_data",

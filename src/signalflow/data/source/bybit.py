@@ -69,6 +69,80 @@ class BybitClient(RawDataSource):
             await self._session.close()
             self._session = None
 
+    async def get_pairs(
+        self,
+        category: str = "spot",
+        quote: str | None = None,
+    ) -> list[str]:
+        """Get list of available instruments from Bybit.
+
+        Args:
+            category (str): Market category. One of:
+                - "spot" for spot trading
+                - "linear" for USDT perpetuals
+                - "inverse" for coin-margined contracts
+            quote (str | None): Filter by quote/settlement currency (e.g., "USDT").
+                If None, returns all instruments.
+
+        Returns:
+            list[str]: List of symbols (e.g., ["BTCUSDT", "ETHUSDT"]).
+
+        Example:
+            ```python
+            async with BybitClient() as client:
+                # All spot USDT pairs
+                spot = await client.get_pairs(category="spot", quote="USDT")
+
+                # All linear perpetuals
+                perps = await client.get_pairs(category="linear")
+            ```
+        """
+        if self._session is None:
+            raise RuntimeError("BybitClient must be used as an async context manager.")
+
+        url = f"{self.base_url}/v5/market/instruments-info"
+        params: dict[str, str] = {"category": category}
+
+        for attempt in range(self.max_retries):
+            try:
+                async with self._session.get(url, params=params) as resp:
+                    if resp.status == 429:
+                        retry_after = int(resp.headers.get("Retry-After", 60))
+                        logger.warning(f"Rate limited, waiting {retry_after}s")
+                        await asyncio.sleep(retry_after)
+                        continue
+
+                    if resp.status != 200:
+                        text = await resp.text()
+                        raise RuntimeError(f"Bybit API HTTP {resp.status}: {text}")
+
+                    body = await resp.json()
+
+                if body.get("retCode") != 0:
+                    raise RuntimeError(f"Bybit API error {body.get('retCode')}: {body.get('retMsg')}")
+
+                pairs: list[str] = []
+                for inst in body.get("result", {}).get("list", []):
+                    if inst.get("status") != "Trading":
+                        continue
+                    symbol = inst.get("symbol", "")
+                    # Quote filtering: quoteCoin for spot, settleCoin for derivatives
+                    ccy_field = "quoteCoin" if category == "spot" else "settleCoin"
+                    if quote is None or inst.get(ccy_field) == quote:
+                        pairs.append(symbol)
+
+                return sorted(pairs)
+
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if attempt < self.max_retries - 1:
+                    wait = 2**attempt
+                    logger.warning(f"Request failed, retrying in {wait}s: {e}")
+                    await asyncio.sleep(wait)
+                else:
+                    raise RuntimeError(f"Failed to get instruments: {e}") from e
+
+        return []
+
     async def get_klines(
         self,
         pair: str,
@@ -269,6 +343,26 @@ class BybitSpotLoader(RawDataLoader):
     store: DuckDbSpotStore = field(default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_bybit_spot.duckdb")))
     timeframe: str = "1m"
 
+    async def get_pairs(self, quote: str | None = None) -> list[str]:
+        """Get list of available Bybit spot trading pairs.
+
+        Args:
+            quote (str | None): Filter by quote currency (e.g., "USDT").
+                If None, returns all spot pairs.
+
+        Returns:
+            list[str]: List of symbols (e.g., ["BTCUSDT", "ETHUSDT"]).
+
+        Example:
+            ```python
+            loader = BybitSpotLoader(store=store)
+            usdt_pairs = await loader.get_pairs(quote="USDT")
+            # ['BTCUSDT', 'ETHUSDT', ...]
+            ```
+        """
+        async with BybitClient() as client:
+            return await client.get_pairs(category="spot", quote=quote)
+
     async def download(
         self,
         pairs: list[str],
@@ -406,6 +500,26 @@ class BybitFuturesLoader(RawDataLoader):
     )
     timeframe: str = "1m"
     category: str = "linear"
+
+    async def get_pairs(self, quote: str | None = None) -> list[str]:
+        """Get list of available Bybit futures/perpetual pairs.
+
+        Args:
+            quote (str | None): Filter by settlement currency (e.g., "USDT").
+                If None, returns all pairs for the configured category.
+
+        Returns:
+            list[str]: List of symbols (e.g., ["BTCUSDT", "ETHUSDT"]).
+
+        Example:
+            ```python
+            loader = BybitFuturesLoader(store=store, category="linear")
+            usdt_perps = await loader.get_pairs(quote="USDT")
+            # ['BTCUSDT', 'ETHUSDT', ...]
+            ```
+        """
+        async with BybitClient() as client:
+            return await client.get_pairs(category=self.category, quote=quote)
 
     async def download(
         self,

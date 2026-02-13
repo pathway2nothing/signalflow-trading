@@ -104,6 +104,11 @@ class TestOkxClient:
         with pytest.raises(RuntimeError, match="async context manager"):
             asyncio.run(client.get_klines("BTC-USDT"))
 
+    def test_get_pairs_raises_without_context_manager(self) -> None:
+        client = OkxClient()
+        with pytest.raises(RuntimeError, match="async context manager"):
+            asyncio.run(client.get_pairs())
+
     def test_unsupported_timeframe(self) -> None:
         async def _run():
             async with OkxClient() as client:
@@ -243,3 +248,133 @@ class TestOkxRegistration:
 
     def test_futures_loader_default_suffix(self) -> None:
         assert OkxFuturesLoader.inst_suffix == "-SWAP"
+
+
+# ---------------------------------------------------------------------------
+# get_pairs() tests
+# ---------------------------------------------------------------------------
+
+
+def _make_okx_instruments_response(instruments: list[dict]) -> dict:
+    """Build OKX instruments response."""
+    return {"code": "0", "msg": "", "data": instruments}
+
+
+class TestOkxClientGetPairs:
+    def test_get_pairs_spot(self) -> None:
+        instruments = [
+            {"instId": "BTC-USDT", "quoteCcy": "USDT", "state": "live"},
+            {"instId": "ETH-USDT", "quoteCcy": "USDT", "state": "live"},
+            {"instId": "ETH-BTC", "quoteCcy": "BTC", "state": "live"},
+            {"instId": "OLD-USDT", "quoteCcy": "USDT", "state": "suspend"},
+        ]
+        body = _make_okx_instruments_response(instruments)
+        mock_resp = _mock_response(body)
+
+        async def _run():
+            async with OkxClient() as client:
+                mock_session = AsyncMock()
+                mock_session.get = MagicMock(return_value=mock_resp)
+                client._session = mock_session
+
+                # All pairs
+                pairs = await client.get_pairs(inst_type="SPOT")
+                assert pairs == ["BTC-USDT", "ETH-BTC", "ETH-USDT"]
+                assert "OLD-USDT" not in pairs  # suspended
+
+        asyncio.run(_run())
+
+    def test_get_pairs_spot_quote_filter(self) -> None:
+        instruments = [
+            {"instId": "BTC-USDT", "quoteCcy": "USDT", "state": "live"},
+            {"instId": "ETH-USDT", "quoteCcy": "USDT", "state": "live"},
+            {"instId": "ETH-BTC", "quoteCcy": "BTC", "state": "live"},
+        ]
+        body = _make_okx_instruments_response(instruments)
+        mock_resp = _mock_response(body)
+
+        async def _run():
+            async with OkxClient() as client:
+                mock_session = AsyncMock()
+                mock_session.get = MagicMock(return_value=mock_resp)
+                client._session = mock_session
+
+                pairs = await client.get_pairs(inst_type="SPOT", quote="USDT")
+                assert pairs == ["BTC-USDT", "ETH-USDT"]
+                assert "ETH-BTC" not in pairs
+
+        asyncio.run(_run())
+
+    def test_get_pairs_swap(self) -> None:
+        instruments = [
+            {"instId": "BTC-USDT-SWAP", "settleCcy": "USDT", "state": "live"},
+            {"instId": "ETH-USDT-SWAP", "settleCcy": "USDT", "state": "live"},
+            {"instId": "BTC-USD-SWAP", "settleCcy": "BTC", "state": "live"},
+        ]
+        body = _make_okx_instruments_response(instruments)
+        mock_resp = _mock_response(body)
+
+        async def _run():
+            async with OkxClient() as client:
+                mock_session = AsyncMock()
+                mock_session.get = MagicMock(return_value=mock_resp)
+                client._session = mock_session
+
+                # Filter by USDT settlement
+                pairs = await client.get_pairs(inst_type="SWAP", quote="USDT")
+                assert pairs == ["BTC-USDT-SWAP", "ETH-USDT-SWAP"]
+
+        asyncio.run(_run())
+
+    def test_get_pairs_api_error(self) -> None:
+        body = {"code": "50001", "msg": "Service unavailable"}
+        mock_resp = _mock_response(body)
+
+        async def _run():
+            async with OkxClient(max_retries=1) as client:
+                mock_session = AsyncMock()
+                mock_session.get = MagicMock(return_value=mock_resp)
+                client._session = mock_session
+
+                with pytest.raises(RuntimeError, match="OKX API error"):
+                    await client.get_pairs()
+
+        asyncio.run(_run())
+
+
+class TestOkxLoaderGetPairs:
+    @patch.object(OkxClient, "get_pairs")
+    def test_spot_loader_get_pairs(self, mock_get_pairs: AsyncMock) -> None:
+        mock_get_pairs.return_value = ["BTC-USDT", "ETH-USDT"]
+
+        async def _run():
+            loader = OkxSpotLoader()
+            pairs = await loader.get_pairs(quote="USDT")
+            assert pairs == ["BTC-USDT", "ETH-USDT"]
+
+        asyncio.run(_run())
+        mock_get_pairs.assert_called_once_with(inst_type="SPOT", quote="USDT")
+
+    @patch.object(OkxClient, "get_pairs")
+    def test_futures_loader_get_pairs_swap(self, mock_get_pairs: AsyncMock) -> None:
+        mock_get_pairs.return_value = ["BTC-USDT-SWAP", "ETH-USDT-SWAP"]
+
+        async def _run():
+            loader = OkxFuturesLoader(inst_suffix="-SWAP")
+            pairs = await loader.get_pairs(quote="USDT")
+            assert pairs == ["BTC-USDT-SWAP", "ETH-USDT-SWAP"]
+
+        asyncio.run(_run())
+        mock_get_pairs.assert_called_once_with(inst_type="SWAP", quote="USDT")
+
+    @patch.object(OkxClient, "get_pairs")
+    def test_futures_loader_get_pairs_futures(self, mock_get_pairs: AsyncMock) -> None:
+        mock_get_pairs.return_value = ["BTC-USDT-240329"]
+
+        async def _run():
+            loader = OkxFuturesLoader(inst_suffix="-240329")
+            pairs = await loader.get_pairs()
+            assert pairs == ["BTC-USDT-240329"]
+
+        asyncio.run(_run())
+        mock_get_pairs.assert_called_once_with(inst_type="FUTURES", quote=None)

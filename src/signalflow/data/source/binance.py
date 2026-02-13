@@ -68,6 +68,7 @@ class BinanceClient(RawDataSource):
 
     base_url: str = "https://api.binance.com"
     klines_path: str = "/api/v3/klines"
+    exchange_info_path: str = "/api/v3/exchangeInfo"
     max_retries: int = 3
     timeout_sec: int = 30
     min_delay_sec: float = 0.05
@@ -85,6 +86,66 @@ class BinanceClient(RawDataSource):
         if self._session:
             await self._session.close()
             self._session = None
+
+    async def get_pairs(self, quote: str | None = None) -> list[str]:
+        """Get list of available trading pairs.
+
+        Args:
+            quote (str | None): Filter by quote asset (e.g., "USDT", "BTC").
+                If None, returns all trading pairs.
+
+        Returns:
+            list[str]: List of trading pair symbols (e.g., ["BTCUSDT", "ETHUSDT"]).
+
+        Example:
+            ```python
+            async with BinanceClient() as client:
+                # All pairs
+                all_pairs = await client.get_pairs()
+
+                # Only USDT pairs
+                usdt_pairs = await client.get_pairs(quote="USDT")
+            ```
+        """
+        if self._session is None:
+            raise RuntimeError("BinanceClient must be used as an async context manager.")
+
+        url = f"{self.base_url}{self.exchange_info_path}"
+
+        for attempt in range(self.max_retries):
+            try:
+                async with self._session.get(url) as resp:
+                    if resp.status == 429:
+                        retry_after = int(resp.headers.get("Retry-After", 60))
+                        logger.warning(f"Rate limited, waiting {retry_after}s")
+                        await asyncio.sleep(retry_after)
+                        continue
+
+                    if resp.status != 200:
+                        text = await resp.text()
+                        raise RuntimeError(f"Binance API error {resp.status}: {text}")
+
+                    data = await resp.json()
+
+                pairs: list[str] = []
+                for symbol in data.get("symbols", []):
+                    if symbol.get("status") != "TRADING":
+                        continue
+                    sym = symbol.get("symbol", "")
+                    if quote is None or symbol.get("quoteAsset") == quote:
+                        pairs.append(sym)
+
+                return sorted(pairs)
+
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if attempt < self.max_retries - 1:
+                    wait = 2**attempt
+                    logger.warning(f"Request failed, retrying in {wait}s: {e}")
+                    await asyncio.sleep(wait)
+                else:
+                    raise RuntimeError(f"Failed to get exchange info: {e}") from e
+
+        return []
 
     async def get_klines(
         self,
@@ -286,6 +347,26 @@ class BinanceSpotLoader(RawDataLoader):
     store: DuckDbSpotStore = field(default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data.duckdb")))
     timeframe: str = "1m"
 
+    async def get_pairs(self, quote: str | None = None) -> list[str]:
+        """Get list of available trading pairs from Binance Spot.
+
+        Args:
+            quote (str | None): Filter by quote asset (e.g., "USDT").
+                If None, returns all trading pairs.
+
+        Returns:
+            list[str]: List of trading pair symbols.
+
+        Example:
+            ```python
+            loader = BinanceSpotLoader(store=store)
+            usdt_pairs = await loader.get_pairs(quote="USDT")
+            # ['BTCUSDT', 'ETHUSDT', ...]
+            ```
+        """
+        async with BinanceClient() as client:
+            return await client.get_pairs(quote=quote)
+
     async def download(
         self,
         pairs: list[str],
@@ -443,6 +524,29 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
     )
     timeframe: str = "1m"
 
+    async def get_pairs(self, quote: str | None = None) -> list[str]:
+        """Get list of available USDT-M futures pairs.
+
+        Args:
+            quote (str | None): Filter by quote asset (e.g., "USDT").
+                If None, returns all futures pairs.
+
+        Returns:
+            list[str]: List of futures pair symbols.
+
+        Example:
+            ```python
+            loader = BinanceFuturesUsdtLoader(store=store)
+            pairs = await loader.get_pairs()
+            # ['BTCUSDT', 'ETHUSDT', ...]
+            ```
+        """
+        async with BinanceClient(
+            base_url="https://fapi.binance.com",
+            exchange_info_path="/fapi/v1/exchangeInfo",
+        ) as client:
+            return await client.get_pairs(quote=quote)
+
     async def download(
         self,
         pairs: list[str],
@@ -580,6 +684,29 @@ class BinanceFuturesCoinLoader(RawDataLoader):
         default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_futures_coin.duckdb"))
     )
     timeframe: str = "1m"
+
+    async def get_pairs(self, quote: str | None = None) -> list[str]:
+        """Get list of available COIN-M futures pairs.
+
+        Args:
+            quote (str | None): Filter by margin asset (e.g., "BTC").
+                If None, returns all COIN-M futures pairs.
+
+        Returns:
+            list[str]: List of futures pair symbols (e.g., ["BTCUSD_PERP"]).
+
+        Example:
+            ```python
+            loader = BinanceFuturesCoinLoader(store=store)
+            pairs = await loader.get_pairs()
+            # ['BTCUSD_PERP', 'ETHUSD_PERP', ...]
+            ```
+        """
+        async with BinanceClient(
+            base_url="https://dapi.binance.com",
+            exchange_info_path="/dapi/v1/exchangeInfo",
+        ) as client:
+            return await client.get_pairs(quote=quote)
 
     async def download(
         self,
