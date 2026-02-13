@@ -256,3 +256,126 @@ class TestRawDataFactoryFromStores:
         assert len(df) == 25
         assert set(df["pair"].unique().to_list()) == {"BTCUSDT", "ETHUSDT"}
         store.close()
+
+
+class TestRawDataFactoryMultiSource:
+    """Tests for multi-source (dict) input to from_stores."""
+
+    def _make_perpetual_data(self, n=10, oi_multiplier=1.0):
+        klines = []
+        for i in range(n):
+            klines.append({
+                "timestamp": datetime(2024, 1, 1, 0, i),
+                "open": 100.0 + i,
+                "high": 101.0 + i,
+                "low": 99.0 + i,
+                "close": 100.5 + i,
+                "volume": 1000.0,
+                "open_interest": 50000.0 * oi_multiplier,
+                "funding_rate": 0.0001,
+            })
+        return klines
+
+    def test_from_stores_dict_creates_nested(self, tmp_path: Path):
+        """from_stores with dict creates nested structure."""
+        binance_store = DuckDbRawStore(
+            db_path=tmp_path / "binance.duckdb", data_type="perpetual"
+        )
+        okx_store = DuckDbRawStore(
+            db_path=tmp_path / "okx.duckdb", data_type="perpetual"
+        )
+
+        binance_store.insert_klines("BTCUSDT", self._make_perpetual_data(10, 1.0))
+        okx_store.insert_klines("BTCUSDT", self._make_perpetual_data(10, 0.8))
+
+        raw = RawDataFactory.from_stores(
+            stores={
+                "binance": binance_store,
+                "okx": okx_store,
+            },
+            pairs=["BTCUSDT"],
+            start=datetime(2024, 1, 1),
+            end=datetime(2024, 1, 1, 0, 9),
+        )
+
+        # Check nested structure
+        assert "perpetual" in raw.data
+        assert isinstance(raw.data["perpetual"], dict)
+        assert "binance" in raw.data["perpetual"]
+        assert "okx" in raw.data["perpetual"]
+
+        # Check accessor works
+        assert raw.perpetual.sources == ["binance", "okx"]
+        assert len(raw.perpetual.binance) == 10
+        assert len(raw.perpetual.okx) == 10
+
+        # Check tuple indexing
+        df = raw["perpetual", "binance"]
+        assert len(df) == 10
+
+        binance_store.close()
+        okx_store.close()
+
+    def test_from_stores_dict_default_source(self, tmp_path: Path):
+        """from_stores with dict sets correct default_source."""
+        store1 = DuckDbRawStore(db_path=tmp_path / "a.duckdb", data_type="perpetual")
+        store2 = DuckDbRawStore(db_path=tmp_path / "b.duckdb", data_type="perpetual")
+
+        store1.insert_klines("BTCUSDT", self._make_perpetual_data(5))
+        store2.insert_klines("BTCUSDT", self._make_perpetual_data(5))
+
+        raw = RawDataFactory.from_stores(
+            stores={"alpha": store1, "beta": store2},
+            pairs=["BTCUSDT"],
+            start=datetime(2024, 1, 1),
+            end=datetime(2024, 1, 1, 0, 4),
+            default_source="beta",
+        )
+
+        assert raw.default_source == "beta"
+        store1.close()
+        store2.close()
+
+    def test_from_stores_dict_empty(self):
+        """from_stores with empty dict returns empty RawData."""
+        raw = RawDataFactory.from_stores(
+            stores={},
+            pairs=["BTCUSDT"],
+            start=datetime(2024, 1, 1),
+            end=datetime(2024, 1, 2),
+        )
+
+        assert isinstance(raw, RawData)
+        assert raw.data == {}
+
+    def test_from_stores_dict_auto_default_source(self, tmp_path: Path):
+        """from_stores auto-sets first source as default."""
+        store = DuckDbRawStore(db_path=tmp_path / "test.duckdb", data_type="perpetual")
+        store.insert_klines("BTCUSDT", self._make_perpetual_data(5))
+
+        raw = RawDataFactory.from_stores(
+            stores={"myexchange": store},
+            pairs=["BTCUSDT"],
+            start=datetime(2024, 1, 1),
+            end=datetime(2024, 1, 1, 0, 4),
+        )
+
+        assert raw.default_source == "myexchange"
+        store.close()
+
+    def test_from_stores_dict_data_normalized(self, tmp_path: Path):
+        """from_stores normalizes timestamps and sorts data."""
+        store = DuckDbRawStore(db_path=tmp_path / "test.duckdb", data_type="perpetual")
+        store.insert_klines("BTCUSDT", self._make_perpetual_data(10))
+
+        raw = RawDataFactory.from_stores(
+            stores={"exchange": store},
+            pairs=["BTCUSDT"],
+            start=datetime(2024, 1, 1),
+            end=datetime(2024, 1, 1, 0, 9),
+        )
+
+        df = raw.perpetual.exchange
+        assert df["timestamp"].dtype == pl.Datetime("us")
+        assert df["timestamp"].is_sorted()
+        store.close()

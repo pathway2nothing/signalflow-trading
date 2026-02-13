@@ -4,7 +4,8 @@ Immutable and mutable data containers for market data,
 signals, positions, orders, and portfolio state.
 """
 
-from signalflow.core.containers.raw_data import RawData
+from signalflow.core.containers.raw_data import RawData, DataTypeAccessor
+from signalflow.core.containers.raw_data_lazy import RawDataLazy, LazyDataTypeAccessor
 from signalflow.core.containers.raw_data_view import RawDataView
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.position import Position
@@ -16,7 +17,10 @@ from signalflow.core.containers.order import Order, OrderFill
 
 __all__ = [
     "RawData",
+    "RawDataLazy",
     "RawDataView",
+    "DataTypeAccessor",
+    "LazyDataTypeAccessor",
     "Signals",
     "Position",
     "Trade",
