@@ -350,6 +350,68 @@ def init(output: str, force: bool):
 
 
 # =============================================================================
+# Viz Command
+# =============================================================================
+
+
+@cli.command()
+@click.argument("config_path", type=click.Path(exists=True))
+@click.option("--output", "-o", type=click.Path(), help="Save to file instead of opening browser")
+@click.option("--format", "-f", "fmt", type=click.Choice(["html", "mermaid"]), default="html", help="Output format")
+@click.option("--no-browser", is_flag=True, help="Don't open browser (HTML only)")
+def viz(config_path: str, output: str | None, fmt: str, no_browser: bool):
+    """
+    Visualize pipeline from YAML configuration.
+
+    Opens an interactive HTML visualization showing the data flow
+    from data sources through features to detector and runner.
+
+    \b
+    Example:
+        sf viz config.yaml                    # Opens in browser
+        sf viz config.yaml -o pipeline.html   # Save to file
+        sf viz config.yaml -f mermaid         # Output Mermaid diagram
+    """
+    from signalflow.cli.config import BacktestConfig
+    from signalflow import viz as sf_viz
+
+    # Load config
+    click.echo(f"Loading config: {config_path}")
+    try:
+        config = BacktestConfig.from_yaml(config_path)
+    except Exception as e:
+        click.secho(f"Error loading config: {e}", fg="red", err=True)
+        sys.exit(1)
+
+    # Build pipeline
+    try:
+        builder = config.to_builder()
+    except Exception as e:
+        click.secho(f"Error building pipeline: {e}", fg="red", err=True)
+        sys.exit(1)
+
+    # Generate visualization
+    click.echo(f"Generating {fmt} visualization...")
+
+    show = fmt == "html" and not no_browser and output is None
+
+    result = sf_viz.pipeline(
+        builder,
+        output=output,
+        format=fmt,
+        show=show,
+    )
+
+    if output:
+        click.secho(f"Saved to: {output}", fg="green")
+    elif fmt == "mermaid":
+        click.echo()
+        click.echo(result)
+    elif not show:
+        click.echo("Visualization ready (use --output to save)")
+
+
+# =============================================================================
 # Entry Point
 # =============================================================================
 

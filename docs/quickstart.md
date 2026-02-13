@@ -25,7 +25,57 @@ pip install signalflow-ta
 
 ---
 
-## Your First Strategy: SMA Crossover
+## The Fast Way: Fluent API
+
+SignalFlow v0.5 introduces a streamlined API for quick backtesting:
+
+```python
+import signalflow as sf
+
+# Run a complete backtest in ~10 lines
+result = (
+    sf.Backtest("my_strategy")
+    .data(raw=my_raw_data)
+    .detector("example/sma_cross", fast_period=20, slow_period=50)
+    .entry(size_pct=0.1, max_positions=5)
+    .exit(tp=0.03, sl=0.015)
+    .capital(50_000)
+    .run()
+)
+
+# Analyze results
+print(result.summary())
+result.plot()
+```
+
+Or use the CLI with YAML config:
+
+```bash
+# Create sample config
+sf init
+
+# Validate and run
+sf validate backtest.yaml
+sf run backtest.yaml --plot
+```
+
+!!! tip "When to use the Fluent API"
+    Use the fluent API for:
+
+    - Quick prototyping and iteration
+    - Simple strategies with standard entry/exit rules
+    - Teaching and demonstrations
+
+    Use the full component-based approach (below) for:
+
+    - Custom entry/exit logic
+    - ML-based signal validation
+    - Complex position sizing strategies
+    - Production deployments
+
+---
+
+## Your First Strategy: SMA Crossover (Detailed)
 
 We'll build a classic Simple Moving Average crossover strategy step by step,
 using synthetic data so everything works offline.
@@ -255,7 +305,50 @@ if trades_df.height > 0:
 
 ## Complete Example
 
-Here's the full workflow in one script:
+### Fluent API (Simple)
+
+The quickest way to run a backtest:
+
+```python
+import signalflow as sf
+from datetime import datetime
+from pathlib import Path
+
+from signalflow.data.source import VirtualDataProvider
+from signalflow.data.raw_store import DuckDbSpotStore
+from signalflow.data import RawDataFactory
+
+# 1. Generate and load data
+store = DuckDbSpotStore(db_path=Path("quickstart.duckdb"))
+provider = VirtualDataProvider(store=store, seed=42)
+provider.download(pairs=["BTCUSDT"], n_bars=10_000)
+
+raw_data = RawDataFactory.from_duckdb_spot_store(
+    spot_store_path=Path("quickstart.duckdb"),
+    pairs=["BTCUSDT"],
+    start=datetime(2020, 1, 1),
+    end=datetime(2030, 1, 1),
+)
+
+# 2. Run backtest with fluent API
+result = (
+    sf.Backtest("quickstart")
+    .data(raw=raw_data)
+    .detector("example/sma_cross", fast_period=20, slow_period=50)
+    .entry(size_pct=0.1, max_positions=5)
+    .exit(tp=0.02, sl=0.01)
+    .capital(10_000)
+    .run()
+)
+
+# 3. Analyze results
+print(result.summary())
+print(f"Metrics: {result.metrics}")
+```
+
+### Component-Based (Advanced)
+
+Full control with explicit components:
 
 ```python
 from datetime import datetime

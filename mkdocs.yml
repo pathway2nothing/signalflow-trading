@@ -122,6 +122,7 @@ nav:
     # Add notebooks here, e.g.:
     # - My Tutorial: notebooks/my_tutorial.ipynb
   - User Guide:
+    - CLI & YAML Config: guide/cli.md
     - Signal Architecture & Meta-Labeling: guide/signal-architecture.md
     - Data Sources: guide/data-sources.md
     - Data Stores: guide/data-stores.md

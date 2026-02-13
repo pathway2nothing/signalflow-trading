@@ -63,6 +63,10 @@ def __getattr__(name: str):
         import signalflow.api as api
         return api
 
+    if name == "viz":
+        import signalflow.viz as viz
+        return viz
+
     raise AttributeError(f"module 'signalflow' has no attribute {name!r}")
 
 
@@ -78,6 +82,7 @@ __all__ = [
     "target",
     "utils",
     "validator",
+    "viz",
     # Core containers
     "RawData",
     "Signals",
