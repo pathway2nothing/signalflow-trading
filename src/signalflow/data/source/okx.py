@@ -90,6 +90,80 @@ class OkxClient(RawDataSource):
             await self._session.close()
             self._session = None
 
+    async def get_pairs(
+        self,
+        inst_type: str = "SPOT",
+        quote: str | None = None,
+    ) -> list[str]:
+        """Get list of available instruments from OKX.
+
+        Args:
+            inst_type (str): Instrument type. One of:
+                - "SPOT" for spot trading
+                - "SWAP" for perpetual contracts
+                - "FUTURES" for delivery futures
+            quote (str | None): Filter by quote/settlement currency (e.g., "USDT").
+                If None, returns all instruments.
+
+        Returns:
+            list[str]: List of instrument IDs (e.g., ["BTC-USDT", "ETH-USDT"]).
+
+        Example:
+            ```python
+            async with OkxClient() as client:
+                # All spot USDT pairs
+                spot = await client.get_pairs(inst_type="SPOT", quote="USDT")
+
+                # All perpetual swaps
+                perps = await client.get_pairs(inst_type="SWAP")
+            ```
+        """
+        if self._session is None:
+            raise RuntimeError("OkxClient must be used as an async context manager.")
+
+        url = f"{self.base_url}/api/v5/public/instruments"
+        params: dict[str, str] = {"instType": inst_type}
+
+        for attempt in range(self.max_retries):
+            try:
+                async with self._session.get(url, params=params) as resp:
+                    if resp.status == 429:
+                        retry_after = int(resp.headers.get("Retry-After", 60))
+                        logger.warning(f"Rate limited, waiting {retry_after}s")
+                        await asyncio.sleep(retry_after)
+                        continue
+
+                    if resp.status != 200:
+                        text = await resp.text()
+                        raise RuntimeError(f"OKX API HTTP {resp.status}: {text}")
+
+                    body = await resp.json()
+
+                if body.get("code") != "0":
+                    raise RuntimeError(f"OKX API error {body.get('code')}: {body.get('msg')}")
+
+                pairs: list[str] = []
+                for inst in body.get("data", []):
+                    if inst.get("state") != "live":
+                        continue
+                    inst_id = inst.get("instId", "")
+                    # Quote filtering: use quoteCcy for SPOT, settleCcy for derivatives
+                    ccy_field = "quoteCcy" if inst_type == "SPOT" else "settleCcy"
+                    if quote is None or inst.get(ccy_field) == quote:
+                        pairs.append(inst_id)
+
+                return sorted(pairs)
+
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if attempt < self.max_retries - 1:
+                    wait = 2**attempt
+                    logger.warning(f"Request failed, retrying in {wait}s: {e}")
+                    await asyncio.sleep(wait)
+                else:
+                    raise RuntimeError(f"Failed to get instruments: {e}") from e
+
+        return []
+
     async def get_klines(
         self,
         inst_id: str,
@@ -281,6 +355,26 @@ class OkxSpotLoader(RawDataLoader):
     store: DuckDbSpotStore = field(default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_okx_spot.duckdb")))
     timeframe: str = "1m"
 
+    async def get_pairs(self, quote: str | None = None) -> list[str]:
+        """Get list of available OKX spot trading pairs.
+
+        Args:
+            quote (str | None): Filter by quote currency (e.g., "USDT").
+                If None, returns all spot pairs.
+
+        Returns:
+            list[str]: List of instrument IDs in OKX format (e.g., ["BTC-USDT"]).
+
+        Example:
+            ```python
+            loader = OkxSpotLoader(store=store)
+            usdt_pairs = await loader.get_pairs(quote="USDT")
+            # ['BTC-USDT', 'ETH-USDT', ...]
+            ```
+        """
+        async with OkxClient() as client:
+            return await client.get_pairs(inst_type="SPOT", quote=quote)
+
     async def download(
         self,
         pairs: list[str],
@@ -420,6 +514,27 @@ class OkxFuturesLoader(RawDataLoader):
     store: DuckDbSpotStore = field(default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_okx_futures.duckdb")))
     timeframe: str = "1m"
     inst_suffix: str = "-SWAP"
+
+    async def get_pairs(self, quote: str | None = None) -> list[str]:
+        """Get list of available OKX perpetual swap instruments.
+
+        Args:
+            quote (str | None): Filter by settlement currency (e.g., "USDT").
+                If None, returns all swap instruments.
+
+        Returns:
+            list[str]: List of instrument IDs in OKX format (e.g., ["BTC-USDT-SWAP"]).
+
+        Example:
+            ```python
+            loader = OkxFuturesLoader(store=store)
+            usdt_perps = await loader.get_pairs(quote="USDT")
+            # ['BTC-USDT-SWAP', 'ETH-USDT-SWAP', ...]
+            ```
+        """
+        inst_type = "SWAP" if self.inst_suffix == "-SWAP" else "FUTURES"
+        async with OkxClient() as client:
+            return await client.get_pairs(inst_type=inst_type, quote=quote)
 
     async def download(
         self,

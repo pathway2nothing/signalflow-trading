@@ -5,8 +5,12 @@ from cryptocurrency exchanges.
 
 Supported Exchanges:
     - Binance: Spot, USDT-M Futures, COIN-M Futures
-    - Bybit: Spot, Linear Futures
+    - Bybit: Spot, Linear Futures, Inverse Futures
     - OKX: Spot, Perpetual Swaps
+    - Deribit: Futures/Perpetuals
+    - Kraken: Spot, Futures
+    - Hyperliquid: Perpetuals (DEX)
+    - WhiteBIT: Spot, Futures
 
 Base Classes:
     RawDataSource: Abstract base for exchange API clients.
@@ -38,11 +42,30 @@ from signalflow.data.source.bybit import (
     BybitClient,
     BybitSpotLoader,
     BybitFuturesLoader,
+    BybitFuturesInverseLoader,
 )
 from signalflow.data.source.okx import (
     OkxClient,
     OkxSpotLoader,
     OkxFuturesLoader,
+)
+from signalflow.data.source.deribit import (
+    DeribitClient,
+    DeribitFuturesLoader,
+)
+from signalflow.data.source.kraken import (
+    KrakenClient,
+    KrakenSpotLoader,
+    KrakenFuturesLoader,
+)
+from signalflow.data.source.hyperliquid import (
+    HyperliquidClient,
+    HyperliquidFuturesLoader,
+)
+from signalflow.data.source.whitebit import (
+    WhitebitClient,
+    WhitebitSpotLoader,
+    WhitebitFuturesLoader,
 )
 from signalflow.data.source.virtual import VirtualDataProvider, generate_ohlcv, generate_crossover_data
 
@@ -50,16 +73,35 @@ from signalflow.data.source.virtual import VirtualDataProvider, generate_ohlcv, 
 __all__ = [
     "RawDataSource",
     "RawDataLoader",
+    # Binance
     "BinanceClient",
     "BinanceSpotLoader",
     "BinanceFuturesUsdtLoader",
     "BinanceFuturesCoinLoader",
+    # Bybit
     "BybitClient",
     "BybitSpotLoader",
     "BybitFuturesLoader",
+    "BybitFuturesInverseLoader",
+    # OKX
     "OkxClient",
     "OkxSpotLoader",
     "OkxFuturesLoader",
+    # Deribit
+    "DeribitClient",
+    "DeribitFuturesLoader",
+    # Kraken
+    "KrakenClient",
+    "KrakenSpotLoader",
+    "KrakenFuturesLoader",
+    # Hyperliquid
+    "HyperliquidClient",
+    "HyperliquidFuturesLoader",
+    # WhiteBIT
+    "WhitebitClient",
+    "WhitebitSpotLoader",
+    "WhitebitFuturesLoader",
+    # Virtual
     "VirtualDataProvider",
     "generate_ohlcv",
     "generate_crossover_data",

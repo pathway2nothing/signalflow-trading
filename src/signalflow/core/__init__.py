@@ -10,6 +10,7 @@ Provides fundamental building blocks for SignalFlow trading framework:
 
 from signalflow.core.containers import (
     RawData,
+    RawDataLazy,
     Signals,
     RawDataView,
     Position,
@@ -35,6 +36,7 @@ from signalflow.core.base_mixin import SfTorchModuleMixin
 
 __all__ = [
     "RawData",
+    "RawDataLazy",
     "Signals",
     "RawDataView",
     "Position",

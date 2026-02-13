@@ -27,13 +27,20 @@ Example:
 
 from datetime import datetime
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 import polars as pl
 
 from signalflow.core import RawData
 from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.raw_store.base import RawDataStore
+
+
+def _get_data_type(store: RawDataStore) -> str:
+    """Extract data_type from store."""
+    if hasattr(store, "data_type"):
+        return store.data_type
+    return "unknown"
 
 
 class RawDataFactory:
@@ -85,55 +92,67 @@ class RawDataFactory:
 
     @staticmethod
     def from_stores(
-        stores: Sequence[RawDataStore],
+        stores: Mapping[str, RawDataStore] | Sequence[RawDataStore],
         pairs: list[str],
         start: datetime,
         end: datetime,
+        default_source: str | None = None,
     ) -> RawData:
         """Create RawData from multiple stores.
 
-        Loads data from each store and merges into a single RawData container.
-        Each store's data_type becomes the key in RawData.data dict.
+        Supports two input formats:
+        - Dict: {source_name: store} for multi-source per data_type (nested structure)
+        - Sequence: [store1, store2] for single source per data_type (flat structure)
 
         Args:
-            stores: Sequence of RawDataStore instances.
+            stores: Either dict mapping source names to stores, or sequence of stores.
+                Dict format creates nested structure: data[data_type][source] = DataFrame.
+                Sequence format creates flat structure: data[data_type] = DataFrame.
             pairs: List of trading pairs to load.
             start: Start datetime (inclusive).
             end: End datetime (inclusive).
+            default_source: Default source for nested data access.
+                Used when accessing data without explicit source.
 
         Returns:
             RawData: Container with merged data from all stores.
 
         Raises:
-            ValueError: If stores have duplicate data_type keys.
+            ValueError: If stores have duplicate keys (flat) or conflicting data_types (nested).
 
         Example:
             ```python
-            from signalflow.data import RawDataFactory, StoreFactory
+            from signalflow.data import RawDataFactory, DuckDbRawStore
 
-            # Create stores
-            spot_store = StoreFactory.create_raw_store(
-                backend="duckdb",
-                data_type="spot",
-                db_path="data/spot.duckdb",
-            )
-            futures_store = StoreFactory.create_raw_store(
-                backend="duckdb",
-                data_type="futures",
-                db_path="data/futures.duckdb",
+            # Multi-source (dict) - creates nested structure
+            raw = RawDataFactory.from_stores(
+                stores={
+                    "binance": DuckDbRawStore(db_path="binance.duckdb", data_type="perpetual"),
+                    "okx": DuckDbRawStore(db_path="okx.duckdb", data_type="perpetual"),
+                    "bybit": DuckDbRawStore(db_path="bybit.duckdb", data_type="perpetual"),
+                },
+                pairs=["BTCUSDT", "ETHUSDT"],
+                start=datetime(2024, 1, 1),
+                end=datetime(2024, 12, 31),
+                default_source="binance",
             )
 
-            # Load from multiple stores
-            raw_data = RawDataFactory.from_stores(
+            # Hierarchical access
+            df = raw.perpetual.binance           # specific source
+            df = raw.perpetual.to_polars()       # default with warning
+            print(raw.perpetual.sources)         # ["binance", "okx", "bybit"]
+
+            # Single-source (sequence) - creates flat structure
+            raw = RawDataFactory.from_stores(
                 stores=[spot_store, futures_store],
                 pairs=["BTCUSDT", "ETHUSDT"],
                 start=datetime(2024, 1, 1),
                 end=datetime(2024, 12, 31),
             )
 
-            # Access data by type
-            spot_df = raw_data["spot"]
-            futures_df = raw_data["futures"]
+            # Simple access
+            spot_df = raw["spot"]
+            futures_df = raw["futures"]
             ```
         """
         if not stores:
@@ -142,8 +161,91 @@ class RawDataFactory:
                 datetime_end=end,
                 pairs=pairs,
                 data={},
+                default_source=default_source,
             )
 
+        # Dict input: multi-source per data_type (nested structure)
+        if isinstance(stores, Mapping):
+            return RawDataFactory._from_stores_dict(
+                stores=stores,
+                pairs=pairs,
+                start=start,
+                end=end,
+                default_source=default_source,
+            )
+
+        # Sequence input: single source per data_type (flat structure)
+        return RawDataFactory._from_stores_sequence(
+            stores=stores,
+            pairs=pairs,
+            start=start,
+            end=end,
+            default_source=default_source,
+        )
+
+    @staticmethod
+    def _from_stores_dict(
+        stores: Mapping[str, RawDataStore],
+        pairs: list[str],
+        start: datetime,
+        end: datetime,
+        default_source: str | None,
+    ) -> RawData:
+        """Create RawData from dict of stores (multi-source).
+
+        Creates nested structure: data[data_type][source] = DataFrame.
+        """
+        # Nested structure: data_type -> source -> DataFrame
+        nested_data: dict[str, dict[str, pl.DataFrame]] = {}
+
+        for source_name, store in stores.items():
+            data_type = _get_data_type(store)
+            df = store.load_many(pairs=pairs, start=start, end=end)
+
+            # Normalize timestamps
+            if "timestamp" in df.columns:
+                df = df.with_columns(
+                    pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None)
+                )
+
+            # Sort by (pair, timestamp)
+            if {"pair", "timestamp"}.issubset(df.columns):
+                df = df.sort(["pair", "timestamp"])
+
+            if data_type not in nested_data:
+                nested_data[data_type] = {}
+
+            if source_name in nested_data[data_type]:
+                raise ValueError(
+                    f"Duplicate source '{source_name}' for data type '{data_type}'"
+                )
+
+            nested_data[data_type][source_name] = df
+
+        # Use first source as default if not specified
+        if default_source is None and stores:
+            default_source = next(iter(stores.keys()))
+
+        return RawData(
+            datetime_start=start,
+            datetime_end=end,
+            pairs=pairs,
+            data=nested_data,
+            default_source=default_source,
+        )
+
+    @staticmethod
+    def _from_stores_sequence(
+        stores: Sequence[RawDataStore],
+        pairs: list[str],
+        start: datetime,
+        end: datetime,
+        default_source: str | None,
+    ) -> RawData:
+        """Create RawData from sequence of stores (single-source per type).
+
+        Creates flat structure: data[data_type] = DataFrame.
+        """
         merged_data: dict[str, pl.DataFrame] = {}
 
         for store in stores:
@@ -158,6 +260,7 @@ class RawDataFactory:
             datetime_end=end,
             pairs=pairs,
             data=merged_data,
+            default_source=default_source,
         )
 
     @staticmethod

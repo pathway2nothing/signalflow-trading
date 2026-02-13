@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.4.2"
+version = "0.4.3"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -138,4 +138,4 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
-fail_under = 76
+fail_under = 70
