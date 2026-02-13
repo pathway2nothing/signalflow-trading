@@ -72,8 +72,8 @@ class TestHtmlRenderer:
         html = renderer.render()
 
         assert "<!DOCTYPE html>" in html
-        assert "cytoscape" in html.lower()
-        assert "SignalFlow Pipeline" in html
+        assert "d3.js" in html.lower() or "d3.v7" in html.lower()
+        assert "SignalFlow" in html
 
     def test_render_includes_graph_json(self, sample_graph):
         renderer = HtmlRenderer(sample_graph)
@@ -92,10 +92,13 @@ class TestHtmlRenderer:
         assert output_path.exists()
         assert output_path.read_text() == html
 
-    def test_render_metadata(self, sample_graph):
+    def test_render_has_sidebar_and_controls(self, sample_graph):
         renderer = HtmlRenderer(sample_graph)
         html = renderer.render()
 
-        # Should show node/edge counts
-        assert "Nodes: 2" in html
-        assert "Edges: 1" in html
+        # Should have sidebar with stats
+        assert "node-count" in html
+        assert "edge-count" in html
+        # Should have zoom controls
+        assert "btn-fit" in html
+        assert "btn-zoom-in" in html

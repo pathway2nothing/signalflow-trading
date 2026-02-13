@@ -189,9 +189,38 @@ def _render(
     return result
 
 
+def serve(
+    source,
+    *,
+    port: int = 4141,
+    open_browser: bool = True,
+):
+    """
+    Start local visualization server (like Kedro-Viz).
+
+    Starts an HTTP server at localhost:{port} serving the pipeline
+    visualization. Press Ctrl+C to stop.
+
+    Args:
+        source: Pipeline source (BacktestBuilder, FeaturePipeline, etc.)
+        port: Server port (default: 4141)
+        open_browser: Open browser automatically
+
+    Example:
+        >>> import signalflow as sf
+        >>> builder = sf.Backtest("test").data(...).detector(...)
+        >>> sf.viz.serve(builder)  # Opens http://localhost:4141
+    """
+    from signalflow.viz.server import serve as _serve
+
+    graph = pipeline(source, format="json", show=False)
+    _serve(graph, port=port, open_browser=open_browser, block=True)
+
+
 __all__ = [
     "pipeline",
     "features",
     "data_flow",
+    "serve",
     "PipelineGraph",
 ]

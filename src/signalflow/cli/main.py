@@ -356,24 +356,26 @@ def init(output: str, force: bool):
 
 @cli.command()
 @click.argument("config_path", type=click.Path(exists=True))
-@click.option("--output", "-o", type=click.Path(), help="Save to file instead of opening browser")
+@click.option("--port", "-p", default=4141, help="Server port (default: 4141)")
+@click.option("--output", "-o", type=click.Path(), help="Save to file instead of starting server")
 @click.option("--format", "-f", "fmt", type=click.Choice(["html", "mermaid"]), default="html", help="Output format")
-@click.option("--no-browser", is_flag=True, help="Don't open browser (HTML only)")
-def viz(config_path: str, output: str | None, fmt: str, no_browser: bool):
+@click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
+def viz(config_path: str, port: int, output: str | None, fmt: str, no_browser: bool):
     """
     Visualize pipeline from YAML configuration.
 
-    Opens an interactive HTML visualization showing the data flow
-    from data sources through features to detector and runner.
+    Starts a local server (like Kedro-Viz) showing the pipeline DAG
+    with data flow from data sources through features to detector.
 
     \b
     Example:
-        sf viz config.yaml                    # Opens in browser
-        sf viz config.yaml -o pipeline.html   # Save to file
+        sf viz config.yaml                    # Starts server at localhost:4141
+        sf viz config.yaml -p 8080            # Use custom port
+        sf viz config.yaml -o pipeline.html   # Save to file (no server)
         sf viz config.yaml -f mermaid         # Output Mermaid diagram
     """
     from signalflow.cli.config import BacktestConfig
-    from signalflow import viz as sf_viz
+    from signalflow.viz.extractors import BacktestExtractor
 
     # Load config
     click.echo(f"Loading config: {config_path}")
@@ -390,25 +392,27 @@ def viz(config_path: str, output: str | None, fmt: str, no_browser: bool):
         click.secho(f"Error building pipeline: {e}", fg="red", err=True)
         sys.exit(1)
 
-    # Generate visualization
-    click.echo(f"Generating {fmt} visualization...")
+    # Extract graph
+    graph = BacktestExtractor(builder).extract()
 
-    show = fmt == "html" and not no_browser and output is None
+    # Output to file or mermaid
+    if output or fmt == "mermaid":
+        from signalflow import viz as sf_viz
 
-    result = sf_viz.pipeline(
-        builder,
-        output=output,
-        format=fmt,
-        show=show,
-    )
+        result = sf_viz.pipeline(builder, output=output, format=fmt, show=False)
 
-    if output:
-        click.secho(f"Saved to: {output}", fg="green")
-    elif fmt == "mermaid":
-        click.echo()
-        click.echo(result)
-    elif not show:
-        click.echo("Visualization ready (use --output to save)")
+        if output:
+            click.secho(f"Saved to: {output}", fg="green")
+        else:
+            click.echo()
+            click.echo(result)
+        return
+
+    # Start server (default)
+    from signalflow.viz.server import serve
+
+    click.echo(f"Starting SignalFlow Viz server...")
+    serve(graph, port=port, open_browser=not no_browser, block=True)
 
 
 # =============================================================================
