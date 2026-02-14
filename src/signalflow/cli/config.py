@@ -22,7 +22,7 @@ class DataConfig:
     pairs: list[str]
     start: str | datetime
     end: str | datetime | None = None
-    timeframe: str = "1h"
+    timeframe: str = "1m"
     data_type: str = "perpetual"
 
 
@@ -207,6 +207,14 @@ class BacktestConfig:
                 issues.append("ERROR: data.pairs is required")
             if not self.data.start:
                 issues.append("ERROR: data.start is required")
+            # Validate timeframe
+            from signalflow.data.resample import TIMEFRAME_MINUTES
+
+            if self.data.timeframe not in TIMEFRAME_MINUTES:
+                valid = ", ".join(sorted(TIMEFRAME_MINUTES, key=lambda k: TIMEFRAME_MINUTES[k]))
+                issues.append(
+                    f"ERROR: Unknown timeframe {self.data.timeframe!r}. Valid: {valid}"
+                )
 
         # Check detector
         if self.detector is None:
@@ -318,7 +326,7 @@ data:
     - ETHUSDT
   start: "2024-01-01"
   end: "2024-06-01"             # Optional, defaults to now
-  timeframe: 1h                 # Candle timeframe
+  timeframe: 1m                 # Candle timeframe
   data_type: perpetual          # spot | futures | perpetual
 
 # Detector configuration

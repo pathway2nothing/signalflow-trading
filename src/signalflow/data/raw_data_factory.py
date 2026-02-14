@@ -97,6 +97,7 @@ class RawDataFactory:
         start: datetime,
         end: datetime,
         default_source: str | None = None,
+        target_timeframe: str | None = None,
     ) -> RawData:
         """Create RawData from multiple stores.
 
@@ -113,6 +114,8 @@ class RawDataFactory:
             end: End datetime (inclusive).
             default_source: Default source for nested data access.
                 Used when accessing data without explicit source.
+            target_timeframe: Target timeframe (e.g. ``"1h"``).
+                If provided, data is auto-resampled to this timeframe.
 
         Returns:
             RawData: Container with merged data from all stores.
@@ -172,6 +175,7 @@ class RawDataFactory:
                 start=start,
                 end=end,
                 default_source=default_source,
+                target_timeframe=target_timeframe,
             )
 
         # Sequence input: single source per data_type (flat structure)
@@ -181,6 +185,7 @@ class RawDataFactory:
             start=start,
             end=end,
             default_source=default_source,
+            target_timeframe=target_timeframe,
         )
 
     @staticmethod
@@ -190,6 +195,7 @@ class RawDataFactory:
         start: datetime,
         end: datetime,
         default_source: str | None,
+        target_timeframe: str | None = None,
     ) -> RawData:
         """Create RawData from dict of stores (multi-source).
 
@@ -211,6 +217,12 @@ class RawDataFactory:
             # Sort by (pair, timestamp)
             if {"pair", "timestamp"}.issubset(df.columns):
                 df = df.sort(["pair", "timestamp"])
+
+            # Resample to target timeframe if requested
+            if target_timeframe is not None and df.height > 1:
+                from signalflow.data.resample import align_to_timeframe
+
+                df = align_to_timeframe(df, target_timeframe)
 
             if data_type not in nested_data:
                 nested_data[data_type] = {}
@@ -241,6 +253,7 @@ class RawDataFactory:
         start: datetime,
         end: datetime,
         default_source: str | None,
+        target_timeframe: str | None = None,
     ) -> RawData:
         """Create RawData from sequence of stores (single-source per type).
 
@@ -253,6 +266,11 @@ class RawDataFactory:
             for key, df in raw.data.items():
                 if key in merged_data:
                     raise ValueError(f"Duplicate data key '{key}' from multiple stores")
+                # Resample to target timeframe if requested
+                if target_timeframe is not None and df.height > 1:
+                    from signalflow.data.resample import align_to_timeframe
+
+                    df = align_to_timeframe(df, target_timeframe)
                 merged_data[key] = df
 
         return RawData(
@@ -270,6 +288,7 @@ class RawDataFactory:
         start: datetime,
         end: datetime,
         data_types: list[str] | None = None,
+        target_timeframe: str | None = None,
     ) -> RawData:
         """Create RawData from DuckDB spot store.
 
@@ -415,6 +434,13 @@ class RawDataFactory:
                     raise ValueError(f"Duplicate (pair, timestamp) detected. Examples:\n{dups}")
 
                 spot = spot.sort(["pair", "timestamp"])
+
+                # Resample to target timeframe if requested
+                if target_timeframe is not None and spot.height > 1:
+                    from signalflow.data.resample import align_to_timeframe
+
+                    spot = align_to_timeframe(spot, target_timeframe)
+
                 data["spot"] = spot
 
             return RawData(

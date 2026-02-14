@@ -37,7 +37,7 @@ class TestDataConfig:
             pairs=["BTCUSDT"],
             start="2024-01-01",
         )
-        assert cfg.timeframe == "1h"
+        assert cfg.timeframe == "1m"
         assert cfg.data_type == "perpetual"
         assert cfg.end is None
 

@@ -79,7 +79,7 @@ class BacktestBuilder:
         pairs: list[str] | None = None,
         start: str | datetime | None = None,
         end: str | datetime | None = None,
-        timeframe: str = "1h",
+        timeframe: str = "1m",
         data_type: str = "perpetual",
     ) -> Self:
         """

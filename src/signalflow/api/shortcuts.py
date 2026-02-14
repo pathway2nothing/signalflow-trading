@@ -24,7 +24,7 @@ def load(
     pairs: list[str],
     start: str | datetime,
     end: str | datetime | None = None,
-    timeframe: str = "1h",
+    timeframe: str = "1m",
     data_type: str = "spot",
 ) -> RawData:
     """
@@ -38,7 +38,8 @@ def load(
         pairs: List of trading pairs to load
         start: Start date (ISO string like "2024-01-01" or datetime)
         end: End date (default: now)
-        timeframe: Candle timeframe (default: "1h") - used for exchange cache
+        timeframe: Target candle timeframe (default: "1h"). Data is
+            auto-resampled to this timeframe if the source uses a smaller one.
         data_type: Data type ("spot", "futures", "perpetual")
 
     Returns:
@@ -87,6 +88,7 @@ def load(
                 pairs=pairs,
                 start=start_dt,
                 end=end_dt,
+                target_timeframe=timeframe,
             )
         else:
             # For non-spot data, use generic store approach
@@ -102,6 +104,7 @@ def load(
                 pairs=pairs,
                 start=start_dt,
                 end=end_dt,
+                target_timeframe=timeframe,
             )
 
     # Exchange name - not directly supported yet
