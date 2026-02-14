@@ -186,12 +186,60 @@ class InvalidParameterError(ConfigurationError):
         super().__init__("\n".join(lines))
 
 
+class ValidatorNotFoundError(ComponentNotFoundError):
+    """Raised when a validator is not found in registry."""
+
+    def __init__(self, name: str, available: list[str] | None = None):
+        from signalflow.core import SfComponentType
+
+        super().__init__(SfComponentType.VALIDATOR, name, available)
+
+    def _build_message(self) -> str:
+        lines = [
+            f"Validator '{self.name}' not found in registry.",
+            "",
+        ]
+
+        if self.available:
+            lines.append("Available validators:")
+            for opt in sorted(self.available)[:10]:
+                lines.append(f"  - {opt}")
+        else:
+            lines.append("No validators registered.")
+
+        lines.extend([
+            "",
+            "Or pass a validator instance directly:",
+            "",
+            "  from signalflow.validator import LightGBMValidator",
+            "",
+            "  sf.Backtest()",
+            "      .validator(LightGBMValidator())",
+            "      ...",
+        ])
+
+        return "\n".join(lines)
+
+
+class DuplicateComponentNameError(ConfigurationError):
+    """Raised when a component name is already registered."""
+
+    def __init__(self, component_kind: str, name: str):
+        msg = (
+            f"Duplicate {component_kind} name: '{name}'. "
+            f"Each {component_kind} must have a unique name."
+        )
+        super().__init__(msg)
+
+
 __all__ = [
     "SignalFlowError",
     "ConfigurationError",
     "DataError",
     "ComponentNotFoundError",
     "DetectorNotFoundError",
+    "ValidatorNotFoundError",
+    "DuplicateComponentNameError",
     "MissingDataError",
     "MissingDetectorError",
     "InvalidParameterError",
