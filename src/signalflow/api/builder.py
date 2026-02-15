@@ -8,10 +8,12 @@ Supports multiple named instances of each component type
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import reduce
-from typing import TYPE_CHECKING, Any, Self
+from threading import Event
+from typing import TYPE_CHECKING, Any, Callable, Self
 
 import polars as pl
 
@@ -575,15 +577,175 @@ class BacktestBuilder:
         return self
 
     # =========================================================================
+    # Serialization
+    # =========================================================================
+
+    def to_dict(self) -> dict[str, Any]:
+        """Export builder configuration as JSON-serializable dict.
+
+        Captures all configured state so it can be restored via ``from_dict()``.
+        RawData instances are NOT serialized — only parameter-based data configs.
+
+        Returns:
+            Configuration dict suitable for JSON serialization.
+        """
+        config: dict[str, Any] = {"strategy_id": self.strategy_id}
+
+        # Data
+        if self._data_params:
+            config["data"] = self._serialize_data_params(self._data_params)
+        if self._named_data:
+            config["data_sources"] = {
+                name: self._serialize_data_params(src) if isinstance(src, dict) else {"_type": "preloaded"}
+                for name, src in self._named_data.items()
+            }
+
+        # Detectors
+        if self._named_detectors:
+            config["detectors"] = {}
+            for name, det in self._named_detectors.items():
+                det_info: dict[str, Any] = {"class_name": det.__class__.__name__}
+                if dataclasses.is_dataclass(det):
+                    det_info["params"] = {
+                        f.name: getattr(det, f.name)
+                        for f in dataclasses.fields(det)
+                        if not f.name.startswith("_")
+                        and f.name not in ("component_type", "features", "pair_col", "ts_col",
+                                           "raw_data_type", "require_probability",
+                                           "keep_only_latest_per_pair", "group_col",
+                                           "allowed_signal_types", "signal_category")
+                        and self._is_json_serializable(getattr(det, f.name))
+                    }
+                if name in self._detector_data_sources:
+                    det_info["data_source"] = self._detector_data_sources[name]
+                config["detectors"][name] = det_info
+
+        # Aggregation
+        if self._aggregation_config:
+            config["aggregation"] = self._aggregation_config
+
+        # Entry
+        if self._entry_config:
+            config["entry"] = self._entry_config
+        if self._named_entries:
+            config["entries"] = dict(self._named_entries)
+
+        # Exit
+        if self._exit_config:
+            config["exit"] = self._exit_config
+        if self._named_exits:
+            config["exits"] = dict(self._named_exits)
+
+        # Capital & fees
+        config["capital"] = self._capital
+        config["fee"] = self._fee
+
+        return config
+
+    @classmethod
+    def from_dict(cls, config: dict[str, Any]) -> BacktestBuilder:
+        """Reconstruct a builder from a config dict (inverse of ``to_dict()``).
+
+        Detector instances are recreated from registry using class_name + params.
+        Data sources marked as ``_type: preloaded`` are skipped — caller must
+        re-attach them via ``.data(raw=...)``.
+
+        Args:
+            config: Config dict as produced by ``to_dict()``.
+
+        Returns:
+            Configured BacktestBuilder.
+        """
+        builder = cls(strategy_id=config.get("strategy_id", "backtest"))
+
+        # Data (parameter-based only)
+        if "data" in config:
+            builder.data(**config["data"])
+        if "data_sources" in config:
+            for name, src in config["data_sources"].items():
+                if isinstance(src, dict) and src.get("_type") == "preloaded":
+                    continue
+                builder.data(name=name, **src)
+
+        # Detectors
+        if "detectors" in config:
+            for name, det_info in config["detectors"].items():
+                params = det_info.get("params", {})
+                class_name = det_info.get("class_name", name)
+                data_source = det_info.get("data_source")
+                # Try to find in registry by class_name or name
+                builder.detector(
+                    class_name,
+                    name=name,
+                    data_source=data_source,
+                    **params,
+                )
+
+        # Aggregation
+        if "aggregation" in config:
+            builder.aggregation(**config["aggregation"])
+
+        # Entry
+        if "entry" in config:
+            builder.entry(**config["entry"])
+        if "entries" in config:
+            for name, entry_cfg in config["entries"].items():
+                builder.entry(name=name, **entry_cfg)
+
+        # Exit
+        if "exit" in config:
+            builder.exit(**config["exit"])
+        if "exits" in config:
+            for name, exit_cfg in config["exits"].items():
+                builder.exit(name=name, **exit_cfg)
+
+        # Capital & fees
+        if "capital" in config:
+            builder.capital(config["capital"])
+        if "fee" in config:
+            builder.fee(config["fee"])
+
+        return builder
+
+    @staticmethod
+    def _serialize_data_params(params: dict[str, Any]) -> dict[str, Any]:
+        """Serialize data parameters, converting datetimes to ISO strings."""
+        result = {}
+        for k, v in params.items():
+            if v is None:
+                continue
+            if isinstance(v, datetime):
+                result[k] = v.isoformat()
+            else:
+                result[k] = v
+        return result
+
+    @staticmethod
+    def _is_json_serializable(value: Any) -> bool:
+        """Check if a value is JSON-serializable."""
+        return isinstance(value, (str, int, float, bool, type(None), list, dict))
+
+    # =========================================================================
     # Execution
     # =========================================================================
 
-    def run(self) -> BacktestResult:
+    def run(
+        self,
+        *,
+        progress_callback: Callable[[int, int, dict[str, Any]], None] | None = None,
+        cancel_event: Event | None = None,
+    ) -> BacktestResult:
         """
         Execute backtest and return results.
 
         Resolves all configuration, creates components from registry,
         runs the backtest, and wraps results in BacktestResult.
+
+        Args:
+            progress_callback: Called every N bars with ``(current, total, metrics)``.
+                Useful for streaming progress to UI via WebSocket.
+            cancel_event: Threading event — set it to gracefully stop the backtest.
+                The runner will break after the current bar and return partial results.
 
         Returns:
             BacktestResult with trades, metrics, and analytics
@@ -606,7 +768,11 @@ class BacktestBuilder:
         broker = self._build_broker()
 
         # 4. Create and run runner
-        runner = self._build_runner(broker, entry_rules, exit_rules)
+        runner = self._build_runner(
+            broker, entry_rules, exit_rules,
+            progress_callback=progress_callback,
+            cancel_event=cancel_event,
+        )
         state = runner.run(
             raw_data=raw,
             signals=merged_signals,
@@ -1030,7 +1196,15 @@ class BacktestBuilder:
                 store=InMemoryStrategyStore(),
             )
 
-    def _build_runner(self, broker: Any, entry_rules: list[Any], exit_rules: list[Any]) -> Any:
+    def _build_runner(
+        self,
+        broker: Any,
+        entry_rules: list[Any],
+        exit_rules: list[Any],
+        *,
+        progress_callback: Callable[[int, int, dict[str, Any]], None] | None = None,
+        cancel_event: Event | None = None,
+    ) -> Any:
         """Build runner from registry."""
         try:
             runner_cls = default_registry.get(SfComponentType.STRATEGY_RUNNER, "backtest")
@@ -1046,6 +1220,8 @@ class BacktestBuilder:
             exit_rules=exit_rules,
             initial_capital=self._capital,
             show_progress=self._show_progress,
+            progress_callback=progress_callback,
+            cancel_event=cancel_event,
         )
 
     def visualize(

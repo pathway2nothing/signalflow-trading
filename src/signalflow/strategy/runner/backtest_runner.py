@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from threading import Event
+from typing import Any, Callable, ClassVar
 from signalflow.core import SfComponentType, StrategyState, Signals, sf_component
 from signalflow.strategy.component.base import EntryRule, ExitRule
 from signalflow.analytic import StrategyMetric
@@ -24,6 +25,12 @@ class BacktestRunner(StrategyRunner):
     price_col: str = "close"
     data_key: str = "spot"
     show_progress: bool = True
+    progress_callback: Callable[[int, int, dict[str, Any]], None] | None = None
+    """Called periodically: ``(current_bar, total_bars, latest_metrics)``."""
+    progress_interval: int = 500
+    """Call progress_callback every N bars (default: 500)."""
+    cancel_event: Event | None = None
+    """Set externally to request graceful cancellation."""
     _trades: list = field(default_factory=list, init=False)
     _metrics_history: list[dict] = field(default_factory=list, init=False)
 
@@ -63,8 +70,13 @@ class BacktestRunner(StrategyRunner):
                     named_signal_lookups[det_name] = self._build_signal_lookup(det_signals.value)
 
         iterator = tqdm(timestamps, desc="Backtesting") if self.show_progress else timestamps
+        total = len(timestamps)
 
-        for ts in iterator:
+        for i, ts in enumerate(iterator):
+            # Check for cancellation
+            if self.cancel_event is not None and self.cancel_event.is_set():
+                break
+
             state = self._process_bar_optimized(
                 ts=ts,
                 price_lookup=price_lookup,
@@ -72,6 +84,17 @@ class BacktestRunner(StrategyRunner):
                 state=state,
                 named_signal_lookups=named_signal_lookups,
             )
+
+            # Progress callback
+            if (
+                self.progress_callback is not None
+                and (i + 1) % self.progress_interval == 0
+            ):
+                self.progress_callback(i + 1, total, self._metrics_history[-1] if self._metrics_history else {})
+
+        # Final callback at 100%
+        if self.progress_callback is not None and total > 0:
+            self.progress_callback(total, total, self._metrics_history[-1] if self._metrics_history else {})
 
         return state
 

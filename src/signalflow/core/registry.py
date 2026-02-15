@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import pkgutil
 import sys
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
-from typing import Any
+from typing import Any, ClassVar, get_type_hints
 
 from loguru import logger
 
@@ -423,6 +424,124 @@ class SignalFlowRegistry:
             Sorted list of registered data type names.
         """
         return sorted(self._raw_data_types)
+
+    # ── Schema introspection ──────────────────────────────────────────
+
+    # Fields from base classes that are internal infrastructure, not user-facing params
+    _BASE_FIELDS: ClassVar[frozenset[str]] = frozenset({
+        "component_type",
+        # SignalDetector base
+        "pair_col", "ts_col", "group_col", "raw_data_type",
+        "features", "require_probability", "keep_only_latest_per_pair",
+        "allowed_signal_types", "signal_category",
+        # Feature base
+        "normalized", "norm_period",
+        # Runner internal
+        "broker", "entry_rules", "exit_rules", "metrics",
+        "strategy_id", "initial_capital", "price_col", "data_key", "show_progress",
+    })
+
+    def get_schema(self, component_type: SfComponentType, name: str) -> dict[str, Any]:
+        """Get JSON-serializable parameter schema for a registered component.
+
+        Uses ``dataclasses.fields()`` to introspect ``@dataclass``-decorated
+        components and extract field names, types, and defaults.
+
+        Args:
+            component_type: Type of component.
+            name: Component registry name (case-insensitive).
+
+        Returns:
+            Schema dict with keys: ``name``, ``class_name``, ``component_type``,
+            ``description``, ``parameters``, ``requires``, ``outputs``.
+
+        Raises:
+            KeyError: If component not found.
+
+        Example:
+            >>> schema = registry.get_schema(SfComponentType.DETECTOR, "example/sma_cross")
+            >>> for p in schema["parameters"]:
+            ...     print(f"{p['name']}: {p['type']} = {p['default']}")
+        """
+        cls = self.get(component_type, name)
+
+        parameters: list[dict[str, Any]] = []
+        if dataclasses.is_dataclass(cls):
+            for f in dataclasses.fields(cls):
+                if f.name.startswith("_") or f.name in self._BASE_FIELDS:
+                    continue
+                # Skip ClassVar fields (they show up as strings containing "ClassVar")
+                type_str = self._type_to_str(f.type)
+                if "ClassVar" in type_str:
+                    continue
+
+                has_default = f.default is not dataclasses.MISSING
+                has_default_factory = f.default_factory is not dataclasses.MISSING  # type: ignore[misc]
+
+                parameters.append({
+                    "name": f.name,
+                    "type": type_str,
+                    "default": f.default if has_default else None,
+                    "required": not has_default and not has_default_factory,
+                })
+
+        # Extract ClassVar metadata
+        requires = getattr(cls, "requires", [])
+        outputs = getattr(cls, "outputs", [])
+
+        # First line of docstring as description
+        doc = (cls.__doc__ or "").strip()
+        description = doc.split("\n")[0] if doc else ""
+
+        return {
+            "name": name,
+            "class_name": cls.__name__,
+            "component_type": component_type.value,
+            "description": description,
+            "parameters": parameters,
+            "requires": list(requires) if requires else [],
+            "outputs": list(outputs) if outputs else [],
+        }
+
+    def export_schemas(self) -> dict[str, list[dict[str, Any]]]:
+        """Export schemas for all registered components, grouped by type.
+
+        Useful for bulk loading into UI component browsers without N+1 calls.
+
+        Returns:
+            Dict mapping component type names to lists of component schemas.
+
+        Example:
+            >>> all_schemas = registry.export_schemas()
+            >>> for det in all_schemas.get("DETECTOR", []):
+            ...     print(det["name"], len(det["parameters"]), "params")
+        """
+        self._discover_if_needed()
+        result: dict[str, list[dict[str, Any]]] = {}
+        for comp_type, names_dict in self._items.items():
+            schemas = []
+            for name in sorted(names_dict):
+                try:
+                    schemas.append(self.get_schema(comp_type, name))
+                except Exception:
+                    logger.debug(f"export_schemas: failed to get schema for {comp_type.value}:{name}")
+            if schemas:
+                result[comp_type.value] = schemas
+        return result
+
+    @staticmethod
+    def _type_to_str(type_annotation: Any) -> str:
+        """Convert a type annotation to a readable string."""
+        s = str(type_annotation)
+        # Clean up common patterns
+        for prefix in ("typing.", "signalflow.core.enums.", "signalflow."):
+            s = s.replace(prefix, "")
+        # Remove <class '...'> wrapper
+        if s.startswith("<class '") and s.endswith("'>"):
+            s = s[8:-2]
+        return s
+
+    # ── Snapshot ────────────────────────────────────────────────────────
 
     def snapshot(self) -> dict[str, list[str]]:
         """Snapshot of registry for debugging.
