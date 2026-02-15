@@ -49,6 +49,27 @@ hide:
     sf run backtest.yaml --plot
     ```
 
+-   :material-chart-scatter-plot:{ .lg .middle } **Pipeline Visualization**
+
+    ---
+
+    Interactive D3.js pipeline DAG, Mermaid export, local dev server
+
+    ```python
+    sf.viz.pipeline(builder)
+    sf.viz.serve(builder, port=4141)
+    ```
+
+-   :material-swap-horizontal:{ .lg .middle } **OHLCV Resampling**
+
+    ---
+
+    Auto-detect timeframes, resample to any interval, exchange-aware selection
+
+    ```python
+    df_4h = align_to_timeframe(df_1m, "4h")
+    ```
+
 -   :material-message-alert:{ .lg .middle } **Better Error Messages**
 
     ---

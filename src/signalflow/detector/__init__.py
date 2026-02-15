@@ -22,6 +22,9 @@ from signalflow.detector.zscore_anomaly import ZScoreAnomalyDetector
 from signalflow.detector.percentile_regime import PercentileRegimeDetector
 from signalflow.detector.local_extrema import LocalExtremaDetector
 
+# Funding rate detector
+from signalflow.detector.funding_rate import FundingRateDetector
+
 __all__ = [
     # Base
     "SignalDetector",
@@ -42,4 +45,6 @@ __all__ = [
     "ZScoreAnomalyDetector",
     "PercentileRegimeDetector",
     "LocalExtremaDetector",
+    # Funding rate
+    "FundingRateDetector",
 ]

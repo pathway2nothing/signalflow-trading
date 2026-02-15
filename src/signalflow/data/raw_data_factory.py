@@ -295,6 +295,8 @@ class RawDataFactory:
         Loads spot trading data from DuckDB storage with validation,
         deduplication checks, and schema normalization.
 
+        If ``data_types`` is ``None``, defaults to ``["spot"]``.
+
         Processing steps:
             1. Load data from DuckDB for specified pairs and date range
             2. Validate required columns (pair, timestamp)
@@ -405,6 +407,9 @@ class RawDataFactory:
             Duplicate detection shows first 10 examples if found.
             All data sorted by (pair, timestamp) for consistent ordering.
         """
+        if data_types is None:
+            data_types = ["spot"]
+
         data: dict[str, pl.DataFrame] = {}
         store = DuckDbSpotStore(spot_store_path)
         try:

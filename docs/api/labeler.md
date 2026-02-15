@@ -7,7 +7,7 @@ look-ahead labels (direction, return magnitude, volume regime) at various horizo
     The target functionality is implemented in the `signalflow.target` module.
 
 !!! tip "Event Detection"
-    Market-wide event detectors are in the [`detector.market`](detector.md#market-wide-detectors) module.
+    Market-wide event detectors are in the [`detector.market`](detector.md#market-wide-detection) module.
     Use `mask_targets_by_signals()` to exclude labels around detected events.
 
 ## Base Class

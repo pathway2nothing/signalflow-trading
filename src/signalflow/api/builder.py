@@ -1024,18 +1024,23 @@ class BacktestBuilder:
 
     def _build_broker(self) -> Any:
         """Build broker from registry."""
+        from signalflow.data.strategy_store.memory import InMemoryStrategyStore
+
         try:
             broker_cls = default_registry.get(SfComponentType.STRATEGY_BROKER, "backtest")
-            executor_cls = default_registry.get(SfComponentType.STRATEGY_EXECUTOR, "virtual_spot")
+            executor_cls = default_registry.get(SfComponentType.STRATEGY_EXECUTOR, "virtual/spot")
 
             executor = executor_cls(fee_rate=self._fee)
-            return broker_cls(executor=executor)
+            return broker_cls(executor=executor, store=InMemoryStrategyStore())
         except KeyError:
             # Fallback to direct imports
             from signalflow.strategy.broker import BacktestBroker
             from signalflow.strategy.broker.executor import VirtualSpotExecutor
 
-            return BacktestBroker(executor=VirtualSpotExecutor(fee_rate=self._fee))
+            return BacktestBroker(
+                executor=VirtualSpotExecutor(fee_rate=self._fee),
+                store=InMemoryStrategyStore(),
+            )
 
     def _build_runner(self, broker: Any, entry_rules: list[Any], exit_rules: list[Any]) -> Any:
         """Build runner from registry."""

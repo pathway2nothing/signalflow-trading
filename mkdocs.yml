@@ -119,8 +119,11 @@ nav:
     - Quick Start: quickstart.md
   - Tutorials:
     - notebooks/index.md
-    # Add notebooks here, e.g.:
-    # - My Tutorial: notebooks/my_tutorial.ipynb
+    - "01 - Quick Start": notebooks/01_quickstart.ipynb
+    - "02 - Custom Detector": notebooks/02_custom_detector.ipynb
+    - "03 - Data Loading & Resampling": notebooks/03_data_loading.ipynb
+    - "04 - Pipeline Visualization": notebooks/04_visualization.ipynb
+    - "05 - Advanced Strategies": notebooks/05_advanced_strategies.ipynb
   - User Guide:
     - CLI & YAML Config: guide/cli.md
     - Signal Architecture & Meta-Labeling: guide/signal-architecture.md
@@ -137,6 +140,7 @@ nav:
     - signalflow-nn: ecosystem/signalflow-nn.md
   - API Reference:
     - api/index.md
+    - High-Level API: api/api.md
     - Core: api/core.md
     - Data: api/data.md
     - Detector: api/detector.md
@@ -144,7 +148,10 @@ nav:
     - Labeler: api/labeler.md
     - Validator: api/validator.md
     - Strategy: api/strategy.md
+    - Visualization: api/viz.md
+    - CLI: api/cli.md
     - Technical Analysis (ta): api/ta.md
+  - Changelog: changelog.md
   - Contributing: contributing.md
 
 extra_css:
