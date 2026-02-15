@@ -219,7 +219,7 @@ def normalize_kraken_futures_pair(symbol: str) -> str:
     # Remove prefixes: PI_, PF_, FI_
     for prefix in ("PI_", "PF_", "FI_"):
         if symbol.startswith(prefix):
-            symbol = symbol[len(prefix):]
+            symbol = symbol[len(prefix) :]
             break
     # XBT -> BTC
     symbol = symbol.replace("XBT", "BTC")

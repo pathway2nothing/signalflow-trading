@@ -27,7 +27,13 @@ class BacktestRunner(StrategyRunner):
     _trades: list = field(default_factory=list, init=False)
     _metrics_history: list[dict] = field(default_factory=list, init=False)
 
-    def run(self, raw_data, signals: Signals, state: StrategyState | None = None):
+    def run(
+        self,
+        raw_data,
+        signals: Signals,
+        state: StrategyState | None = None,
+        named_signals: dict[str, Signals] | None = None,
+    ):
         from signalflow.core.containers.strategy_state import StrategyState
         from tqdm import tqdm
 
@@ -49,11 +55,22 @@ class BacktestRunner(StrategyRunner):
 
         signal_lookup = self._build_signal_lookup(signals_df) if signals_df.height > 0 else {}
 
+        # Build per-detector signal lookups for cross-referencing
+        named_signal_lookups: dict[str, dict] = {}
+        if named_signals:
+            for det_name, det_signals in named_signals.items():
+                if det_signals.value.height > 0:
+                    named_signal_lookups[det_name] = self._build_signal_lookup(det_signals.value)
+
         iterator = tqdm(timestamps, desc="Backtesting") if self.show_progress else timestamps
 
         for ts in iterator:
             state = self._process_bar_optimized(
-                ts=ts, price_lookup=price_lookup, signal_lookup=signal_lookup, state=state
+                ts=ts,
+                price_lookup=price_lookup,
+                signal_lookup=signal_lookup,
+                state=state,
+                named_signal_lookups=named_signal_lookups,
             )
 
         return state
@@ -83,6 +100,7 @@ class BacktestRunner(StrategyRunner):
         price_lookup: dict[datetime, dict[str, float]],
         signal_lookup: dict[datetime, pl.DataFrame],
         state: StrategyState,
+        named_signal_lookups: dict[str, dict] | None = None,
     ) -> StrategyState:
         state.touch(ts)
         state.reset_tick_cache()
@@ -101,6 +119,14 @@ class BacktestRunner(StrategyRunner):
         bar_signals_df = signal_lookup.get(ts, pl.DataFrame())
         bar_signals = Signals(bar_signals_df)
         state.runtime["_bar_signals"] = bar_signals
+
+        # Build named bar-level signals for entry rule cross-referencing
+        if named_signal_lookups:
+            named_bar: dict[str, Signals] = {}
+            for det_name, det_lookup in named_signal_lookups.items():
+                det_df = det_lookup.get(ts, pl.DataFrame())
+                named_bar[det_name] = Signals(det_df)
+            state.runtime["_named_signals"] = named_bar
 
         exit_orders = []
         open_positions = state.portfolio.open_positions()

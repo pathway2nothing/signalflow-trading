@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.4.3"
+version = "0.5.0"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -23,7 +23,13 @@ dependencies = [
     "pandas-ta>=0.3.14b",
     "plotly>=5.0.0",
     "pyarrow>=14.0.0",
+    "click>=8.0.0",
+    "pyyaml>=6.0",
 ]
+
+# CLI entry point
+[project.scripts]
+sf = "signalflow.cli.main:main"
 
 [project.optional-dependencies]
 dev = [

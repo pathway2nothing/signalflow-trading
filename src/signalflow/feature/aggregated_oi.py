@@ -72,25 +72,25 @@ class AggregatedOpenInterest(GlobalFeature):
         # Step 1: Aggregate OI by timestamp
         agg_oi = (
             df.group_by(self.ts_col)
-            .agg([
-                pl.col(self.oi_col).sum().alias("agg_oi"),
-                pl.col(self.group_col).n_unique().alias("n_pairs"),
-            ])
+            .agg(
+                [
+                    pl.col(self.oi_col).sum().alias("agg_oi"),
+                    pl.col(self.group_col).n_unique().alias("n_pairs"),
+                ]
+            )
             .sort(self.ts_col)
         )
 
         # Step 2: Compute derived features
-        agg_oi = agg_oi.with_columns([
-            # Percentage change
-            (pl.col("agg_oi") / pl.col("agg_oi").shift(1) - 1).alias("agg_oi_change"),
-            # Rolling stats for z-score
-            pl.col("agg_oi")
-            .rolling_mean(window_size=self.zscore_window)
-            .alias("_mean"),
-            pl.col("agg_oi")
-            .rolling_std(window_size=self.zscore_window)
-            .alias("_std"),
-        ])
+        agg_oi = agg_oi.with_columns(
+            [
+                # Percentage change
+                (pl.col("agg_oi") / pl.col("agg_oi").shift(1) - 1).alias("agg_oi_change"),
+                # Rolling stats for z-score
+                pl.col("agg_oi").rolling_mean(window_size=self.zscore_window).alias("_mean"),
+                pl.col("agg_oi").rolling_std(window_size=self.zscore_window).alias("_std"),
+            ]
+        )
 
         # Z-score with safe division
         agg_oi = agg_oi.with_columns(
@@ -211,29 +211,35 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
             # Aggregate OI per timestamp for this source
             agg = (
                 df.group_by(self.ts_col)
-                .agg([
-                    pl.col(self.oi_col).sum().alias("_oi"),
-                ])
+                .agg(
+                    [
+                        pl.col(self.oi_col).sum().alias("_oi"),
+                    ]
+                )
                 .with_columns(pl.lit(source_name).alias("_source"))
             )
             source_aggs.append(agg)
 
         if not source_aggs:
-            return pl.DataFrame(schema={
-                self.ts_col: pl.Datetime("us"),
-                "agg_oi_total": pl.Float64,
-                "agg_oi_change": pl.Float64,
-                "agg_oi_zscore": pl.Float64,
-            })
+            return pl.DataFrame(
+                schema={
+                    self.ts_col: pl.Datetime("us"),
+                    "agg_oi_total": pl.Float64,
+                    "agg_oi_change": pl.Float64,
+                    "agg_oi_zscore": pl.Float64,
+                }
+            )
 
         # Combine and aggregate across sources
         combined = pl.concat(source_aggs)
         agg_oi = (
             combined.group_by(self.ts_col)
-            .agg([
-                pl.col("_oi").sum().alias("agg_oi_total"),
-                pl.col("_source").n_unique().alias("n_sources"),
-            ])
+            .agg(
+                [
+                    pl.col("_oi").sum().alias("agg_oi_total"),
+                    pl.col("_source").n_unique().alias("n_sources"),
+                ]
+            )
             .sort(self.ts_col)
         )
 
@@ -250,17 +256,13 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
             agg_oi = agg_oi.join(per_source, on=self.ts_col, how="left")
 
         # Derived features
-        agg_oi = agg_oi.with_columns([
-            (pl.col("agg_oi_total") / pl.col("agg_oi_total").shift(1) - 1).alias(
-                "agg_oi_change"
-            ),
-            pl.col("agg_oi_total")
-            .rolling_mean(window_size=self.zscore_window)
-            .alias("_mean"),
-            pl.col("agg_oi_total")
-            .rolling_std(window_size=self.zscore_window)
-            .alias("_std"),
-        ])
+        agg_oi = agg_oi.with_columns(
+            [
+                (pl.col("agg_oi_total") / pl.col("agg_oi_total").shift(1) - 1).alias("agg_oi_change"),
+                pl.col("agg_oi_total").rolling_mean(window_size=self.zscore_window).alias("_mean"),
+                pl.col("agg_oi_total").rolling_std(window_size=self.zscore_window).alias("_std"),
+            ]
+        )
 
         agg_oi = agg_oi.with_columns(
             pl.when(pl.col("_std") > 0)
@@ -294,11 +296,13 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
         # Step 1: Aggregate OI by timestamp (across all sources and pairs)
         agg_oi = (
             df_filtered.group_by(self.ts_col)
-            .agg([
-                pl.col(self.oi_col).sum().alias("agg_oi_total"),
-                pl.col(self.source_col).n_unique().alias("n_sources"),
-                pl.col(self.group_col).n_unique().alias("n_pairs"),
-            ])
+            .agg(
+                [
+                    pl.col(self.oi_col).sum().alias("agg_oi_total"),
+                    pl.col(self.source_col).n_unique().alias("n_sources"),
+                    pl.col(self.group_col).n_unique().alias("n_pairs"),
+                ]
+            )
             .sort(self.ts_col)
         )
 
@@ -320,17 +324,13 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
             agg_oi = agg_oi.join(per_source, on=self.ts_col, how="left")
 
         # Step 2: Derived features
-        agg_oi = agg_oi.with_columns([
-            (pl.col("agg_oi_total") / pl.col("agg_oi_total").shift(1) - 1).alias(
-                "agg_oi_change"
-            ),
-            pl.col("agg_oi_total")
-            .rolling_mean(window_size=self.zscore_window)
-            .alias("_mean"),
-            pl.col("agg_oi_total")
-            .rolling_std(window_size=self.zscore_window)
-            .alias("_std"),
-        ])
+        agg_oi = agg_oi.with_columns(
+            [
+                (pl.col("agg_oi_total") / pl.col("agg_oi_total").shift(1) - 1).alias("agg_oi_change"),
+                pl.col("agg_oi_total").rolling_mean(window_size=self.zscore_window).alias("_mean"),
+                pl.col("agg_oi_total").rolling_std(window_size=self.zscore_window).alias("_std"),
+            ]
+        )
 
         agg_oi = agg_oi.with_columns(
             pl.when(pl.col("_std") > 0)

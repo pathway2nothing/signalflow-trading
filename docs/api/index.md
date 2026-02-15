@@ -4,11 +4,14 @@ Complete API documentation for SignalFlow components.
 
 ## Modules
 
+- [High-Level API](api.md) - Builder, Result, Shortcuts, Exceptions
 - [Core](core.md) - Core containers and registries
-- [Data](data.md) - Data loading and storage
+- [Data](data.md) - Data loading, storage, and resampling
 - [Detector](detector.md) - Signal detection
 - [Feature](feature.md) - Feature extraction
 - [Labeler](labeler.md) - Signal labeling
 - [Validator](validator.md) - Signal validation
 - [Strategy](strategy.md) - Strategy execution
+- [Visualization](viz.md) - Pipeline visualization
+- [CLI](cli.md) - Command-line interface
 - [Technical Analysis (ta)](ta.md) - 199+ indicators from `signalflow-ta`

@@ -61,6 +61,9 @@ class SignalEntryRule(EntryRule):
     # === Signal type mapping ===
     signal_type_map: dict[str, str] | None = None  # signal_type -> "BUY"/"SELL"; None = legacy behavior
 
+    # === Cross-referencing ===
+    source_detector: str | None = None  # filter signals to this named detector only
+
     # === New injectable components ===
     position_sizer: PositionSizer | None = None
     entry_filters: list[EntryFilter] | EntryFilter | None = None
@@ -97,6 +100,14 @@ class SignalEntryRule(EntryRule):
     def check_entries(self, signals: Signals, prices: dict[str, float], state: StrategyState) -> list[Order]:
         """Check signals and generate entry orders."""
         orders: list[Order] = []
+
+        # Cross-referencing: use signals from specific detector if configured
+        if self.source_detector:
+            named = state.runtime.get("_named_signals", {})
+            if self.source_detector in named:
+                signals = named[self.source_detector]
+            else:
+                return orders
 
         if signals is None or signals.value.height == 0:
             return orders
@@ -178,19 +189,23 @@ class SignalEntryRule(EntryRule):
 
             qty = notional / price
 
+            order_meta = {
+                "signal_type": signal_type,
+                "signal_probability": probability,
+                "signal_ts": row.get(self.ts_col),
+                "requested_notional": notional,
+                "sizer_used": (self.position_sizer.__class__.__name__ if self.position_sizer else "legacy"),
+            }
+            if self.source_detector:
+                order_meta["source_detector"] = self.source_detector
+
             order = Order(
                 pair=pair,
                 side=side,
                 order_type="MARKET",
                 qty=qty,
                 signal_strength=probability,
-                meta={
-                    "signal_type": signal_type,
-                    "signal_probability": probability,
-                    "signal_ts": row.get(self.ts_col),
-                    "requested_notional": notional,
-                    "sizer_used": (self.position_sizer.__class__.__name__ if self.position_sizer else "legacy"),
-                },
+                meta=order_meta,
             )
             orders.append(order)
 

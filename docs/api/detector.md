@@ -109,6 +109,14 @@ df_masked = mask_targets_by_signals(
       show_source: true
       members: true
 
+## Funding Rate Detector
+
+::: signalflow.detector.funding_rate.FundingRateDetector
+    options:
+      show_root_heading: true
+      show_source: true
+      members: true
+
 ## Generic Detectors
 
 ### Z-Score Anomaly Detector

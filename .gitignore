@@ -172,3 +172,5 @@ notebooks/*.png
 # Test/benchmark scripts
 scripts/
 notebooks/*.html
+notebooks/*.ipynb
+backtest.yaml

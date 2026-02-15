@@ -16,6 +16,75 @@ hide:
 **algorithmic trading**, **quantitative finance**, and
 **machine learning-based trading strategies**.
 
+---
+
+## What's New in v0.5
+
+<div class="grid cards" markdown>
+
+-   :material-code-braces:{ .lg .middle } **Fluent Builder API**
+
+    ---
+
+    Clean, chainable API for quick backtesting with IDE autocomplete support
+
+    ```python
+    result = (
+        sf.Backtest("my_strategy")
+        .data(raw=my_data)
+        .detector("sma_cross")
+        .exit(tp=0.03, sl=0.015)
+        .run()
+    )
+    ```
+
+-   :material-console:{ .lg .middle } **CLI & YAML Config**
+
+    ---
+
+    Run backtests from command line with YAML configuration files
+
+    ```bash
+    sf init
+    sf run backtest.yaml --plot
+    ```
+
+-   :material-chart-scatter-plot:{ .lg .middle } **Pipeline Visualization**
+
+    ---
+
+    Interactive D3.js pipeline DAG, Mermaid export, local dev server
+
+    ```python
+    sf.viz.pipeline(builder)
+    sf.viz.serve(builder, port=4141)
+    ```
+
+-   :material-swap-horizontal:{ .lg .middle } **OHLCV Resampling**
+
+    ---
+
+    Auto-detect timeframes, resample to any interval, exchange-aware selection
+
+    ```python
+    df_4h = align_to_timeframe(df_1m, "4h")
+    ```
+
+-   :material-message-alert:{ .lg .middle } **Better Error Messages**
+
+    ---
+
+    Clear, actionable error messages with suggestions for fixing issues
+
+-   :material-notebook:{ .lg .middle } **Jupyter Support**
+
+    ---
+
+    Rich HTML rendering of results in Jupyter notebooks
+
+</div>
+
+---
 
 <div class="grid cards" markdown>
 

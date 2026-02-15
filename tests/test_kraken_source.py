@@ -39,16 +39,18 @@ def _make_kraken_spot_response(timestamps_sec: list[int], pair: str = "XXBTZUSD"
     rows = []
     for i, ts in enumerate(sorted(timestamps_sec)):
         p = base_price + i
-        rows.append([
-            ts,         # time (open time in seconds)
-            str(p),     # open
-            str(p + 1), # high
-            str(p - 1), # low
-            str(p + 0.5), # close
-            str(p + 0.25), # vwap
-            str(100.0 + i), # volume
-            10 + i,     # count
-        ])
+        rows.append(
+            [
+                ts,  # time (open time in seconds)
+                str(p),  # open
+                str(p + 1),  # high
+                str(p - 1),  # low
+                str(p + 0.5),  # close
+                str(p + 0.25),  # vwap
+                str(100.0 + i),  # volume
+                10 + i,  # count
+            ]
+        )
     return {"error": [], "result": {pair: rows, "last": timestamps_sec[-1] if timestamps_sec else 0}}
 
 
@@ -57,14 +59,16 @@ def _make_kraken_futures_response(timestamps_sec: list[int], base_price: float =
     candles = []
     for i, ts in enumerate(sorted(timestamps_sec)):
         p = base_price + i
-        candles.append({
-            "time": ts,
-            "open": str(p),
-            "high": str(p + 1),
-            "low": str(p - 1),
-            "close": str(p + 0.5),
-            "volume": str(100.0 + i),
-        })
+        candles.append(
+            {
+                "time": ts,
+                "open": str(p),
+                "high": str(p + 1),
+                "low": str(p - 1),
+                "close": str(p + 0.5),
+                "volume": str(100.0 + i),
+            }
+        )
     return {"candles": candles}
 
 

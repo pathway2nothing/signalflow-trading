@@ -56,10 +56,7 @@ class DataTypeAccessor:
             return sources[source]
         data_type = object.__getattribute__(self, "_data_type")
         available = list(sources.keys())
-        raise AttributeError(
-            f"No source '{source}' for data type '{data_type}'. "
-            f"Available: {available}"
-        )
+        raise AttributeError(f"No source '{source}' for data type '{data_type}'. Available: {available}")
 
     @property
     def sources(self) -> list[str]:
@@ -216,9 +213,7 @@ class RawData:
         default_source = object.__getattribute__(self, "default_source")
 
         if name not in data:
-            raise AttributeError(
-                f"No data type '{name}'. Available: {list(data.keys())}"
-            )
+            raise AttributeError(f"No data type '{name}'. Available: {list(data.keys())}")
 
         value = data[name]
 
@@ -276,10 +271,7 @@ class RawData:
         if isinstance(obj, dict):
             if source is not None:
                 if source not in obj:
-                    raise KeyError(
-                        f"Source '{source}' not found for '{key}'. "
-                        f"Available: {list(obj.keys())}"
-                    )
+                    raise KeyError(f"Source '{source}' not found for '{key}'. Available: {list(obj.keys())}")
                 return obj[source]
 
             # No source specified - use default with warning
