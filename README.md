@@ -25,7 +25,7 @@
 <p>
 <a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/data-polars%20%7C%20duckdb-blueviolet" alt="Data: Polars | DuckDB"></a>
 <a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/ML-pytorch%20%7C%20lightning-red?logo=pytorch&logoColor=white" alt="ML: PyTorch | Lightning"></a>
-<a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/exchange-Binance-yellow?logo=binance&logoColor=white" alt="Exchange: Binance"></a>
+<a href="https://github.com/pathway2nothing/signalflow-trading"><img src="https://img.shields.io/badge/exchanges-8%20supported-yellow" alt="Exchanges: 8 supported"></a>
 </p>
 
 </div>
@@ -216,6 +216,44 @@ capital: 50000
 fee: 0.001
 ```
 
+## Multi-Detector Ensembles
+
+Combine multiple detectors with signal aggregation:
+
+```python
+result = (
+    sf.Backtest("ensemble")
+    .data(raw=spot_1m, name="1m")
+    .data(raw=spot_1h, name="1h")
+    .detector("sma_cross", name="trend", data_source="1h")
+    .detector("volume_spike", name="volume", data_source="1m")
+    .aggregation(mode="weighted", weights=[0.7, 0.3])
+    .entry(size_pct=0.15)
+    .exit(tp=0.03, sl=0.015)
+    .capital(50_000)
+    .run()
+)
+```
+
+**Aggregation modes:** `majority`, `weighted`, `unanimous`, `any`, `meta_labeling`
+
+## Pipeline Visualization
+
+Inspect your backtest pipeline as an interactive DAG:
+
+```python
+builder = sf.Backtest("test").data(...).detector(...)
+
+sf.viz.pipeline(builder)                    # Open interactive HTML
+sf.viz.pipeline(builder, output="dag.html") # Save to file
+sf.viz.serve(builder, port=4141)            # Local dev server
+```
+
+```bash
+sf viz backtest.yaml           # From CLI
+sf viz backtest.yaml -o dag.html
+```
+
 ## Core Architecture: The Signal Pipeline
 
 The framework implements a modular three-stage processing logic:
@@ -245,6 +283,10 @@ The framework implements a modular three-stage processing logic:
   - **Entry Filters**: Regime, volatility, drawdown, correlation, time-of-day filtering
   - **Exit Rules**: Trailing stops, volatility-based exits, composite exit managers
   - **Signal Aggregation**: Majority voting, weighted averaging, meta-labeling
+
+* **OHLCV Resampling**: Unified timeframe conversion across 8 exchanges with auto-detection and smart timeframe selection.
+
+* **Pipeline Visualization**: Interactive D3.js DAG viewer, Mermaid diagram export, and local dev server for inspecting backtest pipelines.
 
 * **Paper Trading Ready**: Real-time `RealtimeRunner` with monitoring, alerts, and virtual execution for risk-free validation.
 
@@ -289,6 +331,7 @@ validated_signals = validator.validate_signals(signals, features)
 * **Data**: `polars`, `pandas`, `duckdb`
 * **ML/Compute**: `pytorch`, `lightning`, `scikit-learn`, `numba`, `optuna`
 * **Technical Analysis**: `pandas-ta`
+* **Visualization**: `d3.js`, `dagre`
 * **CLI**: `click`, `pyyaml`
 
 
@@ -297,7 +340,7 @@ validated_signals = validator.validate_signals(signals, features)
 * `signalflow.api`: High-level fluent API (`Backtest`, `BacktestResult`, `load`)
 * `signalflow.cli`: Command-line interface
 * `signalflow.core`: Core data containers (`RawData`, `Signals`) and registries
-* `signalflow.data`: Exchange loaders (Binance), virtual data, DuckDB/SQLite/PostgreSQL storage
+* `signalflow.data`: Exchange loaders (Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT), OHLCV resampling, DuckDB/SQLite/PostgreSQL storage
 * `signalflow.feature`: Feature extractors and technical indicator adapters
 * `signalflow.target`: Advanced labeling techniques (Fixed Horizon, Triple Barrier)
 * `signalflow.detector`: Signal detection algorithms
@@ -308,6 +351,7 @@ validated_signals = validator.validate_signals(signals, features)
   - **Model Integration**: Protocol-based ML/RL model integration
   - **Monitoring**: Real-time alerts and performance tracking
   - **Brokers**: Backtest, virtual, and live execution brokers
+* `signalflow.viz`: Interactive pipeline visualization (D3.js, Mermaid), graph extractors, local dev server
 
 ## Ecosystem
 
