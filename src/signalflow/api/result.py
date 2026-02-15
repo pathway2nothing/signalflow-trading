@@ -8,6 +8,7 @@ signalflow.analytic.strategy for visualization and metrics computation.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol, Sequence, runtime_checkable
 
 import polars as pl
@@ -355,6 +356,51 @@ class BacktestResult:
             "trades": [self._trade_to_dict(t) for t in self.trades] if self.trades else [],
             "config": self.config,
         }
+
+    def to_json_dict(self) -> dict[str, Any]:
+        """Export fully JSON-serializable result with equity curve.
+
+        All datetime values are converted to ISO 8601 strings.
+        Polars types are converted to Python native types.
+
+        Returns:
+            Dict with keys: ``metrics``, ``n_trades``, ``trades``,
+            ``equity_curve``, ``config``.
+        """
+        return {
+            "metrics": self.metrics,
+            "n_trades": self.n_trades,
+            "trades": [self._trade_to_json_safe(t) for t in self.trades] if self.trades else [],
+            "equity_curve": self._get_equity_curve(),
+            "config": self._json_safe(self.config),
+        }
+
+    def _get_equity_curve(self) -> list[dict[str, Any]]:
+        """Extract equity curve from metrics_df as JSON-safe list of dicts."""
+        if self.metrics_df is None or self.metrics_df.height == 0:
+            return []
+        rows = self.metrics_df.to_dicts()
+        return [self._json_safe(row) for row in rows]
+
+    def _trade_to_json_safe(self, trade: TradeType) -> dict[str, Any]:
+        """Convert trade to JSON-safe dict (datetimes → ISO strings)."""
+        d = self._trade_to_dict(trade)
+        return self._json_safe(d)
+
+    @staticmethod
+    def _json_safe(obj: Any) -> Any:
+        """Recursively convert non-JSON-serializable types."""
+        if isinstance(obj, dict):
+            return {k: BacktestResult._json_safe(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [BacktestResult._json_safe(v) for v in obj]
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, float) and (obj != obj or obj == float("inf") or obj == float("-inf")):
+            return None  # NaN / Inf → null
+        if hasattr(obj, "item"):
+            return obj.item()  # numpy/polars scalar → Python native
+        return obj
 
     def to_dataframe(self) -> pl.DataFrame:
         """Export trades as Polars DataFrame.
