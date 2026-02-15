@@ -204,7 +204,9 @@ class SignalAggregator:
 
         # Average probabilities across all detectors
         prob_dfs = [
-            _ensure_probability(sig.value).select([self.pair_col, self.ts_col, pl.col("probability").alias(f"_prob_{i}")])
+            _ensure_probability(sig.value).select(
+                [self.pair_col, self.ts_col, pl.col("probability").alias(f"_prob_{i}")]
+            )
             for i, sig in enumerate(signals_list)
         ]
 

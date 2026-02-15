@@ -53,7 +53,7 @@ def _make_ohlcv(
         for col, vals in extra_cols.items():
             # Repeat values to match total rows
             full_vals = vals * len(pairs)
-            df = df.with_columns(pl.Series(col, full_vals[:df.height]))
+            df = df.with_columns(pl.Series(col, full_vals[: df.height]))
     return df
 
 
@@ -117,9 +117,7 @@ class TestDetectTimeframe:
         assert detect_timeframe(df) == "4h"
 
     def test_detect_multi_pair(self):
-        df = _make_ohlcv(
-            ["BTCUSDT", "ETHUSDT"], datetime(2024, 1, 1), n_bars=10, tf_minutes=60
-        )
+        df = _make_ohlcv(["BTCUSDT", "ETHUSDT"], datetime(2024, 1, 1), n_bars=10, tf_minutes=60)
         assert detect_timeframe(df) == "1h"
 
     def test_too_few_rows(self):
@@ -166,9 +164,7 @@ class TestResampleOhlcv:
             resample_ohlcv(df, "4h", "1h")
 
     def test_preserves_pairs(self):
-        df = _make_ohlcv(
-            ["BTCUSDT", "ETHUSDT"], datetime(2024, 1, 1), n_bars=8, tf_minutes=60
-        )
+        df = _make_ohlcv(["BTCUSDT", "ETHUSDT"], datetime(2024, 1, 1), n_bars=8, tf_minutes=60)
         result = resample_ohlcv(df, "1h", "4h")
         pairs = result["pair"].unique().sort().to_list()
         assert pairs == ["BTCUSDT", "ETHUSDT"]
@@ -184,9 +180,7 @@ class TestResampleOhlcv:
             tf_minutes=60,
             extra_cols={"funding_rate": [0.01, 0.02, 0.03, 0.04]},
         )
-        result = resample_ohlcv(
-            df, "1h", "4h", fill_rules={"funding_rate": "mean"}
-        )
+        result = resample_ohlcv(df, "1h", "4h", fill_rules={"funding_rate": "mean"})
         assert result.height == 1
         # mean of [0.01, 0.02, 0.03, 0.04] = 0.025
         assert abs(result["funding_rate"][0] - 0.025) < 1e-9

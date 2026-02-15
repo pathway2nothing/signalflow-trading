@@ -210,9 +210,7 @@ class RawDataFactory:
 
             # Normalize timestamps
             if "timestamp" in df.columns:
-                df = df.with_columns(
-                    pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None)
-                )
+                df = df.with_columns(pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None))
 
             # Sort by (pair, timestamp)
             if {"pair", "timestamp"}.issubset(df.columns):
@@ -228,9 +226,7 @@ class RawDataFactory:
                 nested_data[data_type] = {}
 
             if source_name in nested_data[data_type]:
-                raise ValueError(
-                    f"Duplicate source '{source_name}' for data type '{data_type}'"
-                )
+                raise ValueError(f"Duplicate source '{source_name}' for data type '{data_type}'")
 
             nested_data[data_type][source_name] = df
 

@@ -278,12 +278,7 @@ class BacktestResult:
         return "\n".join(lines)
 
     def __repr__(self) -> str:
-        return (
-            f"BacktestResult("
-            f"trades={self.n_trades}, "
-            f"return={self.total_return:+.1%}, "
-            f"win_rate={self.win_rate:.1%})"
-        )
+        return f"BacktestResult(trades={self.n_trades}, return={self.total_return:+.1%}, win_rate={self.win_rate:.1%})"
 
     # =========================================================================
     # Jupyter Support

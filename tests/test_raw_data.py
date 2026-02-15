@@ -84,11 +84,13 @@ def nested_raw_data():
     base = datetime(2024, 1, 1)
 
     def make_df(source: str, multiplier: float):
-        return pl.DataFrame({
-            "pair": ["BTCUSDT"] * 5,
-            "timestamp": [base.replace(hour=i) for i in range(5)],
-            "open_interest": [1000.0 * multiplier + i for i in range(5)],
-        })
+        return pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"] * 5,
+                "timestamp": [base.replace(hour=i) for i in range(5)],
+                "open_interest": [1000.0 * multiplier + i for i in range(5)],
+            }
+        )
 
     return RawData(
         datetime_start=base,

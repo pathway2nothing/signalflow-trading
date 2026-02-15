@@ -76,10 +76,7 @@ class LazyDataTypeAccessor:
 
         if source not in lazy_raw._stores.get(data_type, {}):
             available = list(lazy_raw._stores.get(data_type, {}).keys())
-            raise AttributeError(
-                f"No source '{source}' for data type '{data_type}'. "
-                f"Available: {available}"
-            )
+            raise AttributeError(f"No source '{source}' for data type '{data_type}'. Available: {available}")
 
         return lazy_raw._load(data_type, source)
 
@@ -104,8 +101,7 @@ class LazyDataTypeAccessor:
             source = sources[0]
 
         warnings.warn(
-            f"Using default source '{source}' for '{data_type}'. "
-            f"Specify explicitly: raw.{data_type}.{source}",
+            f"Using default source '{source}' for '{data_type}'. Specify explicitly: raw.{data_type}.{source}",
             UserWarning,
             stacklevel=2,
         )
@@ -174,18 +170,15 @@ class RawDataLazy:
     cache_dir: Path | None = None
 
     # Internal: stores[data_type][source] -> RawDataStore
-    _stores: dict[str, dict[str, "RawDataStore"]] = field(
-        default_factory=dict, repr=False
-    )
+    _stores: dict[str, dict[str, "RawDataStore"]] = field(default_factory=dict, repr=False)
     # Internal: memory cache[data_type][source] -> DataFrame
-    _memory_cache: dict[str, dict[str, pl.DataFrame]] = field(
-        default_factory=dict, repr=False
-    )
+    _memory_cache: dict[str, dict[str, pl.DataFrame]] = field(default_factory=dict, repr=False)
 
     def __post_init__(self):
         """Initialize cache directory for disk mode."""
         if self.cache_mode == "disk" and self.cache_dir is None:
             import tempfile
+
             self.cache_dir = Path(tempfile.mkdtemp(prefix="signalflow_cache_"))
 
     # ── Factory ───────────────────────────────────────────────────────
@@ -295,9 +288,7 @@ class RawDataLazy:
 
         # Normalize timestamps
         if "timestamp" in df.columns:
-            df = df.with_columns(
-                pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None)
-            )
+            df = df.with_columns(pl.col("timestamp").cast(pl.Datetime("us")).dt.replace_time_zone(None))
 
         # Sort by (pair, timestamp)
         if {"pair", "timestamp"}.issubset(df.columns):
@@ -364,15 +355,17 @@ class RawDataLazy:
         """Attribute access: raw.perpetual -> LazyDataTypeAccessor."""
         # Avoid recursion
         if name.startswith("_") or name in (
-            "datetime_start", "datetime_end", "pairs", "default_source",
-            "cache_mode", "cache_dir",
+            "datetime_start",
+            "datetime_end",
+            "pairs",
+            "default_source",
+            "cache_mode",
+            "cache_dir",
         ):
             raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
 
         if name not in self._stores:
-            raise AttributeError(
-                f"No data type '{name}'. Available: {list(self._stores.keys())}"
-            )
+            raise AttributeError(f"No data type '{name}'. Available: {list(self._stores.keys())}")
 
         return LazyDataTypeAccessor(self, name)
 
@@ -391,10 +384,7 @@ class RawDataLazy:
 
         if source is not None:
             if source not in self._stores[key]:
-                raise KeyError(
-                    f"Source '{source}' not found for '{key}'. "
-                    f"Available: {list(self._stores[key].keys())}"
-                )
+                raise KeyError(f"Source '{source}' not found for '{key}'. Available: {list(self._stores[key].keys())}")
             return self._load(key, source)
 
         # No source specified - use default with warning
@@ -407,8 +397,7 @@ class RawDataLazy:
             return pl.DataFrame()
 
         warnings.warn(
-            f"Using default source '{default}' for '{key}'. "
-            f"Specify explicitly: raw.get('{key}', source='{default}')",
+            f"Using default source '{default}' for '{key}'. Specify explicitly: raw.get('{key}', source='{default}')",
             UserWarning,
             stacklevel=2,
         )
@@ -432,9 +421,7 @@ class RawDataLazy:
     def sources(self, data_type: str) -> list[str]:
         """Return available sources for a data type."""
         if data_type not in self._stores:
-            raise KeyError(
-                f"No data type '{data_type}'. Available: {list(self._stores.keys())}"
-            )
+            raise KeyError(f"No data type '{data_type}'. Available: {list(self._stores.keys())}")
         return list(self._stores[data_type].keys())
 
     # ── Conversion ────────────────────────────────────────────────────
@@ -481,10 +468,7 @@ class RawDataLazy:
             result[data_type] = {}
             for source in self._stores[data_type]:
                 if self.cache_mode == "memory":
-                    loaded = (
-                        data_type in self._memory_cache
-                        and source in self._memory_cache[data_type]
-                    )
+                    loaded = data_type in self._memory_cache and source in self._memory_cache[data_type]
                 elif self.cache_mode == "disk":
                     loaded = self._cache_path(data_type, source).exists()
                 else:

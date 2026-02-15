@@ -642,11 +642,7 @@ class BacktestBuilder:
         issues: list[str] = []
 
         # Check data
-        has_data = (
-            self._raw is not None
-            or self._data_params is not None
-            or bool(self._named_data)
-        )
+        has_data = self._raw is not None or self._data_params is not None or bool(self._named_data)
         if not has_data:
             issues.append("ERROR: No data source configured. Use .data()")
         elif self._data_params and not self._named_data:
@@ -656,11 +652,7 @@ class BacktestBuilder:
                 issues.append("ERROR: No start date specified in .data()")
 
         # Check detector/signals
-        has_detector = (
-            self._detector is not None
-            or bool(self._named_detectors)
-            or self._signals is not None
-        )
+        has_detector = self._detector is not None or bool(self._named_detectors) or self._signals is not None
         if not has_detector:
             issues.append("ERROR: No detector or signals configured. Use .detector() or .signals()")
 
@@ -838,11 +830,7 @@ class BacktestBuilder:
         for det_name, detector in self._named_detectors.items():
             signals = self._run_detector(detector, raw, det_name)
             # Tag signals with source detector name
-            signals = Signals(
-                signals.value.with_columns(
-                    pl.lit(det_name).alias("_source_detector")
-                )
-            )
+            signals = Signals(signals.value.with_columns(pl.lit(det_name).alias("_source_detector")))
             named_signals[det_name] = signals
 
         # Apply validators (if any)
@@ -884,9 +872,7 @@ class BacktestBuilder:
                     # Get features from raw data for validation
                     first_key = next(iter(raw.data.keys()), "spot")
                     features = raw.get(first_key)
-                    named_signals[d_name] = validator.validate_signals(
-                        named_signals[d_name], features
-                    )
+                    named_signals[d_name] = validator.validate_signals(named_signals[d_name], features)
                 except (NotImplementedError, Exception):
                     # Validator may not be trained yet — skip silently
                     pass
@@ -991,10 +977,12 @@ class BacktestBuilder:
 
                 tpsl_cls = TakeProfitStopLossExit
 
-            rules.append(tpsl_cls(
-                take_profit_pct=tp or 0.02,
-                stop_loss_pct=sl or 0.01,
-            ))
+            rules.append(
+                tpsl_cls(
+                    take_profit_pct=tp or 0.02,
+                    stop_loss_pct=sl or 0.01,
+                )
+            )
 
         # Trailing stop
         trailing = config.get("trailing")

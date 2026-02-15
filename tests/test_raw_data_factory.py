@@ -264,26 +264,24 @@ class TestRawDataFactoryMultiSource:
     def _make_perpetual_data(self, n=10, oi_multiplier=1.0):
         klines = []
         for i in range(n):
-            klines.append({
-                "timestamp": datetime(2024, 1, 1, 0, i),
-                "open": 100.0 + i,
-                "high": 101.0 + i,
-                "low": 99.0 + i,
-                "close": 100.5 + i,
-                "volume": 1000.0,
-                "open_interest": 50000.0 * oi_multiplier,
-                "funding_rate": 0.0001,
-            })
+            klines.append(
+                {
+                    "timestamp": datetime(2024, 1, 1, 0, i),
+                    "open": 100.0 + i,
+                    "high": 101.0 + i,
+                    "low": 99.0 + i,
+                    "close": 100.5 + i,
+                    "volume": 1000.0,
+                    "open_interest": 50000.0 * oi_multiplier,
+                    "funding_rate": 0.0001,
+                }
+            )
         return klines
 
     def test_from_stores_dict_creates_nested(self, tmp_path: Path):
         """from_stores with dict creates nested structure."""
-        binance_store = DuckDbRawStore(
-            db_path=tmp_path / "binance.duckdb", data_type="perpetual"
-        )
-        okx_store = DuckDbRawStore(
-            db_path=tmp_path / "okx.duckdb", data_type="perpetual"
-        )
+        binance_store = DuckDbRawStore(db_path=tmp_path / "binance.duckdb", data_type="perpetual")
+        okx_store = DuckDbRawStore(db_path=tmp_path / "okx.duckdb", data_type="perpetual")
 
         binance_store.insert_klines("BTCUSDT", self._make_perpetual_data(10, 1.0))
         okx_store.insert_klines("BTCUSDT", self._make_perpetual_data(10, 0.8))

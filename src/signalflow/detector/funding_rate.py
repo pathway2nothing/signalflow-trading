@@ -50,9 +50,7 @@ class FundingRateDetector(SignalDetector):
     min_positive_hours: int = 24
     funding_col: str = "funding_rate"
 
-    allowed_signal_types: set[str] | None = field(
-        default_factory=lambda: {"rise"}
-    )
+    allowed_signal_types: set[str] | None = field(default_factory=lambda: {"rise"})
 
     def preprocess(
         self,
@@ -60,11 +58,7 @@ class FundingRateDetector(SignalDetector):
         context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
         """Extract perpetual data with funding rates."""
-        key = (
-            self.raw_data_type.value
-            if hasattr(self.raw_data_type, "value")
-            else str(self.raw_data_type)
-        )
+        key = self.raw_data_type.value if hasattr(self.raw_data_type, "value") else str(self.raw_data_type)
         df = raw_data_view.to_polars(key)
         return df.sort([self.pair_col, self.ts_col])
 
@@ -91,10 +85,7 @@ class FundingRateDetector(SignalDetector):
 
         # 1. Extract rows with actual funding rate observations
         funding = (
-            features
-            .filter(pl.col(fr_col).is_not_null())
-            .select([pair_col, ts_col, fr_col])
-            .sort([pair_col, ts_col])
+            features.filter(pl.col(fr_col).is_not_null()).select([pair_col, ts_col, fr_col]).sort([pair_col, ts_col])
         )
 
         if funding.is_empty():
@@ -120,36 +111,24 @@ class FundingRateDetector(SignalDetector):
         # 3. Shift by 1 to exclude the current row, then forward-fill
         #    within each pair to propagate the last *previous* non-positive ts
         funding = funding.with_columns(
-            pl.col("_non_pos_ts")
-            .shift(1)
-            .forward_fill()
-            .over(pair_col)
-            .alias("_last_prev_non_pos_ts"),
+            pl.col("_non_pos_ts").shift(1).forward_fill().over(pair_col).alias("_last_prev_non_pos_ts"),
         )
 
         # 4. Compute hours since previous non-positive reading
         funding = funding.with_columns(
-            (
-                (pl.col(ts_col) - pl.col("_last_prev_non_pos_ts"))
-                .dt.total_hours()
-            ).alias("_hours_gap"),
+            ((pl.col(ts_col) - pl.col("_last_prev_non_pos_ts")).dt.total_hours()).alias("_hours_gap"),
         )
 
         # 5. Signal: current is negative AND gap >= min_positive_hours
-        signal_mask = (
-            (pl.col(fr_col) < 0)
-            & (pl.col("_hours_gap") >= self.min_positive_hours)
-        )
+        signal_mask = (pl.col(fr_col) < 0) & (pl.col("_hours_gap") >= self.min_positive_hours)
 
-        signals_df = (
-            funding
-            .filter(signal_mask)
-            .select([
+        signals_df = funding.filter(signal_mask).select(
+            [
                 pair_col,
                 ts_col,
                 pl.lit("rise").alias("signal_type"),
                 pl.lit(1).alias("signal"),
-            ])
+            ]
         )
 
         return Signals(signals_df)

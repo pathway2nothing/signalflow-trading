@@ -36,18 +36,20 @@ def _make_hyperliquid_klines_response(timestamps_ms: list[int], base_price: floa
     for i, close_ts in enumerate(sorted(timestamps_ms)):
         # t = open time, T = close time
         open_ts = close_ts - 60_000  # 1 minute before
-        candles.append({
-            "t": open_ts,
-            "T": close_ts,
-            "o": str(base_price + i),
-            "h": str(base_price + i + 1),
-            "l": str(base_price + i - 1),
-            "c": str(base_price + i + 0.5),
-            "v": str(100.0 + i),
-            "n": 10 + i,
-            "s": "BTC",
-            "i": "1m",
-        })
+        candles.append(
+            {
+                "t": open_ts,
+                "T": close_ts,
+                "o": str(base_price + i),
+                "h": str(base_price + i + 1),
+                "l": str(base_price + i - 1),
+                "c": str(base_price + i + 0.5),
+                "v": str(100.0 + i),
+                "n": 10 + i,
+                "s": "BTC",
+                "i": "1m",
+            }
+        )
     return candles
 
 

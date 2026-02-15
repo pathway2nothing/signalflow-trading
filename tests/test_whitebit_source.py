@@ -42,15 +42,17 @@ def _make_whitebit_klines_response(timestamps_sec: list[int], base_price: float 
     result = []
     for i, ts in enumerate(sorted(timestamps_sec)):
         p = base_price + i
-        result.append([
-            ts,             # timestamp (open time in seconds)
-            str(p),         # open
-            str(p + 0.5),   # close (index 2!)
-            str(p + 1),     # high
-            str(p - 1),     # low
-            str(100.0 + i), # volume_stock
-            str(10000.0 + i * 100),  # volume_money
-        ])
+        result.append(
+            [
+                ts,  # timestamp (open time in seconds)
+                str(p),  # open
+                str(p + 0.5),  # close (index 2!)
+                str(p + 1),  # high
+                str(p - 1),  # low
+                str(100.0 + i),  # volume_stock
+                str(10000.0 + i * 100),  # volume_money
+            ]
+        )
     return {"success": True, "result": result}
 
 

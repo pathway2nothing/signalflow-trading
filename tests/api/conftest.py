@@ -16,15 +16,17 @@ def sample_ohlcv_df() -> pl.DataFrame:
     base_price = 50000.0
     timestamps = [datetime(2024, 1, 1) + timedelta(hours=i) for i in range(n_bars)]
 
-    return pl.DataFrame({
-        "pair": ["BTCUSDT"] * n_bars,
-        "timestamp": timestamps,
-        "open": [base_price + i * 10 for i in range(n_bars)],
-        "high": [base_price + i * 10 + 50 for i in range(n_bars)],
-        "low": [base_price + i * 10 - 50 for i in range(n_bars)],
-        "close": [base_price + i * 10 + 25 for i in range(n_bars)],
-        "volume": [1000.0] * n_bars,
-    })
+    return pl.DataFrame(
+        {
+            "pair": ["BTCUSDT"] * n_bars,
+            "timestamp": timestamps,
+            "open": [base_price + i * 10 for i in range(n_bars)],
+            "high": [base_price + i * 10 + 50 for i in range(n_bars)],
+            "low": [base_price + i * 10 - 50 for i in range(n_bars)],
+            "close": [base_price + i * 10 + 25 for i in range(n_bars)],
+            "volume": [1000.0] * n_bars,
+        }
+    )
 
 
 @pytest.fixture
@@ -41,16 +43,18 @@ def sample_raw_data(sample_ohlcv_df: pl.DataFrame) -> RawData:
 @pytest.fixture
 def sample_signals() -> Signals:
     """Create sample Signals."""
-    df = pl.DataFrame({
-        "pair": ["BTCUSDT", "BTCUSDT", "BTCUSDT"],
-        "timestamp": [
-            datetime(2024, 1, 1, 10),
-            datetime(2024, 1, 1, 20),
-            datetime(2024, 1, 2, 10),
-        ],
-        "signal_type": ["rise", "fall", "rise"],
-        "signal": [1, -1, 1],
-    })
+    df = pl.DataFrame(
+        {
+            "pair": ["BTCUSDT", "BTCUSDT", "BTCUSDT"],
+            "timestamp": [
+                datetime(2024, 1, 1, 10),
+                datetime(2024, 1, 1, 20),
+                datetime(2024, 1, 2, 10),
+            ],
+            "signal_type": ["rise", "fall", "rise"],
+            "signal": [1, -1, 1],
+        }
+    )
     return Signals(df)
 
 
@@ -67,17 +71,18 @@ def sample_state() -> StrategyState:
 @pytest.fixture
 def sample_trades() -> list:
     """Create sample trades list."""
+
     class MockTrade:
         def __init__(self, pnl: float):
             self.pnl = pnl
             self.pair = "BTCUSDT"
 
     return [
-        MockTrade(100.0),   # win
-        MockTrade(-50.0),   # loss
-        MockTrade(200.0),   # win
-        MockTrade(-30.0),   # loss
-        MockTrade(150.0),   # win
+        MockTrade(100.0),  # win
+        MockTrade(-50.0),  # loss
+        MockTrade(200.0),  # win
+        MockTrade(-30.0),  # loss
+        MockTrade(150.0),  # win
     ]
 
 

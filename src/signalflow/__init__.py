@@ -37,34 +37,42 @@ import signalflow.validator as validator
 # IMPORTANT: Only api/ module is lazy-loaded. Other modules (detector, feature,
 # etc.) must stay eager for autodiscover() to work correctly.
 
+
 def __getattr__(name: str):
     """Lazy load API module components."""
     if name == "Backtest":
         from signalflow.api.builder import Backtest
+
         return Backtest
 
     if name == "BacktestBuilder":
         from signalflow.api.builder import BacktestBuilder
+
         return BacktestBuilder
 
     if name == "BacktestResult":
         from signalflow.api.result import BacktestResult
+
         return BacktestResult
 
     if name == "backtest":
         from signalflow.api.shortcuts import backtest
+
         return backtest
 
     if name == "load":
         from signalflow.api.shortcuts import load
+
         return load
 
     if name == "api":
         import signalflow.api as api
+
         return api
 
     if name == "viz":
         import signalflow.viz as viz
+
         return viz
 
     raise AttributeError(f"module 'signalflow' has no attribute {name!r}")

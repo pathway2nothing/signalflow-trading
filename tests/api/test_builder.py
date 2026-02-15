@@ -98,9 +98,7 @@ class TestBuilderRegistry:
     def test_detector_from_registry_name(self, sample_raw_data):
         """detector() accepts registry name string."""
         builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector("example/sma_cross", fast_period=10, slow_period=20)
+            Backtest("test").data(raw=sample_raw_data).detector("example/sma_cross", fast_period=10, slow_period=20)
         )
         assert builder._detector is not None
 
@@ -109,11 +107,7 @@ class TestBuilderRegistry:
         from signalflow.detector import ExampleSmaCrossDetector
 
         detector = ExampleSmaCrossDetector(fast_period=5, slow_period=15)
-        builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector(detector)
-        )
+        builder = Backtest("test").data(raw=sample_raw_data).detector(detector)
         assert builder._detector is detector
 
     def test_registry_has_entry_rules(self):
@@ -146,10 +140,7 @@ class TestBuilderValidation:
     def test_validate_tp_sl_warning(self, sample_raw_data):
         """Validation warns when TP < SL."""
         builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector("example/sma_cross")
-            .exit(tp=0.01, sl=0.02)  # Bad ratio
+            Backtest("test").data(raw=sample_raw_data).detector("example/sma_cross").exit(tp=0.01, sl=0.02)  # Bad ratio
         )
         issues = builder.validate()
         assert any("WARNING" in i and "TP" in i for i in issues)
@@ -337,11 +328,7 @@ class TestBuilderMultiData:
             pairs=["BTCUSDT"],
             data={"spot": sample_raw_data.get("spot")},
         )
-        builder = (
-            Backtest()
-            .data(raw=sample_raw_data, name="1m")
-            .data(raw=raw2, name="1h")
-        )
+        builder = Backtest().data(raw=sample_raw_data, name="1m").data(raw=raw2, name="1h")
         assert len(builder._named_data) == 2
         assert "1m" in builder._named_data
         assert "1h" in builder._named_data
@@ -392,11 +379,7 @@ class TestBuilderMultiDetector:
 
     def test_detector_explicit_name(self, sample_raw_data):
         """detector(name=...) uses explicit name."""
-        builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector("example/sma_cross", name="trend")
-        )
+        builder = Backtest("test").data(raw=sample_raw_data).detector("example/sma_cross", name="trend")
         assert "trend" in builder._named_detectors
 
     def test_detector_data_source(self, sample_raw_data):
@@ -425,10 +408,12 @@ class TestBuilderMultiDetector:
         builder = (
             Backtest("test")
             .data(raw=sample_raw_data)
-            .detectors([
-                ("trend", "example/sma_cross"),
-                ("volume", "example/sma_cross"),
-            ])
+            .detectors(
+                [
+                    ("trend", "example/sma_cross"),
+                    ("volume", "example/sma_cross"),
+                ]
+            )
         )
         assert "trend" in builder._named_detectors
         assert "volume" in builder._named_detectors
@@ -439,20 +424,12 @@ class TestBuilderMultiDetector:
 
         det1 = ExampleSmaCrossDetector(fast_period=5, slow_period=15)
         det2 = ExampleSmaCrossDetector(fast_period=10, slow_period=30)
-        builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detectors([det1, det2])
-        )
+        builder = Backtest("test").data(raw=sample_raw_data).detectors([det1, det2])
         assert len(builder._named_detectors) == 2
 
     def test_backward_compat_single_detector(self, sample_raw_data):
         """Single detector() call still works in backward-compat mode."""
-        builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector("example/sma_cross")
-        )
+        builder = Backtest("test").data(raw=sample_raw_data).detector("example/sma_cross")
         # _detector should be set for backward compat
         assert builder._detector is not None
         # Also appears in _named_detectors
@@ -528,19 +505,23 @@ class TestBuilderMultiEntry:
 
     def test_entries_dict(self):
         """entries() accepts dict of name -> config."""
-        builder = Backtest().entries({
-            "trend": {"size_pct": 0.15, "source_detector": "trend"},
-            "volume": {"size_pct": 0.05},
-        })
+        builder = Backtest().entries(
+            {
+                "trend": {"size_pct": 0.15, "source_detector": "trend"},
+                "volume": {"size_pct": 0.05},
+            }
+        )
         assert "trend" in builder._named_entries
         assert "volume" in builder._named_entries
 
     def test_entries_list(self):
         """entries() accepts list of (name, config) tuples."""
-        builder = Backtest().entries([
-            ("trend", {"size_pct": 0.15}),
-            ("volume", {"size_pct": 0.05}),
-        ])
+        builder = Backtest().entries(
+            [
+                ("trend", {"size_pct": 0.15}),
+                ("volume", {"size_pct": 0.05}),
+            ]
+        )
         assert len(builder._named_entries) == 2
 
     def test_entry_backward_compat(self):
@@ -562,11 +543,7 @@ class TestBuilderMultiExit:
 
     def test_multiple_named_exits(self):
         """Multiple named exits stored correctly."""
-        builder = (
-            Backtest()
-            .exit(name="standard", tp=0.03, sl=0.015)
-            .exit(name="trailing", trailing=0.02)
-        )
+        builder = Backtest().exit(name="standard", tp=0.03, sl=0.015).exit(name="trailing", trailing=0.02)
         assert len(builder._named_exits) == 2
         assert builder._named_exits["trailing"]["trailing"] == 0.02
 
@@ -579,18 +556,22 @@ class TestBuilderMultiExit:
 
     def test_exits_dict(self):
         """exits() accepts dict of name -> config."""
-        builder = Backtest().exits({
-            "standard": {"tp": 0.03, "sl": 0.015},
-            "trailing": {"trailing": 0.02},
-        })
+        builder = Backtest().exits(
+            {
+                "standard": {"tp": 0.03, "sl": 0.015},
+                "trailing": {"trailing": 0.02},
+            }
+        )
         assert len(builder._named_exits) == 2
 
     def test_exits_list(self):
         """exits() accepts list of (name, config) tuples."""
-        builder = Backtest().exits([
-            ("standard", {"tp": 0.03, "sl": 0.015}),
-            ("trailing", {"trailing": 0.02}),
-        ])
+        builder = Backtest().exits(
+            [
+                ("standard", {"tp": 0.03, "sl": 0.015}),
+                ("trailing", {"trailing": 0.02}),
+            ]
+        )
         assert len(builder._named_exits) == 2
 
 
@@ -683,11 +664,7 @@ class TestBuilderMultiValidation:
 
     def test_validate_named_data_counts_as_data(self, sample_raw_data):
         """Named data sources satisfy the 'has data' check."""
-        builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data, name="1m")
-            .detector("example/sma_cross")
-        )
+        builder = Backtest("test").data(raw=sample_raw_data, name="1m").detector("example/sma_cross")
         issues = builder.validate()
         assert not any("No data" in i for i in issues)
 
@@ -740,10 +717,7 @@ class TestBuilderBuildEntryRules:
     def test_build_single_entry(self, sample_raw_data):
         """Single unnamed entry builds one rule."""
         builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector("example/sma_cross")
-            .entry(size=200, max_positions=5)
+            Backtest("test").data(raw=sample_raw_data).detector("example/sma_cross").entry(size=200, max_positions=5)
         )
         rules = builder._build_entry_rules()
         assert len(rules) == 1
@@ -778,11 +752,7 @@ class TestBuilderBuildEntryRules:
     def test_build_entry_size_pct_uses_capital(self, sample_raw_data):
         """size_pct entry calculates size from capital."""
         builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector("example/sma_cross")
-            .entry(size_pct=0.1)
-            .capital(50_000)
+            Backtest("test").data(raw=sample_raw_data).detector("example/sma_cross").entry(size_pct=0.1).capital(50_000)
         )
         rules = builder._build_entry_rules()
         # size_pct=0.1 * capital=50_000 = 5_000
@@ -794,12 +764,7 @@ class TestBuilderBuildExitRules:
 
     def test_build_single_exit(self, sample_raw_data):
         """Single unnamed exit builds exit rules."""
-        builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector("example/sma_cross")
-            .exit(tp=0.03, sl=0.015)
-        )
+        builder = Backtest("test").data(raw=sample_raw_data).detector("example/sma_cross").exit(tp=0.03, sl=0.015)
         rules = builder._build_exit_rules()
         assert len(rules) >= 1
 
@@ -818,11 +783,7 @@ class TestBuilderBuildExitRules:
 
     def test_build_default_exit(self, sample_raw_data):
         """No exit config gives default TP/SL rule."""
-        builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector("example/sma_cross")
-        )
+        builder = Backtest("test").data(raw=sample_raw_data).detector("example/sma_cross")
         rules = builder._build_exit_rules()
         assert len(rules) >= 1
 
@@ -832,22 +793,14 @@ class TestBuilderSignalResolution:
 
     def test_precomputed_signals(self, sample_raw_data, sample_signals):
         """Pre-computed signals skip detection."""
-        builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .signals(sample_signals)
-        )
+        builder = Backtest("test").data(raw=sample_raw_data).signals(sample_signals)
         merged, named = builder._resolve_signals(sample_raw_data)
         assert merged is sample_signals
         assert named == {}
 
     def test_single_detector_resolution(self, sample_raw_data):
         """Single named detector resolves correctly."""
-        builder = (
-            Backtest("test")
-            .data(raw=sample_raw_data)
-            .detector("example/sma_cross", name="trend")
-        )
+        builder = Backtest("test").data(raw=sample_raw_data).detector("example/sma_cross", name="trend")
         merged, named = builder._resolve_signals(sample_raw_data)
         assert isinstance(merged, Signals)
         assert "trend" in named

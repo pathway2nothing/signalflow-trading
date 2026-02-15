@@ -63,16 +63,18 @@ class ComponentNotFoundError(SignalFlowError):
         else:
             lines.append("No components registered for this type.")
 
-        lines.extend([
-            "",
-            "To register a custom component, use @sf_component decorator:",
-            "",
-            f"  from signalflow.core import sf_component, SfComponentType",
-            "",
-            f"  @sf_component(SfComponentType.{self.component_type.name}, 'my/{self.name}')",
-            f"  class MyComponent:",
-            f"      ...",
-        ])
+        lines.extend(
+            [
+                "",
+                "To register a custom component, use @sf_component decorator:",
+                "",
+                f"  from signalflow.core import sf_component, SfComponentType",
+                "",
+                f"  @sf_component(SfComponentType.{self.component_type.name}, 'my/{self.name}')",
+                f"  class MyComponent:",
+                f"      ...",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -101,16 +103,18 @@ class DetectorNotFoundError(ComponentNotFoundError):
             lines.append("No detectors registered. Install signalflow-ta for built-in detectors:")
             lines.append("  pip install signalflow-ta")
 
-        lines.extend([
-            "",
-            "Or pass a detector instance directly:",
-            "",
-            "  from signalflow.detector import ExampleSmaCrossDetector",
-            "",
-            "  sf.Backtest()",
-            "      .detector(ExampleSmaCrossDetector(fast_period=20, slow_period=50))",
-            "      ...",
-        ])
+        lines.extend(
+            [
+                "",
+                "Or pass a detector instance directly:",
+                "",
+                "  from signalflow.detector import ExampleSmaCrossDetector",
+                "",
+                "  sf.Backtest()",
+                "      .detector(ExampleSmaCrossDetector(fast_period=20, slow_period=50))",
+                "      ...",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -119,22 +123,24 @@ class MissingDataError(ConfigurationError):
     """Raised when data is not configured for backtest."""
 
     def __init__(self):
-        msg = "\n".join([
-            "No data configured for backtest.",
-            "",
-            "Configure data using one of these methods:",
-            "",
-            "  # Option 1: Pre-loaded RawData",
-            "  sf.Backtest()",
-            "      .data(raw=my_raw_data)",
-            "      ...",
-            "",
-            "  # Option 2: Load from DuckDB file",
-            "  raw = sf.load('data/binance.duckdb', pairs=['BTCUSDT'], start='2024-01-01')",
-            "  sf.Backtest()",
-            "      .data(raw=raw)",
-            "      ...",
-        ])
+        msg = "\n".join(
+            [
+                "No data configured for backtest.",
+                "",
+                "Configure data using one of these methods:",
+                "",
+                "  # Option 1: Pre-loaded RawData",
+                "  sf.Backtest()",
+                "      .data(raw=my_raw_data)",
+                "      ...",
+                "",
+                "  # Option 2: Load from DuckDB file",
+                "  raw = sf.load('data/binance.duckdb', pairs=['BTCUSDT'], start='2024-01-01')",
+                "  sf.Backtest()",
+                "      .data(raw=raw)",
+                "      ...",
+            ]
+        )
         super().__init__(msg)
 
 
@@ -142,28 +148,30 @@ class MissingDetectorError(ConfigurationError):
     """Raised when detector is not configured for backtest."""
 
     def __init__(self):
-        msg = "\n".join([
-            "No detector or signals configured for backtest.",
-            "",
-            "Configure using one of these methods:",
-            "",
-            "  # Option 1: Registry name (requires signalflow-ta or custom registration)",
-            "  sf.Backtest()",
-            "      .detector('namespace/detector_name', param=value)",
-            "      ...",
-            "",
-            "  # Option 2: Detector instance",
-            "  from signalflow.detector import ExampleSmaCrossDetector",
-            "  detector = ExampleSmaCrossDetector(fast_period=20, slow_period=50)",
-            "  sf.Backtest()",
-            "      .detector(detector)",
-            "      ...",
-            "",
-            "  # Option 3: Pre-computed signals",
-            "  sf.Backtest()",
-            "      .signals(my_signals)",
-            "      ...",
-        ])
+        msg = "\n".join(
+            [
+                "No detector or signals configured for backtest.",
+                "",
+                "Configure using one of these methods:",
+                "",
+                "  # Option 1: Registry name (requires signalflow-ta or custom registration)",
+                "  sf.Backtest()",
+                "      .detector('namespace/detector_name', param=value)",
+                "      ...",
+                "",
+                "  # Option 2: Detector instance",
+                "  from signalflow.detector import ExampleSmaCrossDetector",
+                "  detector = ExampleSmaCrossDetector(fast_period=20, slow_period=50)",
+                "  sf.Backtest()",
+                "      .detector(detector)",
+                "      ...",
+                "",
+                "  # Option 3: Pre-computed signals",
+                "  sf.Backtest()",
+                "      .signals(my_signals)",
+                "      ...",
+            ]
+        )
         super().__init__(msg)
 
 
@@ -207,16 +215,18 @@ class ValidatorNotFoundError(ComponentNotFoundError):
         else:
             lines.append("No validators registered.")
 
-        lines.extend([
-            "",
-            "Or pass a validator instance directly:",
-            "",
-            "  from signalflow.validator import LightGBMValidator",
-            "",
-            "  sf.Backtest()",
-            "      .validator(LightGBMValidator())",
-            "      ...",
-        ])
+        lines.extend(
+            [
+                "",
+                "Or pass a validator instance directly:",
+                "",
+                "  from signalflow.validator import LightGBMValidator",
+                "",
+                "  sf.Backtest()",
+                "      .validator(LightGBMValidator())",
+                "      ...",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -225,10 +235,7 @@ class DuplicateComponentNameError(ConfigurationError):
     """Raised when a component name is already registered."""
 
     def __init__(self, component_kind: str, name: str):
-        msg = (
-            f"Duplicate {component_kind} name: '{name}'. "
-            f"Each {component_kind} must have a unique name."
-        )
+        msg = f"Duplicate {component_kind} name: '{name}'. Each {component_kind} must have a unique name."
         super().__init__(msg)
 
 

@@ -593,9 +593,7 @@ class KrakenSpotLoader(RawDataLoader):
         timeframe: Fixed timeframe for all data.
     """
 
-    store: DuckDbSpotStore = field(
-        default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_kraken_spot.duckdb"))
-    )
+    store: DuckDbSpotStore = field(default_factory=lambda: DuckDbSpotStore(db_path=Path("raw_data_kraken_spot.duckdb")))
     timeframe: str = "1m"
 
     async def get_pairs(self, quote: str | None = None) -> list[str]:

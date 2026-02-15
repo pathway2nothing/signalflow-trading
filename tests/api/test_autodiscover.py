@@ -14,17 +14,20 @@ class TestAutodiscover:
     def test_import_signalflow_works(self):
         """Basic import doesn't crash."""
         import signalflow as sf
+
         assert sf is not None
 
     def test_registry_is_available(self):
         """default_registry is accessible after import."""
         import signalflow as sf
+
         assert hasattr(sf, "default_registry")
         assert sf.default_registry is not None
 
     def test_registry_snapshot_not_empty(self):
         """Registry has components after import."""
         import signalflow as sf
+
         snapshot = sf.default_registry.snapshot()
         assert len(snapshot) > 0
 
@@ -62,6 +65,7 @@ class TestAutodiscover:
 
         # Registry should still work
         from signalflow.core import SfComponentType
+
         detectors = sf.default_registry.list(SfComponentType.DETECTOR)
         assert len(detectors) > 0
 
@@ -87,6 +91,7 @@ class TestAutodiscover:
 
         # Registry should still work
         from signalflow.core import SfComponentType
+
         detectors = sf.default_registry.list(SfComponentType.DETECTOR)
         assert len(detectors) > 0
 
@@ -112,6 +117,7 @@ class TestAutodiscover:
 
         # Create detector from registry
         from signalflow.core import SfComponentType
+
         detector = sf.default_registry.create(
             SfComponentType.DETECTOR,
             "example/sma_cross",
@@ -128,31 +134,37 @@ class TestModuleAccess:
     def test_detector_module(self):
         """signalflow.detector is accessible."""
         import signalflow as sf
+
         assert sf.detector is not None
 
     def test_feature_module(self):
         """signalflow.feature is accessible."""
         import signalflow as sf
+
         assert sf.feature is not None
 
     def test_strategy_module(self):
         """signalflow.strategy is accessible."""
         import signalflow as sf
+
         assert sf.strategy is not None
 
     def test_data_module(self):
         """signalflow.data is accessible."""
         import signalflow as sf
+
         assert sf.data is not None
 
     def test_validator_module(self):
         """signalflow.validator is accessible."""
         import signalflow as sf
+
         assert sf.validator is not None
 
     def test_analytic_module(self):
         """signalflow.analytic is accessible."""
         import signalflow as sf
+
         assert sf.analytic is not None
 
 
@@ -162,19 +174,23 @@ class TestCoreExports:
     def test_raw_data(self):
         """RawData is accessible."""
         import signalflow as sf
+
         assert sf.RawData is not None
 
     def test_signals(self):
         """Signals is accessible."""
         import signalflow as sf
+
         assert sf.Signals is not None
 
     def test_sf_component(self):
         """sf_component decorator is accessible."""
         import signalflow as sf
+
         assert sf.sf_component is not None
 
     def test_strategy_state(self):
         """StrategyState is accessible."""
         import signalflow as sf
+
         assert sf.StrategyState is not None

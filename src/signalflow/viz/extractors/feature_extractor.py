@@ -80,11 +80,7 @@ class FeaturePipelineExtractor(BaseExtractor):
 
         # Extract params (exclude internal fields)
         exclude_fields = {"group_col", "ts_col", "normalized", "norm_period", "sources"}
-        params = {
-            k: v
-            for k, v in feature.__dict__.items()
-            if not k.startswith("_") and k not in exclude_fields
-        }
+        params = {k: v for k, v in feature.__dict__.items() if not k.startswith("_") and k not in exclude_fields}
 
         # Build display name
         name_parts = [cls_name]

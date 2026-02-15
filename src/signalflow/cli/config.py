@@ -298,10 +298,7 @@ class BacktestConfig:
     def _parse_named_data(raw: dict | list) -> dict[str, DataConfig]:
         """Parse named data configs from dict or list format."""
         if isinstance(raw, list):
-            return {
-                item["name"]: DataConfig(**{k: v for k, v in item.items() if k != "name"})
-                for item in raw
-            }
+            return {item["name"]: DataConfig(**{k: v for k, v in item.items() if k != "name"}) for item in raw}
         return {name: DataConfig(**cfg) for name, cfg in raw.items()}
 
     @staticmethod
@@ -430,9 +427,7 @@ class BacktestConfig:
 
             if self.data.timeframe not in TIMEFRAME_MINUTES:
                 valid = ", ".join(sorted(TIMEFRAME_MINUTES, key=lambda k: TIMEFRAME_MINUTES[k]))
-                issues.append(
-                    f"ERROR: Unknown timeframe {self.data.timeframe!r}. Valid: {valid}"
-                )
+                issues.append(f"ERROR: Unknown timeframe {self.data.timeframe!r}. Valid: {valid}")
 
         # Check detector
         has_detector = self.detector is not None or bool(self.detectors)
@@ -479,10 +474,7 @@ class BacktestConfig:
             exit_configs = [self.exit]
         for cfg in exit_configs:
             if cfg.tp and cfg.sl and cfg.tp < cfg.sl:
-                issues.append(
-                    f"WARNING: TP ({cfg.tp:.1%}) < SL ({cfg.sl:.1%}), "
-                    "risk/reward < 1"
-                )
+                issues.append(f"WARNING: TP ({cfg.tp:.1%}) < SL ({cfg.sl:.1%}), risk/reward < 1")
 
         # Validate capital
         if self.capital <= 0:
@@ -621,7 +613,7 @@ def generate_sample_config() -> str:
     Returns:
         Sample YAML config string
     """
-    return '''# SignalFlow Backtest Configuration
+    return """# SignalFlow Backtest Configuration
 # ===================================
 # Run with: sf run config.yaml
 
@@ -713,4 +705,4 @@ fee: 0.001                      # 0.1% trading fee
 #     sl: 0.015
 #   trailing:
 #     trailing: 0.02
-'''
+"""

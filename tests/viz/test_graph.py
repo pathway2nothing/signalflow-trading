@@ -173,14 +173,10 @@ class TestPipelineGraph:
 
     def test_merge(self):
         graph1 = PipelineGraph()
-        graph1.add_node(
-            DataSourceNode(id="a", name="A", node_type=NodeType.DATA_SOURCE)
-        )
+        graph1.add_node(DataSourceNode(id="a", name="A", node_type=NodeType.DATA_SOURCE))
 
         graph2 = PipelineGraph()
-        graph2.add_node(
-            DataSourceNode(id="b", name="B", node_type=NodeType.DATA_SOURCE)
-        )
+        graph2.add_node(DataSourceNode(id="b", name="B", node_type=NodeType.DATA_SOURCE))
         graph2.add_edge(Edge(source_id="a", target_id="b"))
 
         merged = graph1.merge(graph2)

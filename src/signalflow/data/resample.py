@@ -29,9 +29,7 @@ from signalflow.data.source._helpers import TIMEFRAME_MS
 # Constants
 # ---------------------------------------------------------------------------
 
-TIMEFRAME_MINUTES: Final[dict[str, int]] = {
-    tf: ms // 60_000 for tf, ms in TIMEFRAME_MS.items()
-}
+TIMEFRAME_MINUTES: Final[dict[str, int]] = {tf: ms // 60_000 for tf, ms in TIMEFRAME_MS.items()}
 """Mapping from timeframe string to minutes (e.g. ``"4h"`` → ``240``)."""
 
 DEFAULT_FILL_RULES: Final[dict[str, str]] = {
@@ -160,9 +158,7 @@ def detect_timeframe(
     # Compute per-pair diffs and find the mode.
     deltas = (
         df.sort([pair_col, ts_col])
-        .with_columns(
-            pl.col(ts_col).diff().over(pair_col).alias("_delta")
-        )
+        .with_columns(pl.col(ts_col).diff().over(pair_col).alias("_delta"))
         .filter(pl.col("_delta").is_not_null())
         .select("_delta")
     )
@@ -170,12 +166,7 @@ def detect_timeframe(
     if deltas.height == 0:
         raise ValueError("Cannot detect timeframe: no timestamp deltas computed")
 
-    mode_delta = (
-        deltas.group_by("_delta")
-        .len()
-        .sort("len", descending=True)
-        .row(0)[0]
-    )
+    mode_delta = deltas.group_by("_delta").len().sort("len", descending=True).row(0)[0]
 
     delta_minutes = int(mode_delta.total_seconds() // 60)
 
@@ -238,10 +229,7 @@ def resample_ohlcv(
         return df
 
     if not can_resample(source_tf, target_tf):
-        raise ValueError(
-            f"Cannot resample from {source_tf} to {target_tf}: "
-            f"target must be an exact multiple of source"
-        )
+        raise ValueError(f"Cannot resample from {source_tf} to {target_tf}: target must be an exact multiple of source")
 
     rules = {**DEFAULT_FILL_RULES, **(fill_rules or {})}
     every = _TRUNCATE_EVERY[target_tf]
@@ -306,8 +294,7 @@ def align_to_timeframe(
         source_tf = detect_timeframe(df, ts_col=ts_col, pair_col=pair_col)
     except ValueError:
         warnings.warn(
-            f"Could not detect source timeframe; returning data as-is. "
-            f"Target was {target_tf!r}.",
+            f"Could not detect source timeframe; returning data as-is. Target was {target_tf!r}.",
             stacklevel=2,
         )
         return df
