@@ -1,0 +1,3266 @@
+
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="High-performance algorithmic trading framework">
+      
+      
+      
+        <link rel="canonical" href="https://signalflow-trading.com/v0.5.1/guide/signal-architecture/">
+      
+      
+        <link rel="prev" href="../cli/">
+      
+      
+        <link rel="next" href="../data-sources/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Signal Architecture & Meta-Labeling - SignalFlow</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link rel="icon" type="image/png" sizes="32x32" href="https://signalflow-trading.com/v0.5.1assets/favicon.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://signalflow-trading.com/v0.5.1assets/favicon.png">
+  <link rel="apple-touch-icon" href="https://signalflow-trading.com/v0.5.1assets/logo.png">
+  
+  <!-- Open Graph для пошуку та соц мереж -->
+  <meta property="og:image" content="https://signalflow-trading.com/v0.5.1assets/logo.png">
+  <meta property="og:title" content="SignalFlow">
+  <meta property="og:description" content="High-performance algorithmic trading framework">
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#signal-architecture-meta-labeling" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="SignalFlow" class="md-header__button md-logo" aria-label="SignalFlow" data-md-component="logo">
+      
+  <img src="../../assets/logo-small.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SignalFlow
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Signal Architecture & Meta-Labeling
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="cyan"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pathway2nothing/signalflow-trading" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    signalflow-trading
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../notebooks/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../cli/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../ecosystem/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Ecosystem
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="SignalFlow" class="md-nav__button md-logo" aria-label="SignalFlow" data-md-component="logo">
+      
+  <img src="../../assets/logo-small.png" alt="logo">
+
+    </a>
+    SignalFlow
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pathway2nothing/signalflow-trading" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    signalflow-trading
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../notebooks/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/01_quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start: First Backtest in 5 Minutes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/02_custom_detector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create Your Own Signal Detector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/03_data_loading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Loading &amp; Resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/04_visualization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Visualization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/05_advanced_strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Multi-Detector Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI & YAML Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signal Architecture & Meta-Labeling
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signal Architecture & Meta-Labeling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-core-idea" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Core Idea
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a Signal?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is a Signal?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-level-signal-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two-Level Signal Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-categories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal Categories
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#null-vs-flat-uncertainty-vs-market-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Null vs FLAT: Uncertainty vs Market State
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-dual-pipeline-labelers-vs-detectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Dual Pipeline: Labelers vs Detectors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Dual Pipeline: Labelers vs Detectors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#labeler-historical-forward-looking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Labeler (Historical, Forward-Looking)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detector-real-time-backward-looking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detector (Real-Time, Backward-Looking)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-both" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Both?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-labelers-detectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Labelers &amp; Detectors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Labelers &amp; Detectors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#price-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price Direction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anomaly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anomaly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volatility-regime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volatility Regime
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-regime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume Regime
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#imperfect-labels-are-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Imperfect Labels Are Expected
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meta-labeling-the-two-stage-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta-Labeling: The Two-Stage Approach
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Meta-Labeling: The Two-Stage Approach">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-1-primary-model-detector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1: Primary Model (Detector)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-2-secondary-model-validator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 2: Secondary Model (Validator)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-in-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combined in Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-signals-to-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From Signals to Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="From Signals to Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configurable-signal-to-action-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configurable Signal-to-Action Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#directional_signal_map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DIRECTIONAL_SIGNAL_MAP
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#smooth-labeling-planned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smooth Labeling (Planned)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extending-the-signal-taxonomy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extending the Signal Taxonomy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Extending the Signal Taxonomy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-create-a-labeler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Create a Labeler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-create-a-detector-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Create a Detector (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-register-in-signal_registry-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Register in signal_registry (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-stores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Stores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-data-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Data Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-detectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Detectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signal Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../ecosystem/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ecosystem
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Ecosystem
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ecosystem/signalflow-ta/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    signalflow-ta
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ecosystem/signalflow-nn/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    signalflow-nn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../api/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    High-Level API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/detector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Detector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/feature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/labeler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Labeler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/validator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/viz/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visualization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ta/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Technical Analysis (ta)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-core-idea" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Core Idea
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a Signal?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is a Signal?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-level-signal-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two-Level Signal Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-categories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal Categories
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#null-vs-flat-uncertainty-vs-market-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Null vs FLAT: Uncertainty vs Market State
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-dual-pipeline-labelers-vs-detectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Dual Pipeline: Labelers vs Detectors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Dual Pipeline: Labelers vs Detectors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#labeler-historical-forward-looking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Labeler (Historical, Forward-Looking)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detector-real-time-backward-looking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detector (Real-Time, Backward-Looking)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-both" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Both?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-labelers-detectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Labelers &amp; Detectors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Labelers &amp; Detectors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#price-direction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price Direction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anomaly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anomaly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volatility-regime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volatility Regime
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#volume-regime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume Regime
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#imperfect-labels-are-expected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Imperfect Labels Are Expected
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meta-labeling-the-two-stage-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta-Labeling: The Two-Stage Approach
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Meta-Labeling: The Two-Stage Approach">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-1-primary-model-detector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1: Primary Model (Detector)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-2-secondary-model-validator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 2: Secondary Model (Validator)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#combined-in-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combined in Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-signals-to-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From Signals to Actions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="From Signals to Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configurable-signal-to-action-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configurable Signal-to-Action Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#directional_signal_map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DIRECTIONAL_SIGNAL_MAP
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#smooth-labeling-planned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smooth Labeling (Planned)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extending-the-signal-taxonomy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extending the Signal Taxonomy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Extending the Signal Taxonomy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-create-a-labeler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Create a Labeler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-create-a-detector-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Create a Detector (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-register-in-signal_registry-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Register in signal_registry (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="signal-architecture-meta-labeling">Signal Architecture &amp; Meta-Labeling<a class="headerlink" href="#signal-architecture-meta-labeling" title="Anchor link to this section">&para;</a></h1>
+<p>This page describes the core philosophy behind SignalFlow: the signal-driven
+approach to algorithmic trading based on Marcos Lopez de Prado's meta-labeling
+methodology.</p>
+<hr />
+<h2 id="the-core-idea">The Core Idea<a class="headerlink" href="#the-core-idea" title="Anchor link to this section">&para;</a></h2>
+<p>Traditional algorithmic trading systems make binary decisions: buy or sell based
+on some rule. SignalFlow takes a fundamentally different approach inspired by
+machine learning research in quantitative finance:</p>
+<ol>
+<li><strong>Signal Detection</strong> -- identify <em>potential</em> market changes</li>
+<li><strong>Signal Validation</strong> -- use ML to estimate the <em>probability</em> that a signal is correct</li>
+<li><strong>Strategy Execution</strong> -- use validated signals to make trading decisions</li>
+</ol>
+<p>This separation is critical: the detector's job is to have <strong>high recall</strong>
+(detect as many real opportunities as possible), while the validator's job is to
+have <strong>high precision</strong> (filter out false positives).</p>
+<pre class="mermaid"><code>flowchart LR
+    D[Detector] --&gt;|raw signals| V[Validator]
+    V --&gt;|filtered signals + probability| S[Strategy]
+    L[Labeler] --&gt;|historical labels| T[Train Validator]
+    T --&gt; V
+
+    style D fill:#ea580c,stroke:#f97316,color:#fff
+    style V fill:#16a34a,stroke:#22c55e,color:#fff
+    style S fill:#dc2626,stroke:#ef4444,color:#fff
+    style L fill:#7c3aed,stroke:#8b5cf6,color:#fff
+    style T fill:#0891b2,stroke:#06b6d4,color:#fff</code></pre>
+<hr />
+<h2 id="what-is-a-signal">What is a Signal?<a class="headerlink" href="#what-is-a-signal" title="Anchor link to this section">&para;</a></h2>
+<p>A <strong>signal</strong> is a prediction that a specific type of market change is occurring
+or is about to occur. Signals are <strong>not</strong> trading orders -- they are
+informational events that the strategy layer interprets.</p>
+<h3 id="two-level-signal-model">Two-Level Signal Model<a class="headerlink" href="#two-level-signal-model" title="Anchor link to this section">&para;</a></h3>
+<p>SignalFlow uses a two-level signal model:</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Field</th>
+<th>Type</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Category</strong></td>
+<td><code>signal_category</code></td>
+<td><code>SignalCategory</code> enum</td>
+<td>Broad classification for routing</td>
+</tr>
+<tr>
+<td><strong>Type</strong></td>
+<td><code>signal_type</code></td>
+<td><code>str</code></td>
+<td>Specific signal value within category</td>
+</tr>
+</tbody>
+</table>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.core.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalCategory</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># A signal has both a category and a type</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">signal_category</span> <span class="o">=</span> <span class="n">SignalCategory</span><span class="o">.</span><span class="n">PRICE_DIRECTION</span>  <span class="c1"># broad: about price movement</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">signal_type</span> <span class="o">=</span> <span class="s2">&quot;rise&quot;</span>                               <span class="c1"># specific: price is rising</span>
+</span></code></pre></div>
+<p>This design allows the system to:</p>
+<ul>
+<li><strong>Route</strong> signals based on category (e.g., directional signals go to entry
+  rules, volatility signals go to position sizing)</li>
+<li><strong>Extend</strong> signal types without modifying core code (any string is valid as a
+  <code>signal_type</code>)</li>
+<li>Keep <strong>multiple signal categories per timestamp</strong> (e.g., a bar can
+  simultaneously have a <code>price_direction=rise</code> signal and a
+  <code>volatility=high_volatility</code> signal)</li>
+</ul>
+<h3 id="signal-categories">Signal Categories<a class="headerlink" href="#signal-categories" title="Anchor link to this section">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Description</th>
+<th>Example Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PRICE_DIRECTION</code></td>
+<td>Price movement direction</td>
+<td><code>rise</code>, <code>fall</code>, <code>flat</code></td>
+</tr>
+<tr>
+<td><code>PRICE_STRUCTURE</code></td>
+<td>Price patterns and extrema</td>
+<td><code>local_max</code>, <code>local_min</code>, <code>breakout_up</code></td>
+</tr>
+<tr>
+<td><code>TREND_MOMENTUM</code></td>
+<td>Trend state and momentum</td>
+<td><code>trend_start</code>, <code>trend_reversal</code>, <code>overbought</code></td>
+</tr>
+<tr>
+<td><code>VOLATILITY</code></td>
+<td>Volatility regime</td>
+<td><code>high_volatility</code>, <code>low_volatility</code>, <code>volatility_expansion</code></td>
+</tr>
+<tr>
+<td><code>VOLUME_LIQUIDITY</code></td>
+<td>Volume and liquidity patterns</td>
+<td><code>abnormal_volume</code>, <code>illiquidity</code>, <code>accumulation</code></td>
+</tr>
+<tr>
+<td><code>MARKET_WIDE</code></td>
+<td>Cross-pair market events</td>
+<td><code>market_crash</code>, <code>regime_shift</code>, <code>synchronization</code></td>
+</tr>
+<tr>
+<td><code>ANOMALY</code></td>
+<td>Anomalous events</td>
+<td><code>extreme_positive_anomaly</code>, <code>extreme_negative_anomaly</code></td>
+</tr>
+</tbody>
+</table>
+<p>The full registry of known signal types is in
+<code>signalflow.core.signal_registry.KNOWN_SIGNALS</code>. This registry is <strong>advisory</strong> --
+new signal types can be used without modifying it.</p>
+<h3 id="null-vs-flat-uncertainty-vs-market-state">Null vs FLAT: Uncertainty vs Market State<a class="headerlink" href="#null-vs-flat-uncertainty-vs-market-state" title="Anchor link to this section">&para;</a></h3>
+<p>A critical distinction in SignalFlow:</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"flat"</code></td>
+<td>The market is moving sideways. This is a <strong>valid signal</strong> -- a real market state.</td>
+<td>After a strong trend, price consolidates in a range. The labeler identifies this as <code>"flat"</code>.</td>
+</tr>
+<tr>
+<td><code>null</code></td>
+<td>The labeler/detector <strong>doesn't know</strong>. Epistemic uncertainty.</td>
+<td>An unexpected tweet from a public figure causes unpredictable volatility. The labeler cannot determine direction and outputs <code>null</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>This matters for ML training: <code>"flat"</code> is a valid class label that the model
+should learn to predict. <code>null</code> means "skip this sample" -- the labeler has no
+information about this timestamp, and the model should not be trained on it.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># FLAT = real market state (valid signal)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="s2">&quot;flat&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;signal_type&quot;</span><span class="p">)</span>     <span class="c1"># &quot;I know the market is sideways&quot;</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># null = uncertainty (no information)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">Utf8</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;signal_type&quot;</span><span class="p">)</span>  <span class="c1"># &quot;I don&#39;t know what&#39;s happening&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="the-dual-pipeline-labelers-vs-detectors">The Dual Pipeline: Labelers vs Detectors<a class="headerlink" href="#the-dual-pipeline-labelers-vs-detectors" title="Anchor link to this section">&para;</a></h2>
+<p>Every signal category in SignalFlow can have two complementary implementations:</p>
+<h3 id="labeler-historical-forward-looking">Labeler (Historical, Forward-Looking)<a class="headerlink" href="#labeler-historical-forward-looking" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li>Lives in <code>signalflow.target</code> module</li>
+<li><strong>Knows the future</strong> -- uses data after timestamp <code>t</code> to label <code>t</code></li>
+<li>Purpose: generate <strong>training labels</strong> for ML models</li>
+<li>Extends <code>Labeler</code> base class, implements <code>compute_group()</code></li>
+<li><strong>Length-preserving</strong>: output has the same number of rows as input</li>
+</ul>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.target</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnomalyLabeler</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">labeler</span> <span class="o">=</span> <span class="n">AnomalyLabeler</span><span class="p">(</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">threshold_return_std</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">horizon</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">mask_to_signals</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">labeled_df</span> <span class="o">=</span> <span class="n">labeler</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="n">ohlcv_df</span><span class="p">)</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># Each row gets a label: &quot;extreme_positive_anomaly&quot;, &quot;extreme_negative_anomaly&quot;, or null</span>
+</span></code></pre></div>
+<h3 id="detector-real-time-backward-looking">Detector (Real-Time, Backward-Looking)<a class="headerlink" href="#detector-real-time-backward-looking" title="Anchor link to this section">&para;</a></h3>
+<ul>
+<li>Lives in <code>signalflow.detector</code> module</li>
+<li><strong>Only uses past and current data</strong> -- safe for live trading</li>
+<li>Purpose: generate <strong>trading signals</strong> in real-time</li>
+<li>Extends <code>SignalDetector</code> base class, implements <code>detect()</code></li>
+<li>Outputs a <code>Signals</code> DataFrame (only rows with detected signals)</li>
+</ul>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.detector</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnomalyDetector</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">detector</span> <span class="o">=</span> <span class="n">AnomalyDetector</span><span class="p">(</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">threshold_return_std</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">vol_window</span><span class="o">=</span><span class="mi">1440</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">signals</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">raw_data_view</span><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># Only bars with anomalies are returned</span>
+</span></code></pre></div>
+<h3 id="why-both">Why Both?<a class="headerlink" href="#why-both" title="Anchor link to this section">&para;</a></h3>
+<p>The labeler knows the future, so its labels are <strong>more accurate</strong> but can only
+be used for training. The detector works in real-time but is <strong>less precise</strong>.</p>
+<p>The training pipeline:</p>
+<ol>
+<li>Run <strong>labeler</strong> on historical data to create perfect (or near-perfect) labels</li>
+<li>Train a <strong>validator</strong> (ML model) to predict labeler output from features</li>
+<li>In production, the <strong>detector</strong> generates candidate signals</li>
+<li>The <strong>validator</strong> filters and scores them</li>
+</ol>
+<pre class="mermaid"><code>flowchart TB
+    subgraph Training ["Training (offline)"]
+        H[Historical Data] --&gt; L[Labeler]
+        L --&gt;|labels| ML[Train ML Model]
+        H --&gt; F1[Features]
+        F1 --&gt; ML
+    end
+
+    subgraph Production ["Production (real-time)"]
+        M[Market Data] --&gt; D[Detector]
+        M --&gt; F2[Features]
+        D --&gt;|candidate signals| V[Validator / ML Model]
+        F2 --&gt; V
+        V --&gt;|validated signals| S[Strategy]
+    end
+
+    ML -.-&gt;|trained model| V
+
+    style L fill:#7c3aed,stroke:#8b5cf6,color:#fff
+    style D fill:#ea580c,stroke:#f97316,color:#fff
+    style V fill:#16a34a,stroke:#22c55e,color:#fff
+    style ML fill:#0891b2,stroke:#06b6d4,color:#fff</code></pre>
+<hr />
+<h2 id="available-labelers-detectors">Available Labelers &amp; Detectors<a class="headerlink" href="#available-labelers-detectors" title="Anchor link to this section">&para;</a></h2>
+<h3 id="price-direction">Price Direction<a class="headerlink" href="#price-direction" title="Anchor link to this section">&para;</a></h3>
+<p>The most basic signal category. Predicts whether price will rise or fall.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Algorithm</th>
+<th>Signal Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FixedHorizonLabeler</code></td>
+<td>Forward return sign over N bars</td>
+<td><code>rise</code>, <code>fall</code>, <code>null</code></td>
+</tr>
+<tr>
+<td><code>TripleBarrierLabeler</code></td>
+<td>Triple barrier method (De Prado)</td>
+<td><code>rise</code>, <code>fall</code>, <code>null</code></td>
+</tr>
+<tr>
+<td><code>TakeProfitLabeler</code></td>
+<td>Symmetric TP/SL barrier</td>
+<td><code>rise</code>, <code>fall</code>, <code>null</code></td>
+</tr>
+<tr>
+<td><code>TrendScanningLabeler</code></td>
+<td>OLS t-statistic across windows (De Prado)</td>
+<td><code>rise</code>, <code>fall</code>, <code>null</code></td>
+</tr>
+<tr>
+<td><code>ExampleSmaCrossDetector</code></td>
+<td>SMA crossover (real-time)</td>
+<td><code>rise</code>, <code>fall</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="anomaly">Anomaly<a class="headerlink" href="#anomaly" title="Anchor link to this section">&para;</a></h3>
+<p>Detects extreme, unexpected market events (anomalous returns).</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Algorithm</th>
+<th>Signal Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AnomalyLabeler</code></td>
+<td>Forward return magnitude vs rolling vol</td>
+<td><code>extreme_positive_anomaly</code>, <code>extreme_negative_anomaly</code>, <code>null</code></td>
+</tr>
+<tr>
+<td><code>AnomalyDetector</code></td>
+<td>Current return magnitude vs rolling vol</td>
+<td><code>extreme_positive_anomaly</code>, <code>extreme_negative_anomaly</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="volatility-regime">Volatility Regime<a class="headerlink" href="#volatility-regime" title="Anchor link to this section">&para;</a></h3>
+<p>Classifies current volatility state.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Algorithm</th>
+<th>Signal Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>VolatilityRegimeLabeler</code></td>
+<td>Forward realized vol percentile</td>
+<td><code>high_volatility</code>, <code>low_volatility</code>, <code>null</code></td>
+</tr>
+<tr>
+<td><code>VolatilityDetector</code></td>
+<td>Backward realized vol percentile</td>
+<td><code>high_volatility</code>, <code>low_volatility</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="price-structure">Price Structure<a class="headerlink" href="#price-structure" title="Anchor link to this section">&para;</a></h3>
+<p>Identifies local price extrema.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Algorithm</th>
+<th>Signal Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>StructureLabeler</code></td>
+<td>Symmetric window extrema (look-ahead)</td>
+<td><code>local_max</code>, <code>local_min</code>, <code>null</code></td>
+</tr>
+<tr>
+<td><code>StructureDetector</code></td>
+<td>Backward zigzag with confirmation delay</td>
+<td><code>local_max</code>, <code>local_min</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="volume-regime">Volume Regime<a class="headerlink" href="#volume-regime" title="Anchor link to this section">&para;</a></h3>
+<p>Classifies volume patterns.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Algorithm</th>
+<th>Signal Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>VolumeRegimeLabeler</code></td>
+<td>Forward volume ratio vs SMA</td>
+<td><code>abnormal_volume</code>, <code>illiquidity</code>, <code>null</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="imperfect-labels-are-expected">Imperfect Labels Are Expected<a class="headerlink" href="#imperfect-labels-are-expected" title="Anchor link to this section">&para;</a></h2>
+<p>A fundamental principle of SignalFlow:</p>
+<div class="admonition warning">
+<p class="admonition-title">Labels are not ground truth</p>
+<p>No labeler produces perfect labels. Different labelers can <strong>contradict</strong>
+each other for the same timestamp. Some labelers have large periods of
+<code>null</code> (uncertainty). This is by design.</p>
+</div>
+<p>The philosophy:</p>
+<ul>
+<li>Each labeler implements a <strong>specific definition</strong> of what constitutes a signal</li>
+<li>The <code>FixedHorizonLabeler</code> says "rise" means the price went up over N bars</li>
+<li>The <code>TrendScanningLabeler</code> says "rise" means there's a statistically
+  significant upward OLS trend</li>
+<li>The <code>TripleBarrierLabeler</code> says "rise" means the take-profit barrier was hit
+  first</li>
+</ul>
+<p>These definitions <strong>do not always agree</strong>. A model that can predict <strong>any one</strong>
+of these labelers with reasonable accuracy is considered a good result.</p>
+<p>The task of choosing the right labeler for a given model architecture is itself
+an important research question. Different model architectures may perform better
+with different labeling strategies:</p>
+<ul>
+<li>Linear models may work best with <code>FixedHorizonLabeler</code></li>
+<li>Sequence models (LSTM, Transformer) may benefit from <code>TrendScanningLabeler</code></li>
+<li>Tree models may handle the noise in <code>TripleBarrierLabeler</code> well</li>
+</ul>
+<hr />
+<h2 id="meta-labeling-the-two-stage-approach">Meta-Labeling: The Two-Stage Approach<a class="headerlink" href="#meta-labeling-the-two-stage-approach" title="Anchor link to this section">&para;</a></h2>
+<p>De Prado's meta-labeling methodology works in two stages:</p>
+<h3 id="stage-1-primary-model-detector">Stage 1: Primary Model (Detector)<a class="headerlink" href="#stage-1-primary-model-detector" title="Anchor link to this section">&para;</a></h3>
+<p>The primary model detects the <strong>direction</strong> of potential trades. It should
+have high recall -- it's better to detect too many signals than to miss real
+ones.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.detector</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExampleSmaCrossDetector</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">detector</span> <span class="o">=</span> <span class="n">ExampleSmaCrossDetector</span><span class="p">(</span><span class="n">fast_period</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">slow_period</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">signals</span> <span class="o">=</span> <span class="n">detector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">raw_data_view</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># Many signals, some false positives</span>
+</span></code></pre></div>
+<h3 id="stage-2-secondary-model-validator">Stage 2: Secondary Model (Validator)<a class="headerlink" href="#stage-2-secondary-model-validator" title="Anchor link to this section">&para;</a></h3>
+<p>The secondary model (meta-labeler) predicts the <strong>probability of success</strong> for
+each signal from the primary model. It acts as a filter.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.validator</span><span class="w"> </span><span class="kn">import</span> <span class="n">LightGBMValidator</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">validator</span> <span class="o">=</span> <span class="n">LightGBMValidator</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">validator</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="o">=</span><span class="n">features</span><span class="p">,</span> <span class="n">y_train</span><span class="o">=</span><span class="n">labels</span><span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">validated</span> <span class="o">=</span> <span class="n">validator</span><span class="o">.</span><span class="n">validate_signals</span><span class="p">(</span><span class="n">signals</span><span class="p">,</span> <span class="n">features</span><span class="p">)</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Each signal now has a probability estimate</span>
+</span></code></pre></div>
+<h3 id="combined-in-strategy">Combined in Strategy<a class="headerlink" href="#combined-in-strategy" title="Anchor link to this section">&para;</a></h3>
+<p>The <code>SignalAggregator</code> supports a dedicated <code>META_LABELING</code> voting mode for
+combining detector signals with validator confidence:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.strategy.component.entry.aggregation</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">SignalAggregator</span><span class="p">,</span> <span class="n">VotingMode</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="p">)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">aggregator</span> <span class="o">=</span> <span class="n">SignalAggregator</span><span class="p">(</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">voting_mode</span><span class="o">=</span><span class="n">VotingMode</span><span class="o">.</span><span class="n">META_LABELING</span><span class="p">,</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">probability_threshold</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">)</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">combined</span> <span class="o">=</span> <span class="n">aggregator</span><span class="o">.</span><span class="n">aggregate</span><span class="p">([</span><span class="n">detector_signals</span><span class="p">,</span> <span class="n">validator_signals</span><span class="p">])</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="c1"># Direction from detector, confidence from validator</span>
+</span></code></pre></div>
+<hr />
+<h2 id="from-signals-to-actions">From Signals to Actions<a class="headerlink" href="#from-signals-to-actions" title="Anchor link to this section">&para;</a></h2>
+<p>Not all signals map directly to buy/sell decisions. A <code>high_volatility</code> signal
+doesn't mean "buy" or "sell" -- it means "volatility is high", which might
+affect position sizing or risk management.</p>
+<p>The decision of <strong>what to do</strong> with a signal is the strategy layer's
+responsibility. This logic can range from simple rules to complex RL policies:</p>
+<ul>
+<li><strong>Simple</strong>: <code>rise -&gt; BUY</code>, <code>fall -&gt; SELL</code> (built into entry rules)</li>
+<li><strong>Configurable</strong>: <code>local_min -&gt; BUY</code>, <code>overbought -&gt; SELL</code> (via <code>signal_type_map</code>)</li>
+<li><strong>Contextual</strong>: <code>high_volatility + local_min -&gt; BUY with larger size</code></li>
+<li><strong>Learned</strong>: RL model that optimizes actions over signal combinations</li>
+</ul>
+<h3 id="configurable-signal-to-action-mapping">Configurable Signal-to-Action Mapping<a class="headerlink" href="#configurable-signal-to-action-mapping" title="Anchor link to this section">&para;</a></h3>
+<p>Entry rules (<code>SignalEntryRule</code>, <code>FixedSizeEntryRule</code>, <code>ModelEntryRule</code>) support
+a <code>signal_type_map</code> parameter that maps any <code>signal_type</code> to an order side:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.strategy.component.entry</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalEntryRule</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># Custom mapping: trade structure signals</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">entry</span> <span class="o">=</span> <span class="n">SignalEntryRule</span><span class="p">(</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">signal_type_map</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="s2">&quot;local_min&quot;</span><span class="p">:</span> <span class="s2">&quot;BUY&quot;</span><span class="p">,</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        <span class="s2">&quot;local_max&quot;</span><span class="p">:</span> <span class="s2">&quot;SELL&quot;</span><span class="p">,</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>        <span class="s2">&quot;oversold&quot;</span><span class="p">:</span> <span class="s2">&quot;BUY&quot;</span><span class="p">,</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>        <span class="s2">&quot;overbought&quot;</span><span class="p">:</span> <span class="s2">&quot;SELL&quot;</span><span class="p">,</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="p">},</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">base_position_size</span><span class="o">=</span><span class="mf">200.0</span><span class="p">,</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>When <code>signal_type_map=None</code> (default), legacy behavior is used: only <code>"rise"</code>
+and <code>"fall"</code> signals are recognized.</p>
+<h3 id="directional_signal_map">DIRECTIONAL_SIGNAL_MAP<a class="headerlink" href="#directional_signal_map" title="Anchor link to this section">&para;</a></h3>
+<p>The <code>DIRECTIONAL_SIGNAL_MAP</code> in <code>signalflow.core.signal_registry</code> provides a
+global registry of inherently directional signal types. Use the
+<code>from_directional_map()</code> classmethod to create an entry rule that trades all
+known directional signals:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.core.signal_registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">DIRECTIONAL_SIGNAL_MAP</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># Global registry of directional signal types</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">DIRECTIONAL_SIGNAL_MAP</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="s2">&quot;rise&quot;</span><span class="p">:</span> <span class="s2">&quot;BUY&quot;</span><span class="p">,</span> <span class="s2">&quot;fall&quot;</span><span class="p">:</span> <span class="s2">&quot;SELL&quot;</span><span class="p">,</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="s2">&quot;local_min&quot;</span><span class="p">:</span> <span class="s2">&quot;BUY&quot;</span><span class="p">,</span> <span class="s2">&quot;local_max&quot;</span><span class="p">:</span> <span class="s2">&quot;SELL&quot;</span><span class="p">,</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="s2">&quot;breakout_up&quot;</span><span class="p">:</span> <span class="s2">&quot;BUY&quot;</span><span class="p">,</span> <span class="s2">&quot;breakout_down&quot;</span><span class="p">:</span> <span class="s2">&quot;SELL&quot;</span><span class="p">,</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="s2">&quot;oversold&quot;</span><span class="p">:</span> <span class="s2">&quot;BUY&quot;</span><span class="p">,</span> <span class="s2">&quot;overbought&quot;</span><span class="p">:</span> <span class="s2">&quot;SELL&quot;</span><span class="p">,</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="p">}</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="c1"># Create entry rule that trades all directional signals</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="n">entry</span> <span class="o">=</span> <span class="n">SignalEntryRule</span><span class="o">.</span><span class="n">from_directional_map</span><span class="p">(</span><span class="n">base_position_size</span><span class="o">=</span><span class="mf">200.0</span><span class="p">)</span>
+</span></code></pre></div>
+<hr />
+<h2 id="smooth-labeling-planned">Smooth Labeling (Planned)<a class="headerlink" href="#smooth-labeling-planned" title="Anchor link to this section">&para;</a></h2>
+<p>Standard categorical labels (<code>"rise"</code>, <code>"fall"</code>) lose information about the
+<strong>magnitude</strong> of the signal. A barely-rising market and a strongly-rising market
+both get the same label.</p>
+<p>Smooth labeling preserves this information:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>signal_category = &quot;price_direction&quot;
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>signal_type = &quot;rise&quot;           # categorical (for routing and strategy logic)
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>signal_value = 0.73            # continuous (magnitude/confidence for ML training)
+</span></code></pre></div>
+<p>The <code>signal_type</code> remains categorical for routing purposes, while <code>signal_value</code>
+(stored in the existing <code>signal</code> column of the <code>Signals</code> DataFrame) carries
+the continuous magnitude. This improves ML training by providing a richer
+target variable.</p>
+<div class="admonition info">
+<p class="admonition-title">Status</p>
+<p>Smooth labeling is planned for a future release. The <code>TrendScanningLabeler</code>
+already provides a <code>t_stat</code> meta column that can serve as a continuous signal
+value when <code>include_meta=True</code>.</p>
+</div>
+<hr />
+<h2 id="extending-the-signal-taxonomy">Extending the Signal Taxonomy<a class="headerlink" href="#extending-the-signal-taxonomy" title="Anchor link to this section">&para;</a></h2>
+<p>Adding a new signal category requires minimal changes:</p>
+<h3 id="1-create-a-labeler">1. Create a Labeler<a class="headerlink" href="#1-create-a-labeler" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">sf_component</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.core.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalCategory</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.target.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Labeler</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="nd">@dataclass</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="nd">@sf_component</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;my_custom_labeler&quot;</span><span class="p">)</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyLabeler</span><span class="p">(</span><span class="n">Labeler</span><span class="p">):</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="n">signal_category</span> <span class="o">=</span> <span class="n">SignalCategory</span><span class="o">.</span><span class="n">MARKET_WIDE</span>  <span class="c1"># or any category</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">compute_group</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group_df</span><span class="p">,</span> <span class="n">data_context</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>        <span class="c1"># Your forward-looking labeling algorithm</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>        <span class="o">...</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>        <span class="k">return</span> <span class="n">group_df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>            <span class="n">pl</span><span class="o">.</span><span class="n">when</span><span class="p">(</span><span class="n">condition</span><span class="p">)</span>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>            <span class="o">.</span><span class="n">then</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="s2">&quot;my_signal_type&quot;</span><span class="p">))</span>
+</span><span id="__span-10-17"><a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>            <span class="o">.</span><span class="n">otherwise</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">Utf8</span><span class="p">))</span>
+</span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>            <span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">out_col</span><span class="p">)</span>
+</span><span id="__span-10-19"><a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>        <span class="p">)</span>
+</span></code></pre></div>
+<h3 id="2-create-a-detector-optional">2. Create a Detector (optional)<a class="headerlink" href="#2-create-a-detector-optional" title="Anchor link to this section">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">sf_component</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.core.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalCategory</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">signalflow.detector.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">SignalDetector</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="nd">@dataclass</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="nd">@sf_component</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;my_custom_detector&quot;</span><span class="p">)</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyDetector</span><span class="p">(</span><span class="n">SignalDetector</span><span class="p">):</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    <span class="n">signal_category</span> <span class="o">=</span> <span class="n">SignalCategory</span><span class="o">.</span><span class="n">MARKET_WIDE</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>    <span class="n">allowed_signal_types</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>        <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;my_signal_type&quot;</span><span class="p">}</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>    <span class="p">)</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">detect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>        <span class="c1"># Your backward-looking detection algorithm</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>        <span class="o">...</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>        <span class="k">return</span> <span class="n">Signals</span><span class="p">(</span><span class="n">signals_df</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="3-register-in-signal_registry-optional">3. Register in signal_registry (optional)<a class="headerlink" href="#3-register-in-signal_registry-optional" title="Anchor link to this section">&para;</a></h3>
+<p>Update <code>KNOWN_SIGNALS</code> and <code>DIRECTIONAL_SIGNAL_MAP</code> if the signal types should
+be discoverable or have directional mappings.</p>
+<hr />
+<h2 id="architecture-summary">Architecture Summary<a class="headerlink" href="#architecture-summary" title="Anchor link to this section">&para;</a></h2>
+<pre class="mermaid"><code>flowchart TB
+    subgraph Signals ["Signal Categories"]
+        direction TB
+        PD["Price Direction&lt;br/&gt;rise, fall, flat"]
+        PS["Price Structure&lt;br/&gt;local_max, local_min"]
+        TM["Trend Momentum&lt;br/&gt;trend_start, trend_reversal"]
+        VOL["Volatility&lt;br/&gt;high_volatility, low_volatility"]
+        VL["Volume Liquidity&lt;br/&gt;abnormal_volume, illiquidity"]
+        MW["Market Wide&lt;br/&gt;market_crash, synchronization"]
+        AN["Anomaly&lt;br/&gt;extreme_positive_anomaly"]
+    end
+
+    subgraph Pipeline ["Processing Pipeline"]
+        direction LR
+        DET[Detectors] --&gt; ROUTER[Signal Router]
+        ROUTER --&gt; |directional| ENTRY[Entry Rules]
+        ROUTER --&gt; |non-directional| SIZING[Position Sizing]
+        ROUTER --&gt; |anomaly| RISK[Risk Management]
+        ENTRY --&gt; EXEC[Strategy Execution]
+        SIZING --&gt; EXEC
+        RISK --&gt; EXEC
+    end
+
+    subgraph Training ["Training Pipeline"]
+        direction LR
+        LAB[Labelers] --&gt; TRAIN[Train Validator]
+        TRAIN --&gt; VAL[Validator]
+        VAL --&gt; DET
+    end
+
+    Signals --&gt; DET
+    Signals --&gt; LAB
+
+    style PD fill:#3b82f6,color:#fff
+    style PS fill:#8b5cf6,color:#fff
+    style TM fill:#06b6d4,color:#fff
+    style VOL fill:#f97316,color:#fff
+    style VL fill:#22c55e,color:#fff
+    style MW fill:#ef4444,color:#fff
+    style AN fill:#dc2626,color:#fff</code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../cli/" class="md-footer__link md-footer__link--prev" aria-label="Previous: CLI &amp; YAML Config">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                CLI & YAML Config
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../data-sources/" class="md-footer__link md-footer__link--next" aria-label="Next: Data Sources">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Data Sources
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SignalFlow
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/pathway2nothing/signalflow-trading" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "content.tabs.link", "navigation.tracking", "navigation.indexes", "versioning"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
