@@ -428,18 +428,34 @@ class SignalFlowRegistry:
     # ── Schema introspection ──────────────────────────────────────────
 
     # Fields from base classes that are internal infrastructure, not user-facing params
-    _BASE_FIELDS: ClassVar[frozenset[str]] = frozenset({
-        "component_type",
-        # SignalDetector base
-        "pair_col", "ts_col", "group_col", "raw_data_type",
-        "features", "require_probability", "keep_only_latest_per_pair",
-        "allowed_signal_types", "signal_category",
-        # Feature base
-        "normalized", "norm_period",
-        # Runner internal
-        "broker", "entry_rules", "exit_rules", "metrics",
-        "strategy_id", "initial_capital", "price_col", "data_key", "show_progress",
-    })
+    _BASE_FIELDS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "component_type",
+            # SignalDetector base
+            "pair_col",
+            "ts_col",
+            "group_col",
+            "raw_data_type",
+            "features",
+            "require_probability",
+            "keep_only_latest_per_pair",
+            "allowed_signal_types",
+            "signal_category",
+            # Feature base
+            "normalized",
+            "norm_period",
+            # Runner internal
+            "broker",
+            "entry_rules",
+            "exit_rules",
+            "metrics",
+            "strategy_id",
+            "initial_capital",
+            "price_col",
+            "data_key",
+            "show_progress",
+        }
+    )
 
     def get_schema(self, component_type: SfComponentType, name: str) -> dict[str, Any]:
         """Get JSON-serializable parameter schema for a registered component.
@@ -478,12 +494,14 @@ class SignalFlowRegistry:
                 has_default = f.default is not dataclasses.MISSING
                 has_default_factory = f.default_factory is not dataclasses.MISSING  # type: ignore[misc]
 
-                parameters.append({
-                    "name": f.name,
-                    "type": type_str,
-                    "default": f.default if has_default else None,
-                    "required": not has_default and not has_default_factory,
-                })
+                parameters.append(
+                    {
+                        "name": f.name,
+                        "type": type_str,
+                        "default": f.default if has_default else None,
+                        "required": not has_default and not has_default_factory,
+                    }
+                )
 
         # Extract ClassVar metadata
         requires = getattr(cls, "requires", [])

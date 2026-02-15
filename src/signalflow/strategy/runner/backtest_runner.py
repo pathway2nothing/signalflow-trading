@@ -86,10 +86,7 @@ class BacktestRunner(StrategyRunner):
             )
 
             # Progress callback
-            if (
-                self.progress_callback is not None
-                and (i + 1) % self.progress_interval == 0
-            ):
+            if self.progress_callback is not None and (i + 1) % self.progress_interval == 0:
                 self.progress_callback(i + 1, total, self._metrics_history[-1] if self._metrics_history else {})
 
         # Final callback at 100%

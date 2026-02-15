@@ -610,10 +610,19 @@ class BacktestBuilder:
                         f.name: getattr(det, f.name)
                         for f in dataclasses.fields(det)
                         if not f.name.startswith("_")
-                        and f.name not in ("component_type", "features", "pair_col", "ts_col",
-                                           "raw_data_type", "require_probability",
-                                           "keep_only_latest_per_pair", "group_col",
-                                           "allowed_signal_types", "signal_category")
+                        and f.name
+                        not in (
+                            "component_type",
+                            "features",
+                            "pair_col",
+                            "ts_col",
+                            "raw_data_type",
+                            "require_probability",
+                            "keep_only_latest_per_pair",
+                            "group_col",
+                            "allowed_signal_types",
+                            "signal_category",
+                        )
                         and self._is_json_serializable(getattr(det, f.name))
                     }
                 if name in self._detector_data_sources:
@@ -769,7 +778,9 @@ class BacktestBuilder:
 
         # 4. Create and run runner
         runner = self._build_runner(
-            broker, entry_rules, exit_rules,
+            broker,
+            entry_rules,
+            exit_rules,
             progress_callback=progress_callback,
             cancel_event=cancel_event,
         )

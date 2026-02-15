@@ -53,15 +53,17 @@ def _make_ohlcv(n: int = 10, pairs: list[str] | None = None) -> pl.DataFrame:
     rows = []
     for pair in pairs:
         for i in range(n):
-            rows.append({
-                "pair": pair,
-                "timestamp": TS + timedelta(hours=i),
-                "open": 100.0 + i,
-                "high": 105.0 + i,
-                "low": 95.0 + i,
-                "close": 102.0 + i,
-                "volume": 1000.0,
-            })
+            rows.append(
+                {
+                    "pair": pair,
+                    "timestamp": TS + timedelta(hours=i),
+                    "open": 100.0 + i,
+                    "high": 105.0 + i,
+                    "low": 95.0 + i,
+                    "close": 102.0 + i,
+                    "volume": 1000.0,
+                }
+            )
     return pl.DataFrame(rows)
 
 
@@ -136,6 +138,7 @@ class TestRegistryGetSchema:
     def test_non_dataclass_returns_empty_params(self):
         class PlainClass:
             """No dataclass."""
+
             pass
 
         reg = SignalFlowRegistry()
@@ -184,24 +187,28 @@ class TestBacktestResultJsonExport:
 
         trades = []
         for i in range(n_trades):
-            trades.append({
-                "pair": "BTCUSDT",
-                "entry_time": TS + timedelta(hours=i),
-                "exit_time": TS + timedelta(hours=i + 1),
-                "entry_price": 100.0 + i,
-                "exit_price": 102.0 + i,
-                "pnl": 20.0,
-                "pnl_pct": 0.02,
-                "exit_reason": "take_profit",
-            })
+            trades.append(
+                {
+                    "pair": "BTCUSDT",
+                    "entry_time": TS + timedelta(hours=i),
+                    "exit_time": TS + timedelta(hours=i + 1),
+                    "entry_price": 100.0 + i,
+                    "exit_price": 102.0 + i,
+                    "pnl": 20.0,
+                    "pnl_pct": 0.02,
+                    "exit_reason": "take_profit",
+                }
+            )
 
         metrics_df = None
         if with_metrics_df:
-            metrics_df = pl.DataFrame({
-                "timestamp": [(TS + timedelta(hours=i)).timestamp() for i in range(5)],
-                "equity": [10000.0, 10100.0, 10200.0, 10150.0, 10300.0],
-                "total_return": [0.0, 0.01, 0.02, 0.015, 0.03],
-            })
+            metrics_df = pl.DataFrame(
+                {
+                    "timestamp": [(TS + timedelta(hours=i)).timestamp() for i in range(5)],
+                    "equity": [10000.0, 10100.0, 10200.0, 10150.0, 10300.0],
+                    "total_return": [0.0, 0.01, 0.02, 0.015, 0.03],
+                }
+            )
 
         raw = RawData(
             datetime_start=TS,
