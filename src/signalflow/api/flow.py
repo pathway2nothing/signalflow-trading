@@ -204,11 +204,7 @@ class FlowResult:
         result: dict[str, Any] = {}
 
         if self.backtest_metrics:
-            result["metrics"] = (
-                self.backtest_metrics
-                if isinstance(self.backtest_metrics, dict)
-                else {}
-            )
+            result["metrics"] = self.backtest_metrics if isinstance(self.backtest_metrics, dict) else {}
 
         result["n_trades"] = self.trades.height if self.trades is not None else 0
         result["execution_time"] = self.execution_time
@@ -224,13 +220,9 @@ class FlowResult:
             }
 
         if self.window_results:
-            result["window_results"] = [
-                wr.to_json_dict() for wr in self.window_results
-            ]
+            result["window_results"] = [wr.to_json_dict() for wr in self.window_results]
         if self.fold_results:
-            result["fold_results"] = [
-                fr.to_json_dict() for fr in self.fold_results
-            ]
+            result["fold_results"] = [fr.to_json_dict() for fr in self.fold_results]
 
         return result
 
@@ -724,9 +716,7 @@ class FlowBuilder:
         elif run_mode == RunMode.TEMPORAL_CV:
             result = self._run_temporal_cv(folds, gap, progress_callback)
         elif run_mode == RunMode.WALK_FORWARD:
-            result = self._run_walk_forward(
-                train_size, test_size, step, retrain, progress_callback
-            )
+            result = self._run_walk_forward(train_size, test_size, step, retrain, progress_callback)
         elif run_mode == RunMode.LIVE:
             result = self._run_live(paper)
         else:
@@ -961,17 +951,13 @@ class FlowBuilder:
             if isinstance(value, dict):
                 # Nested structure (multi-source)
                 filtered_data[key] = {
-                    src: df.filter(
-                        (pl.col("timestamp") >= start) & (pl.col("timestamp") < end)
-                    )
+                    src: df.filter((pl.col("timestamp") >= start) & (pl.col("timestamp") < end))
                     if isinstance(df, pl.DataFrame) and "timestamp" in df.columns
                     else df
                     for src, df in value.items()
                 }
             elif isinstance(value, pl.DataFrame) and "timestamp" in value.columns:
-                filtered_data[key] = value.filter(
-                    (pl.col("timestamp") >= start) & (pl.col("timestamp") < end)
-                )
+                filtered_data[key] = value.filter((pl.col("timestamp") >= start) & (pl.col("timestamp") < end))
             else:
                 filtered_data[key] = value
         return RawData(
@@ -1017,12 +1003,7 @@ class FlowBuilder:
             result.signals = test_signals
 
             # Train validator on train data and validate test signals
-            if (
-                train_start is not None
-                and train_end is not None
-                and self._named_validators
-                and self._named_labelers
-            ):
+            if train_start is not None and train_end is not None and self._named_validators and self._named_labelers:
                 train_raw = self._filter_raw_data(raw, train_start, train_end)
 
                 # Compute features and labels on train data
@@ -1042,10 +1023,7 @@ class FlowBuilder:
                         if train_df.height == 0:
                             continue
 
-                        feature_cols = [
-                            c for c in train_df.columns
-                            if c not in ("timestamp", "pair", "label")
-                        ]
+                        feature_cols = [c for c in train_df.columns if c not in ("timestamp", "pair", "label")]
                         X_train = train_df.select(feature_cols)
                         y_train = train_df.select("label")
 
@@ -1085,8 +1063,7 @@ class FlowBuilder:
         import numpy as np
 
         metrics_list = [
-            r.backtest_metrics for r in sub_results
-            if r.backtest_metrics and isinstance(r.backtest_metrics, dict)
+            r.backtest_metrics for r in sub_results if r.backtest_metrics and isinstance(r.backtest_metrics, dict)
         ]
         if not metrics_list:
             return {}
@@ -1247,7 +1224,13 @@ class FlowBuilder:
     def _compute_feature_metrics(self, features: pl.DataFrame, metric_node: Any) -> dict:
         """Compute feature analysis metrics."""
         return {
-            "n_features": len([c for c in features.columns if c not in ("timestamp", "pair", "close", "open", "high", "low", "volume")]),
+            "n_features": len(
+                [
+                    c
+                    for c in features.columns
+                    if c not in ("timestamp", "pair", "close", "open", "high", "low", "volume")
+                ]
+            ),
             "n_rows": features.height,
             "null_pct": features.null_count().sum_horizontal().item() / (features.height * features.width),
         }

@@ -43,8 +43,7 @@ class BacktestProgress:
         if self.verbose:
             console.print(
                 Panel.fit(
-                    f"[bold cyan]SignalFlow Backtest[/bold cyan]\n"
-                    f"Strategy: [yellow]{self.strategy_id}[/yellow]",
+                    f"[bold cyan]SignalFlow Backtest[/bold cyan]\nStrategy: [yellow]{self.strategy_id}[/yellow]",
                     border_style="cyan",
                 )
             )
@@ -98,9 +97,7 @@ class BacktestProgress:
 
 
 @contextmanager
-def backtest_progress(
-    strategy_id: str, verbose: bool = True
-) -> Generator[BacktestProgress, None, None]:
+def backtest_progress(strategy_id: str, verbose: bool = True) -> Generator[BacktestProgress, None, None]:
     """Context manager for backtest progress tracking.
 
     Args:
