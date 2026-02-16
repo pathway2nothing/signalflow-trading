@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import fields
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
+
 from loguru import logger
 
 T = TypeVar("T")
@@ -65,4 +66,4 @@ class KwargsTolerantMixin:
         wrapped_init.__qualname__ = orig_init.__qualname__
         wrapped_init.__doc__ = orig_init.__doc__
 
-        setattr(cls, "__init__", wrapped_init)
+        cls.__init__ = wrapped_init

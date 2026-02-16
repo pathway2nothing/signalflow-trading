@@ -4,16 +4,16 @@ from datetime import datetime
 
 import pytest
 
-from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core.containers.position import Position
-from signalflow.core.enums import PositionType
 from signalflow.analytic.strategy.main_strategy_metrics import (
-    TotalReturnMetric,
     BalanceAllocationMetric,
     DrawdownMetric,
-    WinRateMetric,
     SharpeRatioMetric,
+    TotalReturnMetric,
+    WinRateMetric,
 )
+from signalflow.core.containers.position import Position
+from signalflow.core.containers.strategy_state import StrategyState
+from signalflow.core.enums import PositionType
 
 TS = datetime(2024, 1, 1)
 

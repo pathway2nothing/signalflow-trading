@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import ClassVar
-import uuid
 
-from signalflow.core.enums import SfComponentType, PositionType
-from signalflow.core.decorators import sf_component
-from signalflow.core.containers.position import Position
-from signalflow.core.containers.trade import Trade
 from signalflow.core.containers.order import Order, OrderFill
+from signalflow.core.containers.position import Position
 from signalflow.core.containers.strategy_state import StrategyState
+from signalflow.core.containers.trade import Trade
+from signalflow.core.decorators import sf_component
+from signalflow.core.enums import PositionType, SfComponentType
 from signalflow.strategy.broker.base import Broker
-from signalflow.strategy.broker.executor.base import OrderExecutor
-from signalflow.data.strategy_store.base import StrategyStore
 
 
 @dataclass

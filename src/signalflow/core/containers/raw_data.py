@@ -1,10 +1,9 @@
 import warnings
-
-import polars as pl
-
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Iterator
+
+import polars as pl
 
 
 class DataTypeAccessor:
@@ -37,7 +36,7 @@ class DataTypeAccessor:
         ```
     """
 
-    __slots__ = ("_sources", "_default", "_data_type")
+    __slots__ = ("_data_type", "_default", "_sources")
 
     def __init__(
         self,

@@ -11,15 +11,15 @@ import pytest
 
 from signalflow.core.enums import SfComponentType
 from signalflow.core.registry import default_registry
-from signalflow.data.source.hyperliquid import (
-    HyperliquidClient,
-    HyperliquidFuturesLoader,
-    _HYPERLIQUID_INTERVAL_MAP,
-)
 from signalflow.data.source._helpers import (
+    dt_to_ms_utc,
     normalize_hyperliquid_pair,
     to_hyperliquid_coin,
-    dt_to_ms_utc,
+)
+from signalflow.data.source.hyperliquid import (
+    _HYPERLIQUID_INTERVAL_MAP,
+    HyperliquidClient,
+    HyperliquidFuturesLoader,
 )
 
 START = datetime(2024, 1, 1)

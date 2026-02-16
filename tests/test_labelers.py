@@ -8,7 +8,6 @@ import pytest
 
 from signalflow.core.containers.signals import Signals
 from signalflow.core.enums import SignalType
-from signalflow.target.base import Labeler
 from signalflow.target.fixed_horizon_labeler import FixedHorizonLabeler
 
 

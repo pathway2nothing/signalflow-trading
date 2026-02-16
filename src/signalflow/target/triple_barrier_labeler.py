@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import Any
 
 import numpy as np
 import polars as pl
 from numba import njit, prange
 
-from signalflow.core import sf_component, SignalType
+from signalflow.core import SignalType, sf_component
 from signalflow.target.base import Labeler
 
 

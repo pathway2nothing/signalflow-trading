@@ -15,16 +15,16 @@ from signalflow.viz.graph.nodes import (
 from signalflow.viz.graph.pipeline_graph import PipelineGraph
 
 __all__ = [
+    "DataSourceNode",
+    "DetectorNode",
     "Edge",
     "EdgeType",
+    "FeatureNode",
+    "LabelerNode",
     "Node",
     "NodeType",
-    "DataSourceNode",
-    "FeatureNode",
-    "DetectorNode",
-    "LabelerNode",
-    "ValidatorNode",
-    "RunnerNode",
-    "RuleNode",
     "PipelineGraph",
+    "RuleNode",
+    "RunnerNode",
+    "ValidatorNode",
 ]

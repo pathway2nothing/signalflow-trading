@@ -6,9 +6,8 @@ import numpy as np
 import polars as pl
 import pytest
 
-from signalflow.core import RawData, Signals
 from signalflow.analytic.signals.classification_metrics import SignalClassificationMetric
-
+from signalflow.core import RawData, Signals
 
 TS = datetime(2024, 1, 1)
 

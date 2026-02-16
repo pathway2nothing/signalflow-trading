@@ -31,22 +31,21 @@ Example:
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 import aiohttp
 from loguru import logger
 
 from signalflow.core import sf_component
 from signalflow.data.raw_store import DuckDbSpotStore
-from signalflow.data.source.base import RawDataSource, RawDataLoader
 from signalflow.data.source._helpers import (
     TIMEFRAME_MS,
     dt_to_ms_utc,
-    ms_to_dt_utc_naive,
     ensure_utc_naive,
+    ms_to_dt_utc_naive,
 )
+from signalflow.data.source.base import RawDataLoader, RawDataSource
 
 
 @dataclass
@@ -73,7 +72,7 @@ class BinanceClient(RawDataSource):
     timeout_sec: int = 30
     min_delay_sec: float = 0.05
 
-    _session: Optional[aiohttp.ClientSession] = field(default=None, init=False)
+    _session: aiohttp.ClientSession | None = field(default=None, init=False)
 
     async def __aenter__(self) -> "BinanceClient":
         """Enter async context - creates session."""
@@ -137,7 +136,7 @@ class BinanceClient(RawDataSource):
 
                 return sorted(pairs)
 
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            except (TimeoutError, aiohttp.ClientError) as e:
                 if attempt < self.max_retries - 1:
                     wait = 2**attempt
                     logger.warning(f"Request failed, retrying in {wait}s: {e}")
@@ -152,8 +151,8 @@ class BinanceClient(RawDataSource):
         pair: str,
         timeframe: str = "1m",
         *,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 1000,
     ) -> list[dict]:
         """Fetch OHLCV klines from Binance.
@@ -184,7 +183,7 @@ class BinanceClient(RawDataSource):
             params["endTime"] = dt_to_ms_utc(end_time)
 
         url = f"{self.base_url}{self.klines_path}"
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
 
         for attempt in range(self.max_retries):
             try:
@@ -218,7 +217,7 @@ class BinanceClient(RawDataSource):
 
                 return out
 
-            except (aiohttp.ClientError, asyncio.TimeoutError, RuntimeError) as e:
+            except (TimeoutError, aiohttp.ClientError, RuntimeError) as e:
                 last_err = e
                 if attempt < self.max_retries - 1:
                     wait = 2**attempt
@@ -370,9 +369,9 @@ class BinanceSpotLoader(RawDataLoader):
     async def download(
         self,
         pairs: list[str],
-        days: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        days: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
         fill_gaps: bool = True,
     ) -> None:
         """Download historical data with intelligent range detection.
@@ -395,7 +394,7 @@ class BinanceSpotLoader(RawDataLoader):
             Errors logged but don't stop other pairs.
         """
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         if end is None:
             end = now
         else:
@@ -550,9 +549,9 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
     async def download(
         self,
         pairs: list[str],
-        days: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        days: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
         fill_gaps: bool = True,
     ) -> None:
         """Download historical USDT-M futures data.
@@ -564,7 +563,7 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
             end (datetime | None): Range end. Default: now.
             fill_gaps (bool): Detect and fill gaps. Default: True.
         """
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         if end is None:
             end = now
         else:
@@ -711,9 +710,9 @@ class BinanceFuturesCoinLoader(RawDataLoader):
     async def download(
         self,
         pairs: list[str],
-        days: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        days: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
         fill_gaps: bool = True,
     ) -> None:
         """Download historical COIN-M futures data.
@@ -725,7 +724,7 @@ class BinanceFuturesCoinLoader(RawDataLoader):
             end (datetime | None): Range end. Default: now.
             fill_gaps (bool): Detect and fill gaps. Default: True.
         """
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         if end is None:
             end = now
         else:

@@ -111,7 +111,7 @@ def _display_result(result: BacktestResult) -> None:
 
     # Return with color
     return_color = "green" if result.total_return >= 0 else "red"
-    click.echo(f"  Total Return:    ", nl=False)
+    click.echo("  Total Return:    ", nl=False)
     click.secho(f"{result.total_return:+.2%}", fg=return_color, bold=True)
 
     click.echo("-" * 50)
@@ -175,7 +175,7 @@ def list():
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed info")
 def list_detectors(verbose: bool):
     """List available signal detectors."""
-    from signalflow.core import default_registry, SfComponentType
+    from signalflow.core import SfComponentType, default_registry
 
     detectors = default_registry.list(SfComponentType.DETECTOR)
 
@@ -204,7 +204,7 @@ def list_detectors(verbose: bool):
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed info")
 def list_metrics(verbose: bool):
     """List available strategy metrics."""
-    from signalflow.core import default_registry, SfComponentType
+    from signalflow.core import SfComponentType, default_registry
 
     metrics = default_registry.list(SfComponentType.STRATEGY_METRIC)
 
@@ -231,7 +231,7 @@ def list_metrics(verbose: bool):
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed info")
 def list_features(verbose: bool):
     """List available features."""
-    from signalflow.core import default_registry, SfComponentType
+    from signalflow.core import SfComponentType, default_registry
 
     features = default_registry.list(SfComponentType.FEATURE)
 
@@ -249,7 +249,7 @@ def list_features(verbose: bool):
 @list.command("all")
 def list_all():
     """List all registered components."""
-    from signalflow.core import default_registry, SfComponentType
+    from signalflow.core import SfComponentType, default_registry
 
     click.echo("SignalFlow Registry")
     click.echo("=" * 50)
@@ -411,7 +411,7 @@ def viz(config_path: str, port: int, output: str | None, fmt: str, no_browser: b
     # Start server (default)
     from signalflow.viz.server import serve
 
-    click.echo(f"Starting SignalFlow Viz server...")
+    click.echo("Starting SignalFlow Viz server...")
     serve(graph, port=port, open_browser=not no_browser, block=True)
 
 

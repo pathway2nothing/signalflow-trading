@@ -1,5 +1,4 @@
 # docs/hooks.py
-import os
 import tomllib
 
 

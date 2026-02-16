@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from signalflow.viz.graph import (
     DataSourceNode,
     Edge,

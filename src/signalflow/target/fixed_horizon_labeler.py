@@ -3,9 +3,8 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import SignalType
+from signalflow.core import SignalType, sf_component
 from signalflow.target.base import Labeler
-from signalflow.core import sf_component
 
 
 @dataclass

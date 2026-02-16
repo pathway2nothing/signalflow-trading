@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable, Optional
 
-from signalflow.core import sf_component, StrategyState, Position, Trade
-
+from signalflow.core import Position, StrategyState, Trade, sf_component
+from signalflow.data.strategy_store._serialization import state_from_json as _state_from_json
+from signalflow.data.strategy_store._serialization import to_json as _to_json
 from signalflow.data.strategy_store.base import StrategyStore
 from signalflow.data.strategy_store.schema import SCHEMA_SQL
-from signalflow.data.strategy_store._serialization import to_json as _to_json, state_from_json as _state_from_json
 
 
 def _adapt_datetime(val: datetime) -> str:
@@ -39,7 +39,7 @@ class SqliteStrategyStore(StrategyStore):
         self.con.executescript(SCHEMA_SQL)
         self.con.commit()
 
-    def load_state(self, strategy_id: str) -> Optional[StrategyState]:
+    def load_state(self, strategy_id: str) -> StrategyState | None:
         row = self.con.execute(
             "SELECT payload_json FROM strategy_state WHERE strategy_id = ?",
             (strategy_id,),

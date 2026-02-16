@@ -29,15 +29,10 @@ from signalflow.feature.mutual_information import (
     entropy_discrete,
     mutual_information_continuous,
     mutual_information_continuous_discrete,
-    mutual_information_discrete,
     normalized_mutual_information,
 )
 from signalflow.target.multi_target_generator import (
-    DEFAULT_HORIZONS,
-    DEFAULT_TARGET_TYPES,
-    HorizonConfig,
     MultiTargetGenerator,
-    TargetType,
 )
 from signalflow.target.utils import mask_targets_by_signals
 
@@ -46,7 +41,7 @@ if TYPE_CHECKING:
     from signalflow.detector.base import SignalDetector
 
 
-def _default_event_detector() -> "SignalDetector":
+def _default_event_detector() -> SignalDetector:
     """Deferred import to avoid circular dependency."""
     from signalflow.detector.market import AgreementDetector
 
@@ -57,7 +52,7 @@ def _df_to_raw_data_view(
     df: pl.DataFrame,
     pair_col: str = "pair",
     ts_col: str = "timestamp",
-) -> "RawDataView":
+) -> RawDataView:
     """Convert a DataFrame to RawDataView for detector usage.
 
     Creates a minimal RawDataView from an OHLCV DataFrame.

@@ -10,18 +10,17 @@ Provides specialized validators for different sklearn-compatible models:
 Each validator has model-specific defaults and tuning spaces.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, ClassVar
-from pathlib import Path
 import pickle
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl
 
-from signalflow.core import sf_component, Signals
-from signalflow.utils import import_model_class, build_optuna_params
+from signalflow.core import Signals, sf_component
+from signalflow.utils import build_optuna_params, import_model_class
 from signalflow.validator.base import SignalValidator
-
 
 # ---------------------------------------------------------------------------
 # Base class for sklearn-compatible validators

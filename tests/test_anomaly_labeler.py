@@ -11,11 +11,10 @@ import numpy as np
 import polars as pl
 import pytest
 
-from signalflow.core import RawData, RawDataView, Signals
+from signalflow.core import RawData, RawDataView
 from signalflow.core.enums import SignalCategory
-from signalflow.target.anomaly_labeler import AnomalyLabeler
 from signalflow.detector.anomaly_detector import AnomalyDetector
-
+from signalflow.target.anomaly_labeler import AnomalyLabeler
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 

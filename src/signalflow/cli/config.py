@@ -208,17 +208,17 @@ class BacktestConfig:
         # === Data: singular or plural ===
         data_cfg = None
         data_sources = None
-        if "data_sources" in d and d["data_sources"]:
+        if d.get("data_sources"):
             data_sources = cls._parse_named_data(d["data_sources"])
-        elif "data" in d and d["data"]:
+        elif d.get("data"):
             data_cfg = DataConfig(**d["data"])
 
         # === Detector: singular or plural ===
         detector_cfg = None
         detectors = None
-        if "detectors" in d and d["detectors"]:
+        if d.get("detectors"):
             detectors = cls._parse_named_detectors(d["detectors"])
-        elif "detector" in d and d["detector"]:
+        elif d.get("detector"):
             det_data = d["detector"]
             detector_cfg = DetectorConfig(
                 name=det_data.get("name", ""),
@@ -228,15 +228,15 @@ class BacktestConfig:
 
         # === Validators (new, plural only) ===
         validators_cfg = None
-        if "validators" in d and d["validators"]:
+        if d.get("validators"):
             validators_cfg = cls._parse_named_validators(d["validators"])
 
         # === Entry: singular or plural ===
         entry_cfg = EntryConfig()
         entries = None
-        if "entries" in d and d["entries"]:
+        if d.get("entries"):
             entries = cls._parse_named_entries(d["entries"])
-        elif "entry" in d and d["entry"]:
+        elif d.get("entry"):
             entry_data = d["entry"]
             entry_cfg = EntryConfig(
                 rule=entry_data.get("rule"),
@@ -250,9 +250,9 @@ class BacktestConfig:
         # === Exit: singular or plural ===
         exit_cfg = ExitConfig()
         exits = None
-        if "exits" in d and d["exits"]:
+        if d.get("exits"):
             exits = cls._parse_named_exits(d["exits"])
-        elif "exit" in d and d["exit"]:
+        elif d.get("exit"):
             exit_data = d["exit"]
             exit_cfg = ExitConfig(
                 rule=exit_data.get("rule"),
@@ -264,7 +264,7 @@ class BacktestConfig:
 
         # === Aggregation ===
         agg_cfg = None
-        if "aggregation" in d and d["aggregation"]:
+        if d.get("aggregation"):
             agg_data = d["aggregation"]
             agg_cfg = AggregationConfig(
                 mode=agg_data.get("mode", "merge"),

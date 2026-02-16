@@ -22,7 +22,6 @@ from signalflow.core import sf_component
 from signalflow.core.enums import SignalCategory
 from signalflow.target.base import Labeler
 
-
 # ── Window-based structure labeler ──────────────────────────────────────
 
 

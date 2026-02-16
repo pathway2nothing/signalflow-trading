@@ -25,9 +25,9 @@ Example:
     ```
 """
 
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Mapping, Sequence
 
 import polars as pl
 

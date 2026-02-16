@@ -3,18 +3,18 @@ from __future__ import annotations
 import bisect
 import datetime as dt
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
-import polars as pl
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import polars as pl
 from loguru import logger
+from plotly.subplots import make_subplots
 from scipy import stats
 
-from signalflow.core import sf_component, StrategyState, RawData
 from signalflow.analytic.base import StrategyMetric
+from signalflow.core import RawData, StrategyState, sf_component
 
 
 @dataclass
@@ -27,7 +27,7 @@ class StrategyMainResult(StrategyMetric):
         state: StrategyState,
         prices: dict[str, float],
         **kwargs,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Compute metric values."""
         return {}
 
@@ -266,7 +266,7 @@ class StrategyDistributionResult(StrategyMetric):
         state: StrategyState,
         prices: dict[str, float],
         **kwargs,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         return {}
 
     def plot(
@@ -479,7 +479,7 @@ class StrategyEquityResult(StrategyMetric):
         state: StrategyState,
         prices: dict[str, float],
         **kwargs,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         return {}
 
     def plot(
@@ -582,7 +582,7 @@ class StrategyEquityResult(StrategyMetric):
 class StrategyPairResult(StrategyMetric):
     """Pair visualization with price line, entry/exit markers, and net position size."""
 
-    pairs: List[str] = field(default_factory=list)
+    pairs: list[str] = field(default_factory=list)
     price_col: str = "close"
     ts_col: str = "timestamp"
     pair_col: str = "pair"
@@ -596,7 +596,7 @@ class StrategyPairResult(StrategyMetric):
     template: str = "plotly_white"
     hovermode: str = "x unified"
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> Dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
         return {}
 
     def plot(
@@ -676,7 +676,7 @@ class StrategyPairResult(StrategyMetric):
         exit_y: list[float] = []
         exit_cd: list[list[Any]] = []
 
-        deltas: Dict[int, float] = {}
+        deltas: dict[int, float] = {}
 
         for tr in trades:
             tid = tr.get(self.trade_id_col)
@@ -861,7 +861,7 @@ class StrategyPairResult(StrategyMetric):
 
         return out
 
-    def _nearest_price(self, *, epoch_s: int, ts_s: list[int], price: list[float]) -> Optional[float]:
+    def _nearest_price(self, *, epoch_s: int, ts_s: list[int], price: list[float]) -> float | None:
         if epoch_s is None or not ts_s:
             return None
         i = bisect.bisect_left(ts_s, int(epoch_s))

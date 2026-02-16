@@ -1,11 +1,12 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
-from typing import ClassVar
-from signalflow.core import SfComponentType, RawData, Signals, StrategyState
+from typing import Any, ClassVar
+
 import plotly.graph_objects as go
-from typing import Dict, Any, List, Tuple
 import polars as pl
 from loguru import logger
+
+from signalflow.core import RawData, SfComponentType, Signals, StrategyState
 
 
 @dataclass
@@ -19,7 +20,7 @@ class SignalMetric:
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Compute metrics from signals.
 
         Returns:
@@ -30,12 +31,12 @@ class SignalMetric:
 
     def plot(
         self,
-        computed_metrics: Dict[str, Any],
-        plots_context: Dict[str, Any],
+        computed_metrics: dict[str, Any],
+        plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> List[go.Figure] | go.Figure | None:
+    ) -> list[go.Figure] | go.Figure | None:
         """Generate visualization from computed metrics.
 
         Returns:
@@ -72,7 +73,7 @@ class StrategyMetric(ABC):
 
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> Dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
         """Compute metric values."""
         logger.warning("Computing is not implemented for this component")
         return {}

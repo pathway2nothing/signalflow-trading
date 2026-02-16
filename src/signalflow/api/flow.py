@@ -17,32 +17,33 @@ from __future__ import annotations
 import copy
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from threading import Event
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 import polars as pl
 
-from signalflow.core import (
-    RawData,
-    Signals,
-    SfComponentType,
-    default_registry,
-    sf_component,
-)
 from signalflow.api.exceptions import (
     ConfigurationError,
     MissingDataError,
 )
+from signalflow.core import (
+    RawData,
+    SfComponentType,
+    Signals,
+    default_registry,
+    sf_component,
+)
 
 if TYPE_CHECKING:
     from signalflow.detector.base import SignalDetector
-    from signalflow.validator.base import SignalValidator
     from signalflow.feature import FeaturePipeline
     from signalflow.target.base import SignalLabeler
+    from signalflow.validator.base import SignalValidator
 
 
 class RunMode(str, Enum):
@@ -108,8 +109,8 @@ class FlowResult:
     execution_time: float = 0.0
 
     # For walk-forward mode
-    fold_results: list["FlowResult"] | None = None
-    window_results: list["FlowResult"] | None = None
+    fold_results: list[FlowResult] | None = None
+    window_results: list[FlowResult] | None = None
 
     def summary(self) -> str:
         """Generate unified summary across all metrics."""
@@ -284,18 +285,18 @@ class FlowBuilder:
     _named_data: dict[str, RawData | dict[str, Any]] = field(default_factory=dict, repr=False)
 
     # Features
-    _feature_pipelines: dict[str, "FeaturePipeline"] = field(default_factory=dict, repr=False)
+    _feature_pipelines: dict[str, FeaturePipeline] = field(default_factory=dict, repr=False)
 
     # Detection
-    _named_detectors: dict[str, "SignalDetector"] = field(default_factory=dict, repr=False)
+    _named_detectors: dict[str, SignalDetector] = field(default_factory=dict, repr=False)
     _signals: Signals | None = field(default=None, repr=False)
     _aggregation_config: dict[str, Any] | None = field(default=None, repr=False)
 
     # Labeling
-    _named_labelers: dict[str, "SignalLabeler"] = field(default_factory=dict, repr=False)
+    _named_labelers: dict[str, SignalLabeler] = field(default_factory=dict, repr=False)
 
     # Validation
-    _named_validators: dict[str, "SignalValidator"] = field(default_factory=dict, repr=False)
+    _named_validators: dict[str, SignalValidator] = field(default_factory=dict, repr=False)
 
     # Strategy
     _entry_config: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -371,7 +372,7 @@ class FlowBuilder:
 
     def features(
         self,
-        pipeline: "FeaturePipeline | str",
+        pipeline: FeaturePipeline | str,
         *,
         name: str | None = None,
         **kwargs: Any,
@@ -411,7 +412,7 @@ class FlowBuilder:
 
     def detector(
         self,
-        detector: "SignalDetector | str",
+        detector: SignalDetector | str,
         *,
         name: str | None = None,
         **kwargs: Any,
@@ -484,7 +485,7 @@ class FlowBuilder:
 
     def labeler(
         self,
-        labeler: "SignalLabeler | str",
+        labeler: SignalLabeler | str,
         *,
         name: str | None = None,
         **kwargs: Any,
@@ -527,7 +528,7 @@ class FlowBuilder:
 
     def validator(
         self,
-        validator: "SignalValidator | str",
+        validator: SignalValidator | str,
         *,
         name: str | None = None,
         **kwargs: Any,

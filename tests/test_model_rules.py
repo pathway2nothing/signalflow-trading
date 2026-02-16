@@ -3,7 +3,6 @@
 from datetime import datetime
 
 import polars as pl
-import pytest
 
 from signalflow.core.containers.position import Position
 from signalflow.core.containers.signals import Signals
@@ -12,7 +11,6 @@ from signalflow.core.enums import PositionType
 from signalflow.strategy.model.context import ModelContext
 from signalflow.strategy.model.decision import StrategyAction, StrategyDecision
 from signalflow.strategy.model.rules import ModelEntryRule, ModelExitRule
-
 
 TS = datetime(2024, 1, 1)
 

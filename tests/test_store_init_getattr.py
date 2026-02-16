@@ -23,7 +23,7 @@ class TestRawStoreGetattr:
         from signalflow.data import raw_store
 
         with pytest.raises(AttributeError, match="has no attribute"):
-            getattr(raw_store, "NonexistentStore")
+            raw_store.NonexistentStore
 
 
 class TestStrategyStoreGetattr:
@@ -38,4 +38,4 @@ class TestStrategyStoreGetattr:
         from signalflow.data import strategy_store
 
         with pytest.raises(AttributeError, match="has no attribute"):
-            getattr(strategy_store, "NonexistentStore")
+            strategy_store.NonexistentStore

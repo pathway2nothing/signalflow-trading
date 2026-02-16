@@ -16,7 +16,7 @@ from loguru import logger
 
 from signalflow.core import RawDataView, Signals
 from signalflow.core.decorators import sf_component
-from signalflow.core.enums import SignalCategory, SfComponentType
+from signalflow.core.enums import SfComponentType, SignalCategory
 from signalflow.detector.base import SignalDetector
 
 

@@ -1,22 +1,22 @@
-import duckdb
-import polars as pl
-
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Iterable
-from loguru import logger
-import pandas as pd
 
-from signalflow.core import sf_component, SfComponentType, RawData
+import duckdb
+import pandas as pd
+import polars as pl
+from loguru import logger
+
+from signalflow.core import RawData, SfComponentType, sf_component
 from signalflow.core.registry import default_registry
-from signalflow.data.raw_store.base import RawDataStore
 from signalflow.data.raw_store._schema import (
     CORE_COLUMNS,
     normalize_ts,
     polars_schema,
     resolve_columns,
 )
+from signalflow.data.raw_store.base import RawDataStore
 
 # Column name -> DuckDB SQL type.  Anything not listed defaults to DOUBLE.
 _SQL_TYPES: dict[str, str] = {
@@ -225,7 +225,7 @@ class DuckDbRawStore(RawDataStore):
 
     # ── Queries ───────────────────────────────────────────────────────
 
-    def get_time_bounds(self, pair: str) -> tuple[Optional[datetime], Optional[datetime]]:
+    def get_time_bounds(self, pair: str) -> tuple[datetime | None, datetime | None]:
         """Get earliest and latest timestamps for a pair."""
         result = self._con.execute(
             "SELECT MIN(timestamp), MAX(timestamp) FROM ohlcv WHERE pair = ?",
@@ -255,7 +255,7 @@ class DuckDbRawStore(RawDataStore):
 
         existing_times = {row[0] for row in existing}
         gaps: list[tuple[datetime, datetime]] = []
-        gap_start: Optional[datetime] = None
+        gap_start: datetime | None = None
         current = start
 
         while current <= end:
@@ -278,9 +278,9 @@ class DuckDbRawStore(RawDataStore):
     def load(
         self,
         pair: str,
-        hours: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        hours: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> pl.DataFrame:
         """Load data for a single trading pair."""
         col_list = ", ".join(self._columns)
@@ -313,9 +313,9 @@ class DuckDbRawStore(RawDataStore):
     def load_many(
         self,
         pairs: Iterable[str],
-        hours: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        hours: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> pl.DataFrame:
         """Batch load for multiple pairs."""
         pairs = list(pairs)
@@ -384,7 +384,7 @@ class DuckDbRawStore(RawDataStore):
         pairs: list[str],
         start: datetime,
         end: datetime,
-        data_key: Optional[str] = None,
+        data_key: str | None = None,
     ) -> RawData:
         """Convert store data to RawData container.
 

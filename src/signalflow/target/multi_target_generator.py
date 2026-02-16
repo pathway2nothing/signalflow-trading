@@ -7,11 +7,9 @@ at different horizons and target types simultaneously.
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
 import polars as pl
 from loguru import logger
 
-from signalflow.core import SignalType
 from signalflow.target.base import Labeler
 from signalflow.target.triple_barrier_labeler import TripleBarrierLabeler
 

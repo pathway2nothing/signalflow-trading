@@ -1,11 +1,11 @@
 """Tests for signalflow.core.registry.SignalFlowRegistry."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from signalflow.core.enums import RawDataType, SfComponentType
 from signalflow.core.registry import SignalFlowRegistry, default_registry
-from signalflow.core.enums import SfComponentType, RawDataType
 
 
 class DummyDetector:

@@ -4,22 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from signalflow.core.enums import SfComponentType
 from signalflow.core.registry import default_registry
+from signalflow.data.source._helpers import dt_to_ms_utc
 from signalflow.data.source.bybit import (
-    BybitClient,
-    BybitFuturesLoader,
-    BybitFuturesInverseLoader,
-    BybitSpotLoader,
     _BYBIT_INTERVAL_MAP,
+    BybitClient,
+    BybitFuturesInverseLoader,
+    BybitFuturesLoader,
+    BybitSpotLoader,
 )
-from signalflow.data.source._helpers import dt_to_ms_utc, ms_to_dt_utc_naive
 
 START = datetime(2024, 1, 1)
 PAIR = "BTCUSDT"

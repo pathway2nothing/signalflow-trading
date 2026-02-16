@@ -7,13 +7,14 @@ signalflow.analytic.strategy for visualization and metrics computation.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol, Sequence, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import polars as pl
 
-from signalflow.core import StrategyState, RawData, Signals, default_registry, SfComponentType
+from signalflow.core import RawData, SfComponentType, Signals, StrategyState, default_registry
 
 if TYPE_CHECKING:
     import plotly.graph_objects as go

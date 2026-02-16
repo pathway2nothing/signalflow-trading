@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 class BacktestExtractor(BaseExtractor):
     """Extract full pipeline graph from BacktestBuilder."""
 
-    def __init__(self, builder: "BacktestBuilder"):
+    def __init__(self, builder: BacktestBuilder):
         self.builder = builder
 
     def extract(self) -> PipelineGraph:

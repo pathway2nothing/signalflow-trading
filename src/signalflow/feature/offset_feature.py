@@ -3,7 +3,7 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import default_registry, SfComponentType
+from signalflow.core import SfComponentType, default_registry
 from signalflow.feature.base import Feature, GlobalFeature
 
 

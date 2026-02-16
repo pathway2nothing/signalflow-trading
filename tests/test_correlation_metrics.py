@@ -4,13 +4,12 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import polars as pl
-import pytest
 
-from signalflow.core import RawData, Signals
 from signalflow.analytic.signals.correlation_metrics import (
     SignalCorrelationMetric,
     SignalTimingMetric,
 )
+from signalflow.core import RawData, Signals
 
 TS = datetime(2024, 1, 1)
 

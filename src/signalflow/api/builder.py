@@ -9,33 +9,34 @@ Supports multiple named instances of each component type
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import reduce
 from threading import Event
-from typing import TYPE_CHECKING, Any, Callable, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import polars as pl
 
-from signalflow.core import (
-    default_registry,
-    SfComponentType,
-    RawData,
-    Signals,
-)
 from signalflow.api.exceptions import (
     DetectorNotFoundError,
-    ValidatorNotFoundError,
     DuplicateComponentNameError,
+    InvalidParameterError,
     MissingDataError,
     MissingDetectorError,
-    InvalidParameterError,
+    ValidatorNotFoundError,
+)
+from signalflow.core import (
+    RawData,
+    SfComponentType,
+    Signals,
+    default_registry,
 )
 
 if TYPE_CHECKING:
+    from signalflow.api.result import BacktestResult
     from signalflow.detector.base import SignalDetector
     from signalflow.validator.base import SignalValidator
-    from signalflow.api.result import BacktestResult
 
 
 @dataclass

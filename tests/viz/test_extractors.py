@@ -1,6 +1,5 @@
 """Tests for signalflow.viz.extractors module."""
 
-import pytest
 
 from signalflow.viz.extractors import (
     BacktestExtractor,

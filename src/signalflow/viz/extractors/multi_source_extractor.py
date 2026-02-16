@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class MultiSourceExtractor(BaseExtractor):
     """Extract data flow graph from multi-source RawData."""
 
-    def __init__(self, raw: "RawData"):
+    def __init__(self, raw: RawData):
         self.raw = raw
 
     def extract(self) -> PipelineGraph:

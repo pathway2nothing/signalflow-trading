@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, sf_component
+from signalflow.core import Signals, sf_component
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 

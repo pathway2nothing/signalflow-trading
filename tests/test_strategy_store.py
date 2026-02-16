@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from signalflow.core import StrategyState, Position, Trade
+from signalflow.core import Position, StrategyState, Trade
 
 
 class TestStrategyStoreSaveLoad:

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import polars as pl
 import pytest
 
-from signalflow.core import RawData, Signals, StrategyState, Portfolio
+from signalflow.core import Portfolio, RawData, Signals, StrategyState
 
 
 @pytest.fixture

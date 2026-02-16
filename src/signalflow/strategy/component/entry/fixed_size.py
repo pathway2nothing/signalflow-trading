@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from signalflow.core import Signals, Order, StrategyState, SignalType, sf_component
+
+import polars as pl
+
+from signalflow.core import Order, Signals, SignalType, StrategyState, sf_component
 from signalflow.core.signal_registry import DIRECTIONAL_SIGNAL_MAP
 from signalflow.strategy.component.base import EntryRule
-import polars as pl
 
 
 @dataclass

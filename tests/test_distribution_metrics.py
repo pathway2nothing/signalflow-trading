@@ -5,9 +5,8 @@ from datetime import datetime, timedelta
 import polars as pl
 import pytest
 
-from signalflow.core import RawData, Signals
 from signalflow.analytic.signals.distribution_metrics import SignalDistributionMetric
-
+from signalflow.core import RawData, Signals
 
 TS = datetime(2024, 1, 1)
 

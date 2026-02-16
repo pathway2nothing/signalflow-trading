@@ -11,7 +11,6 @@ from signalflow.core.enums import PositionType
 from signalflow.strategy.model.context import ModelContext
 from signalflow.strategy.model.decision import StrategyAction, StrategyDecision
 
-
 TS = datetime(2024, 1, 1)
 
 

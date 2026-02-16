@@ -1,13 +1,17 @@
 from __future__ import annotations
+
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from threading import Event
-from typing import Any, Callable, ClassVar
-from signalflow.core import SfComponentType, StrategyState, Signals, sf_component
-from signalflow.strategy.component.base import EntryRule, ExitRule
-from signalflow.analytic import StrategyMetric
-from signalflow.strategy.runner.base import StrategyRunner
 from datetime import datetime
+from threading import Event
+from typing import Any
+
 import polars as pl
+
+from signalflow.analytic import StrategyMetric
+from signalflow.core import SfComponentType, Signals, StrategyState, sf_component
+from signalflow.strategy.component.base import EntryRule
+from signalflow.strategy.runner.base import StrategyRunner
 
 
 @dataclass
@@ -41,8 +45,9 @@ class BacktestRunner(StrategyRunner):
         state: StrategyState | None = None,
         named_signals: dict[str, Signals] | None = None,
     ):
-        from signalflow.core.containers.strategy_state import StrategyState
         from tqdm import tqdm
+
+        from signalflow.core.containers.strategy_state import StrategyState
 
         if state is None:
             state = StrategyState(strategy_id=self.strategy_id)

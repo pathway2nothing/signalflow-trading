@@ -1,9 +1,11 @@
-from signalflow.target.base import Labeler
+from abc import abstractmethod
 from dataclasses import dataclass
+from typing import Any
+
 import pandas as pd
 import polars as pl
-from typing import Any
-from abc import abstractmethod
+
+from signalflow.target.base import Labeler
 
 
 @dataclass

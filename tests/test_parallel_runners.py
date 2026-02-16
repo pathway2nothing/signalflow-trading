@@ -3,17 +3,16 @@
 from datetime import datetime, timedelta
 
 import polars as pl
-import pytest
 
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
+from signalflow.strategy.component.entry import FixedSizeEntryRule
 from signalflow.strategy.runner import (
     IsolatedBalanceRunner,
-    UnlimitedBalanceRunner,
     IsolatedResults,
+    UnlimitedBalanceRunner,
     UnlimitedResults,
 )
-from signalflow.strategy.component.entry import FixedSizeEntryRule
 
 
 def make_test_data(pairs: list[str], n_bars: int = 10) -> tuple[RawData, Signals]:
@@ -214,7 +213,7 @@ class TestUnlimitedBalanceRunner:
 
 class TestIsolatedResults:
     def test_pair_metrics_df(self):
-        from signalflow.strategy.runner import PairResult, IsolatedResults
+        from signalflow.strategy.runner import IsolatedResults, PairResult
 
         pair_results = {
             "BTCUSDT": PairResult(
@@ -280,11 +279,11 @@ class TestBarSignalsInRuntime:
 
     def test_optimized_runner_stores_bar_signals(self):
         """BacktestRunner should store _bar_signals in state.runtime."""
-        from signalflow.strategy.runner import BacktestRunner
+        from signalflow.data.strategy_store.memory import InMemoryStrategyStore
         from signalflow.strategy.broker import BacktestBroker
         from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
-        from signalflow.data.strategy_store.memory import InMemoryStrategyStore
         from signalflow.strategy.component.base import ExitRule
+        from signalflow.strategy.runner import BacktestRunner
 
         # Create a custom exit rule that checks for _bar_signals
         bar_signals_captured = []

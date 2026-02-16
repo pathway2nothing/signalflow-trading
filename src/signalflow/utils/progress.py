@@ -7,12 +7,12 @@ Provides visual feedback during long-running operations.
 from __future__ import annotations
 
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Generator
+from typing import Any
 
 from rich.console import Console
-from rich.live import Live
 from rich.panel import Panel
 from rich.progress import (
     BarColumn,
@@ -23,8 +23,6 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 from rich.table import Table
-from rich.text import Text
-
 
 console = Console()
 
@@ -38,7 +36,7 @@ class BacktestProgress:
     _start_time: float = field(default=0.0, init=False)
     _stats: dict[str, Any] = field(default_factory=dict, init=False)
 
-    def __enter__(self) -> "BacktestProgress":
+    def __enter__(self) -> BacktestProgress:
         self._start_time = time.time()
         if self.verbose:
             console.print(
@@ -198,13 +196,13 @@ def print_info(message: str) -> None:
 
 
 __all__ = [
-    "console",
     "BacktestProgress",
     "backtest_progress",
+    "console",
     "create_progress_bar",
+    "print_error",
+    "print_info",
     "print_metrics",
     "print_success",
     "print_warning",
-    "print_error",
-    "print_info",
 ]

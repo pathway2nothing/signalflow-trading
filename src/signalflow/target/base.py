@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import RawDataType, SfComponentType, SignalType, SignalCategory, Signals
+from signalflow.core import RawDataType, SfComponentType, SignalCategory, Signals, SignalType
 
 
 @dataclass

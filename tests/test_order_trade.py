@@ -1,7 +1,8 @@
 """Tests for signalflow.core.containers.order and trade."""
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 from signalflow.core.containers.order import Order, OrderFill
 from signalflow.core.containers.trade import Trade

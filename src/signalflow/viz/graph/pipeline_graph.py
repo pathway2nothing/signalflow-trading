@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from signalflow.viz.graph.edges import Edge, EdgeType
+from signalflow.viz.graph.edges import Edge
 from signalflow.viz.graph.nodes import Node, NodeType
 
 

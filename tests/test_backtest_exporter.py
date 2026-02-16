@@ -4,14 +4,12 @@ from datetime import datetime
 from pathlib import Path
 
 import polars as pl
-import pytest
 
 from signalflow.core.containers.position import Position
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.enums import PositionType
 from signalflow.strategy.exporter.parquet_exporter import BacktestExporter
-
 
 TS = datetime(2024, 1, 1)
 TS2 = datetime(2024, 1, 1, 0, 1)

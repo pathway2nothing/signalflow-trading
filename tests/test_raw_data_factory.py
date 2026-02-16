@@ -2,15 +2,13 @@
 
 from datetime import datetime
 from pathlib import Path
-import tempfile
 
 import polars as pl
 import pytest
 
 from signalflow.core import RawData
 from signalflow.data.raw_data_factory import RawDataFactory
-from signalflow.data.raw_store import DuckDbSpotStore, DuckDbRawStore
-
+from signalflow.data.raw_store import DuckDbRawStore, DuckDbSpotStore
 
 TS = datetime(2024, 1, 1)
 

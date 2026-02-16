@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional, ClassVar
+from typing import ClassVar
+
 from signalflow.core import SfComponentType
-import polars as pl
 
 
 @dataclass

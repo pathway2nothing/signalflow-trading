@@ -11,19 +11,19 @@ import pytest
 
 from signalflow.core.enums import SfComponentType
 from signalflow.core.registry import default_registry
-from signalflow.data.source.kraken import (
-    KrakenClient,
-    KrakenSpotLoader,
-    KrakenFuturesLoader,
-    _KRAKEN_SPOT_INTERVAL_MAP,
-    _KRAKEN_FUTURES_INTERVAL_MAP,
-)
 from signalflow.data.source._helpers import (
-    normalize_kraken_spot_pair,
-    to_kraken_spot_symbol,
-    normalize_kraken_futures_pair,
-    to_kraken_futures_symbol,
     dt_to_sec_utc,
+    normalize_kraken_futures_pair,
+    normalize_kraken_spot_pair,
+    to_kraken_futures_symbol,
+    to_kraken_spot_symbol,
+)
+from signalflow.data.source.kraken import (
+    _KRAKEN_FUTURES_INTERVAL_MAP,
+    _KRAKEN_SPOT_INTERVAL_MAP,
+    KrakenClient,
+    KrakenFuturesLoader,
+    KrakenSpotLoader,
 )
 
 START = datetime(2024, 1, 1)

@@ -3,9 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Iterable, Literal
-
-import polars as pl
+from typing import Any, Literal
 
 TradeSide = Literal["BUY", "SELL"]
 

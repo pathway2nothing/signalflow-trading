@@ -1,6 +1,7 @@
-from signalflow.strategy.broker.executor.base import OrderExecutor
-from signalflow.core.decorators import sf_component
 from dataclasses import dataclass
+
+from signalflow.core.decorators import sf_component
+from signalflow.strategy.broker.executor.base import OrderExecutor
 
 
 @dataclass

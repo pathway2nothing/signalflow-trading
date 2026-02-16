@@ -33,10 +33,11 @@ from __future__ import annotations
 
 import hashlib
 import warnings
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Literal, Mapping
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 
@@ -63,9 +64,9 @@ class LazyDataTypeAccessor:
         ```
     """
 
-    __slots__ = ("_lazy_raw", "_data_type")
+    __slots__ = ("_data_type", "_lazy_raw")
 
-    def __init__(self, lazy_raw: "RawDataLazy", data_type: str):
+    def __init__(self, lazy_raw: RawDataLazy, data_type: str):
         object.__setattr__(self, "_lazy_raw", lazy_raw)
         object.__setattr__(self, "_data_type", data_type)
 
@@ -170,7 +171,7 @@ class RawDataLazy:
     cache_dir: Path | None = None
 
     # Internal: stores[data_type][source] -> RawDataStore
-    _stores: dict[str, dict[str, "RawDataStore"]] = field(default_factory=dict, repr=False)
+    _stores: dict[str, dict[str, RawDataStore]] = field(default_factory=dict, repr=False)
     # Internal: memory cache[data_type][source] -> DataFrame
     _memory_cache: dict[str, dict[str, pl.DataFrame]] = field(default_factory=dict, repr=False)
 
@@ -186,14 +187,14 @@ class RawDataLazy:
     @classmethod
     def from_stores(
         cls,
-        stores: Mapping[str, "RawDataStore"],
+        stores: Mapping[str, RawDataStore],
         pairs: list[str],
         start: datetime,
         end: datetime,
         default_source: str | None = None,
         cache_mode: CacheMode = "memory",
         cache_dir: Path | None = None,
-    ) -> "RawDataLazy":
+    ) -> RawDataLazy:
         """Create lazy RawData from dict of stores.
 
         Args:
@@ -226,7 +227,7 @@ class RawDataLazy:
             ```
         """
         # Group stores by data_type
-        nested_stores: dict[str, dict[str, "RawDataStore"]] = {}
+        nested_stores: dict[str, dict[str, RawDataStore]] = {}
 
         for source_name, store in stores.items():
             data_type = getattr(store, "data_type", "unknown")
@@ -306,7 +307,7 @@ class RawDataLazy:
 
         return df
 
-    def preload(self, data_types: list[str] | None = None, sources: list[str] | None = None) -> "RawDataLazy":
+    def preload(self, data_types: list[str] | None = None, sources: list[str] | None = None) -> RawDataLazy:
         """Preload specified data into cache.
 
         Useful to trigger loading before intensive computations.
@@ -335,7 +336,7 @@ class RawDataLazy:
 
         return self
 
-    def clear_cache(self) -> "RawDataLazy":
+    def clear_cache(self) -> RawDataLazy:
         """Clear all cached data.
 
         Returns:
@@ -426,7 +427,7 @@ class RawDataLazy:
 
     # ── Conversion ────────────────────────────────────────────────────
 
-    def to_raw_data(self) -> "RawData":
+    def to_raw_data(self) -> RawData:
         """Convert to eager RawData by loading all data.
 
         Returns:

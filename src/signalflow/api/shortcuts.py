@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING
 from signalflow.core import RawData
 
 if TYPE_CHECKING:
-    from signalflow.detector.base import SignalDetector
     from signalflow.api.result import BacktestResult
+    from signalflow.detector.base import SignalDetector
 
 
 def load(
@@ -206,7 +206,7 @@ def backtest(
 def load_artifact(
     path: str | Path,
     name: str = "features",
-) -> "pl.DataFrame":
+) -> pl.DataFrame:
     """
     Load a parquet artifact from a flow artifacts directory.
 

@@ -1,23 +1,24 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pandas as pd
 import polars as pl
 from loguru import logger
 
-from signalflow.core import sf_component, SfComponentType
+from signalflow.core import SfComponentType, sf_component
 from signalflow.core.registry import default_registry
-from signalflow.data.raw_store.base import RawDataStore
 from signalflow.data.raw_store._schema import (
     CORE_COLUMNS,
     normalize_ts,
     polars_schema,
     resolve_columns,
 )
+from signalflow.data.raw_store.base import RawDataStore
 
 try:
     import psycopg
@@ -141,7 +142,7 @@ class PgRawStore(RawDataStore):
 
     # ── Queries ───────────────────────────────────────────────────────
 
-    def get_time_bounds(self, pair: str) -> tuple[Optional[datetime], Optional[datetime]]:
+    def get_time_bounds(self, pair: str) -> tuple[datetime | None, datetime | None]:
         with self._con.cursor() as cur:
             cur.execute(
                 "SELECT MIN(timestamp), MAX(timestamp) FROM ohlcv WHERE pair = %s",
@@ -169,7 +170,7 @@ class PgRawStore(RawDataStore):
 
         existing_times = {row[0] for row in existing}
         gaps: list[tuple[datetime, datetime]] = []
-        gap_start: Optional[datetime] = None
+        gap_start: datetime | None = None
         current = start
 
         while current <= end:
@@ -202,16 +203,16 @@ class PgRawStore(RawDataStore):
     def load(
         self,
         pair: str,
-        hours: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        hours: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> pl.DataFrame:
         col_list = ", ".join(self._all_column_names)
         query = f"SELECT {col_list} FROM ohlcv WHERE pair = %s"
         params: list[object] = [pair]
 
         if hours is not None:
-            cutoff = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+            cutoff = datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(hours=hours)
             query += " AND timestamp > %s"
             params.append(cutoff)
         elif start and end:
@@ -233,9 +234,9 @@ class PgRawStore(RawDataStore):
     def load_many(
         self,
         pairs: Iterable[str],
-        hours: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        hours: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> pl.DataFrame:
         pairs = list(pairs)
         if not pairs:
@@ -247,7 +248,7 @@ class PgRawStore(RawDataStore):
         params: list[object] = [*pairs]
 
         if hours is not None:
-            cutoff = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+            cutoff = datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(hours=hours)
             query += " AND timestamp > %s"
             params.append(cutoff)
         elif start and end:

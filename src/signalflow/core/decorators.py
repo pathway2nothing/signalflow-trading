@@ -1,6 +1,7 @@
-from typing import Any, Type
-from signalflow.core.registry import default_registry
+from typing import Any
+
 from signalflow.core.enums import SfComponentType
+from signalflow.core.registry import default_registry
 
 
 def sf_component(*, name: str, override: bool = True):
@@ -85,7 +86,7 @@ def sf_component(*, name: str, override: bool = True):
         Use override=True carefully to avoid accidental overrides.
     """
 
-    def decorator(cls: Type[Any]) -> Type[Any]:
+    def decorator(cls: type[Any]) -> type[Any]:
         component_type = getattr(cls, "component_type", None)
         if not isinstance(component_type, SfComponentType):
             raise ValueError(f"{cls.__name__} must define class attribute 'component_type: SfComponentType'")

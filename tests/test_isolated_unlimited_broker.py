@@ -12,7 +12,6 @@ from signalflow.core.enums import PositionType
 from signalflow.strategy.broker.isolated_broker import IsolatedBacktestBroker
 from signalflow.strategy.broker.unlimited_broker import UnlimitedBacktestBroker
 
-
 TS = datetime(2024, 1, 1)
 
 

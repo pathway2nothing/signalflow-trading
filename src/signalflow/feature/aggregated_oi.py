@@ -6,7 +6,7 @@ useful for detecting market-wide sentiment shifts.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import polars as pl
@@ -186,7 +186,7 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
 
     def compute_from_raw(
         self,
-        raw: "RawData",
+        raw: RawData,
         context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
         """Compute aggregated OI directly from RawData.

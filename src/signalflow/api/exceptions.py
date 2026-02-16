@@ -68,11 +68,11 @@ class ComponentNotFoundError(SignalFlowError):
                 "",
                 "To register a custom component, use @sf_component decorator:",
                 "",
-                f"  from signalflow.core import sf_component, SfComponentType",
+                "  from signalflow.core import sf_component, SfComponentType",
                 "",
                 f"  @sf_component(SfComponentType.{self.component_type.name}, 'my/{self.name}')",
-                f"  class MyComponent:",
-                f"      ...",
+                "  class MyComponent:",
+                "      ...",
             ]
         )
 

@@ -1,8 +1,9 @@
 """Tests for signalflow.core.containers.signals.Signals."""
 
+from datetime import datetime
+
 import polars as pl
 import pytest
-from datetime import datetime, timedelta
 
 from signalflow.core.containers.signals import Signals
 from signalflow.core.enums import SignalType

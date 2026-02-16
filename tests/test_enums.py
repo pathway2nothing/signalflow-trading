@@ -1,12 +1,12 @@
 """Tests for signalflow.core.enums."""
 
 from signalflow.core.enums import (
-    SignalType,
-    SignalCategory,
-    PositionType,
-    SfComponentType,
     DataFrameType,
+    PositionType,
     RawDataType,
+    SfComponentType,
+    SignalCategory,
+    SignalType,
 )
 
 

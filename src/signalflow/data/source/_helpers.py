@@ -4,7 +4,7 @@ Common datetime conversion functions and constants used across
 Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT, and other exchange data loaders.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Final
 
 # Standard timeframe to milliseconds mapping.
@@ -41,9 +41,9 @@ def dt_to_ms_utc(dt: datetime) -> int:
         1704067200000
     """
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     else:
-        dt = dt.astimezone(timezone.utc)
+        dt = dt.astimezone(UTC)
     return int(dt.timestamp() * 1000)
 
 
@@ -60,7 +60,7 @@ def ms_to_dt_utc_naive(ms: int) -> datetime:
         >>> ms_to_dt_utc_naive(1704067200000)
         datetime.datetime(2024, 1, 1, 0, 0)
     """
-    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).replace(tzinfo=None)
+    return datetime.fromtimestamp(ms / 1000, tz=UTC).replace(tzinfo=None)
 
 
 def ensure_utc_naive(dt: datetime) -> datetime:
@@ -80,7 +80,7 @@ def ensure_utc_naive(dt: datetime) -> datetime:
     """
     if dt.tzinfo is None:
         return dt
-    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.astimezone(UTC).replace(tzinfo=None)
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ def sec_to_dt_utc_naive(sec: int) -> datetime:
         >>> sec_to_dt_utc_naive(1704067200)
         datetime.datetime(2024, 1, 1, 0, 0)
     """
-    return datetime.fromtimestamp(sec, tz=timezone.utc).replace(tzinfo=None)
+    return datetime.fromtimestamp(sec, tz=UTC).replace(tzinfo=None)
 
 
 def dt_to_sec_utc(dt: datetime) -> int:
@@ -118,9 +118,9 @@ def dt_to_sec_utc(dt: datetime) -> int:
         1704067200
     """
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     else:
-        dt = dt.astimezone(timezone.utc)
+        dt = dt.astimezone(UTC)
     return int(dt.timestamp())
 
 

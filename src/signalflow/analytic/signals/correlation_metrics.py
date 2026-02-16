@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import numpy as np
-import pandas as pd
-import polars as pl
 import plotly.graph_objects as go
+import polars as pl
 from loguru import logger
 from plotly.subplots import make_subplots
 from scipy import stats
@@ -36,7 +35,7 @@ class SignalCorrelationMetric(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Compute signal-return correlations."""
         if "spot" in raw_data:
             price_df = raw_data["spot"]
@@ -104,7 +103,7 @@ class SignalCorrelationMetric(SignalMetric):
         signals_df: pl.DataFrame,
         price_df: pl.DataFrame,
         look_ahead: int,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Calculate returns for signals at specified look-ahead."""
         strengths = []
         returns = []
@@ -149,7 +148,7 @@ class SignalCorrelationMetric(SignalMetric):
         self,
         signals_df: pl.DataFrame,
         price_df: pl.DataFrame,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze returns by signal strength quintiles."""
         default_period = self.look_ahead_periods[0] if self.look_ahead_periods else 60
         strengths, returns = self._calculate_signal_returns(signals_df, price_df, default_period)
@@ -183,8 +182,8 @@ class SignalCorrelationMetric(SignalMetric):
 
     def plot(
         self,
-        computed_metrics: Dict[str, Any],
-        plots_context: Dict[str, Any],
+        computed_metrics: dict[str, Any],
+        plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
@@ -215,7 +214,7 @@ class SignalCorrelationMetric(SignalMetric):
 
         return fig
 
-    def _add_correlation_bars(self, fig: go.Figure, metrics: Dict[str, Any]):
+    def _add_correlation_bars(self, fig: go.Figure, metrics: dict[str, Any]):
         """Add correlation bar chart."""
         correlations = metrics["quant"]["correlations"]
 
@@ -251,7 +250,7 @@ class SignalCorrelationMetric(SignalMetric):
             col=1,
         )
 
-    def _add_scatter_plot(self, fig: go.Figure, metrics: Dict[str, Any], ctx: Dict[str, Any]):
+    def _add_scatter_plot(self, fig: go.Figure, metrics: dict[str, Any], ctx: dict[str, Any]):
         """Add scatter plot for first period."""
         scatter_data = metrics["series"]["scatter_data"]
         if not scatter_data:
@@ -280,7 +279,7 @@ class SignalCorrelationMetric(SignalMetric):
             col=2,
         )
 
-    def _add_quintile_returns(self, fig: go.Figure, metrics: Dict[str, Any]):
+    def _add_quintile_returns(self, fig: go.Figure, metrics: dict[str, Any]):
         """Add quintile returns bar chart."""
         quintile_data = metrics["quant"]["quintile_analysis"]
         if not quintile_data:
@@ -302,7 +301,7 @@ class SignalCorrelationMetric(SignalMetric):
             col=1,
         )
 
-    def _add_quintile_winrate(self, fig: go.Figure, metrics: Dict[str, Any]):
+    def _add_quintile_winrate(self, fig: go.Figure, metrics: dict[str, Any]):
         """Add quintile win rate chart."""
         quintile_data = metrics["quant"]["quintile_analysis"]
         if not quintile_data:
@@ -369,7 +368,7 @@ class SignalTimingMetric(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Compute optimal timing metrics."""
         if "spot" in raw_data:
             price_df = raw_data["spot"]
@@ -481,8 +480,8 @@ class SignalTimingMetric(SignalMetric):
 
     def plot(
         self,
-        computed_metrics: Dict[str, Any],
-        plots_context: Dict[str, Any],
+        computed_metrics: dict[str, Any],
+        plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,

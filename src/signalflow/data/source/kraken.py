@@ -2,26 +2,25 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 import aiohttp
 from loguru import logger
 
 from signalflow.core import sf_component
 from signalflow.data.raw_store import DuckDbSpotStore
-from signalflow.data.source.base import RawDataSource, RawDataLoader
 from signalflow.data.source._helpers import (
     TIMEFRAME_MS,
-    sec_to_dt_utc_naive,
     dt_to_sec_utc,
     ensure_utc_naive,
-    normalize_kraken_spot_pair,
-    to_kraken_spot_symbol,
     normalize_kraken_futures_pair,
+    normalize_kraken_spot_pair,
+    sec_to_dt_utc_naive,
     to_kraken_futures_symbol,
+    to_kraken_spot_symbol,
 )
+from signalflow.data.source.base import RawDataLoader, RawDataSource
 
 # Kraken spot interval mapping (minutes).
 # Note: Kraken spot has LIMITED interval support.
@@ -74,7 +73,7 @@ class KrakenClient(RawDataSource):
     timeout_sec: int = 30
     min_delay_sec: float = 0.2  # Kraken has stricter rate limits
 
-    _session: Optional[aiohttp.ClientSession] = field(default=None, init=False)
+    _session: aiohttp.ClientSession | None = field(default=None, init=False)
 
     async def __aenter__(self) -> "KrakenClient":
         timeout = aiohttp.ClientTimeout(total=self.timeout_sec)
@@ -138,7 +137,7 @@ class KrakenClient(RawDataSource):
 
                 return sorted(pairs)
 
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            except (TimeoutError, aiohttp.ClientError) as e:
                 if attempt < self.max_retries - 1:
                     wait = 2**attempt
                     logger.warning(f"Request failed, retrying in {wait}s: {e}")
@@ -153,7 +152,7 @@ class KrakenClient(RawDataSource):
         pair: str,
         timeframe: str = "1m",
         *,
-        since: Optional[datetime] = None,
+        since: datetime | None = None,
         limit: int = 720,
     ) -> list[dict]:
         """Fetch OHLCV klines from Kraken Spot API.
@@ -188,7 +187,7 @@ class KrakenClient(RawDataSource):
             params["since"] = dt_to_sec_utc(since)
 
         url = f"{self.spot_url}/OHLC"
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
 
         for attempt in range(self.max_retries):
             try:
@@ -238,7 +237,7 @@ class KrakenClient(RawDataSource):
                     )
                 return out
 
-            except (aiohttp.ClientError, asyncio.TimeoutError, RuntimeError) as e:
+            except (TimeoutError, aiohttp.ClientError, RuntimeError) as e:
                 last_err = e
                 if attempt < self.max_retries - 1:
                     wait = 2**attempt
@@ -387,7 +386,7 @@ class KrakenClient(RawDataSource):
 
                 return sorted(pairs)
 
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            except (TimeoutError, aiohttp.ClientError) as e:
                 if attempt < self.max_retries - 1:
                     wait = 2**attempt
                     logger.warning(f"Request failed, retrying in {wait}s: {e}")
@@ -402,8 +401,8 @@ class KrakenClient(RawDataSource):
         symbol: str,
         timeframe: str = "1m",
         *,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 5000,
     ) -> list[dict]:
         """Fetch OHLCV klines from Kraken Futures API.
@@ -439,7 +438,7 @@ class KrakenClient(RawDataSource):
         if end_time is not None:
             params["to"] = dt_to_sec_utc(end_time)
 
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
 
         for attempt in range(self.max_retries):
             try:
@@ -481,7 +480,7 @@ class KrakenClient(RawDataSource):
                 out.sort(key=lambda x: x["timestamp"])
                 return out
 
-            except (aiohttp.ClientError, asyncio.TimeoutError, RuntimeError) as e:
+            except (TimeoutError, aiohttp.ClientError, RuntimeError) as e:
                 last_err = e
                 if attempt < self.max_retries - 1:
                     wait = 2**attempt
@@ -618,9 +617,9 @@ class KrakenSpotLoader(RawDataLoader):
     async def download(
         self,
         pairs: list[str],
-        days: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        days: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
         fill_gaps: bool = True,
     ) -> None:
         """Download historical Kraken spot data.
@@ -632,7 +631,7 @@ class KrakenSpotLoader(RawDataLoader):
             end: Range end. Default: now.
             fill_gaps: Detect and fill gaps. Default: True.
         """
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         if end is None:
             end = now
         else:
@@ -776,9 +775,9 @@ class KrakenFuturesLoader(RawDataLoader):
     async def download(
         self,
         pairs: list[str],
-        days: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        days: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
         fill_gaps: bool = True,
     ) -> None:
         """Download historical Kraken futures data.
@@ -790,7 +789,7 @@ class KrakenFuturesLoader(RawDataLoader):
             end: Range end. Default: now.
             fill_gaps: Detect and fill gaps. Default: True.
         """
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         if end is None:
             end = now
         else:

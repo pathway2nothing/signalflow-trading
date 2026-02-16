@@ -7,8 +7,8 @@ import numpy as np
 import polars as pl
 import pytest
 
+from signalflow.detector.market import GlobalEventDetector
 from signalflow.feature.informativeness import (
-    CompositeWeights,
     FeatureInformativenessAnalyzer,
     InformativenessReport,
     RollingMIConfig,
@@ -18,7 +18,6 @@ from signalflow.target.multi_target_generator import (
     MultiTargetGenerator,
     TargetType,
 )
-from signalflow.detector.market import GlobalEventDetector
 
 
 def _make_ohlcv_with_features(

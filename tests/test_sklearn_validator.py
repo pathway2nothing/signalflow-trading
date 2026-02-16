@@ -8,15 +8,14 @@ import pytest
 
 from signalflow.core import Signals
 from signalflow.validator import (
-    RandomForestValidator,
-    LogisticRegressionValidator,
-    SVMValidator,
-    LightGBMValidator,
-    XGBoostValidator,
     AutoSelectValidator,
+    LightGBMValidator,
+    LogisticRegressionValidator,
+    RandomForestValidator,
     SklearnSignalValidator,
+    SVMValidator,
+    XGBoostValidator,
 )
-
 
 TS = datetime(2024, 1, 1)
 

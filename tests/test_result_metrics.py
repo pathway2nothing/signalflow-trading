@@ -4,12 +4,11 @@ from datetime import datetime, timedelta
 
 import polars as pl
 
-from signalflow.core import RawData
-from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core.containers.position import Position
-from signalflow.core.enums import PositionType
 from signalflow.analytic.strategy.result_metrics import StrategyMainResult, StrategyPairResult
-
+from signalflow.core import RawData
+from signalflow.core.containers.position import Position
+from signalflow.core.containers.strategy_state import StrategyState
+from signalflow.core.enums import PositionType
 
 TS = datetime(2024, 1, 1)
 

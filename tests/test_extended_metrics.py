@@ -4,18 +4,18 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core.containers.position import Position
-from signalflow.core.enums import PositionType
 from signalflow.analytic.strategy.extended_metrics import (
-    SortinoRatioMetric,
-    CalmarRatioMetric,
-    ProfitFactorMetric,
     AverageTradeMetric,
+    CalmarRatioMetric,
     ExpectancyMetric,
-    RiskRewardMetric,
     MaxConsecutiveMetric,
+    ProfitFactorMetric,
+    RiskRewardMetric,
+    SortinoRatioMetric,
 )
+from signalflow.core.containers.position import Position
+from signalflow.core.containers.strategy_state import StrategyState
+from signalflow.core.enums import PositionType
 
 TS = datetime(2024, 1, 1)
 

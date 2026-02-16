@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from signalflow.core import Position, Order, StrategyState, PositionType, sf_component
+
+from signalflow.core import Order, Position, PositionType, StrategyState, sf_component
 from signalflow.strategy.component.base import ExitRule
 
 

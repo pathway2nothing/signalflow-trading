@@ -1,15 +1,15 @@
-from typing import Dict, Any, Tuple
 from dataclasses import dataclass
+from typing import Any
 
-import polars as pl
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import polars as pl
 from loguru import logger
+from plotly.subplots import make_subplots
 
-from signalflow.core import sf_component, RawData, Signals
 from signalflow.analytic.base import SignalMetric
+from signalflow.core import RawData, Signals, sf_component
 
 
 @dataclass
@@ -22,7 +22,7 @@ class SignalProfileMetric(SignalMetric):
     """
 
     look_ahead: int = 1440
-    quantiles: Tuple[float, float] = (0.25, 0.75)
+    quantiles: tuple[float, float] = (0.25, 0.75)
 
     chart_height: int = 900
     chart_width: int = 1400
@@ -32,7 +32,7 @@ class SignalProfileMetric(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Calculate performance metrics for signals across all pairs."""
 
         if "spot" in raw_data:
@@ -156,8 +156,8 @@ class SignalProfileMetric(SignalMetric):
 
     def plot(
         self,
-        computed_metrics: Dict[str, Any],
-        plots_context: Dict[str, Any],
+        computed_metrics: dict[str, Any],
+        plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,

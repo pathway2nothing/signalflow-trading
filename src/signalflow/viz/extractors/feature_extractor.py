@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class FeaturePipelineExtractor(BaseExtractor):
     """Extract graph from FeaturePipeline."""
 
-    def __init__(self, pipeline: "FeaturePipeline"):
+    def __init__(self, pipeline: FeaturePipeline):
         self.pipeline = pipeline
 
     def extract(self) -> PipelineGraph:
@@ -70,7 +70,7 @@ class FeaturePipelineExtractor(BaseExtractor):
 
         return graph
 
-    def _feature_to_node(self, feature: "Feature", index: int) -> FeatureNode:
+    def _feature_to_node(self, feature: Feature, index: int) -> FeatureNode:
         """Convert Feature instance to FeatureNode."""
         from signalflow.feature.base import GlobalFeature
 

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from signalflow.core import StrategyState, Position, Trade
+from signalflow.core import Position, StrategyState, Trade
 
 PG_DSN = os.environ.get("SIGNALFLOW_PG_DSN", "")
 pg_available = pytest.mark.skipif(not PG_DSN, reason="SIGNALFLOW_PG_DSN not set")

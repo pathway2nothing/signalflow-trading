@@ -6,7 +6,7 @@ import pkgutil
 import sys
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
-from typing import Any, ClassVar, get_type_hints
+from typing import Any, ClassVar
 
 from loguru import logger
 

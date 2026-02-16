@@ -1,10 +1,10 @@
 """Tests for signalflow.utils.kwargs_mixin.KwargsTolerantMixin."""
 
-import pytest
 from dataclasses import dataclass
 
-from signalflow.utils.kwargs_mixin import KwargsTolerantMixin
+import pytest
 
+from signalflow.utils.kwargs_mixin import KwargsTolerantMixin
 
 # The mixin wraps __init__ in __init_subclass__ and uses dataclass fields()
 # to identify known vs unknown kwargs. It requires:

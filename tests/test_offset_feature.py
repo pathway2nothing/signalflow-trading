@@ -6,9 +6,6 @@ import polars as pl
 import pytest
 
 from signalflow.feature.offset_feature import OffsetFeature
-from signalflow.core.registry import default_registry
-from signalflow.core import SfComponentType
-
 
 TS = datetime(2024, 1, 1)
 

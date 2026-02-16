@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 
 def pipeline(
-    source: Union["BacktestBuilder", "FeaturePipeline", "SignalDetector"],
+    source: BacktestBuilder | FeaturePipeline | SignalDetector,
     *,
     output: str | Path | None = None,
     format: Literal["html", "mermaid", "json"] = "html",
@@ -96,7 +96,7 @@ def pipeline(
 
 
 def features(
-    pipeline: "FeaturePipeline",
+    pipeline: FeaturePipeline,
     *,
     output: str | Path | None = None,
     format: Literal["html", "mermaid"] = "html",
@@ -130,7 +130,7 @@ def features(
 
 
 def data_flow(
-    raw: "RawData",
+    raw: RawData,
     *,
     output: str | Path | None = None,
     format: Literal["html", "mermaid"] = "html",
@@ -218,9 +218,9 @@ def serve(
 
 
 __all__ = [
-    "pipeline",
-    "features",
-    "data_flow",
-    "serve",
     "PipelineGraph",
+    "data_flow",
+    "features",
+    "pipeline",
+    "serve",
 ]

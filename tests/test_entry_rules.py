@@ -12,7 +12,6 @@ from signalflow.core.enums import PositionType
 from signalflow.strategy.component.entry.fixed_size import FixedSizeEntryRule
 from signalflow.strategy.component.entry.signal import SignalEntryRule
 
-
 TS = datetime(2024, 1, 1)
 
 

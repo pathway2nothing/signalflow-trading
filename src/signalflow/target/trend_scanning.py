@@ -142,7 +142,7 @@ if _HAS_NUMBA:
             best_w = np.nan
 
             L = min_lf
-            while L <= max_lf:
+            while max_lf >= L:
                 end = t + L
                 if end > n:
                     L += step

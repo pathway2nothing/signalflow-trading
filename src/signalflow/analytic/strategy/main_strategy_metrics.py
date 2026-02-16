@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from signalflow.core import StrategyState, sf_component
-from signalflow.analytic.base import StrategyMetric
+
 import numpy as np
+
+from signalflow.analytic.base import StrategyMetric
+from signalflow.core import StrategyState, sf_component
 
 
 @dataclass
@@ -115,7 +118,6 @@ class SharpeRatioMetric(StrategyMetric):
         self._returns_history = []
 
     def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
-        import numpy as np
 
         equity = state.portfolio.equity(prices=prices)
         current_return = (equity - self.initial_capital) / self.initial_capital

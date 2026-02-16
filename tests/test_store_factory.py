@@ -1,11 +1,10 @@
 """Tests for StoreFactory."""
 
-from pathlib import Path
 
 import pytest
 
-from signalflow.data.store_factory import StoreFactory
 from signalflow.data.raw_store.base import RawDataStore
+from signalflow.data.store_factory import StoreFactory
 from signalflow.data.strategy_store.base import StrategyStore
 
 

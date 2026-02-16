@@ -1,16 +1,16 @@
 # src/signalflow/data/strategy_store/duckdb.py
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable, Optional
 
 import duckdb
 
-from signalflow.core import sf_component, StrategyState, Position, Trade
-
+from signalflow.core import Position, StrategyState, Trade, sf_component
+from signalflow.data.strategy_store._serialization import state_from_json as _state_from_json
+from signalflow.data.strategy_store._serialization import to_json as _to_json
 from signalflow.data.strategy_store.base import StrategyStore
 from signalflow.data.strategy_store.schema import SCHEMA_SQL
-from signalflow.data.strategy_store._serialization import to_json as _to_json, state_from_json as _state_from_json
 
 
 @sf_component(name="duckdb/strategy")
@@ -115,7 +115,7 @@ class DuckDbStrategyStore(StrategyStore):
         """
         self.con.execute(SCHEMA_SQL)
 
-    def load_state(self, strategy_id: str) -> Optional[StrategyState]:
+    def load_state(self, strategy_id: str) -> StrategyState | None:
         """Load strategy state from database.
 
         Retrieves most recent saved state for given strategy.

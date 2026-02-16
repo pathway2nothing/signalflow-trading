@@ -1,6 +1,5 @@
 """Tests for SfTorchModuleMixin in base_mixin.py."""
 
-import pytest
 import optuna
 
 from signalflow.core.base_mixin import SfTorchModuleMixin

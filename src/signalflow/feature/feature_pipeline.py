@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import ClassVar, Any
-from signalflow.core import RawDataView, RawDataType
-from signalflow.core.registry import default_registry
+from typing import Any, ClassVar
+
 import polars as pl
+
+from signalflow.core import RawDataType, RawDataView
+from signalflow.core.registry import default_registry
 from signalflow.feature.base import Feature, GlobalFeature
-from signalflow.feature.offset_feature import OffsetFeature
 
 
 @dataclass

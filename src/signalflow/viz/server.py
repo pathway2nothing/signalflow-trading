@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class VizServer:
     """Simple HTTP server for serving pipeline visualization."""
 
-    def __init__(self, graph: "PipelineGraph", port: int = 4141):
+    def __init__(self, graph: PipelineGraph, port: int = 4141):
         self.graph = graph
         self.port = port
         self._server: socketserver.TCPServer | None = None
@@ -111,7 +111,7 @@ class VizServer:
 
 
 def serve(
-    graph: "PipelineGraph",
+    graph: PipelineGraph,
     port: int = 4141,
     open_browser: bool = True,
     block: bool = True,

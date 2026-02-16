@@ -6,7 +6,7 @@ import asyncio
 import signal
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 import polars as pl
 from loguru import logger
@@ -181,7 +181,7 @@ class RealtimeRunner(StrategyRunner):
                         self._shutdown.wait(),
                         timeout=self.poll_interval_sec,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
                 continue
 
@@ -318,7 +318,7 @@ class RealtimeRunner(StrategyRunner):
             return []
 
         # Find the latest timestamp across all pairs
-        latest: Optional[datetime] = None
+        latest: datetime | None = None
         for pair in self.pairs:
             _, pair_max = self.raw_store.get_time_bounds(pair)
             if pair_max is not None:
@@ -336,7 +336,7 @@ class RealtimeRunner(StrategyRunner):
             start = state.last_ts
         else:
             # First run - find earliest timestamp across all pairs
-            earliest: Optional[datetime] = None
+            earliest: datetime | None = None
             for pair in self.pairs:
                 pair_min, _ = self.raw_store.get_time_bounds(pair)
                 if pair_min is not None:

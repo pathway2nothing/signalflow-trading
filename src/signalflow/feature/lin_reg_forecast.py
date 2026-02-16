@@ -49,7 +49,7 @@ class LinRegForecastFeature(Feature):
 
     def __post_init__(self):
         if self.n_lags < 1:
-            raise ValueError(f"n_lags must be >= 1")
+            raise ValueError("n_lags must be >= 1")
 
     def _get_period_key(self, ts: datetime) -> tuple | None:
         if self.refit_period == "hour":

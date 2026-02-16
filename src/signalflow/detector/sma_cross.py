@@ -27,7 +27,7 @@ class ExampleSmaCrossDetector(SignalDetector):
 
     def __post_init__(self) -> None:
         if self.fast_period >= self.slow_period:
-            raise ValueError(f"fast_period must be < slow_period")
+            raise ValueError("fast_period must be < slow_period")
 
         self.fast_col = f"sma_{self.fast_period}"
         self.slow_col = f"sma_{self.slow_period}"

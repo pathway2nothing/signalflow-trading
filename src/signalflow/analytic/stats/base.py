@@ -10,12 +10,12 @@ from typing import TYPE_CHECKING, Any, Protocol
 import numpy as np
 
 if TYPE_CHECKING:
-    from signalflow.api.result import BacktestResult
     from signalflow.analytic.stats.results import (
         BootstrapResult,
         MonteCarloResult,
         StatisticalTestResult,
     )
+    from signalflow.api.result import BacktestResult
 
 
 class TradeProtocol(Protocol):

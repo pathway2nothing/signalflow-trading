@@ -3,7 +3,7 @@
 import pytest
 
 from signalflow.api.result import BacktestResult
-from signalflow.core import default_registry, SfComponentType
+from signalflow.core import SfComponentType, default_registry
 
 
 class TestBacktestResultProperties:
@@ -185,6 +185,7 @@ class TestBacktestResultJupyter:
     def test_to_dataframe_empty_trades(self, sample_state, sample_raw_data, sample_signals):
         """to_dataframe() handles empty trades."""
         import polars as pl
+
         from signalflow.api.result import BacktestResult
 
         result = BacktestResult(

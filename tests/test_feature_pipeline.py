@@ -1,10 +1,8 @@
 """Tests for signalflow.feature.feature_pipeline.FeaturePipeline."""
 
-import polars as pl
 import pytest
 
-from signalflow.feature.base import Feature, GlobalFeature
-from signalflow.feature.examples import ExampleRsiFeature, ExampleSmaFeature, ExampleGlobalMeanRsiFeature
+from signalflow.feature.examples import ExampleGlobalMeanRsiFeature, ExampleRsiFeature, ExampleSmaFeature
 from signalflow.feature.feature_pipeline import FeaturePipeline
 
 

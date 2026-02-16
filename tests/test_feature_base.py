@@ -1,9 +1,10 @@
 """Tests for signalflow.feature.base.Feature."""
 
-import pytest
-import polars as pl
 from dataclasses import dataclass
 from typing import ClassVar
+
+import polars as pl
+import pytest
 
 from signalflow.feature.base import Feature, GlobalFeature
 

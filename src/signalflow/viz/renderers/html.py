@@ -1051,7 +1051,7 @@ setTimeout(fitToView, 150);
 class HtmlRenderer:
     """Render PipelineGraph to interactive HTML with D3.js."""
 
-    def __init__(self, graph: "PipelineGraph"):
+    def __init__(self, graph: PipelineGraph):
         self.graph = graph
 
     def render(self, output_path: str | Path | None = None) -> str:

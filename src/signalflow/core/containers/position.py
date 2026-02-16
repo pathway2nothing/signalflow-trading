@@ -3,12 +3,9 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Iterable, Literal
+from typing import Any
 
-import polars as pl
-
-from signalflow.core.containers.trade import Trade
-from signalflow.core.containers.trade import TradeSide
+from signalflow.core.containers.trade import Trade, TradeSide
 from signalflow.core.enums import PositionType
 
 

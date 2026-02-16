@@ -1,5 +1,6 @@
-import optuna
 from typing import Any
+
+import optuna
 
 
 def build_optuna_params(trial: optuna.Trial, tune_space: dict[str, tuple]) -> dict[str, Any]:

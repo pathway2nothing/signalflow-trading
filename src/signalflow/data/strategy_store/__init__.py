@@ -31,14 +31,14 @@ Example:
 
 from signalflow.data.strategy_store.base import StrategyStore
 from signalflow.data.strategy_store.duckdb import DuckDbStrategyStore
-from signalflow.data.strategy_store.sqlite import SqliteStrategyStore
 from signalflow.data.strategy_store.memory import InMemoryStrategyStore
+from signalflow.data.strategy_store.sqlite import SqliteStrategyStore
 
 __all__ = [
-    "StrategyStore",
     "DuckDbStrategyStore",
-    "SqliteStrategyStore",
     "InMemoryStrategyStore",
+    "SqliteStrategyStore",
+    "StrategyStore",
 ]
 
 

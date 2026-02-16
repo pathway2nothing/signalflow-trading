@@ -7,7 +7,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from signalflow.core.containers.raw_data_lazy import RawDataLazy, LazyDataTypeAccessor
+from signalflow.core.containers.raw_data_lazy import RawDataLazy
 from signalflow.data.raw_store import DuckDbRawStore
 
 

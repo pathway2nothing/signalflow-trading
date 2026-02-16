@@ -12,11 +12,11 @@ from typing import Any, ClassVar
 import polars as pl
 
 from signalflow.core import (
+    RawDataType,
     RawDataView,
-    Signals,
     SfComponentType,
     SignalCategory,
-    RawDataType,
+    Signals,
     sf_component,
 )
 from signalflow.detector.base import SignalDetector

@@ -5,7 +5,6 @@ CRITICAL: These tests verify that the registry autodiscover mechanism
 still works correctly after adding lazy imports for the api module.
 """
 
-import pytest
 
 
 class TestAutodiscover:
@@ -33,7 +32,7 @@ class TestAutodiscover:
 
     def test_autodiscover_finds_detectors(self):
         """Autodiscover finds @sf_component decorated detectors."""
-        from signalflow.core import default_registry, SfComponentType
+        from signalflow.core import SfComponentType, default_registry
 
         detectors = default_registry.list(SfComponentType.DETECTOR)
         assert len(detectors) > 0
@@ -41,7 +40,7 @@ class TestAutodiscover:
 
     def test_autodiscover_finds_metrics(self):
         """Autodiscover finds strategy metrics."""
-        from signalflow.core import default_registry, SfComponentType
+        from signalflow.core import SfComponentType, default_registry
 
         metrics = default_registry.list(SfComponentType.STRATEGY_METRIC)
         # Should find at least result_main and result_pair
@@ -49,7 +48,7 @@ class TestAutodiscover:
 
     def test_autodiscover_finds_features(self):
         """Autodiscover finds features."""
-        from signalflow.core import default_registry, SfComponentType
+        from signalflow.core import SfComponentType, default_registry
 
         features = default_registry.list(SfComponentType.FEATURE)
         # Features may or may not be registered

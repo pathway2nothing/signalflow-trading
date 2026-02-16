@@ -3,21 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import polars as pl
 from joblib import Parallel, delayed
 from loguru import logger
 
-from signalflow.core.enums import SfComponentType
-from signalflow.core.decorators import sf_component
+from signalflow.analytic import StrategyMetric
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
+from signalflow.core.decorators import sf_component
+from signalflow.core.enums import SfComponentType
 from signalflow.strategy.component.base import EntryRule, ExitRule
 from signalflow.strategy.runner.base import StrategyRunner
-from signalflow.analytic import StrategyMetric
 
 if TYPE_CHECKING:
     from signalflow.core.containers.position import Position
@@ -141,9 +141,9 @@ def _run_pair_backtest(
     metrics: list,
 ) -> PairResult:
     """Run backtest for single pair."""
-    from signalflow.strategy.broker.isolated_broker import IsolatedBacktestBroker
-    from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
     from signalflow.data.strategy_store.memory import InMemoryStrategyStore
+    from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
+    from signalflow.strategy.broker.isolated_broker import IsolatedBacktestBroker
 
     # Create isolated state
     state = StrategyState(strategy_id=f"{config['strategy_id']}_{pair}")

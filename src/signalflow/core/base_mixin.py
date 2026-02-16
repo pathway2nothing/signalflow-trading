@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-import optuna
-from signalflow.core.enums import SfComponentType
 from typing import Literal
+
+import optuna
+
+from signalflow.core.enums import SfComponentType
 
 
 class SfTorchModuleMixin(ABC):

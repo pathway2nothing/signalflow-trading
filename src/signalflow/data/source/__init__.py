@@ -31,44 +31,43 @@ Example:
     ```
 """
 
-from signalflow.data.source.base import RawDataSource, RawDataLoader
+from signalflow.data.source.base import RawDataLoader, RawDataSource
 from signalflow.data.source.binance import (
     BinanceClient,
-    BinanceSpotLoader,
-    BinanceFuturesUsdtLoader,
     BinanceFuturesCoinLoader,
+    BinanceFuturesUsdtLoader,
+    BinanceSpotLoader,
 )
 from signalflow.data.source.bybit import (
     BybitClient,
-    BybitSpotLoader,
-    BybitFuturesLoader,
     BybitFuturesInverseLoader,
-)
-from signalflow.data.source.okx import (
-    OkxClient,
-    OkxSpotLoader,
-    OkxFuturesLoader,
+    BybitFuturesLoader,
+    BybitSpotLoader,
 )
 from signalflow.data.source.deribit import (
     DeribitClient,
     DeribitFuturesLoader,
 )
-from signalflow.data.source.kraken import (
-    KrakenClient,
-    KrakenSpotLoader,
-    KrakenFuturesLoader,
-)
 from signalflow.data.source.hyperliquid import (
     HyperliquidClient,
     HyperliquidFuturesLoader,
 )
+from signalflow.data.source.kraken import (
+    KrakenClient,
+    KrakenFuturesLoader,
+    KrakenSpotLoader,
+)
+from signalflow.data.source.okx import (
+    OkxClient,
+    OkxFuturesLoader,
+    OkxSpotLoader,
+)
+from signalflow.data.source.virtual import VirtualDataProvider, generate_crossover_data, generate_ohlcv
 from signalflow.data.source.whitebit import (
     WhitebitClient,
-    WhitebitSpotLoader,
     WhitebitFuturesLoader,
+    WhitebitSpotLoader,
 )
-from signalflow.data.source.virtual import VirtualDataProvider, generate_ohlcv, generate_crossover_data
-
 
 __all__ = [
     "RawDataSource",

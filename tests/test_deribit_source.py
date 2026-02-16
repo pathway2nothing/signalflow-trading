@@ -11,15 +11,15 @@ import pytest
 
 from signalflow.core.enums import SfComponentType
 from signalflow.core.registry import default_registry
-from signalflow.data.source.deribit import (
-    DeribitClient,
-    DeribitFuturesLoader,
-    _DERIBIT_INTERVAL_MAP,
-)
 from signalflow.data.source._helpers import (
+    dt_to_ms_utc,
     normalize_deribit_pair,
     to_deribit_instrument,
-    dt_to_ms_utc,
+)
+from signalflow.data.source.deribit import (
+    _DERIBIT_INTERVAL_MAP,
+    DeribitClient,
+    DeribitFuturesLoader,
 )
 
 START = datetime(2024, 1, 1)

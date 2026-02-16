@@ -11,18 +11,18 @@ import pytest
 
 from signalflow.core.enums import SfComponentType
 from signalflow.core.registry import default_registry
-from signalflow.data.source.whitebit import (
-    WhitebitClient,
-    WhitebitSpotLoader,
-    WhitebitFuturesLoader,
-    _WHITEBIT_INTERVAL_MAP,
-)
 from signalflow.data.source._helpers import (
-    normalize_whitebit_pair,
-    to_whitebit_symbol,
-    normalize_whitebit_futures_pair,
-    to_whitebit_futures_symbol,
     dt_to_sec_utc,
+    normalize_whitebit_futures_pair,
+    normalize_whitebit_pair,
+    to_whitebit_futures_symbol,
+    to_whitebit_symbol,
+)
+from signalflow.data.source.whitebit import (
+    _WHITEBIT_INTERVAL_MAP,
+    WhitebitClient,
+    WhitebitFuturesLoader,
+    WhitebitSpotLoader,
 )
 
 START = datetime(2024, 1, 1)

@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from datetime import datetime
-from typing import ClassVar, Iterable, Optional
+from typing import ClassVar
 
-from signalflow.core import SfComponentType, StrategyState, Position, Trade
+from signalflow.core import Position, SfComponentType, StrategyState, Trade
 
 
 class StrategyStore(ABC):
@@ -115,7 +116,7 @@ class StrategyStore(ABC):
         ...
 
     @abstractmethod
-    def load_state(self, strategy_id: str) -> Optional[StrategyState]:
+    def load_state(self, strategy_id: str) -> StrategyState | None:
         """Load strategy state from storage.
 
         Retrieves most recent saved state for recovery or resumption.

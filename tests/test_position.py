@@ -1,7 +1,8 @@
 """Tests for signalflow.core.containers.position.Position."""
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 from signalflow.core.containers.position import Position
 from signalflow.core.containers.trade import Trade

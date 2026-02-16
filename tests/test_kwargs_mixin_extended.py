@@ -6,10 +6,9 @@ from datetime import datetime, timedelta
 import polars as pl
 import pytest
 
-from signalflow.utils.kwargs_mixin import KwargsTolerantMixin
 from signalflow.core.enums import SignalType
 from signalflow.target.adapter.pandas_labeler import PandasLabeler
-
+from signalflow.utils.kwargs_mixin import KwargsTolerantMixin
 
 # ── KwargsTolerantMixin ──────────────────────────────────────────────────
 

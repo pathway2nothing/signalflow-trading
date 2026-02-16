@@ -1,17 +1,14 @@
 """Tests for exit rules: TakeProfitStopLossExit, TimeBasedExit, TrailingStopExit, VolatilityExit, CompositeExit."""
 
-from datetime import datetime
 
-import pytest
 
-from signalflow.core.containers.position import Position
 from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core.enums import ExitPriority, PositionType
-from signalflow.strategy.component.exit.tp_sl import TakeProfitStopLossExit
+from signalflow.core.enums import ExitPriority
+from signalflow.strategy.component.exit.composite import CompositeExit
 from signalflow.strategy.component.exit.time_based import TimeBasedExit
+from signalflow.strategy.component.exit.tp_sl import TakeProfitStopLossExit
 from signalflow.strategy.component.exit.trailing_stop import TrailingStopExit
 from signalflow.strategy.component.exit.volatility_exit import VolatilityExit
-from signalflow.strategy.component.exit.composite import CompositeExit
 
 
 def _make_state():

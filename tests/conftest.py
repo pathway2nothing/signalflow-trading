@@ -1,9 +1,9 @@
 """Shared fixtures for signalflow tests."""
 
-import pytest
-import polars as pl
 from datetime import datetime, timedelta
-from pathlib import Path
+
+import polars as pl
+import pytest
 
 
 @pytest.fixture

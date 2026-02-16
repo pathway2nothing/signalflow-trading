@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import ClassVar, Any
+from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl

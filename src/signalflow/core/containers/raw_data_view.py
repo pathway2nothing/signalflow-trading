@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
+
 import pandas as pd
 import polars as pl
-from .raw_data import RawData
+
 from signalflow.core.enums import DataFrameType, RawDataType
+
+from .raw_data import RawData
 
 
 @dataclass

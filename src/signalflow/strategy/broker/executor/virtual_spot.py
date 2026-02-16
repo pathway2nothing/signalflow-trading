@@ -1,13 +1,14 @@
 """Virtual executor for backtesting - simulates order fills at current prices."""
 
 from __future__ import annotations
+
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import ClassVar
-import uuid
 
-from signalflow.core.enums import SfComponentType
 from signalflow.core.decorators import sf_component
+from signalflow.core.enums import SfComponentType
 
 
 @dataclass

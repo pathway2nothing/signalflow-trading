@@ -1,8 +1,7 @@
 """Tests for SignalDetector validation, SMA cross, PandasSignalDetector."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, ClassVar
+from datetime import UTC, datetime, timedelta
 
 import polars as pl
 import pytest
@@ -12,8 +11,9 @@ from signalflow.core.enums import SignalType
 from signalflow.detector.base import SignalDetector
 
 try:
-    from signalflow.detector.adapter.pandas_detector import PandasSignalDetector
     import pandas as pd
+
+    from signalflow.detector.adapter.pandas_detector import PandasSignalDetector
 
     _HAS_PANDAS_DETECTOR = True
 except (ImportError, ModuleNotFoundError):
@@ -90,7 +90,7 @@ class TestValidateFeatures:
         df = pl.DataFrame(
             {
                 "pair": ["BTCUSDT"],
-                "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+                "timestamp": [datetime(2024, 1, 1, tzinfo=UTC)],
                 "close": [100.0],
             }
         )
@@ -149,7 +149,7 @@ class TestValidateSignals:
             pl.DataFrame(
                 {
                     "pair": ["BTCUSDT"],
-                    "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+                    "timestamp": [datetime(2024, 1, 1, tzinfo=UTC)],
                     "signal_type": [SignalType.RISE.value],
                     "signal": [1],
                 }
@@ -183,7 +183,7 @@ class TestNormalizeIndex:
         df = pl.DataFrame(
             {
                 "pair": ["BTCUSDT"],
-                "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+                "timestamp": [datetime(2024, 1, 1, tzinfo=UTC)],
             }
         )
         result = d._normalize_index(df)

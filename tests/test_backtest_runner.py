@@ -9,7 +9,6 @@ from signalflow.core.containers.signals import Signals
 from signalflow.core.enums import SignalType
 from signalflow.strategy.runner import BacktestRunner
 
-
 TS = datetime(2024, 1, 1)
 PAIRS = ["BTCUSDT", "ETHUSDT"]
 
