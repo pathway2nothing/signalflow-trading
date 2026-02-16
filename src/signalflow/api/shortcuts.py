@@ -203,6 +203,32 @@ def backtest(
     return builder.run()
 
 
+def load_artifact(
+    path: str | Path,
+    name: str = "features",
+) -> "pl.DataFrame":
+    """
+    Load a parquet artifact from a flow artifacts directory.
+
+    Args:
+        path: Path to artifacts directory
+        name: Artifact name (features, signals, labels, predictions, trades)
+
+    Returns:
+        Polars DataFrame
+
+    Example:
+        >>> features = sf.load_artifact("artifacts/my_flow", "features")
+        >>> trades = sf.load_artifact("artifacts/my_flow", "trades")
+    """
+    import polars as pl
+
+    artifact_path = Path(path) / f"{name}.parquet"
+    if not artifact_path.exists():
+        raise FileNotFoundError(f"Artifact not found: {artifact_path}")
+    return pl.read_parquet(artifact_path)
+
+
 def _parse_datetime(value: str | datetime | None) -> datetime | None:
     """Parse string to datetime, or return datetime as-is."""
     if value is None:

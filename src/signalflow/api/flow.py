@@ -14,13 +14,15 @@ Examples:
 
 from __future__ import annotations
 
+import copy
+import json
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from threading import Event
-from typing import TYPE_CHECKING, Any, Callable, Self
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Self
 
 import polars as pl
 
@@ -29,6 +31,7 @@ from signalflow.core import (
     Signals,
     SfComponentType,
     default_registry,
+    sf_component,
 )
 from signalflow.api.exceptions import (
     ConfigurationError,
@@ -168,6 +171,68 @@ class FlowResult:
             self.predictions.write_parquet(path / "predictions.parquet")
         if self.trades is not None:
             self.trades.write_parquet(path / "trades.parquet")
+
+        # Save flow config
+        if self.flow_config is not None:
+            config_dict = {
+                "strategy_id": self.flow_config.strategy_id,
+                "run_mode": self.flow_config.run_mode.value,
+                "data_sources": self.flow_config.data_sources,
+                "feature_pipelines": self.flow_config.feature_pipelines,
+                "detectors": self.flow_config.detectors,
+                "labelers": self.flow_config.labelers,
+                "validators": self.flow_config.validators,
+                "metrics": self.flow_config.metrics,
+                "capital": self.flow_config.capital,
+                "fee": self.flow_config.fee,
+            }
+            with open(path / "flow_config.json", "w") as f:
+                json.dump(config_dict, f, indent=2, default=str)
+
+        # Save window/fold summaries
+        if self.window_results:
+            summaries = [wr.to_json_dict() for wr in self.window_results]
+            with open(path / "window_results.json", "w") as f:
+                json.dump(summaries, f, indent=2, default=str)
+        if self.fold_results:
+            summaries = [fr.to_json_dict() for fr in self.fold_results]
+            with open(path / "fold_results.json", "w") as f:
+                json.dump(summaries, f, indent=2, default=str)
+
+    def to_json_dict(self) -> dict[str, Any]:
+        """Export as JSON-serializable dict for API responses."""
+        result: dict[str, Any] = {}
+
+        if self.backtest_metrics:
+            result["metrics"] = (
+                self.backtest_metrics
+                if isinstance(self.backtest_metrics, dict)
+                else {}
+            )
+
+        result["n_trades"] = self.trades.height if self.trades is not None else 0
+        result["execution_time"] = self.execution_time
+
+        if self.trades is not None and self.trades.height > 0:
+            result["trades"] = self.trades.to_dicts()
+
+        if self.flow_config:
+            result["config"] = {
+                "strategy_id": self.flow_config.strategy_id,
+                "run_mode": self.flow_config.run_mode.value,
+                "capital": self.flow_config.capital,
+            }
+
+        if self.window_results:
+            result["window_results"] = [
+                wr.to_json_dict() for wr in self.window_results
+            ]
+        if self.fold_results:
+            result["fold_results"] = [
+                fr.to_json_dict() for fr in self.fold_results
+            ]
+
+        return result
 
 
 @dataclass
@@ -725,41 +790,59 @@ class FlowBuilder:
         gap: int,
         progress_callback: Callable[[int, int, dict[str, Any]], None] | None,
     ) -> FlowResult:
-        """Execute temporal cross-validation."""
+        """Execute temporal cross-validation.
+
+        Uses expanding window: train grows with each fold, test stays fixed size.
+        """
         result = FlowResult()
         result.fold_results = []
 
-        # Resolve data
         raw = self._resolve_data()
 
-        # Get timestamps for splitting
+        # Get timestamp boundaries
         first_key = next(iter(raw.data.keys()), "spot")
         df = raw.get(first_key)
         timestamps = df.select("timestamp").to_series().sort()
         n = len(timestamps)
 
+        if n == 0:
+            return result
+
         fold_size = n // (folds + 1)
+        if fold_size == 0:
+            return result
+
+        gap_td = timedelta(hours=gap) if gap > 0 else timedelta(0)
 
         for fold in range(folds):
-            # Calculate train/test indices
-            train_end = fold_size * (fold + 2)
-            test_start = train_end + gap
-            test_end = min(test_start + fold_size, n)
+            if progress_callback:
+                progress_callback(fold, folds, {"fold": fold})
 
-            if test_start >= n:
+            # Expanding train: from start to fold boundary
+            train_end_idx = fold_size * (fold + 2)
+            test_start_idx = min(train_end_idx + gap, n - 1)
+            test_end_idx = min(test_start_idx + fold_size, n)
+
+            if test_start_idx >= n or test_end_idx <= test_start_idx:
                 break
 
-            train_ts = timestamps[:train_end]
-            test_ts = timestamps[test_start:test_end]
+            train_start_ts = timestamps[0]
+            train_end_ts = timestamps[min(train_end_idx, n - 1)]
+            test_start_ts = timestamps[test_start_idx]
+            test_end_ts = timestamps[min(test_end_idx - 1, n - 1)]
 
-            # Filter data
-            train_df = df.filter(pl.col("timestamp").is_in(train_ts))
-            test_df = df.filter(pl.col("timestamp").is_in(test_ts))
-
-            # Create fold result (simplified for now)
-            fold_result = FlowResult()
-            fold_result.signals = self._resolve_signals(raw)
+            fold_result = self._run_on_window(
+                raw,
+                train_start=train_start_ts,
+                train_end=train_end_ts,
+                test_start=test_start_ts,
+                test_end=test_end_ts,
+            )
             result.fold_results.append(fold_result)
+
+        # Aggregate metrics across folds
+        if result.fold_results:
+            result.backtest_metrics = self._aggregate_results(result.fold_results)
 
         return result
 
@@ -771,13 +854,72 @@ class FlowBuilder:
         retrain: bool,
         progress_callback: Callable[[int, int, dict[str, Any]], None] | None,
     ) -> FlowResult:
-        """Execute walk-forward validation."""
+        """Execute walk-forward validation.
+
+        Rolls a train/test window forward through the data, optionally
+        retraining the validator each window.
+        """
         result = FlowResult()
         result.window_results = []
 
-        # TODO: Implement walk-forward logic
-        # For now, run single
-        return self._run_single(progress_callback, None)
+        train_td = self._parse_period(train_size)
+        test_td = self._parse_period(test_size)
+        step_td = self._parse_period(step) if step is not None else test_td
+
+        raw = self._resolve_data()
+
+        # Get timestamp boundaries
+        first_key = next(iter(raw.data.keys()), "spot")
+        df = raw.get(first_key)
+        min_ts = df.select("timestamp").min().item()
+        max_ts = df.select("timestamp").max().item()
+
+        # Build windows
+        windows: list[tuple[datetime, datetime, datetime, datetime]] = []
+        train_start = min_ts
+        while True:
+            train_end = train_start + train_td
+            test_start = train_end
+            test_end = test_start + test_td
+            if test_end > max_ts:
+                break
+            windows.append((train_start, train_end, test_start, test_end))
+            train_start = train_start + step_td
+
+        if not windows:
+            raise ConfigurationError(
+                f"Cannot create walk-forward windows: data range too short for "
+                f"train_size={train_size}, test_size={test_size}. "
+                f"Data spans {min_ts} to {max_ts}."
+            )
+
+        current_capital = self._capital
+
+        for i, (tr_start, tr_end, te_start, te_end) in enumerate(windows):
+            if progress_callback:
+                progress_callback(i, len(windows), {"window": i})
+
+            window_result = self._run_on_window(
+                raw,
+                train_start=tr_start if retrain else None,
+                train_end=tr_end if retrain else None,
+                test_start=te_start,
+                test_end=te_end,
+                current_capital=current_capital,
+            )
+            result.window_results.append(window_result)
+
+            # Compound capital across windows
+            if window_result.backtest_metrics and isinstance(window_result.backtest_metrics, dict):
+                final_cap = window_result.backtest_metrics.get("final_capital")
+                if final_cap is not None and final_cap > 0:
+                    current_capital = final_cap
+
+        # Aggregate metrics across windows
+        if result.window_results:
+            result.backtest_metrics = self._aggregate_results(result.window_results)
+
+        return result
 
     def _run_live(self, paper: bool) -> FlowResult:
         """Execute live/paper trading mode."""
@@ -785,6 +927,184 @@ class FlowBuilder:
 
         # TODO: Implement live mode
         raise NotImplementedError("Live mode not yet implemented")
+
+    # =========================================================================
+    # Window / Period Helpers
+    # =========================================================================
+
+    @staticmethod
+    def _parse_period(period: str | int | None) -> timedelta:
+        """Convert period string or int to timedelta.
+
+        Supports: "6M" (months), "30d" (days), "1Y" (years), int (days).
+        """
+        if period is None:
+            raise ConfigurationError("Period must be specified")
+        if isinstance(period, int):
+            return timedelta(days=period)
+
+        period = period.strip()
+        if period.endswith("M"):
+            return timedelta(days=int(period[:-1]) * 30)
+        elif period.endswith("Y"):
+            return timedelta(days=int(period[:-1]) * 365)
+        elif period.endswith("d"):
+            return timedelta(days=int(period[:-1]))
+        else:
+            return timedelta(days=int(period))
+
+    @staticmethod
+    def _filter_raw_data(raw: RawData, start: datetime, end: datetime) -> RawData:
+        """Create a new RawData with DataFrames filtered to [start, end)."""
+        filtered_data: dict[str, Any] = {}
+        for key, value in raw.data.items():
+            if isinstance(value, dict):
+                # Nested structure (multi-source)
+                filtered_data[key] = {
+                    src: df.filter(
+                        (pl.col("timestamp") >= start) & (pl.col("timestamp") < end)
+                    )
+                    if isinstance(df, pl.DataFrame) and "timestamp" in df.columns
+                    else df
+                    for src, df in value.items()
+                }
+            elif isinstance(value, pl.DataFrame) and "timestamp" in value.columns:
+                filtered_data[key] = value.filter(
+                    (pl.col("timestamp") >= start) & (pl.col("timestamp") < end)
+                )
+            else:
+                filtered_data[key] = value
+        return RawData(
+            datetime_start=start,
+            datetime_end=end,
+            pairs=raw.pairs,
+            data=filtered_data,
+            default_source=raw.default_source,
+        )
+
+    def _run_on_window(
+        self,
+        raw: RawData,
+        train_start: datetime | None,
+        train_end: datetime | None,
+        test_start: datetime,
+        test_end: datetime,
+        *,
+        current_capital: float | None = None,
+        progress_callback: Callable[[int, int, dict[str, Any]], None] | None = None,
+        cancel_event: Event | None = None,
+    ) -> FlowResult:
+        """Execute the full pipeline on a single train/test window."""
+        result = FlowResult()
+
+        # Override capital if compounding across windows
+        original_capital = self._capital
+        if current_capital is not None:
+            self._capital = current_capital
+
+        try:
+            # Filter data to test period
+            test_raw = self._filter_raw_data(raw, test_start, test_end)
+
+            # Compute features on test data
+            test_features = None
+            if self._feature_pipelines:
+                test_features = self._compute_features(test_raw)
+                result.features = test_features
+
+            # Detect signals on test data
+            test_signals = self._resolve_signals(test_raw)
+            result.signals = test_signals
+
+            # Train validator on train data and validate test signals
+            if (
+                train_start is not None
+                and train_end is not None
+                and self._named_validators
+                and self._named_labelers
+            ):
+                train_raw = self._filter_raw_data(raw, train_start, train_end)
+
+                # Compute features and labels on train data
+                train_features = self._compute_features(train_raw) if self._feature_pipelines else None
+                train_signals = self._resolve_signals(train_raw)
+                train_labels = self._compute_labels(train_raw, train_signals) if self._named_labelers else None
+
+                if train_features is not None and train_labels is not None and train_features.height > 0:
+                    # Train and validate per validator
+                    for _name, validator in self._named_validators.items():
+                        train_df = train_features.join(
+                            train_labels.select(["pair", "timestamp", "label"]),
+                            on=["pair", "timestamp"],
+                            how="inner",
+                        ).drop_nulls()
+
+                        if train_df.height == 0:
+                            continue
+
+                        feature_cols = [
+                            c for c in train_df.columns
+                            if c not in ("timestamp", "pair", "label")
+                        ]
+                        X_train = train_df.select(feature_cols)
+                        y_train = train_df.select("label")
+
+                        # Deep copy to avoid state leakage between windows
+                        fold_validator = copy.deepcopy(validator)
+                        fold_validator.fit(X_train, y_train)
+
+                        # Validate test signals
+                        if test_features is not None:
+                            try:
+                                validated = fold_validator.predict(test_signals, test_features)
+                                result.predictions = validated.value if hasattr(validated, "value") else None
+                            except Exception:
+                                pass
+
+            # Apply labeling on test data (for metrics)
+            if self._named_labelers:
+                result.labels = self._compute_labels(test_raw, test_signals)
+
+            # Run backtest on test data
+            if self._entry_config or self._exit_config or not self._metric_nodes:
+                backtest_result = self._run_backtest(test_raw, test_signals, progress_callback, cancel_event)
+                if backtest_result:
+                    result.trades = backtest_result.trades_df
+                    result.backtest_metrics = backtest_result.metrics
+
+            # Compute metric nodes
+            self._compute_metrics(result)
+        finally:
+            self._capital = original_capital
+
+        return result
+
+    @staticmethod
+    def _aggregate_results(sub_results: list[FlowResult]) -> dict[str, float]:
+        """Aggregate metrics across folds/windows."""
+        import numpy as np
+
+        metrics_list = [
+            r.backtest_metrics for r in sub_results
+            if r.backtest_metrics and isinstance(r.backtest_metrics, dict)
+        ]
+        if not metrics_list:
+            return {}
+
+        sharpes = [m.get("sharpe_ratio", 0) for m in metrics_list]
+        returns = [m.get("total_return", 0) for m in metrics_list]
+        win_rates = [m.get("win_rate", 0) for m in metrics_list]
+        n_trades = sum(m.get("n_trades", 0) for m in metrics_list)
+
+        return {
+            "n_folds": len(sub_results),
+            "sharpe_avg": float(np.mean(sharpes)) if sharpes else 0,
+            "sharpe_std": float(np.std(sharpes)) if sharpes else 0,
+            "return_avg": float(np.mean(returns)) if returns else 0,
+            "return_std": float(np.std(returns)) if returns else 0,
+            "win_rate_avg": float(np.mean(win_rates)) if win_rates else 0,
+            "n_trades": n_trades,
+        }
 
     # =========================================================================
     # Private Helpers
@@ -1003,49 +1323,61 @@ def flow(strategy_id: str = "flow") -> FlowBuilder:
 
 # Metric node classes
 @dataclass
+@sf_component(name="flow_feature_metrics")
 class FeatureMetrics:
-    """Metric node for feature analysis."""
+    """Metric node for feature analysis: correlation, importance, distribution."""
 
+    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_correlation: bool = True
     include_importance: bool = True
 
 
 @dataclass
+@sf_component(name="flow_signal_metrics")
 class SignalMetrics:
-    """Metric node for signal analysis."""
+    """Metric node for signal analysis: frequency, clustering, timing."""
 
+    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_frequency: bool = True
     include_clustering: bool = True
 
 
 @dataclass
+@sf_component(name="flow_label_metrics")
 class LabelMetrics:
-    """Metric node for label analysis."""
+    """Metric node for label analysis: win rate distribution, holding time."""
 
+    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_distribution: bool = True
     include_holding_time: bool = True
 
 
 @dataclass
+@sf_component(name="flow_validation_metrics")
 class ValidationMetrics:
-    """Metric node for validation analysis."""
+    """Metric node for validation analysis: confusion matrix, feature importance."""
 
+    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_confusion_matrix: bool = True
     include_feature_importance: bool = True
 
 
 @dataclass
+@sf_component(name="flow_backtest_metrics")
 class BacktestMetrics:
-    """Metric node for full backtest analysis."""
+    """Metric node for full backtest analysis: equity curve, drawdown, Sharpe."""
 
+    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_equity_curve: bool = True
     include_drawdown: bool = True
 
 
 @dataclass
+@sf_component(name="flow_live_metrics")
 class LiveMetrics:
-    """Metric node for live trading analysis."""
+    """Metric node for live trading analysis: latency, fill rate, slippage."""
 
+    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_latency: bool = True
     include_slippage: bool = True
 

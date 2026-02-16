@@ -65,6 +65,11 @@ def __getattr__(name: str):
 
         return load
 
+    if name == "load_artifact":
+        from signalflow.api.shortcuts import load_artifact
+
+        return load_artifact
+
     if name == "api":
         import signalflow.api as api
 
@@ -172,6 +177,7 @@ __all__ = [
     "BacktestResult",
     "backtest",
     "load",
+    "load_artifact",
     # Flow API (unified pipeline)
     "flow",
     "FlowBuilder",
