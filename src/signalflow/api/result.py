@@ -18,6 +18,13 @@ from signalflow.core import StrategyState, RawData, Signals, default_registry, S
 if TYPE_CHECKING:
     import plotly.graph_objects as go
 
+    from signalflow.analytic.stats.results import (
+        BootstrapResult,
+        MonteCarloResult,
+        StatisticalTestResult,
+        ValidationResult,
+    )
+
 
 # =============================================================================
 # Type Definitions
@@ -466,3 +473,202 @@ class BacktestResult:
         if hasattr(trade, "__dict__"):
             return {k: v for k, v in trade.__dict__.items() if not k.startswith("_")}
         return {"trade": str(trade)}
+
+    # =========================================================================
+    # Statistical Validation
+    # =========================================================================
+
+    def monte_carlo(
+        self,
+        n_simulations: int = 10_000,
+        ruin_threshold: float = 0.20,
+        random_seed: int | None = None,
+        confidence_levels: tuple[float, ...] = (0.05, 0.50, 0.95),
+    ) -> MonteCarloResult:
+        """Run Monte Carlo simulation on trade sequence.
+
+        Shuffles trade execution order to estimate distribution of outcomes
+        under different trade sequences. Useful for assessing strategy
+        robustness and estimating risk metrics.
+
+        Args:
+            n_simulations: Number of simulations to run (default: 10,000)
+            ruin_threshold: Max drawdown threshold for risk of ruin (default: 20%)
+            random_seed: Random seed for reproducibility (None for random)
+            confidence_levels: Percentile levels to compute (default: 5%, 50%, 95%)
+
+        Returns:
+            MonteCarloResult with simulation distributions and risk metrics
+
+        Example:
+            >>> result = backtest.run()
+            >>> mc = result.monte_carlo(n_simulations=10_000)
+            >>> print(f"Risk of Ruin: {mc.risk_of_ruin:.1%}")
+            >>> print(f"5th percentile equity: ${mc.equity_percentiles[0.05]:,.2f}")
+            >>> mc.plot()
+        """
+        from signalflow.analytic.stats import MonteCarloSimulator
+
+        simulator = MonteCarloSimulator(
+            n_simulations=n_simulations,
+            ruin_threshold=ruin_threshold,
+            random_seed=random_seed,
+            confidence_levels=confidence_levels,
+        )
+        return simulator.validate(self)
+
+    def bootstrap(
+        self,
+        n_bootstrap: int = 5_000,
+        method: str = "bca",
+        confidence_level: float = 0.95,
+        metrics: tuple[str, ...] | None = None,
+        block_size: int | None = None,
+        random_seed: int | None = None,
+    ) -> BootstrapResult:
+        """Compute bootstrap confidence intervals for key metrics.
+
+        Estimates confidence intervals for performance metrics using
+        bootstrap resampling. Supports BCa (bias-corrected accelerated),
+        percentile, and block bootstrap methods.
+
+        Args:
+            n_bootstrap: Number of bootstrap resamples (default: 5,000)
+            method: Bootstrap method - "bca", "percentile", or "block"
+            confidence_level: Confidence level (default: 0.95 for 95% CI)
+            metrics: Metrics to bootstrap (default: sharpe, sortino, calmar, profit_factor, win_rate)
+            block_size: Block size for block bootstrap (auto if None)
+            random_seed: Random seed for reproducibility
+
+        Returns:
+            BootstrapResult with confidence intervals for each metric
+
+        Example:
+            >>> result = backtest.run()
+            >>> bs = result.bootstrap(method="bca", confidence_level=0.95)
+            >>> sr_ci = bs.intervals["sharpe_ratio"]
+            >>> print(f"Sharpe: {sr_ci.point_estimate:.2f} ({sr_ci.lower:.2f}, {sr_ci.upper:.2f})")
+            >>> print(f"Significant vs 0: {bs.is_significant('sharpe_ratio', 0)}")
+        """
+        from signalflow.analytic.stats import BootstrapValidator
+
+        if metrics is None:
+            metrics = (
+                "sharpe_ratio",
+                "sortino_ratio",
+                "calmar_ratio",
+                "profit_factor",
+                "win_rate",
+            )
+
+        validator = BootstrapValidator(
+            n_bootstrap=n_bootstrap,
+            method=method,  # type: ignore[arg-type]
+            block_size=block_size,
+            confidence_level=confidence_level,
+            random_seed=random_seed,
+            metrics=metrics,
+        )
+        return validator.validate(self)
+
+    def statistical_tests(
+        self,
+        sr_benchmark: float = 0.0,
+        confidence_level: float = 0.95,
+    ) -> StatisticalTestResult:
+        """Run statistical significance tests on backtest results.
+
+        Computes:
+        - Probabilistic Sharpe Ratio (PSR): probability SR > benchmark
+        - Minimum Track Record Length (MinTRL): trades needed for significance
+
+        Based on Bailey & Lopez de Prado (2012).
+
+        Args:
+            sr_benchmark: Benchmark Sharpe ratio to compare against (default: 0)
+            confidence_level: Required confidence level (default: 0.95)
+
+        Returns:
+            StatisticalTestResult with PSR and MinTRL values
+
+        Example:
+            >>> result = backtest.run()
+            >>> tests = result.statistical_tests(sr_benchmark=0.5)
+            >>> print(f"PSR: {tests.psr:.1%}")
+            >>> print(f"Significant: {tests.psr_is_significant}")
+            >>> print(f"Min trades needed: {tests.min_track_record_length}")
+        """
+        from signalflow.analytic.stats import StatisticalTestsValidator
+
+        validator = StatisticalTestsValidator(
+            sr_benchmark=sr_benchmark,
+            confidence_level=confidence_level,
+        )
+        return validator.validate(self)
+
+    def validate(
+        self,
+        monte_carlo: bool = True,
+        bootstrap: bool = True,
+        statistical_tests: bool = True,
+        mc_simulations: int = 10_000,
+        bs_resamples: int = 5_000,
+        confidence_level: float = 0.95,
+        ruin_threshold: float = 0.20,
+    ) -> ValidationResult:
+        """Run comprehensive statistical validation.
+
+        Combines Monte Carlo simulation, bootstrap confidence intervals,
+        and statistical significance tests into a single analysis.
+
+        Args:
+            monte_carlo: Run Monte Carlo simulation (default: True)
+            bootstrap: Run bootstrap confidence intervals (default: True)
+            statistical_tests: Run statistical tests - PSR, MinTRL (default: True)
+            mc_simulations: Number of Monte Carlo simulations
+            bs_resamples: Number of bootstrap resamples
+            confidence_level: Confidence level for all tests
+            ruin_threshold: Max drawdown threshold for risk of ruin
+
+        Returns:
+            ValidationResult combining all analyses
+
+        Example:
+            >>> result = backtest.run()
+            >>> validation = result.validate()
+            >>> print(validation.summary())
+            >>> validation.plot()
+        """
+        from signalflow.analytic.stats import ValidationResult
+
+        mc_result = (
+            self.monte_carlo(
+                n_simulations=mc_simulations,
+                ruin_threshold=ruin_threshold,
+            )
+            if monte_carlo
+            else None
+        )
+
+        bs_result = (
+            self.bootstrap(
+                n_bootstrap=bs_resamples,
+                confidence_level=confidence_level,
+            )
+            if bootstrap
+            else None
+        )
+
+        st_result = (
+            self.statistical_tests(
+                confidence_level=confidence_level,
+            )
+            if statistical_tests
+            else None
+        )
+
+        return ValidationResult(
+            monte_carlo=mc_result,
+            bootstrap=bs_result,
+            statistical_tests=st_result,
+        )

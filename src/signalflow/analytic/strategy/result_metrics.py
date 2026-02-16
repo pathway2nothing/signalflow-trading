@@ -5,10 +5,13 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+import numpy as np
+import pandas as pd
 import polars as pl
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from loguru import logger
+from scipy import stats
 
 from signalflow.core import sf_component, StrategyState, RawData
 from signalflow.analytic.base import StrategyMetric
@@ -250,6 +253,327 @@ class StrategyMainResult(StrategyMetric):
         fig.update_yaxes(title_text="Drawdown (%)", row=1, col=1)
         fig.update_yaxes(title_text="Utilization (%)", row=2, col=1)
         fig.update_xaxes(title_text="Date", row=2, col=1)
+        return fig
+
+
+@dataclass
+@sf_component(name="result_distribution", override=True)
+class StrategyDistributionResult(StrategyMetric):
+    """Returns distribution and monthly heatmap visualization."""
+
+    def compute(
+        self,
+        state: StrategyState,
+        prices: dict[str, float],
+        **kwargs,
+    ) -> Dict[str, float]:
+        return {}
+
+    def plot(
+        self,
+        results: dict,
+        state: StrategyState | None = None,
+        raw_data: RawData | None = None,
+        **kwargs,
+    ) -> list[go.Figure] | go.Figure | None:
+        metrics_df: pl.DataFrame | None = results.get("metrics_df")
+        if metrics_df is None or metrics_df.height == 0:
+            logger.warning("No metrics_df for distribution plot")
+            return None
+
+        figs = []
+
+        dist_fig = self._plot_returns_distribution(metrics_df=metrics_df)
+        if dist_fig:
+            figs.append(dist_fig)
+
+        heatmap_fig = self._plot_returns_heatmap(metrics_df=metrics_df)
+        if heatmap_fig:
+            figs.append(heatmap_fig)
+
+        return figs if figs else None
+
+    def _plot_returns_distribution(self, *, metrics_df: pl.DataFrame) -> go.Figure | None:
+        """Plot returns distribution histogram with normal fit."""
+        if "total_return" not in metrics_df.columns:
+            return None
+
+        returns = metrics_df.get_column("total_return").to_list()
+        if len(returns) < 10:
+            return None
+
+        returns_diff = np.diff(returns)
+
+        fig = make_subplots(
+            rows=1,
+            cols=2,
+            subplot_titles=("Returns Distribution", "Returns QQ Plot"),
+            horizontal_spacing=0.12,
+        )
+
+        # Histogram
+        fig.add_trace(
+            go.Histogram(
+                x=returns_diff,
+                nbinsx=50,
+                name="Returns",
+                marker_color="#1f77b4",
+                opacity=0.7,
+                histnorm="probability density",
+            ),
+            row=1,
+            col=1,
+        )
+
+        # Normal distribution overlay
+        x_range = np.linspace(np.min(returns_diff), np.max(returns_diff), 100)
+        normal_y = stats.norm.pdf(x_range, np.mean(returns_diff), np.std(returns_diff))
+        fig.add_trace(
+            go.Scatter(
+                x=x_range,
+                y=normal_y,
+                mode="lines",
+                name="Normal Fit",
+                line=dict(color="red", width=2),
+            ),
+            row=1,
+            col=1,
+        )
+
+        # QQ Plot
+        sorted_returns = np.sort(returns_diff)
+        n = len(sorted_returns)
+        theoretical_quantiles = stats.norm.ppf(np.linspace(0.01, 0.99, n))
+
+        fig.add_trace(
+            go.Scatter(
+                x=theoretical_quantiles,
+                y=sorted_returns,
+                mode="markers",
+                name="QQ",
+                marker=dict(color="#1f77b4", size=4),
+            ),
+            row=1,
+            col=2,
+        )
+
+        # Reference line
+        fig.add_trace(
+            go.Scatter(
+                x=[theoretical_quantiles.min(), theoretical_quantiles.max()],
+                y=[sorted_returns.min(), sorted_returns.max()],
+                mode="lines",
+                name="Reference",
+                line=dict(color="red", dash="dash"),
+            ),
+            row=1,
+            col=2,
+        )
+
+        # Statistics
+        skew = float(stats.skew(returns_diff))
+        kurtosis = float(stats.kurtosis(returns_diff))
+        fig.add_annotation(
+            x=0.98,
+            y=0.98,
+            xref="paper",
+            yref="paper",
+            text=f"Skew: {skew:.3f}<br>Kurtosis: {kurtosis:.3f}",
+            showarrow=False,
+            bgcolor="white",
+            bordercolor="gray",
+            borderwidth=1,
+            font=dict(size=11),
+        )
+
+        fig.update_layout(
+            title=dict(text="<b>Returns Distribution Analysis</b>"),
+            template="plotly_white",
+            height=450,
+            showlegend=True,
+        )
+        fig.update_xaxes(title_text="Return", row=1, col=1)
+        fig.update_yaxes(title_text="Density", row=1, col=1)
+        fig.update_xaxes(title_text="Theoretical Quantiles", row=1, col=2)
+        fig.update_yaxes(title_text="Sample Quantiles", row=1, col=2)
+
+        return fig
+
+    def _plot_returns_heatmap(self, *, metrics_df: pl.DataFrame) -> go.Figure | None:
+        """Plot monthly returns heatmap."""
+        if "total_return" not in metrics_df.columns or "timestamp" not in metrics_df.columns:
+            return None
+
+        df = metrics_df.to_pandas()
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df["year"] = df["timestamp"].dt.year
+        df["month"] = df["timestamp"].dt.month
+
+        # Calculate monthly returns
+        monthly = (
+            df.groupby(["year", "month"])
+            .agg(
+                first_return=("total_return", "first"),
+                last_return=("total_return", "last"),
+            )
+            .reset_index()
+        )
+        monthly["return"] = (monthly["last_return"] - monthly["first_return"]) * 100
+
+        if monthly.empty:
+            return None
+
+        # Pivot for heatmap
+        pivot = monthly.pivot(index="year", columns="month", values="return")
+        pivot = pivot.reindex(columns=range(1, 13))
+
+        month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+        # Create text annotations
+        text_matrix = []
+        for _, row in pivot.iterrows():
+            text_row = []
+            for val in row:
+                if pd.isna(val):
+                    text_row.append("")
+                else:
+                    text_row.append(f"{val:.1f}%")
+            text_matrix.append(text_row)
+
+        fig = go.Figure(
+            data=go.Heatmap(
+                z=pivot.values,
+                x=month_names,
+                y=pivot.index.astype(str),
+                colorscale="RdYlGn",
+                zmid=0,
+                text=text_matrix,
+                texttemplate="%{text}",
+                textfont=dict(size=10),
+                hovertemplate="Year: %{y}<br>Month: %{x}<br>Return: %{z:.2f}%<extra></extra>",
+                colorbar=dict(title="Return (%)"),
+            )
+        )
+
+        fig.update_layout(
+            title=dict(text="<b>Monthly Returns Heatmap</b>"),
+            xaxis_title="Month",
+            yaxis_title="Year",
+            template="plotly_white",
+            height=max(300, len(pivot) * 50 + 100),
+        )
+
+        return fig
+
+
+@dataclass
+@sf_component(name="result_equity", override=True)
+class StrategyEquityResult(StrategyMetric):
+    """Equity curve with optional benchmark comparison."""
+
+    benchmark_returns: list[float] | None = None
+    benchmark_name: str = "Benchmark"
+
+    def compute(
+        self,
+        state: StrategyState,
+        prices: dict[str, float],
+        **kwargs,
+    ) -> Dict[str, float]:
+        return {}
+
+    def plot(
+        self,
+        results: dict,
+        state: StrategyState | None = None,
+        raw_data: RawData | None = None,
+        **kwargs,
+    ) -> go.Figure | None:
+        metrics_df: pl.DataFrame | None = results.get("metrics_df")
+        if metrics_df is None or metrics_df.height == 0:
+            logger.warning("No metrics_df for equity plot")
+            return None
+
+        if "equity" not in metrics_df.columns:
+            return None
+
+        ts = metrics_df.to_pandas()["timestamp"].to_list()
+        equity = metrics_df.get_column("equity").to_list()
+        initial = equity[0] if equity else 1
+        normalized_equity = [(e / initial - 1) * 100 for e in equity]
+
+        fig = go.Figure()
+
+        # Strategy equity curve
+        fig.add_trace(
+            go.Scatter(
+                x=ts,
+                y=normalized_equity,
+                mode="lines",
+                name="Strategy",
+                line=dict(color="#2171b5", width=2),
+                fill="tozeroy",
+                fillcolor="rgba(33, 113, 181, 0.1)",
+                hovertemplate="Return: %{y:.2f}%<extra></extra>",
+            )
+        )
+
+        # Peak equity line
+        peak_equity = np.maximum.accumulate(normalized_equity)
+        fig.add_trace(
+            go.Scatter(
+                x=ts,
+                y=peak_equity,
+                mode="lines",
+                name="Peak",
+                line=dict(color="rgba(33, 113, 181, 0.4)", width=1, dash="dash"),
+                hovertemplate="Peak: %{y:.2f}%<extra></extra>",
+            )
+        )
+
+        # Benchmark if provided
+        if self.benchmark_returns is not None and len(self.benchmark_returns) > 0:
+            benchmark_cumulative = (np.cumprod(1 + np.array(self.benchmark_returns)) - 1) * 100
+            benchmark_ts = ts[: len(benchmark_cumulative)]
+            fig.add_trace(
+                go.Scatter(
+                    x=benchmark_ts,
+                    y=benchmark_cumulative.tolist(),
+                    mode="lines",
+                    name=self.benchmark_name,
+                    line=dict(color="#d94701", width=2, dash="dot"),
+                    hovertemplate=f"{self.benchmark_name}: %{{y:.2f}}%<extra></extra>",
+                )
+            )
+
+        # Final return annotation
+        final_return = normalized_equity[-1] if normalized_equity else 0
+        fig.add_annotation(
+            x=ts[-1] if ts else 0,
+            y=final_return,
+            text=f"<b>{final_return:.2f}%</b>",
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=2,
+            ax=40,
+            ay=-30,
+            font=dict(size=12, color="#2171b5"),
+        )
+
+        fig.update_layout(
+            title=dict(text=f"<b>Equity Curve</b> | Final Return: {final_return:.2f}%"),
+            xaxis_title="Date",
+            yaxis_title="Return (%)",
+            template="plotly_white",
+            height=500,
+            hovermode="x unified",
+            showlegend=True,
+            legend=dict(orientation="h", y=1.02, x=0),
+        )
+
+        fig.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
+
         return fig
 
 

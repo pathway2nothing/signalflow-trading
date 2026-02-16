@@ -12,6 +12,7 @@ Complete API documentation for SignalFlow components.
 - [Labeler](labeler.md) - Signal labeling
 - [Validator](validator.md) - Signal validation
 - [Strategy](strategy.md) - Strategy execution
+- [Analytic](analytic.md) - Metrics and statistical validation
 - [Visualization](viz.md) - Pipeline visualization
 - [CLI](cli.md) - Command-line interface
 - [Technical Analysis (ta)](ta.md) - 199+ indicators from `signalflow-ta`
