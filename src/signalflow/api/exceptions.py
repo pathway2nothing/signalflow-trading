@@ -239,15 +239,193 @@ class DuplicateComponentNameError(ConfigurationError):
         super().__init__(msg)
 
 
+class LabelerNotFoundError(ComponentNotFoundError):
+    """Raised when a labeler is not found in registry."""
+
+    def __init__(self, name: str, available: list[str] | None = None):
+        from signalflow.core import SfComponentType
+
+        super().__init__(SfComponentType.LABELER, name, available)
+
+    def _build_message(self) -> str:
+        lines = [
+            f"Labeler '{self.name}' not found in registry.",
+            "",
+        ]
+
+        if self.available:
+            lines.append("Available labelers:")
+            for opt in sorted(self.available)[:10]:
+                lines.append(f"  - {opt}")
+        else:
+            lines.append("Built-in labelers:")
+            lines.append("  - triple_barrier  (take-profit/stop-loss/time barriers)")
+            lines.append("  - fixed_horizon   (label based on future return)")
+
+        lines.extend(
+            [
+                "",
+                "Example usage:",
+                "",
+                "  sf.Backtest()",
+                "      .labeler('triple_barrier', tp=0.02, sl=0.01, horizon=20)",
+                "      ...",
+            ]
+        )
+
+        return "\n".join(lines)
+
+
+class InsufficientDataError(DataError):
+    """Raised when there's not enough data for the requested operation."""
+
+    def __init__(
+        self,
+        required: int,
+        available: int,
+        reason: str | None = None,
+    ):
+        self.required = required
+        self.available = available
+
+        lines = [
+            f"Insufficient data: need at least {required} bars, but only {available} available.",
+        ]
+
+        if reason:
+            lines.append(f"  Reason: {reason}")
+
+        lines.extend(
+            [
+                "",
+                "Possible solutions:",
+                "  1. Load more historical data",
+                "  2. Reduce indicator lookback periods",
+                "  3. Use a shorter timeframe (e.g., '1h' instead of '4h')",
+            ]
+        )
+
+        super().__init__("\n".join(lines))
+
+
+class LookAheadBiasError(SignalFlowError):
+    """Raised when look-ahead bias is detected in the pipeline."""
+
+    def __init__(self, component: str, detail: str):
+        lines = [
+            f"Look-ahead bias detected in '{component}'.",
+            f"  {detail}",
+            "",
+            "Look-ahead bias means using future data to make past decisions.",
+            "This invalidates backtest results.",
+            "",
+            "How to fix:",
+            "  - Ensure all features use only past data (shift by 1 or more)",
+            "  - Check that labels don't leak into features",
+            "  - Verify train/test split respects time order",
+        ]
+        super().__init__("\n".join(lines))
+
+
+class NoSignalsError(SignalFlowError):
+    """Raised when detector produces no signals."""
+
+    def __init__(self, detector_name: str, data_rows: int):
+        lines = [
+            f"Detector '{detector_name}' produced 0 signals from {data_rows:,} rows.",
+            "",
+            "Possible causes:",
+            "  1. Detector parameters too strict (e.g., RSI threshold never reached)",
+            "  2. Data range too short for indicator warmup period",
+            "  3. Market conditions don't match detector logic",
+            "",
+            "Try:",
+            "  - Relaxing detector parameters",
+            "  - Using more historical data",
+            "  - Checking detector logic with .detector_result() debug output",
+        ]
+        super().__init__("\n".join(lines))
+
+
+class NoTradesError(SignalFlowError):
+    """Raised when backtest produces no trades."""
+
+    def __init__(self, signals_count: int, reason: str | None = None):
+        lines = [
+            f"Backtest produced 0 trades from {signals_count} signals.",
+        ]
+
+        if reason:
+            lines.append(f"  Reason: {reason}")
+
+        lines.extend(
+            [
+                "",
+                "Possible causes:",
+                "  1. Validator rejected all signals (check validation threshold)",
+                "  2. Entry filters blocked all entries",
+                "  3. Exit rules prevented trade completion",
+                "",
+                "Debug tips:",
+                "  - Run without validator: .validator(None)",
+                "  - Check validator predictions: result.validation_result",
+                "  - Lower validation threshold: .validator('lgbm', threshold=0.3)",
+            ]
+        )
+        super().__init__("\n".join(lines))
+
+
+class ColumnNotFoundError(DataError):
+    """Raised when a required column is missing from data."""
+
+    def __init__(self, column: str, available: list[str], context: str | None = None):
+        lines = [
+            f"Required column '{column}' not found in data.",
+        ]
+
+        if context:
+            lines.append(f"  Context: {context}")
+
+        lines.append("")
+        lines.append("Available columns:")
+        for col in sorted(available)[:15]:
+            lines.append(f"  - {col}")
+        if len(available) > 15:
+            lines.append(f"  ... and {len(available) - 15} more")
+
+        lines.extend(
+            [
+                "",
+                "Common causes:",
+                "  - Column name typo",
+                "  - Feature pipeline not applied before validator",
+                "  - Data schema mismatch between train/test",
+            ]
+        )
+
+        super().__init__("\n".join(lines))
+
+
 __all__ = [
+    # Base
     "SignalFlowError",
     "ConfigurationError",
     "DataError",
+    # Component errors
     "ComponentNotFoundError",
     "DetectorNotFoundError",
     "ValidatorNotFoundError",
+    "LabelerNotFoundError",
     "DuplicateComponentNameError",
+    # Configuration errors
     "MissingDataError",
     "MissingDetectorError",
     "InvalidParameterError",
+    # Data errors
+    "InsufficientDataError",
+    "ColumnNotFoundError",
+    # Runtime errors
+    "LookAheadBiasError",
+    "NoSignalsError",
+    "NoTradesError",
 ]

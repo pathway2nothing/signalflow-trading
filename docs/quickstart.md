@@ -2,6 +2,56 @@
 
 Build your first algorithmic trading strategy with SignalFlow.
 
+!!! tip "New to SignalFlow?"
+    Check the [Glossary](glossary.md) for explanations of terms like Detector, Validator, and Meta-Labeling.
+
+---
+
+## 5-Minute Example
+
+Copy-paste this to run your first backtest:
+
+```python
+import signalflow as sf
+from signalflow.data.source import VirtualDataProvider
+from signalflow.data.raw_store import DuckDbSpotStore
+from signalflow.data import RawDataFactory
+from pathlib import Path
+from datetime import datetime
+
+# 1. Create sample data (no API keys needed)
+store = DuckDbSpotStore(db_path=Path("demo.duckdb"))
+VirtualDataProvider(store=store, seed=42).download(pairs=["BTCUSDT"], n_bars=5000)
+
+# 2. Load data
+data = RawDataFactory.from_duckdb_spot_store(
+    spot_store_path=Path("demo.duckdb"),
+    pairs=["BTCUSDT"],
+    start=datetime(2020, 1, 1),
+    end=datetime(2030, 1, 1),
+)
+
+# 3. Run backtest
+result = (
+    sf.Backtest("my_first_strategy")
+    .data(raw=data)
+    .detector("example/sma_cross", fast_period=10, slow_period=30)
+    .exit(tp=0.02, sl=0.01)  # 2% take-profit, 1% stop-loss
+    .capital(10_000)
+    .run()
+)
+
+# 4. See results
+print(result.summary())
+```
+
+**What this does:**
+
+1. Creates synthetic BTC price data (works offline)
+2. Detects trading signals when fast SMA crosses slow SMA
+3. Backtests with 2% take-profit and 1% stop-loss
+4. Shows performance metrics
+
 ---
 
 ## Prerequisites

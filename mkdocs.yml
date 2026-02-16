@@ -117,6 +117,7 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quick Start: quickstart.md
+    - Glossary: glossary.md
   - Tutorials:
     - notebooks/index.md
     - "01 - Quick Start": notebooks/01_quickstart.ipynb
