@@ -75,6 +75,53 @@ def __getattr__(name: str):
 
         return viz
 
+    # Flow API (unified pipeline)
+    if name == "flow":
+        from signalflow.api.flow import flow
+
+        return flow
+
+    if name == "FlowBuilder":
+        from signalflow.api.flow import FlowBuilder
+
+        return FlowBuilder
+
+    if name == "FlowResult":
+        from signalflow.api.flow import FlowResult
+
+        return FlowResult
+
+    # Metric nodes
+    if name == "FeatureMetrics":
+        from signalflow.api.flow import FeatureMetrics
+
+        return FeatureMetrics
+
+    if name == "SignalMetrics":
+        from signalflow.api.flow import SignalMetrics
+
+        return SignalMetrics
+
+    if name == "LabelMetrics":
+        from signalflow.api.flow import LabelMetrics
+
+        return LabelMetrics
+
+    if name == "ValidationMetrics":
+        from signalflow.api.flow import ValidationMetrics
+
+        return ValidationMetrics
+
+    if name == "BacktestMetrics":
+        from signalflow.api.flow import BacktestMetrics
+
+        return BacktestMetrics
+
+    if name == "LiveMetrics":
+        from signalflow.api.flow import LiveMetrics
+
+        return LiveMetrics
+
     raise AttributeError(f"module 'signalflow' has no attribute {name!r}")
 
 
@@ -125,4 +172,15 @@ __all__ = [
     "BacktestResult",
     "backtest",
     "load",
+    # Flow API (unified pipeline)
+    "flow",
+    "FlowBuilder",
+    "FlowResult",
+    # Metric nodes
+    "FeatureMetrics",
+    "SignalMetrics",
+    "LabelMetrics",
+    "ValidationMetrics",
+    "BacktestMetrics",
+    "LiveMetrics",
 ]
