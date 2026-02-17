@@ -44,6 +44,7 @@ dev = [
 ]
 test = [
   "pytest>=8.0",
+  "pytest-timeout>=2.2",
   "pytest-asyncio>=0.23",
   "pytest-cov>=6.0",
 ]
