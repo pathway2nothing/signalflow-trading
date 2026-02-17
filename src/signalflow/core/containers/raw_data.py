@@ -335,6 +335,20 @@ class RawData:
         """
         return key in self.data
 
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over data type keys.
+
+        Returns:
+            Iterator[str]: Iterator over dataset names.
+
+        Example:
+            ```python
+            for data_type in raw_data:
+                print(f"Dataset: {data_type}")
+            ```
+        """
+        return iter(self.data)
+
     def keys(self) -> Iterator[str]:
         """Return available dataset keys.
 
