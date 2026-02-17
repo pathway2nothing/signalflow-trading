@@ -8,7 +8,7 @@ class OrderExecutor(Protocol):
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_EXECUTOR
     """
     Protocol for order execution.
-    
+
     Implementations:
         - VirtualExecutor: Simulates fills at current prices
         - LiveExecutor: Submits orders to exchange

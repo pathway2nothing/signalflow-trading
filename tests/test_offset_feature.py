@@ -33,7 +33,7 @@ class TestOffsetFeatureValidation:
             OffsetFeature(feature_name=None)
 
     def test_unknown_feature_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(KeyError):
             OffsetFeature(feature_name="nonexistent_feature_12345")
 
 

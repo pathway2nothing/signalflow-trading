@@ -85,7 +85,7 @@ class DuckDbRawStore(RawDataStore):
     @property
     def _all_column_names(self) -> list[str]:
         """Full column list including pair and timestamp."""
-        return ["pair", "timestamp"] + self._columns
+        return ["pair", "timestamp", *self._columns]
 
     def _col_sql_type(self, col: str) -> str:
         """SQL type string for a column."""
@@ -159,7 +159,7 @@ class DuckDbRawStore(RawDataStore):
         # Build target table with spot columns (legacy databases are always spot)
         spot_cols = resolve_columns("spot")
         col_defs = ",\n                    ".join(
-            f"{c} {self._col_sql_type(c)}" for c in ["pair", "timestamp"] + spot_cols
+            f"{c} {self._col_sql_type(c)}" for c in ["pair", "timestamp", *spot_cols]
         )
         self._con.execute(f"""
             CREATE TABLE IF NOT EXISTS ohlcv_new (
@@ -221,7 +221,7 @@ class DuckDbRawStore(RawDataStore):
 
     def _kline_to_row(self, pair: str, k: dict) -> tuple:
         """Convert a kline dict to a positional tuple matching table columns."""
-        return (pair, k["timestamp"]) + tuple(k.get(c) for c in self._columns)
+        return (pair, k["timestamp"], *tuple(k.get(c) for c in self._columns))
 
     # ── Queries ───────────────────────────────────────────────────────
 

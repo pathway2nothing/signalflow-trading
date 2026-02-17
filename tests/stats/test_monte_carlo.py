@@ -66,7 +66,7 @@ class TestNumbaKernels:
         pnls = np.array([100.0, -50.0, -30.0, 80.0, -20.0])
         initial = 1000.0
 
-        equity, max_dd, consec_losses, dd_duration = _compute_equity_metrics(pnls, initial)
+        equity, max_dd, consec_losses, _dd_duration = _compute_equity_metrics(pnls, initial)
 
         assert equity == 1080.0  # 1000 + 80
         assert max_dd > 0.0

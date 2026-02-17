@@ -52,7 +52,7 @@ class TestRegimeFilter:
     def test_allows_rise_in_oversold(self, signal_ctx, state):
         state.runtime["regime"] = {"BTCUSDT": "mean_reversion_oversold"}
         f = RegimeFilter()
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_rejects_rise_in_trend_down(self, signal_ctx, state):
@@ -72,18 +72,18 @@ class TestRegimeFilter:
         )
         state.runtime["regime"] = {"BTCUSDT": "trend_down"}
         f = RegimeFilter()
-        allowed, reason = f.allow_entry(ctx, state, {})
+        allowed, _reason = f.allow_entry(ctx, state, {})
         assert allowed
 
     def test_allows_when_no_regime_data(self, signal_ctx, state):
         f = RegimeFilter()
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_uses_global_regime_as_fallback(self, signal_ctx, state):
         state.runtime["regime"] = {"global": "trend_up"}
         f = RegimeFilter()
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
 
@@ -94,7 +94,7 @@ class TestVolatilityFilter:
     def test_allows_within_range(self, signal_ctx, state):
         state.runtime["atr"] = {"BTCUSDT": 500.0}  # 1% of price
         f = VolatilityFilter(min_volatility=0.005, max_volatility=0.02)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_rejects_too_low_volatility(self, signal_ctx, state):
@@ -113,7 +113,7 @@ class TestVolatilityFilter:
 
     def test_allows_when_no_volatility_data(self, signal_ctx, state):
         f = VolatilityFilter(max_volatility=0.02)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
 
@@ -124,7 +124,7 @@ class TestDrawdownFilter:
     def test_allows_when_below_max_drawdown(self, signal_ctx, state):
         state.metrics["current_drawdown"] = 0.05
         f = DrawdownFilter(max_drawdown=0.10)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_pauses_on_max_drawdown(self, signal_ctx, state):
@@ -156,7 +156,7 @@ class TestDrawdownFilter:
 
         # Recovered below threshold
         state.metrics["current_drawdown"] = 0.04
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
 
@@ -166,7 +166,7 @@ class TestDrawdownFilter:
 class TestCorrelationFilter:
     def test_allows_when_no_correlations(self, signal_ctx, state):
         f = CorrelationFilter()
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_allows_uncorrelated_position(self, signal_ctx, state):
@@ -175,7 +175,7 @@ class TestCorrelationFilter:
         state.runtime["correlations"] = {("BTCUSDT", "ETHUSDT"): 0.5}
 
         f = CorrelationFilter(max_correlation=0.7)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_rejects_correlated_positions(self, signal_ctx, state):
@@ -201,7 +201,7 @@ class TestCorrelationFilter:
 class TestTimeOfDayFilter:
     def test_allows_in_allowed_hours(self, signal_ctx, state):
         f = TimeOfDayFilter(allowed_hours=[9, 10, 11])
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed  # timestamp is hour 10
 
     def test_rejects_outside_allowed_hours(self, signal_ctx, state):
@@ -219,7 +219,7 @@ class TestTimeOfDayFilter:
     def test_allows_when_no_timestamp(self, state):
         ctx = SignalContext(pair="BTCUSDT", signal_type="rise", probability=0.8, price=50000.0, timestamp=None)
         f = TimeOfDayFilter(allowed_hours=[12, 13])
-        allowed, reason = f.allow_entry(ctx, state, {})
+        allowed, _reason = f.allow_entry(ctx, state, {})
         assert allowed
 
 
@@ -229,7 +229,7 @@ class TestTimeOfDayFilter:
 class TestPriceDistanceFilter:
     def test_allows_first_entry(self, signal_ctx, state):
         f = PriceDistanceFilter(min_distance_pct=0.02)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_allows_when_price_dropped_enough_long(self, signal_ctx, state):
@@ -246,7 +246,7 @@ class TestPriceDistanceFilter:
         # New signal at 48500 (3% drop)
         signal_ctx.price = 48500.0
         f = PriceDistanceFilter(min_distance_pct=0.02, direction_aware=True)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_rejects_when_price_too_close_long(self, signal_ctx, state):
@@ -287,7 +287,7 @@ class TestPriceDistanceFilter:
         state.portfolio.positions[pos.id] = pos
 
         f = PriceDistanceFilter(min_distance_pct=0.02, direction_aware=True)
-        allowed, reason = f.allow_entry(ctx, state, {})
+        allowed, _reason = f.allow_entry(ctx, state, {})
         assert allowed
 
     def test_absolute_distance_mode(self, signal_ctx, state):
@@ -303,7 +303,7 @@ class TestPriceDistanceFilter:
         # Price at 50500 (1% up)
         signal_ctx.price = 50500.0
         f = PriceDistanceFilter(min_distance_pct=0.02, direction_aware=False)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert not allowed  # Only 1% away, need 2%
 
 
@@ -313,13 +313,13 @@ class TestPriceDistanceFilter:
 class TestSignalAccuracyFilter:
     def test_allows_when_no_data(self, signal_ctx, state):
         f = SignalAccuracyFilter(min_accuracy=0.50)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_allows_above_min_accuracy(self, signal_ctx, state):
         state.runtime["signal_accuracy"] = {"BTCUSDT": {"overall": 0.55, "samples": 50}}
         f = SignalAccuracyFilter(min_accuracy=0.50, min_samples=20)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_rejects_below_min_accuracy(self, signal_ctx, state):
@@ -332,7 +332,7 @@ class TestSignalAccuracyFilter:
     def test_allows_when_insufficient_samples(self, signal_ctx, state):
         state.runtime["signal_accuracy"] = {"BTCUSDT": {"overall": 0.30, "samples": 10}}
         f = SignalAccuracyFilter(min_accuracy=0.50, min_samples=20)
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed  # Not enough samples
 
 
@@ -342,7 +342,7 @@ class TestSignalAccuracyFilter:
 class TestCompositeEntryFilter:
     def test_empty_filters_allows(self, signal_ctx, state):
         f = CompositeEntryFilter(filters=[])
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_require_all_passes_all_pass(self, signal_ctx, state):
@@ -356,7 +356,7 @@ class TestCompositeEntryFilter:
             ],
             require_all=True,
         )
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_require_all_fails_if_any_fails(self, signal_ctx, state):
@@ -385,7 +385,7 @@ class TestCompositeEntryFilter:
             ],
             require_all=False,
         )
-        allowed, reason = f.allow_entry(signal_ctx, state, {})
+        allowed, _reason = f.allow_entry(signal_ctx, state, {})
         assert allowed
 
     def test_require_any_fails_if_all_fail(self, signal_ctx, state):

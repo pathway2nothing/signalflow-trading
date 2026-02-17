@@ -50,7 +50,7 @@ class TestRawDataFactoryFromDuckDb:
 
     def test_missing_pair_col_raises(self, tmp_path):
         db_path = tmp_path / "test.duckdb"
-        store = DuckDbSpotStore(db_path)
+        DuckDbSpotStore(db_path)
         klines = [
             {
                 "timestamp": datetime(2024, 1, 1),
@@ -62,7 +62,7 @@ class TestRawDataFactoryFromDuckDb:
             }
         ]
         # Manually create broken data
-        df = pl.DataFrame(klines)
+        pl.DataFrame(klines)
         # This would fail because pair column is missing
         # But we can't easily inject this into DuckDB
         # So just verify the validation logic

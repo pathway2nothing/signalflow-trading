@@ -90,10 +90,7 @@ def sample_trades() -> list[MockTrade]:
     trades = []
     for i in range(50):
         # Mix of winning and losing trades
-        if np.random.random() > 0.4:
-            pnl = np.random.uniform(50, 200)  # Win
-        else:
-            pnl = -np.random.uniform(30, 100)  # Loss
+        pnl = np.random.uniform(50, 200) if np.random.random() > 0.4 else -np.random.uniform(30, 100)
 
         trades.append(
             MockTrade(

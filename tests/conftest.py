@@ -45,7 +45,7 @@ def sample_signals_df() -> pl.DataFrame:
 
 
 @pytest.fixture
-def raw_data(sample_ohlcv_df) -> "RawData":
+def raw_data(sample_ohlcv_df):
     """RawData instance with spot data."""
     from signalflow.core.containers.raw_data import RawData
 

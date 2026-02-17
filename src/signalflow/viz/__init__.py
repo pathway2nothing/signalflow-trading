@@ -23,7 +23,7 @@ Example:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Union
+from typing import TYPE_CHECKING, Literal
 
 from signalflow.viz.graph import PipelineGraph
 from signalflow.viz.renderers import HtmlRenderer, MermaidRenderer

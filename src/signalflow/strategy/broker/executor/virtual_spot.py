@@ -49,10 +49,7 @@ class VirtualSpotExecutor:
             if price is None or price <= 0:
                 continue
 
-            if order.side == "BUY":
-                fill_price = price * (1 + self.slippage_pct)
-            else:
-                fill_price = price * (1 - self.slippage_pct)
+            fill_price = price * (1 + self.slippage_pct) if order.side == "BUY" else price * (1 - self.slippage_pct)
 
             notional = fill_price * order.qty
             fee = notional * self.fee_rate

@@ -115,8 +115,8 @@ class StrategyMainResult(StrategyMetric):
             equity = metrics_df.get_column("equity").to_list()
             initial_capital = results.get("initial_capital", equity[0] if equity else 10000)
 
-            allocated_pct = [(eq - c) / eq if eq > 0 else 0.0 for eq, c in zip(equity, cash)]
-            free_pct = [c / eq if eq > 0 else 0.0 for eq, c in zip(equity, cash)]
+            allocated_pct = [(eq - c) / eq if eq > 0 else 0.0 for eq, c in zip(equity, cash, strict=False)]
+            free_pct = [c / eq if eq > 0 else 0.0 for eq, c in zip(equity, cash, strict=False)]
             total_balance_pct = [(eq / initial_capital - 1.0) * 100.0 for eq in equity]
 
             fig.add_trace(

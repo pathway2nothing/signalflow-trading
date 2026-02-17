@@ -80,7 +80,7 @@ class TestSignalCorrelationMetricCompute:
         raw = _make_raw_data()
         signals = _make_signals()
 
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         assert result is not None
         assert "quant" in result
@@ -100,7 +100,7 @@ class TestSignalCorrelationMetricCompute:
             )
         )
 
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
         assert result is None
 
     def test_correlation_periods(self):
@@ -108,7 +108,7 @@ class TestSignalCorrelationMetricCompute:
         raw = _make_raw_data()
         signals = _make_signals()
 
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         assert result is not None
         correlations = result["quant"]["correlations"]
@@ -125,7 +125,7 @@ class TestSignalCorrelationMetricCompute:
         raw = _make_raw_data()
         signals = _make_signals(n_per_pair=100)
 
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         assert result is not None
         quintile_data = result["quant"]["quintile_analysis"]
@@ -161,7 +161,7 @@ class TestSignalTimingMetricCompute:
         raw = _make_raw_data()
         signals = _make_signals()
 
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         assert result is not None
         assert "quant" in result
@@ -174,7 +174,7 @@ class TestSignalTimingMetricCompute:
         raw = _make_raw_data()
         signals = _make_signals()
 
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         assert result is not None
         assert "series" in result
@@ -198,7 +198,7 @@ class TestSignalTimingMetricCompute:
             )
         )
 
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
         assert result is None
 
 

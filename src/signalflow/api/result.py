@@ -302,30 +302,41 @@ class BacktestResult:
         # Determine color for return
         return_color = "#22c55e" if self.total_return >= 0 else "#ef4444"
 
+        div_style = "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px;"
+        header_style = (
+            "background: linear-gradient(135deg, #1e293b 0%, #334155 100%);"
+            " color: white; padding: 20px; border-radius: 12px 12px 0 0;"
+        )
+        body_style = (
+            "background: #f8fafc; padding: 16px; border-radius: 0 0 12px 12px;"
+            " border: 1px solid #e2e8f0; border-top: none;"
+        )
+        td_style = "padding: 8px 0; text-align: right; font-weight: 600;"
+
         html = f"""
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px;">
-            <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; padding: 20px; border-radius: 12px 12px 0 0;">
+        <div style="{div_style}">
+            <div style="{header_style}">
                 <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 500; opacity: 0.8;">BACKTEST RESULT</h3>
                 <div style="font-size: 32px; font-weight: 700; color: {return_color};">
                     {self.total_return:+.2%}
                 </div>
                 <div style="font-size: 12px; opacity: 0.7; margin-top: 4px;">
-                    ${self.initial_capital:,.0f} → ${self.final_capital:,.0f}
+                    ${self.initial_capital:,.0f} &rarr; ${self.final_capital:,.0f}
                 </div>
             </div>
-            <div style="background: #f8fafc; padding: 16px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+            <div style="{body_style}">
                 <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                     <tr>
                         <td style="padding: 8px 0; color: #64748b;">Trades</td>
-                        <td style="padding: 8px 0; text-align: right; font-weight: 600;">{self.n_trades}</td>
+                        <td style="{td_style}">{self.n_trades}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; color: #64748b;">Win Rate</td>
-                        <td style="padding: 8px 0; text-align: right; font-weight: 600;">{self.win_rate:.1%}</td>
+                        <td style="{td_style}">{self.win_rate:.1%}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; color: #64748b;">Profit Factor</td>
-                        <td style="padding: 8px 0; text-align: right; font-weight: 600;">{self.profit_factor:.2f}</td>
+                        <td style="{td_style}">{self.profit_factor:.2f}</td>
                     </tr>
         """
 
@@ -333,7 +344,7 @@ class BacktestResult:
             html += f"""
                     <tr>
                         <td style="padding: 8px 0; color: #64748b;">Max Drawdown</td>
-                        <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #ef4444;">{max_dd:.1%}</td>
+                        <td style="{td_style} color: #ef4444;">{max_dd:.1%}</td>
                     </tr>
             """
 

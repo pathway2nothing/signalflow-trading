@@ -39,16 +39,16 @@ __all__ = [
     "Backtest",
     "BacktestBuilder",
     "BacktestResult",
-    # Shortcuts
-    "load",
-    "backtest",
-    # Exceptions
-    "SignalFlowError",
+    "ComponentNotFoundError",
     "ConfigurationError",
     "DataError",
-    "ComponentNotFoundError",
     "DetectorNotFoundError",
+    "InvalidParameterError",
     "MissingDataError",
     "MissingDetectorError",
-    "InvalidParameterError",
+    # Exceptions
+    "SignalFlowError",
+    "backtest",
+    # Shortcuts
+    "load",
 ]

@@ -392,15 +392,9 @@ class OkxSpotLoader(RawDataLoader):
             fill_gaps: Detect and fill gaps. Default: True.
         """
         now = datetime.now(UTC).replace(tzinfo=None)
-        if end is None:
-            end = now
-        else:
-            end = ensure_utc_naive(end)
+        end = now if end is None else ensure_utc_naive(end)
 
-        if start is None:
-            start = end - timedelta(days=days if days else 7)
-        else:
-            start = ensure_utc_naive(start)
+        start = end - timedelta(days=days if days else 7) if start is None else ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,
@@ -553,15 +547,9 @@ class OkxFuturesLoader(RawDataLoader):
             fill_gaps: Detect and fill gaps. Default: True.
         """
         now = datetime.now(UTC).replace(tzinfo=None)
-        if end is None:
-            end = now
-        else:
-            end = ensure_utc_naive(end)
+        end = now if end is None else ensure_utc_naive(end)
 
-        if start is None:
-            start = end - timedelta(days=days if days else 7)
-        else:
-            start = ensure_utc_naive(start)
+        start = end - timedelta(days=days if days else 7) if start is None else ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,

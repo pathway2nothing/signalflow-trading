@@ -37,10 +37,10 @@ from signalflow.detector.market.zscore_detector import MarketZScoreDetector, ZSc
 __all__ = [
     # New names
     "AgreementDetector",
-    "MarketZScoreDetector",
-    "MarketCusumDetector",
+    "CusumEventDetector",
     # Backward compatibility aliases
     "GlobalEventDetector",
+    "MarketCusumDetector",
+    "MarketZScoreDetector",
     "ZScoreEventDetector",
-    "CusumEventDetector",
 ]

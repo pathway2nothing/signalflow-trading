@@ -161,7 +161,7 @@ class TestFeatureInformativenessAnalyzer:
 
         # 2 features as rows
         assert matrix.height == 2
-        # 2 horizons × 2 targets = 4 pivot columns + 1 feature column
+        # 2 horizons x 2 targets = 4 pivot columns + 1 feature column
         assert matrix.width == 5
 
     def test_with_global_event_detection(self):

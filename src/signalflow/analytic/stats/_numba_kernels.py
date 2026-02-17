@@ -98,7 +98,7 @@ def simulate_equity_curves(
         - max_consecutive_losses: (n_simulations,) array of max consecutive losses
         - longest_dd_durations: (n_simulations,) array of longest drawdown durations
     """
-    n_trades = len(pnls)
+    len(pnls)
 
     final_equities = np.empty(n_simulations, dtype=np.float64)
     max_drawdowns = np.empty(n_simulations, dtype=np.float64)
@@ -215,7 +215,7 @@ def bootstrap_generic(
         np.random.seed(seed + b)
 
         total = 0.0
-        for i in range(n):
+        for _i in range(n):
             idx = np.random.randint(0, n)
             total += data[idx]
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 import polars as pl
 
@@ -43,8 +43,8 @@ class OffsetFeature(Feature):
     window: int = 15
     prefix: str | None = None
 
-    requires = ["open", "high", "low", "close", "volume", "timestamp"]
-    outputs = ["offset"]
+    requires: ClassVar[list[str]] = ["open", "high", "low", "close", "volume", "timestamp"]
+    outputs: ClassVar[list[str]] = ["offset"]
 
     def __post_init__(self):
         if self.feature_name is None:
@@ -59,7 +59,7 @@ class OffsetFeature(Feature):
 
     def output_cols(self, prefix: str = "") -> list[str]:
         base_cols = self._base.output_cols(prefix=f"{prefix}{self.prefix}")
-        return base_cols + [f"{prefix}offset"]
+        return [*base_cols, f"{prefix}offset"]
 
     def required_cols(self) -> list[str]:
         return ["open", "high", "low", "close", "volume", self.ts_col]
@@ -120,7 +120,7 @@ class OffsetFeature(Feature):
         feature_cols = [f"{self.prefix}{col}" for col in self._base.output_cols()]
 
         result = df.join(
-            all_offsets.select(["_grp", "_offset"] + feature_cols),
+            all_offsets.select(["_grp", "_offset", *feature_cols]),
             left_on=["_grp", "offset"],
             right_on=["_grp", "_offset"],
             how="left",
@@ -182,7 +182,7 @@ class OffsetFeature(Feature):
         feature_cols = [f"{self.prefix}{col}" for col in self._base.output_cols()]
 
         result = df.join(
-            all_offsets.select([self.group_col, "_grp", "_offset"] + feature_cols),
+            all_offsets.select([self.group_col, "_grp", "_offset", *feature_cols]),
             left_on=[self.group_col, "_grp", "offset"],
             right_on=[self.group_col, "_grp", "_offset"],
             how="left",

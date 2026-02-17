@@ -105,6 +105,10 @@ select = [
     "RUF",  # ruff-specific rules
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"src/signalflow/viz/renderers/html.py" = ["E501"]  # HTML/CSS/JS template strings
+"src/signalflow/__init__.py" = ["I001"]  # Import order required for circular import avoidance
+
 [tool.ruff.lint.isort]
 known-first-party = ["signalflow"]
 

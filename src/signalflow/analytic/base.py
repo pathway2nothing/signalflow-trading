@@ -68,7 +68,7 @@ class SignalMetric:
 
 
 @dataclass
-class StrategyMetric(ABC):
+class StrategyMetric(ABC):  # noqa: B024
     """Base class for strategy metrics."""
 
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC

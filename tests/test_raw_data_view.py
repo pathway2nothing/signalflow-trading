@@ -1,6 +1,5 @@
 """Tests for signalflow.core.containers.raw_data_view.RawDataView."""
 
-
 import pandas as pd
 import polars as pl
 import pytest
@@ -47,7 +46,7 @@ class TestRawDataViewPandas:
 
     def test_cache_pandas(self, raw_data):
         view = RawDataView(raw=raw_data, cache_pandas=True)
-        df1 = view.to_pandas("spot")
+        view.to_pandas("spot")
         assert "spot" in view._pandas_cache
         df2 = view.to_pandas("spot")
         assert not df2.empty

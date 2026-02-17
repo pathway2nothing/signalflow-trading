@@ -79,7 +79,7 @@ class TestSignalDistributionMetricCompute:
         metric = SignalDistributionMetric()
         raw = _make_raw_data()
         signals = _make_signals()
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         assert result is not None
         assert "quant" in result
@@ -89,7 +89,7 @@ class TestSignalDistributionMetricCompute:
         metric = SignalDistributionMetric()
         raw = _make_raw_data(pairs=["BTCUSDT", "ETHUSDT"])
         signals = _make_signals(pairs=["BTCUSDT", "ETHUSDT"])
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         quant = result["quant"]
         assert "mean_signals_per_pair" in quant
@@ -111,7 +111,7 @@ class TestSignalDistributionMetricCompute:
             }
         )
         signals = Signals(signals_df)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
         assert result is None
 
     def test_single_pair_no_histogram(self):
@@ -138,7 +138,7 @@ class TestSignalDistributionMetricCompute:
         metric = SignalDistributionMetric()
         raw = _make_raw_data(pairs=pairs)
         signals = _make_uniform_signals(pairs=pairs, n_per_pair=10)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         quant = result["quant"]
         assert quant["mean_signals_per_pair"] == pytest.approx(10.0)
@@ -151,7 +151,7 @@ class TestSignalDistributionMetricCompute:
         metric = SignalDistributionMetric()
         raw = _make_raw_data(n=100, pairs=pairs)
         signals = _make_signals(pairs=pairs, signals_per_pair=counts)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         quant = result["quant"]
         assert quant["min_signals_per_pair"] == 5
@@ -162,7 +162,7 @@ class TestSignalDistributionMetricCompute:
         metric = SignalDistributionMetric(rolling_window_minutes=10)
         raw = _make_raw_data(n=100)
         signals = _make_signals(signals_per_pair={"BTCUSDT": 50})
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         assert "signals_rolling" in result["series"]
         rolling_df = result["series"]["signals_rolling"]
@@ -174,7 +174,7 @@ class TestSignalDistributionMetricCompute:
         metric = SignalDistributionMetric()
         raw = _make_raw_data(n=100, pairs=pairs)
         signals = _make_signals(pairs=pairs, signals_per_pair=counts)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         signals_per_pair = result["series"]["signals_per_pair"]
         pair_order = signals_per_pair["pair"].to_list()
@@ -187,7 +187,7 @@ class TestSignalDistributionMetricCompute:
         metric = SignalDistributionMetric(n_bars=5)
         raw = _make_raw_data(n=200, pairs=pairs)
         signals = _make_varied_signals(pairs=pairs)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         # Number of grouped bins should be <= n_bars
         grouped = result["series"]["grouped"]
@@ -197,7 +197,7 @@ class TestSignalDistributionMetricCompute:
         metric = SignalDistributionMetric(rolling_window_minutes=30, ma_window_hours=6)
         raw = _make_raw_data()
         signals = _make_signals()
-        result, ctx = metric.compute(raw, signals)
+        _result, ctx = metric.compute(raw, signals)
 
         assert ctx["rolling_window"] == 30
         assert ctx["ma_window"] == 6

@@ -88,7 +88,7 @@ class TestVolatilityRegimeLabeler:
         result = labeler.compute(df)
         # Before the volatile period, some bars should get labeled
         labels = result["label"].to_list()
-        assert any(l == "high_volatility" for l in labels), "Expected at least one high_volatility label"
+        assert any(lbl == "high_volatility" for lbl in labels), "Expected at least one high_volatility label"
 
     def test_invalid_quantiles_raises(self):
         with pytest.raises(ValueError, match="lower_quantile"):

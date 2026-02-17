@@ -100,7 +100,7 @@ class PercentileRegimeDetector(SignalDetector):
         """
         results = []
 
-        for pair_name, group in features.group_by(self.pair_col, maintain_order=True):
+        for _pair_name, group in features.group_by(self.pair_col, maintain_order=True):
             arr = group[self.target_feature].to_numpy().astype(np.float64)
             n = len(arr)
 

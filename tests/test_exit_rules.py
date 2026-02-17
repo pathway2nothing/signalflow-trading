@@ -1,7 +1,5 @@
 """Tests for exit rules: TakeProfitStopLossExit, TimeBasedExit, TrailingStopExit, VolatilityExit, CompositeExit."""
 
-
-
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.enums import ExitPriority
 from signalflow.strategy.component.exit.composite import CompositeExit

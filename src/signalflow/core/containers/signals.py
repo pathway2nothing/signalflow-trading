@@ -187,7 +187,7 @@ class Signals:
             .alias("_priority")
         )
 
-        sort_cols = key_cols + ["_priority", "_src"]
+        sort_cols = [*key_cols, "_priority", "_src"]
         sort_desc = [False] * len(key_cols) + [True, True]
 
         merged = (

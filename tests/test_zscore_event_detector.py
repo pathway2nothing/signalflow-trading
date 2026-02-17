@@ -56,10 +56,7 @@ def _make_extreme_shock(
     for p in range(n_pairs):
         price = 100.0
         for i in range(n):
-            if i == event_idx:
-                change = shock_size
-            else:
-                change = np.random.randn() * 0.003
+            change = shock_size if i == event_idx else np.random.randn() * 0.003
             price *= np.exp(change)
             rows.append(
                 {

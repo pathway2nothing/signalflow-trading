@@ -40,10 +40,7 @@ def dt_to_ms_utc(dt: datetime) -> int:
         >>> dt_to_ms_utc(datetime(2024, 1, 1))
         1704067200000
     """
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    else:
-        dt = dt.astimezone(UTC)
+    dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
     return int(dt.timestamp() * 1000)
 
 
@@ -117,10 +114,7 @@ def dt_to_sec_utc(dt: datetime) -> int:
         >>> dt_to_sec_utc(datetime(2024, 1, 1))
         1704067200
     """
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    else:
-        dt = dt.astimezone(UTC)
+    dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
     return int(dt.timestamp())
 
 

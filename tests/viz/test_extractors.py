@@ -1,6 +1,5 @@
 """Tests for signalflow.viz.extractors module."""
 
-
 from signalflow.viz.extractors import (
     BacktestExtractor,
     FeaturePipelineExtractor,

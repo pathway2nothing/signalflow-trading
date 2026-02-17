@@ -99,7 +99,7 @@ class LocalExtremaDetector(SignalDetector):
         """
         results = []
 
-        for pair_name, group in features.group_by(self.pair_col, maintain_order=True):
+        for _pair_name, group in features.group_by(self.pair_col, maintain_order=True):
             prices = group[self.price_col].to_numpy().astype(np.float64)
             n = len(prices)
 
@@ -135,23 +135,25 @@ class LocalExtremaDetector(SignalDetector):
                 # Check LOCAL_TOP: max in search window, price dropped since
                 if max_val > 0 and p_current < max_val:
                     swing = (max_val - p_current) / max_val
-                    if swing >= self.min_swing_pct:
-                        if last_emitted_type != self.signal_top or (t - last_emitted_idx) > self.lookback:
-                            signal_types[t] = self.signal_top
-                            probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
-                            last_emitted_type = self.signal_top
-                            last_emitted_idx = t
-                            continue
+                    if swing >= self.min_swing_pct and (
+                        last_emitted_type != self.signal_top or (t - last_emitted_idx) > self.lookback
+                    ):
+                        signal_types[t] = self.signal_top
+                        probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
+                        last_emitted_type = self.signal_top
+                        last_emitted_idx = t
+                        continue
 
                 # Check LOCAL_BOTTOM: min in search window, price risen since
                 if min_val > 0 and p_current > min_val:
                     swing = (p_current - min_val) / min_val
-                    if swing >= self.min_swing_pct:
-                        if last_emitted_type != self.signal_bottom or (t - last_emitted_idx) > self.lookback:
-                            signal_types[t] = self.signal_bottom
-                            probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
-                            last_emitted_type = self.signal_bottom
-                            last_emitted_idx = t
+                    if swing >= self.min_swing_pct and (
+                        last_emitted_type != self.signal_bottom or (t - last_emitted_idx) > self.lookback
+                    ):
+                        signal_types[t] = self.signal_bottom
+                        probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
+                        last_emitted_type = self.signal_bottom
+                        last_emitted_idx = t
 
             group = group.with_columns(
                 [

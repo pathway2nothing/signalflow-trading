@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import polars as pl
 from loguru import logger
@@ -16,29 +16,40 @@ from signalflow.core.decorators import sf_component
 from signalflow.core.enums import SfComponentType
 from signalflow.strategy.broker.backtest import BacktestBroker
 
+if TYPE_CHECKING:
+    from signalflow.strategy.risk.manager import RiskManager
+
 
 @dataclass
 @sf_component(name="virtual/realtime", override=True)
 class VirtualRealtimeBroker(BacktestBroker):
     """Broker for paper trading with structured order/fill logging.
 
-    Extends ``BacktestBroker`` with in-memory ledgers and structured
-    logging of every order, fill, and trade.  Recommended for use with
-    ``RealtimeRunner`` during virtual trading.
+    Extends ``BacktestBroker`` with:
+    - In-memory order/fill/trade ledgers
+    - Structured logging of every order, fill, and trade
+    - Optional :class:`RiskManager` integration for pre-trade checks
+    - Equity curve tracking for post-session analysis
 
     Usage::
+
+        from signalflow.strategy.risk import RiskManager, MaxLeverageLimit
 
         broker = VirtualRealtimeBroker(
             executor=VirtualSpotExecutor(fee_rate=0.001, slippage_pct=0.0005),
             store=strategy_store,
+            risk_manager=RiskManager(limits=[MaxLeverageLimit(max_leverage=3.0)]),
         )
         runner = RealtimeRunner(broker=broker, ...)
     """
 
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_BROKER
 
+    risk_manager: RiskManager | None = None
+
     _order_log: list[dict] = field(default_factory=list, init=False, repr=False)
     _fill_log: list[dict] = field(default_factory=list, init=False, repr=False)
+    _equity_curve: list[dict[str, Any]] = field(default_factory=list, init=False, repr=False)
 
     def submit_orders(
         self,
@@ -46,9 +57,24 @@ class VirtualRealtimeBroker(BacktestBroker):
         prices: dict[str, float],
         ts: datetime,
     ) -> list[OrderFill]:
-        """Submit orders with logging.  Delegates to executor directly."""
+        """Submit orders with risk checking and logging."""
         if not orders:
             return []
+
+        # Risk manager gate
+        if self.risk_manager is not None:
+            # We need StrategyState for risk checks; build a minimal one from
+            # the broker's perspective using the last known state.  The caller
+            # (runner) should have already marked positions, so
+            # ``self._last_state`` is up-to-date.
+            state = getattr(self, "_last_state", None)
+            if state is not None:
+                result = self.risk_manager.check(orders, state, prices, ts)
+                if not result.allowed and not result.passed_orders:
+                    for name, reason in result.violations:
+                        logger.warning(f"RISK REJECT [{name}] {reason}")
+                    return []
+                orders = result.passed_orders
 
         for order in orders:
             order_record = {
@@ -107,6 +133,23 @@ class VirtualRealtimeBroker(BacktestBroker):
 
         return trades
 
+    def mark_positions(self, state: StrategyState, prices: dict[str, float], ts: datetime) -> None:
+        """Mark positions and record equity snapshot."""
+        super().mark_positions(state, prices, ts)
+        # Keep reference for risk manager
+        self._last_state = state
+        # Track equity curve
+        self._equity_curve.append(
+            {
+                "ts": ts,
+                "equity": state.portfolio.equity(prices=prices),
+                "cash": state.portfolio.cash,
+                "n_positions": len(state.portfolio.open_positions()),
+                "gross_exposure": state.portfolio.gross_exposure(prices=prices),
+                "net_exposure": state.portfolio.net_exposure(prices=prices),
+            }
+        )
+
     @property
     def order_log(self) -> list[dict]:
         """All orders submitted during this session."""
@@ -128,3 +171,9 @@ class VirtualRealtimeBroker(BacktestBroker):
         if not self._fill_log:
             return pl.DataFrame()
         return pl.DataFrame(self._fill_log)
+
+    def equity_curve_df(self) -> pl.DataFrame:
+        """Equity curve as a Polars DataFrame."""
+        if not self._equity_curve:
+            return pl.DataFrame()
+        return pl.DataFrame(self._equity_curve)

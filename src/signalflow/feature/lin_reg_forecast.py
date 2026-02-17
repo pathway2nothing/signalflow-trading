@@ -39,8 +39,12 @@ class LinRegForecastFeature(Feature):
     forecast_horizon: int = 1
     min_samples: int = 50
 
-    requires = ["{source_col}"]
-    outputs = ["{source_col}_forecast", "{source_col}_forecast_change", "{source_col}_forecast_direction"]
+    requires: ClassVar[list[str]] = ["{source_col}"]
+    outputs: ClassVar[list[str]] = [
+        "{source_col}_forecast",
+        "{source_col}_forecast_change",
+        "{source_col}_forecast_direction",
+    ]
 
     test_params: ClassVar[list[dict]] = [
         {"source_col": "rsi_14", "n_lags": 10},

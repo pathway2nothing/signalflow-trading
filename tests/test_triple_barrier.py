@@ -126,7 +126,7 @@ class TestTripleBarrierCompute:
                 "volume": pl.Float64,
             }
         )
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             labeler.compute(empty)
 
     def test_include_meta(self):
@@ -299,7 +299,7 @@ class TestTakeProfitCompute:
                 "volume": pl.Float64,
             }
         )
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             labeler.compute(empty)
 
     def test_signal_masking(self):

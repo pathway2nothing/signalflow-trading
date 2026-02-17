@@ -76,7 +76,7 @@ def _inject_spike(
 
     # Propagate forward so the series stays continuous
     for i in range(index + 1, len(close_col)):
-        ratio = close_col[i] / df["close"][i]
+        close_col[i] / df["close"][i]
         factor = new_price / df["close"][index]
         close_col[i] = df["close"][i] * factor
         open_col[i] = df["open"][i] * factor

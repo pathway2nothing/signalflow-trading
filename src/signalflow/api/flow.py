@@ -20,7 +20,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from threading import Event
 from typing import TYPE_CHECKING, Any, ClassVar, Self
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from signalflow.validator.base import SignalValidator
 
 
-class RunMode(str, Enum):
+class RunMode(StrEnum):
     """Flow execution modes."""
 
     SINGLE = "single"
@@ -55,7 +55,7 @@ class RunMode(str, Enum):
     LIVE = "live"
 
 
-class AggregationMode(str, Enum):
+class AggregationMode(StrEnum):
     """Signal aggregation modes for multiple detectors."""
 
     MERGE = "merge"
@@ -803,7 +803,7 @@ class FlowBuilder:
         if fold_size == 0:
             return result
 
-        gap_td = timedelta(hours=gap) if gap > 0 else timedelta(0)
+        timedelta(hours=gap) if gap > 0 else timedelta(0)
 
         for fold in range(folds):
             if progress_callback:
@@ -913,11 +913,205 @@ class FlowBuilder:
         return result
 
     def _run_live(self, paper: bool) -> FlowResult:
-        """Execute live/paper trading mode."""
-        result = FlowResult()
+        """Execute live/paper trading mode.
 
-        # TODO: Implement live mode
-        raise NotImplementedError("Live mode not yet implemented")
+        Wires the FlowBuilder config into a :class:`RealtimeRunner` with
+        either a :class:`VirtualRealtimeBroker` (paper) or, in the future,
+        a live broker.
+
+        The runner requires ``raw_store`` and ``detector`` at minimum.
+        Data sources configured via ``.data(store=...)`` are used to
+        locate the DuckDB store.  If a pre-loaded ``RawData`` was given
+        instead, live mode raises ``ConfigurationError``.
+
+        Args:
+            paper: If True, use VirtualRealtimeBroker (no real money).
+
+        Returns:
+            FlowResult with live_metrics populated.
+        """
+        import asyncio
+
+        from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
+        from signalflow.strategy.broker.virtual_broker import VirtualRealtimeBroker
+        from signalflow.strategy.runner.realtime_runner import RealtimeRunner
+
+        # --- resolve detector ------------------------------------------------
+        if not self._named_detectors:
+            raise ConfigurationError("Live mode requires at least one detector")
+
+        detector = next(iter(self._named_detectors.values()))
+
+        # --- resolve raw store -----------------------------------------------
+        raw_store, pairs, timeframe = self._resolve_live_store()
+
+        # --- build entry/exit rules ------------------------------------------
+        entry_rules, exit_rules = self._build_strategy_rules()
+
+        # --- build metrics ---------------------------------------------------
+        from signalflow.analytic.strategy.main_strategy_metrics import (
+            DrawdownMetric,
+            SharpeRatioMetric,
+            TotalReturnMetric,
+            WinRateMetric,
+        )
+
+        strategy_metrics = [
+            TotalReturnMetric(),
+            DrawdownMetric(),
+            WinRateMetric(),
+            SharpeRatioMetric(),
+        ]
+
+        # --- build broker ----------------------------------------------------
+        store = self._resolve_strategy_store()
+        executor = VirtualSpotExecutor(fee_rate=self._fee, slippage_pct=0.0005 if paper else 0.0)
+        broker = VirtualRealtimeBroker(executor=executor, store=store)
+
+        # --- optional risk manager -------------------------------------------
+        # Users can attach one via broker.risk_manager = ... before calling run
+
+        # --- build runner ----------------------------------------------------
+        runner = RealtimeRunner(
+            strategy_id=self.strategy_id,
+            pairs=pairs,
+            timeframe=timeframe,
+            initial_capital=self._capital,
+            detector=detector,
+            broker=broker,
+            raw_store=raw_store,
+            strategy_store=store,
+            entry_rules=entry_rules,
+            exit_rules=exit_rules,
+            metrics=strategy_metrics,
+        )
+
+        # --- execute ---------------------------------------------------------
+        start = time.time()
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is not None and loop.is_running():
+            # Already inside an async context — run in a new thread
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                pool.submit(asyncio.run, runner.run_async()).result()
+        else:
+            asyncio.run(runner.run_async())
+
+        # --- build result ----------------------------------------------------
+        result = FlowResult()
+        result.execution_time = time.time() - start
+
+        trades_df = runner.trades_df
+        result.trades = trades_df
+
+        metrics_df = runner.metrics_df
+        if metrics_df.height > 0:
+            last = metrics_df.tail(1)
+            result.live_metrics = {col: last.select(col).item() for col in metrics_df.columns if col != "timestamp"}
+            result.backtest_metrics = result.live_metrics
+
+        if isinstance(broker, VirtualRealtimeBroker):
+            eq_df = broker.equity_curve_df()
+            if eq_df.height > 0:
+                result.live_metrics = result.live_metrics or {}
+                result.live_metrics["equity_curve_length"] = eq_df.height
+
+        return result
+
+    # ---- live-mode helpers --------------------------------------------------
+
+    def _resolve_live_store(self) -> tuple[Any, list[str], str]:
+        """Extract raw_store, pairs, timeframe from data config for live mode."""
+        if self._raw is not None:
+            raise ConfigurationError(
+                "Live mode requires a data store path, not pre-loaded RawData. "
+                "Use .data(store='path/to/store.duckdb', pairs=[...]) instead."
+            )
+
+        if not self._named_data:
+            raise ConfigurationError("Live mode requires a data source configured via .data(store=...)")
+
+        first_source = next(iter(self._named_data.values()))
+        if isinstance(first_source, RawData):
+            raise ConfigurationError("Live mode requires a data store path, not pre-loaded RawData.")
+
+        params = first_source
+        store_path = params.get("store")
+        pairs = params.get("pairs") or []
+        timeframe = params.get("timeframe", "1m")
+
+        if not store_path:
+            raise ConfigurationError("Live mode requires store= path in .data()")
+
+        from signalflow.data import StoreFactory
+
+        raw_store = StoreFactory.create_raw_store(
+            backend="duckdb",
+            data_type="spot",
+            db_path=store_path,
+        )
+        return raw_store, pairs, timeframe
+
+    def _build_strategy_rules(self) -> tuple[list, list]:
+        """Build entry/exit rule instances from config."""
+        entry_rules: list = []
+        exit_rules: list = []
+
+        if self._entry_config:
+            from signalflow.strategy.component.entry.signal import SignalEntryRule
+
+            max_pos = self._entry_config.get("max_positions", 10)
+            size = self._entry_config.get("size", 100.0)
+            entry_rules.append(
+                SignalEntryRule(
+                    base_position_size=float(size) if size else 100.0,
+                    max_total_positions=max_pos,
+                )
+            )
+
+        if self._exit_config:
+            tp = self._exit_config.get("tp")
+            sl = self._exit_config.get("sl")
+            trailing = self._exit_config.get("trailing")
+
+            if tp is not None or sl is not None:
+                from signalflow.strategy.component.exit.tp_sl import TakeProfitStopLossExit
+
+                exit_rules.append(
+                    TakeProfitStopLossExit(
+                        take_profit_pct=float(tp) if tp else 0.02,
+                        stop_loss_pct=float(sl) if sl else 0.01,
+                    )
+                )
+
+            if trailing is not None:
+                from signalflow.strategy.component.exit.trailing_stop import TrailingStopExit
+
+                exit_rules.append(TrailingStopExit(trail_pct=float(trailing)))
+
+        # Defaults
+        if not entry_rules:
+            from signalflow.strategy.component.entry.signal import SignalEntryRule
+
+            entry_rules.append(SignalEntryRule())
+        if not exit_rules:
+            from signalflow.strategy.component.exit.tp_sl import TakeProfitStopLossExit
+
+            exit_rules.append(TakeProfitStopLossExit())
+
+        return entry_rules, exit_rules
+
+    def _resolve_strategy_store(self) -> Any:
+        """Get or create a strategy store for state persistence."""
+        from signalflow.data.strategy_store.memory import InMemoryStrategyStore
+
+        return InMemoryStrategyStore()
 
     # =========================================================================
     # Window / Period Helpers
@@ -1099,7 +1293,7 @@ class FlowBuilder:
         # Load first data source for now
         from signalflow.api.shortcuts import load
 
-        first_name, first_source = next(iter(self._named_data.items()))
+        _first_name, first_source = next(iter(self._named_data.items()))
 
         if isinstance(first_source, RawData):
             return first_source
@@ -1367,17 +1561,17 @@ class LiveMetrics:
 
 
 __all__ = [
-    "FlowBuilder",
-    "FlowResult",
-    "FlowConfig",
-    "flow",
-    "RunMode",
     "AggregationMode",
+    "BacktestMetrics",
     # Metric nodes
     "FeatureMetrics",
-    "SignalMetrics",
+    "FlowBuilder",
+    "FlowConfig",
+    "FlowResult",
     "LabelMetrics",
-    "ValidationMetrics",
-    "BacktestMetrics",
     "LiveMetrics",
+    "RunMode",
+    "SignalMetrics",
+    "ValidationMetrics",
+    "flow",
 ]

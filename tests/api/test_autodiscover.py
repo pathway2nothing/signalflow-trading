@@ -6,7 +6,6 @@ still works correctly after adding lazy imports for the api module.
 """
 
 
-
 class TestAutodiscover:
     """Verify registry autodiscover still works with lazy imports."""
 

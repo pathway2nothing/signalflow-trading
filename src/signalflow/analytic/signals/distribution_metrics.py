@@ -74,10 +74,7 @@ class SignalDistributionMetric(SignalMetric):
                 for i in range(actual_n_bars):
                     lower = int(np.floor(bin_edges[i]))
                     upper = int(np.ceil(bin_edges[i + 1]))
-                    if lower == upper:
-                        label = f"{lower}"
-                    else:
-                        label = f"{lower}–{upper}"
+                    label = f"{lower}" if lower == upper else f"{lower}-{upper}"
                     bin_labels.append(label)
 
             binned = np.digitize(signal_counts, bin_edges[:-1]) - 1
@@ -193,10 +190,7 @@ class SignalDistributionMetric(SignalMetric):
         """Create subplot structure."""
         use_histogram = plots_context.get("use_histogram", True)
 
-        if use_histogram:
-            title1 = "Pairs Distribution by Signal Count"
-        else:
-            title1 = "Signal Count per Pair"
+        title1 = "Pairs Distribution by Signal Count" if use_histogram else "Signal Count per Pair"
 
         return make_subplots(
             rows=3,

@@ -115,7 +115,7 @@ class VolatilityDetector(SignalDetector):
         # Step 3-5: compute rolling percentile and classify per group
         # Polars doesn't have rolling_quantile with a rank, so we compute via numpy per group
         results = []
-        for pair_name, group in df.group_by(self.pair_col, maintain_order=True):
+        for _pair_name, group in df.group_by(self.pair_col, maintain_order=True):
             vol_arr = group["_realized_vol"].to_numpy().astype(np.float64)
             n = len(vol_arr)
 

@@ -256,7 +256,7 @@ class SignalCorrelationMetric(SignalMetric):
         if not scatter_data:
             return
 
-        first_key = list(scatter_data.keys())[0]
+        first_key = next(iter(scatter_data.keys()))
         data = scatter_data[first_key]
 
         fig.add_trace(
@@ -286,7 +286,7 @@ class SignalCorrelationMetric(SignalMetric):
             return
 
         labels = list(quintile_data.keys())
-        mean_returns = [quintile_data[l]["mean_return"] * 100 for l in labels]
+        mean_returns = [quintile_data[label]["mean_return"] * 100 for label in labels]
         colors = ["#d73027" if r < 0 else "#1a9850" for r in mean_returns]
 
         fig.add_trace(
@@ -308,7 +308,7 @@ class SignalCorrelationMetric(SignalMetric):
             return
 
         labels = list(quintile_data.keys())
-        win_rates = [quintile_data[l]["win_rate"] * 100 for l in labels]
+        win_rates = [quintile_data[label]["win_rate"] * 100 for label in labels]
 
         fig.add_trace(
             go.Bar(

@@ -99,7 +99,7 @@ class TestStrategyDecision:
             action=StrategyAction.ENTER,
             pair="BTCUSDT",
         )
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(AttributeError):  # FrozenInstanceError
             decision.pair = "ETHUSDT"
 
 
@@ -161,7 +161,7 @@ class TestModelContext:
             timestamp=TS,
             signals=signals,
         )
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(AttributeError):  # FrozenInstanceError
             context.timestamp = datetime.now()
 
     def test_context_with_empty_signals(self):

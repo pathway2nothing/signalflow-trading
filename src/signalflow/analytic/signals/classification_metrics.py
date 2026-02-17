@@ -379,7 +379,7 @@ class SignalClassificationMetric(SignalMetric):
             quartile_colors = ["#d94801", "#8856a7", "#d94801"]
             quartile_names = ["Q1", "Median", "Q3"]
 
-            for q_val, color, name in zip(quartiles, quartile_colors, quartile_names):
+            for q_val, color, name in zip(quartiles, quartile_colors, quartile_names, strict=False):
                 fig.add_vline(
                     x=q_val,
                     line_color=color,
@@ -426,7 +426,7 @@ class SignalClassificationMetric(SignalMetric):
                     height=32,
                 ),
                 cells=dict(
-                    values=list(zip(*table_data)),
+                    values=list(zip(*table_data, strict=False)),
                     fill_color="#f7fbff",
                     align="left",
                     font=dict(size=11, color="#333333"),

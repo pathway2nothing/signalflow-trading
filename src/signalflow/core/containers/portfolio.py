@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
@@ -113,6 +114,109 @@ class Portfolio:
             px = prices.get(p.pair, p.last_price)
             eq += p.side_sign * px * p.qty
         return eq
+
+    def gross_exposure(self, *, prices: dict[str, float]) -> float:
+        """Sum of absolute notional values of all open positions.
+
+        Args:
+            prices: Current prices per pair.
+
+        Returns:
+            Total gross exposure in currency units.
+        """
+        total = 0.0
+        for p in self.positions.values():
+            if p.is_closed:
+                continue
+            px = prices.get(p.pair, p.last_price)
+            total += px * p.qty
+        return total
+
+    def net_exposure(self, *, prices: dict[str, float]) -> float:
+        """Signed sum of notional values (long positive, short negative).
+
+        Args:
+            prices: Current prices per pair.
+
+        Returns:
+            Net exposure in currency units.
+        """
+        total = 0.0
+        for p in self.positions.values():
+            if p.is_closed:
+                continue
+            px = prices.get(p.pair, p.last_price)
+            total += p.side_sign * px * p.qty
+        return total
+
+    def leverage(self, *, prices: dict[str, float]) -> float:
+        """Gross exposure divided by equity.
+
+        Args:
+            prices: Current prices per pair.
+
+        Returns:
+            Leverage ratio (0.0 if equity is zero).
+        """
+        eq = self.equity(prices=prices)
+        if eq <= 0:
+            return 0.0
+        return self.gross_exposure(prices=prices) / eq
+
+    def positions_by_pair(self, *, open_only: bool = True) -> dict[str, list[Position]]:
+        """Group positions by trading pair.
+
+        Args:
+            open_only: If True, only include open positions.
+
+        Returns:
+            Mapping of pair name to list of positions.
+        """
+        result: dict[str, list[Position]] = defaultdict(list)
+        for p in self.positions.values():
+            if open_only and p.is_closed:
+                continue
+            result[p.pair].append(p)
+        return dict(result)
+
+    def pair_exposure(self, pair: str, *, prices: dict[str, float]) -> float:
+        """Gross exposure for a single pair.
+
+        Args:
+            pair: Trading pair name.
+            prices: Current prices per pair.
+
+        Returns:
+            Total notional exposure for the pair.
+        """
+        total = 0.0
+        for p in self.positions.values():
+            if p.is_closed or p.pair != pair:
+                continue
+            px = prices.get(p.pair, p.last_price)
+            total += px * p.qty
+        return total
+
+    def concentration(self, *, prices: dict[str, float]) -> dict[str, float]:
+        """Exposure concentration per pair as fraction of gross exposure.
+
+        Args:
+            prices: Current prices per pair.
+
+        Returns:
+            Dict mapping pair to fraction (0-1) of gross exposure.
+        """
+        gross = self.gross_exposure(prices=prices)
+        if gross <= 0:
+            return {}
+        result: dict[str, float] = {}
+        for p in self.positions.values():
+            if p.is_closed:
+                continue
+            px = prices.get(p.pair, p.last_price)
+            notional = px * p.qty
+            result[p.pair] = result.get(p.pair, 0.0) + notional / gross
+        return result
 
     @staticmethod
     def positions_to_pl(positions: Iterable[Position]) -> pl.DataFrame:

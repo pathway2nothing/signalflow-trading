@@ -70,7 +70,7 @@ class TestValidateFeatures:
 
     def test_not_dataframe_raises(self):
         d = DummyDetector()
-        with pytest.raises(TypeError, match="polars.DataFrame"):
+        with pytest.raises(TypeError, match=r"polars\.DataFrame"):
             d._validate_features("not a df")
 
     def test_missing_pair_col(self):
@@ -277,7 +277,7 @@ class TestPandasSignalDetector:
                 return "not a dataframe"
 
         d = BadPD()
-        with pytest.raises(TypeError, match="pd.DataFrame"):
+        with pytest.raises(TypeError, match=r"pd\.DataFrame"):
             d.detect(_features_df(3))
 
 

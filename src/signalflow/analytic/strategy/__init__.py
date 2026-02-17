@@ -14,6 +14,10 @@ from signalflow.analytic.strategy.main_strategy_metrics import (
     TotalReturnMetric,
     WinRateMetric,
 )
+from signalflow.analytic.strategy.portfolio_metrics import (
+    PortfolioExposureMetric,
+    PortfolioPnLBreakdownMetric,
+)
 from signalflow.analytic.strategy.result_metrics import (
     StrategyDistributionResult,
     StrategyEquityResult,
@@ -22,23 +26,26 @@ from signalflow.analytic.strategy.result_metrics import (
 )
 
 __all__ = [
-    # Main metrics
-    "TotalReturnMetric",
+    "AverageTradeMetric",
     "BalanceAllocationMetric",
+    "CalmarRatioMetric",
     "DrawdownMetric",
-    "WinRateMetric",
+    "ExpectancyMetric",
+    "MaxConsecutiveMetric",
+    # Portfolio metrics
+    "PortfolioExposureMetric",
+    "PortfolioPnLBreakdownMetric",
+    "ProfitFactorMetric",
+    "RiskRewardMetric",
     "SharpeRatioMetric",
     # Extended metrics
     "SortinoRatioMetric",
-    "CalmarRatioMetric",
-    "ProfitFactorMetric",
-    "AverageTradeMetric",
-    "ExpectancyMetric",
-    "RiskRewardMetric",
-    "MaxConsecutiveMetric",
+    "StrategyDistributionResult",
+    "StrategyEquityResult",
     # Result visualizations
     "StrategyMainResult",
     "StrategyPairResult",
-    "StrategyDistributionResult",
-    "StrategyEquityResult",
+    # Main metrics
+    "TotalReturnMetric",
+    "WinRateMetric",
 ]

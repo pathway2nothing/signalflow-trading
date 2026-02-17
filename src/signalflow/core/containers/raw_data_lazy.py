@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 
 if TYPE_CHECKING:
+    from signalflow.core.containers.raw_data import RawData
     from signalflow.data.raw_store.base import RawDataStore
 
 
@@ -272,10 +273,8 @@ class RawDataLazy:
     def _load(self, data_type: str, source: str) -> pl.DataFrame:
         """Load data with caching based on cache_mode."""
         # Check memory cache first
-        if self.cache_mode == "memory":
-            if data_type in self._memory_cache:
-                if source in self._memory_cache[data_type]:
-                    return self._memory_cache[data_type][source]
+        if self.cache_mode == "memory" and data_type in self._memory_cache and source in self._memory_cache[data_type]:
+            return self._memory_cache[data_type][source]
 
         # Check disk cache
         if self.cache_mode == "disk":

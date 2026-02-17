@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class SignalCategory(str, Enum):
+class SignalCategory(StrEnum):
     """High-level signal category.
 
     Each category groups related signal types. Detectors and labelers declare
@@ -38,7 +38,7 @@ class SignalCategory(str, Enum):
     ANOMALY = "anomaly"
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     """Enumeration of price direction signal types.
 
     .. deprecated::
@@ -85,7 +85,7 @@ class SignalType(str, Enum):
     FLAT = "flat"
 
 
-class PositionType(str, Enum):
+class PositionType(StrEnum):
     """Enumeration of position types.
 
     Represents the direction of a trading position.
@@ -131,7 +131,7 @@ class PositionType(str, Enum):
     SHORT = "short"
 
 
-class ExitPriority(str, Enum):
+class ExitPriority(StrEnum):
     """Priority mode for composite exit rules.
 
     Defines how multiple exit rules are combined in CompositeExit.
@@ -162,7 +162,7 @@ class ExitPriority(str, Enum):
     ALL_MUST_AGREE = "all_must_agree"
 
 
-class SfComponentType(str, Enum):
+class SfComponentType(StrEnum):
     """Enumeration of SignalFlow component types.
 
     Defines all component types that can be registered in the component registry.
@@ -253,11 +253,12 @@ class SfComponentType(str, Enum):
     STRATEGY_ENTRY_RULE = "strategy/entry"
     STRATEGY_METRIC = "strategy/metric"
     STRATEGY_ALERT = "strategy/alert"
+    STRATEGY_RISK = "strategy/risk"
 
     EVENT_DETECTOR = "target/event_detector"
 
 
-class DataFrameType(str, Enum):
+class DataFrameType(StrEnum):
     """Supported DataFrame backends.
 
     Specifies which DataFrame library to use for data processing.
@@ -308,7 +309,7 @@ class DataFrameType(str, Enum):
     PANDAS = "pandas"
 
 
-class RawDataType(str, Enum):
+class RawDataType(StrEnum):
     """Built-in raw data types.
 
     Defines types of market data that can be loaded and processed.

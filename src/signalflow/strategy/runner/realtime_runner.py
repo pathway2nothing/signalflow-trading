@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import signal
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -152,10 +153,8 @@ class RealtimeRunner(StrategyRunner):
             # Graceful cleanup
             if sync_task is not None:
                 sync_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await sync_task
-                except asyncio.CancelledError:
-                    pass
 
             self._persist_cycle(state, trades=[], ts=state.last_ts)
             n_open = len(state.portfolio.open_positions()) if hasattr(state.portfolio, "open_positions") else 0
@@ -176,13 +175,11 @@ class RealtimeRunner(StrategyRunner):
             new_timestamps = self._poll_new_bars(state)
 
             if not new_timestamps:
-                try:
+                with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(
                         self._shutdown.wait(),
                         timeout=self.poll_interval_sec,
                     )
-                except TimeoutError:
-                    pass
                 continue
 
             for ts in new_timestamps:
@@ -321,9 +318,8 @@ class RealtimeRunner(StrategyRunner):
         latest: datetime | None = None
         for pair in self.pairs:
             _, pair_max = self.raw_store.get_time_bounds(pair)
-            if pair_max is not None:
-                if latest is None or pair_max > latest:
-                    latest = pair_max
+            if pair_max is not None and (latest is None or pair_max > latest):
+                latest = pair_max
 
         if latest is None:
             return []
@@ -339,9 +335,8 @@ class RealtimeRunner(StrategyRunner):
             earliest: datetime | None = None
             for pair in self.pairs:
                 pair_min, _ = self.raw_store.get_time_bounds(pair)
-                if pair_min is not None:
-                    if earliest is None or pair_min < earliest:
-                        earliest = pair_min
+                if pair_min is not None and (earliest is None or pair_min < earliest):
+                    earliest = pair_min
             start = earliest if earliest is not None else latest
         df = self.raw_store.load_many(self.pairs, start=start, end=latest)
 

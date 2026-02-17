@@ -183,8 +183,8 @@ def plot_bootstrap(result: BootstrapResult) -> go.Figure:
             error_x=dict(
                 type="data",
                 symmetric=False,
-                array=[u - p for u, p in zip(uppers, point_estimates)],
-                arrayminus=[p - l for p, l in zip(point_estimates, lowers)],
+                array=[u - p for u, p in zip(uppers, point_estimates, strict=False)],
+                arrayminus=[p - lo for p, lo in zip(point_estimates, lowers, strict=False)],
                 color="darkgray",
                 thickness=2,
             ),
@@ -268,8 +268,8 @@ def plot_validation_summary(result: ValidationResult) -> go.Figure:
                 error_x=dict(
                     type="data",
                     symmetric=False,
-                    array=[u - p for u, p in zip(uppers, estimates)],
-                    arrayminus=[p - l for p, l in zip(estimates, lowers)],
+                    array=[u - p for u, p in zip(uppers, estimates, strict=False)],
+                    arrayminus=[p - lo for p, lo in zip(estimates, lowers, strict=False)],
                 ),
                 showlegend=False,
             ),

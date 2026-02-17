@@ -1,11 +1,3 @@
-import signalflow.analytic as analytic
-import signalflow.data as data
-import signalflow.detector as detector
-import signalflow.feature as feature
-import signalflow.strategy as strategy
-import signalflow.target as target
-import signalflow.utils as utils
-import signalflow.validator as validator
 from signalflow.core import (
     DataFrameType,
     Order,
@@ -27,6 +19,14 @@ from signalflow.core import (
     get_component,
     sf_component,
 )
+import signalflow.analytic as analytic
+import signalflow.data as data
+import signalflow.detector as detector
+import signalflow.feature as feature
+import signalflow.strategy as strategy
+import signalflow.target as target
+import signalflow.utils as utils
+import signalflow.validator as validator
 from signalflow.feature import Feature, FeaturePipeline, GlobalFeature, OffsetFeature
 
 # =============================================================================
@@ -126,66 +126,94 @@ def __getattr__(name: str):
 
         return LiveMetrics
 
+    # Risk management
+    if name == "RiskManager":
+        from signalflow.strategy.risk.manager import RiskManager
+
+        return RiskManager
+
+    if name == "RiskLimit":
+        from signalflow.strategy.risk.limits import RiskLimit
+
+        return RiskLimit
+
+    if name == "MaxLeverageLimit":
+        from signalflow.strategy.risk.limits import MaxLeverageLimit
+
+        return MaxLeverageLimit
+
+    if name == "MaxPositionsLimit":
+        from signalflow.strategy.risk.limits import MaxPositionsLimit
+
+        return MaxPositionsLimit
+
+    if name == "PairExposureLimit":
+        from signalflow.strategy.risk.limits import PairExposureLimit
+
+        return PairExposureLimit
+
+    if name == "DailyLossLimit":
+        from signalflow.strategy.risk.limits import DailyLossLimit
+
+        return DailyLossLimit
+
     raise AttributeError(f"module 'signalflow' has no attribute {name!r}")
 
 
 __all__ = [
-    # Submodules
+    "Backtest",
+    "BacktestBuilder",
+    "BacktestMetrics",
+    "BacktestResult",
+    "DailyLossLimit",
+    "DataFrameType",
+    "Feature",
+    "FeatureMetrics",
+    "FeaturePipeline",
+    "FlowBuilder",
+    "FlowResult",
+    "GlobalFeature",
+    "LabelMetrics",
+    "LiveMetrics",
+    "MaxLeverageLimit",
+    "MaxPositionsLimit",
+    "OffsetFeature",
+    "Order",
+    "OrderFill",
+    "PairExposureLimit",
+    "Portfolio",
+    "Position",
+    "PositionType",
+    "RawData",
+    "RawDataType",
+    "RawDataView",
+    "RiskLimit",
+    "RiskManager",
+    "SfComponentType",
+    "SfTorchModuleMixin",
+    "SignalMetrics",
+    "SignalType",
+    "Signals",
+    "SignalsTransform",
+    "StrategyState",
+    "Trade",
+    "ValidationMetrics",
     "analytic",
     "api",
+    "backtest",
     "core",
     "data",
+    "default_registry",
     "detector",
     "feature",
+    "flow",
+    "get_component",
+    "load",
+    "load_artifact",
+    "sf_component",
     "strategy",
     "target",
     "utils",
     "validator",
     "viz",
-    # Core containers
-    "RawData",
-    "Signals",
-    "RawDataView",
-    "Position",
-    "Trade",
-    "Portfolio",
-    "StrategyState",
-    "Order",
-    "OrderFill",
-    # Enums
-    "SignalType",
-    "PositionType",
-    "SfComponentType",
-    "DataFrameType",
-    "RawDataType",
-    # Registry
-    "sf_component",
-    "get_component",
-    "default_registry",
-    # Features
-    "Feature",
-    "FeaturePipeline",
-    "GlobalFeature",
-    "OffsetFeature",
-    # Torch
-    "SfTorchModuleMixin",
-    "SignalsTransform",
-    # High-level API (lazy loaded)
-    "Backtest",
-    "BacktestBuilder",
-    "BacktestResult",
-    "backtest",
-    "load",
-    "load_artifact",
-    # Flow API (unified pipeline)
-    "flow",
-    "FlowBuilder",
-    "FlowResult",
-    # Metric nodes
-    "FeatureMetrics",
-    "SignalMetrics",
-    "LabelMetrics",
-    "ValidationMetrics",
-    "BacktestMetrics",
-    "LiveMetrics",
 ]

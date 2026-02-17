@@ -1,6 +1,5 @@
 """Tests for signalflow.viz.renderers module."""
 
-
 import pytest
 
 from signalflow.viz.graph import (

@@ -121,7 +121,7 @@ class TestIsolatedBrokerProcessFills:
         fill = OrderFill(
             id="f1", order_id="o1", pair="BTCUSDT", side="BUY", ts=TS, price=90.0, qty=1.0, fee=0.1, position_id="pos1"
         )
-        trades = broker.process_fills([fill], [order], state)
+        broker.process_fills([fill], [order], state)
         assert state.portfolio.cash == pytest.approx(15000.0 - 90.1)
 
     def test_wrong_pair_raises(self):

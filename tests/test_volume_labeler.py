@@ -62,7 +62,7 @@ class TestVolumeRegimeLabeler:
         result = labeler.compute(df)
         labels = result["label"].to_list()
         # Constant volume -> ratio ~1.0, no spikes or droughts
-        non_null = [l for l in labels if l is not None]
+        non_null = [lbl for lbl in labels if lbl is not None]
         assert len(non_null) == 0, "Constant volume should have no extreme labels"
 
     def test_abnormal_volume_detected(self):
@@ -74,7 +74,7 @@ class TestVolumeRegimeLabeler:
         result = labeler.compute(df)
         labels = result["label"].to_list()
         # Bars before the spike looking forward into it should see "abnormal_volume"
-        has_spike = any(l == "abnormal_volume" for l in labels)
+        has_spike = any(lbl == "abnormal_volume" for lbl in labels)
         assert has_spike, "Expected abnormal_volume labels before high-volume period"
 
     def test_illiquidity_detected(self):
@@ -85,7 +85,7 @@ class TestVolumeRegimeLabeler:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        has_drought = any(l == "illiquidity" for l in labels)
+        has_drought = any(lbl == "illiquidity" for lbl in labels)
         assert has_drought, "Expected illiquidity labels before low-volume period"
 
     def test_labels_are_valid_values(self):

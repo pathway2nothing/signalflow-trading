@@ -377,12 +377,9 @@ class PriceDistanceFilter(EntryFilter):
                     return False, (
                         f"price too close to last entry: {price_change_pct:.2%} > -{self.min_distance_pct:.2%}"
                     )
-            elif direction == "short":
+            elif direction == "short" and price_change_pct < self.min_distance_pct:
                 # SHORT: we want to sell higher
-                if price_change_pct < self.min_distance_pct:
-                    return False, (
-                        f"price too close to last entry: {price_change_pct:.2%} < {self.min_distance_pct:.2%}"
-                    )
+                return False, (f"price too close to last entry: {price_change_pct:.2%} < {self.min_distance_pct:.2%}")
         else:
             # Check absolute distance in either direction
             if abs(price_change_pct) < self.min_distance_pct:

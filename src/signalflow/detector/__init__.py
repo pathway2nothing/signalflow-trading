@@ -25,25 +25,25 @@ from signalflow.detector.volatility_detector import VolatilityDetector
 from signalflow.detector.zscore_anomaly import ZScoreAnomalyDetector
 
 __all__ = [
-    # Base
-    "SignalDetector",
-    "ExampleSmaCrossDetector",
     # Market-wide detectors
     "AgreementDetector",
-    "MarketZScoreDetector",
-    "MarketCusumDetector",
-    # Backward compat aliases for market-wide
-    "GlobalEventDetector",
-    "ZScoreEventDetector",
-    "CusumEventDetector",
     # Preset detectors (backward compat)
     "AnomalyDetector",
-    "VolatilityDetector",
-    "StructureDetector",
-    # Generic detectors
-    "ZScoreAnomalyDetector",
-    "PercentileRegimeDetector",
-    "LocalExtremaDetector",
+    "CusumEventDetector",
+    "ExampleSmaCrossDetector",
     # Funding rate
     "FundingRateDetector",
+    # Backward compat aliases for market-wide
+    "GlobalEventDetector",
+    "LocalExtremaDetector",
+    "MarketCusumDetector",
+    "MarketZScoreDetector",
+    "PercentileRegimeDetector",
+    # Base
+    "SignalDetector",
+    "StructureDetector",
+    "VolatilityDetector",
+    # Generic detectors
+    "ZScoreAnomalyDetector",
+    "ZScoreEventDetector",
 ]

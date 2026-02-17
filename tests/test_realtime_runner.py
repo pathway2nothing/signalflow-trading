@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -26,6 +27,8 @@ from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
 from signalflow.strategy.component.entry.fixed_size import FixedSizeEntryRule
 from signalflow.strategy.component.exit.tp_sl import TakeProfitStopLossExit
 from signalflow.strategy.runner.realtime_runner import RealtimeRunner
+
+_background_tasks: set[asyncio.Task] = set()
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -150,10 +153,8 @@ class TestVirtualDataProvider:
         task = asyncio.create_task(provider.sync(PAIRS, update_interval_sec=0.01))
         await asyncio.sleep(0.1)
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
         df = raw_db.load(PAIR)
         # Should have more bars than the initial 10
@@ -208,7 +209,7 @@ class TestDetectSignals:
         raw_db.insert_klines(PAIR, bars)
 
         target_ts = START + timedelta(minutes=99)
-        bar_df, signals = runner._detect_signals(target_ts)
+        bar_df, _signals = runner._detect_signals(target_ts)
 
         assert bar_df.height > 0
         # bar_df should only contain rows at target_ts
@@ -222,7 +223,7 @@ class TestDetectSignals:
         # Patch detector to raise
         with patch.object(runner.detector, "run", side_effect=RuntimeError("boom")):
             ts = START + timedelta(minutes=4)
-            bar_df, signals = runner._detect_signals(ts)
+            _bar_df, signals = runner._detect_signals(ts)
             assert signals.value.height == 0
 
 
@@ -292,7 +293,9 @@ class TestFullCycle:
             await asyncio.sleep(0.5)
             runner._request_shutdown()
 
-        asyncio.create_task(stop_after_delay())
+        task = asyncio.create_task(stop_after_delay())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
         state = await runner.run_async()
 
         # Should have processed bars
@@ -344,7 +347,9 @@ class TestFullCycle:
             await asyncio.sleep(1.0)
             runner._request_shutdown()
 
-        asyncio.create_task(stop_after_delay())
+        task = asyncio.create_task(stop_after_delay())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
         state = await runner.run_async()
 
         assert runner._bars_processed > 0
@@ -390,7 +395,9 @@ class TestRestartRecovery:
             await asyncio.sleep(0.3)
             runner1._request_shutdown()
 
-        asyncio.create_task(stop_early())
+        task = asyncio.create_task(stop_early())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
         state1 = await runner1.run_async()
         bars_first_run = runner1._bars_processed
 
@@ -414,7 +421,9 @@ class TestRestartRecovery:
             await asyncio.sleep(0.3)
             runner2._request_shutdown()
 
-        asyncio.create_task(stop_again())
+        task = asyncio.create_task(stop_again())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
         state2 = await runner2.run_async()
 
         # Runner2 should have processed the new bars
@@ -436,8 +445,10 @@ class TestGracefulShutdown:
             await asyncio.sleep(0.2)
             runner._request_shutdown()
 
-        asyncio.create_task(send_shutdown())
-        state = await runner.run_async()
+        task = asyncio.create_task(send_shutdown())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+        await runner.run_async()
 
         # Runner should have exited cleanly
         assert runner._shutdown.is_set()
@@ -455,7 +466,9 @@ class TestNoNewBars:
             await asyncio.sleep(0.1)
             runner._request_shutdown()
 
-        asyncio.create_task(stop_quick())
+        task = asyncio.create_task(stop_quick())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
         state = await runner.run_async()
 
         assert runner._bars_processed == 0
@@ -620,7 +633,9 @@ class TestAlertManagerIntegration:
             await asyncio.sleep(0.3)
             runner._request_shutdown()
 
-        asyncio.create_task(stop_after_delay())
+        task = asyncio.create_task(stop_after_delay())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
         await runner.run_async()
 
         # Alert manager should have been called (history may or may not be populated depending on signals)
@@ -641,8 +656,10 @@ class TestAlertManagerIntegration:
             await asyncio.sleep(0.2)
             runner._request_shutdown()
 
-        asyncio.create_task(stop_after_delay())
-        state = await runner.run_async()
+        task = asyncio.create_task(stop_after_delay())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+        await runner.run_async()
 
         # Should run without errors
         assert runner._bars_processed > 0

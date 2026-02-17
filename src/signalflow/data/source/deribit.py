@@ -312,10 +312,7 @@ class DeribitClient(RawDataSource):
             last_ts = klines[-1]["timestamp"]
             next_start = last_ts
 
-            if next_start <= current_start:
-                current_start = current_start + timedelta(milliseconds=1)
-            else:
-                current_start = next_start
+            current_start = current_start + timedelta(milliseconds=1) if next_start <= current_start else next_start
 
             if len(all_klines) and len(all_klines) % 10000 == 0:
                 logger.info(f"{instrument}: loaded {len(all_klines):,} candles...")
@@ -388,15 +385,9 @@ class DeribitFuturesLoader(RawDataLoader):
             fill_gaps: Detect and fill gaps. Default: True.
         """
         now = datetime.now(UTC).replace(tzinfo=None)
-        if end is None:
-            end = now
-        else:
-            end = ensure_utc_naive(end)
+        end = now if end is None else ensure_utc_naive(end)
 
-        if start is None:
-            start = end - timedelta(days=days if days else 7)
-        else:
-            start = ensure_utc_naive(start)
+        start = end - timedelta(days=days if days else 7) if start is None else ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,
@@ -414,10 +405,7 @@ class DeribitFuturesLoader(RawDataLoader):
 
         async def download_pair(client: DeribitClient, pair: str) -> None:
             # Convert compact pair to Deribit instrument if needed
-            if "-" not in pair:
-                instrument = to_deribit_instrument(pair)
-            else:
-                instrument = pair
+            instrument = to_deribit_instrument(pair) if "-" not in pair else pair
 
             store_pair = normalize_deribit_pair(instrument)
             logger.info(f"Processing {pair} -> {instrument} (deribit/futures) from {start} to {end}")
@@ -478,10 +466,7 @@ class DeribitFuturesLoader(RawDataLoader):
         logger.info(f"Update interval: {update_interval_sec}s (timeframe={self.timeframe})")
 
         async def fetch_and_store(client: DeribitClient, pair: str) -> None:
-            if "-" not in pair:
-                instrument = to_deribit_instrument(pair)
-            else:
-                instrument = pair
+            instrument = to_deribit_instrument(pair) if "-" not in pair else pair
 
             store_pair = normalize_deribit_pair(instrument)
             try:

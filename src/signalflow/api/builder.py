@@ -218,10 +218,7 @@ class BacktestBuilder:
 
         # Determine name
         if name is None:
-            if not self._named_detectors:
-                name = "default"
-            else:
-                name = f"detector_{len(self._named_detectors)}"
+            name = "default" if not self._named_detectors else f"detector_{len(self._named_detectors)}"
 
         if name in self._named_detectors:
             raise DuplicateComponentNameError("detector", name)
@@ -346,10 +343,7 @@ class BacktestBuilder:
             instance = validator
 
         if name is None:
-            if not self._named_validators:
-                name = "default"
-            else:
-                name = f"validator_{len(self._named_validators)}"
+            name = "default" if not self._named_validators else f"validator_{len(self._named_validators)}"
 
         if name in self._named_validators:
             raise DuplicateComponentNameError("validator", name)
@@ -863,12 +857,11 @@ class BacktestBuilder:
         # Validate aggregation weights
         if self._aggregation_config:
             weights = self._aggregation_config.get("weights")
-            if weights and len(self._named_detectors) > 1:
-                if len(weights) != len(self._named_detectors):
-                    issues.append(
-                        f"ERROR: Aggregation weights length ({len(weights)}) "
-                        f"must match detector count ({len(self._named_detectors)})"
-                    )
+            if weights and len(self._named_detectors) > 1 and len(weights) != len(self._named_detectors):
+                issues.append(
+                    f"ERROR: Aggregation weights length ({len(weights)}) "
+                    f"must match detector count ({len(self._named_detectors)})"
+                )
 
         # Validate TP/SL ratio (single mode)
         exit_configs = list(self._named_exits.values()) if self._named_exits else [self._exit_config]

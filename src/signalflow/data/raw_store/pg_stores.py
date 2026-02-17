@@ -65,7 +65,7 @@ class PgRawStore(RawDataStore):
 
     @property
     def _all_column_names(self) -> list[str]:
-        return ["pair", "timestamp"] + self._columns
+        return ["pair", "timestamp", *self._columns]
 
     def _col_sql_type(self, col: str) -> str:
         if col in _SQL_TYPES:
@@ -126,7 +126,7 @@ class PgRawStore(RawDataStore):
         placeholders = ", ".join(["%s"] * len(self._all_column_names))
         update_set = ", ".join(f"{c} = EXCLUDED.{c}" for c in self._columns)
 
-        rows = [(pair, normalize_ts(k["timestamp"])) + tuple(k.get(c) for c in self._columns) for k in klines]
+        rows = [(pair, normalize_ts(k["timestamp"]), *tuple(k.get(c) for c in self._columns)) for k in klines]
         with self._con.cursor() as cur:
             cur.executemany(
                 f"""

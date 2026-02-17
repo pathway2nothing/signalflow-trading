@@ -293,10 +293,7 @@ class HyperliquidClient(RawDataSource):
             last_ts = klines[-1]["timestamp"]
             next_start = last_ts
 
-            if next_start <= current_start:
-                current_start = current_start + timedelta(milliseconds=1)
-            else:
-                current_start = next_start
+            current_start = current_start + timedelta(milliseconds=1) if next_start <= current_start else next_start
 
             if len(all_klines) and len(all_klines) % 2000 == 0:
                 logger.info(f"{coin}: loaded {len(all_klines):,} candles...")
@@ -366,15 +363,9 @@ class HyperliquidFuturesLoader(RawDataLoader):
             fill_gaps: Detect and fill gaps. Default: True.
         """
         now = datetime.now(UTC).replace(tzinfo=None)
-        if end is None:
-            end = now
-        else:
-            end = ensure_utc_naive(end)
+        end = now if end is None else ensure_utc_naive(end)
 
-        if start is None:
-            start = end - timedelta(days=days if days else 7)
-        else:
-            start = ensure_utc_naive(start)
+        start = end - timedelta(days=days if days else 7) if start is None else ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,

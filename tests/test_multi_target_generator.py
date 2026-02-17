@@ -82,7 +82,7 @@ class TestMultiTargetGenerator:
         df = _make_ohlcv(300)
         result = gen.generate(df)
         target_cols = [c for c in result.columns if c.startswith("target_")]
-        # 2 horizons × 3 targets = 6 columns
+        # 2 horizons x 3 targets = 6 columns
         assert len(target_cols) == 6
 
     def test_return_magnitude_non_negative(self):

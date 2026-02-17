@@ -56,10 +56,7 @@ def _make_synchronized_drop(
     for p in range(n_pairs):
         price = 100.0
         for i in range(n):
-            if i == event_idx:
-                change = -0.05  # All pairs drop 5%
-            else:
-                change = np.random.randn() * 0.005
+            change = -0.05 if i == event_idx else np.random.randn() * 0.005
             price *= np.exp(change)
             rows.append(
                 {

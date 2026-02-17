@@ -85,7 +85,7 @@ class TestSignalProfileMetricCompute:
         metric = SignalProfileMetric(look_ahead=100)
         raw = _make_raw_data(n=1000)
         signals = _make_signals(n_signals=5, interval_minutes=100)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         assert result is not None
         assert "quant" in result
@@ -95,7 +95,7 @@ class TestSignalProfileMetricCompute:
         metric = SignalProfileMetric(look_ahead=100)
         raw = _make_raw_data(n=1000)
         signals = _make_signals(n_signals=5, interval_minutes=100)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         quant = result["quant"]
         assert "n_signals" in quant
@@ -109,7 +109,7 @@ class TestSignalProfileMetricCompute:
         metric = SignalProfileMetric(look_ahead=100)
         raw = _make_raw_data(n=1000)
         signals = _make_signals(n_signals=5, interval_minutes=100)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         series = result["series"]
         assert "mean_profile" in series
@@ -133,21 +133,21 @@ class TestSignalProfileMetricCompute:
             }
         )
         signals = Signals(signals_df)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
         assert result is None
 
     def test_insufficient_future_data_returns_none(self):
         metric = SignalProfileMetric(look_ahead=1000)
         raw = _make_raw_data(n=100)  # Not enough data for look_ahead
         signals = _make_signals(n_signals=1, interval_minutes=0)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
         assert result is None
 
     def test_signal_count_correct(self):
         metric = SignalProfileMetric(look_ahead=100)
         raw = _make_raw_data(n=1500)
         signals = _make_signals(n_signals=10, interval_minutes=100)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         # Some signals may not have enough future data
         assert result["quant"]["n_signals"] <= 10
@@ -158,7 +158,7 @@ class TestSignalProfileMetricCompute:
         metric = SignalProfileMetric(look_ahead=look_ahead)
         raw = _make_raw_data(n=500)
         signals = _make_signals(n_signals=3, interval_minutes=100)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         mean_profile = result["series"]["mean_profile"]
         assert len(mean_profile) == look_ahead + 1
@@ -167,7 +167,7 @@ class TestSignalProfileMetricCompute:
         metric = SignalProfileMetric(look_ahead=100, quantiles=(0.1, 0.9))
         raw = _make_raw_data(n=1000)
         signals = _make_signals(n_signals=5, interval_minutes=100)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         # Should still have quantile series
         assert "lower_quant" in result["series"]
@@ -193,7 +193,7 @@ class TestSignalProfileMetricCompute:
             data={"futures": price_df},  # using futures instead of spot
         )
         signals = _make_signals(n_signals=5, interval_minutes=100)
-        result, ctx = metric.compute(raw, signals)
+        result, _ctx = metric.compute(raw, signals)
 
         assert result is not None
 

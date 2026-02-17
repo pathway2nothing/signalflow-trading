@@ -54,7 +54,7 @@ class TestStatisticalTestsValidator:
             sr_benchmark=10.0,  # Very high benchmark
             confidence_level=0.95,
         )
-        result = validator.validate(mock_backtest_result)
+        validator.validate(mock_backtest_result)
 
         # With such high benchmark, MinTRL should be None
         # (cannot be significant if SR < benchmark)

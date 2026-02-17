@@ -316,10 +316,7 @@ class KrakenClient(RawDataSource):
             last_ts = klines[-1]["timestamp"]
             next_start = last_ts
 
-            if next_start <= current_start:
-                current_start = current_start + timedelta(seconds=1)
-            else:
-                current_start = next_start
+            current_start = current_start + timedelta(seconds=1) if next_start <= current_start else next_start
 
             if len(all_klines) and len(all_klines) % 5000 == 0:
                 logger.info(f"{pair}: loaded {len(all_klines):,} candles...")
@@ -380,9 +377,10 @@ class KrakenClient(RawDataSource):
                 for ticker in body.get("tickers", []):
                     symbol = ticker.get("symbol", "")
                     # Filter perpetuals (PI_ prefix) and futures (FI_ prefix)
-                    if symbol.startswith(("PI_", "PF_", "FI_")):
-                        if settlement is None or settlement.upper() in symbol.upper():
-                            pairs.append(symbol)
+                    if symbol.startswith(("PI_", "PF_", "FI_")) and (
+                        settlement is None or settlement.upper() in symbol.upper()
+                    ):
+                        pairs.append(symbol)
 
                 return sorted(pairs)
 
@@ -558,10 +556,7 @@ class KrakenClient(RawDataSource):
             last_ts = klines[-1]["timestamp"]
             next_start = last_ts
 
-            if next_start <= current_start:
-                current_start = current_start + timedelta(seconds=1)
-            else:
-                current_start = next_start
+            current_start = current_start + timedelta(seconds=1) if next_start <= current_start else next_start
 
             if len(all_klines) and len(all_klines) % 10000 == 0:
                 logger.info(f"{symbol}: loaded {len(all_klines):,} candles...")
@@ -632,15 +627,9 @@ class KrakenSpotLoader(RawDataLoader):
             fill_gaps: Detect and fill gaps. Default: True.
         """
         now = datetime.now(UTC).replace(tzinfo=None)
-        if end is None:
-            end = now
-        else:
-            end = ensure_utc_naive(end)
+        end = now if end is None else ensure_utc_naive(end)
 
-        if start is None:
-            start = end - timedelta(days=days if days else 7)
-        else:
-            start = ensure_utc_naive(start)
+        start = end - timedelta(days=days if days else 7) if start is None else ensure_utc_naive(start)
 
         tf_minutes = _KRAKEN_SPOT_INTERVAL_MAP.get(self.timeframe, 1)
 
@@ -790,15 +779,9 @@ class KrakenFuturesLoader(RawDataLoader):
             fill_gaps: Detect and fill gaps. Default: True.
         """
         now = datetime.now(UTC).replace(tzinfo=None)
-        if end is None:
-            end = now
-        else:
-            end = ensure_utc_naive(end)
+        end = now if end is None else ensure_utc_naive(end)
 
-        if start is None:
-            start = end - timedelta(days=days if days else 7)
-        else:
-            start = ensure_utc_naive(start)
+        start = end - timedelta(days=days if days else 7) if start is None else ensure_utc_naive(start)
 
         tf_minutes = {
             "1m": 1,

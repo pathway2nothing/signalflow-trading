@@ -102,7 +102,7 @@ class StatisticalTestsValidator(StatisticalValidator):
         PSR = P(SR > SR_benchmark | observed returns)
 
         Formula (Bailey & Lopez de Prado 2012):
-        PSR = Φ[(SR - SR*) × √(n-1) / √(1 - γ₃×SR + (γ₄-1)/4 × SR²)]
+        PSR = Phi[(SR - SR*) x sqrt(n-1) / sqrt(1 - gamma3*SR + (gamma4-1)/4 x SR**2)]
 
         where:
         - Φ is the standard normal CDF
@@ -132,7 +132,7 @@ class StatisticalTestsValidator(StatisticalValidator):
         gamma4 = scipy_stats.kurtosis(returns, fisher=False)  # Kurtosis (not excess)
 
         # Standard error of Sharpe ratio
-        # SE(SR) = sqrt((1 - γ₃×SR + (γ₄-1)/4 × SR²) / (n-1))
+        # SE(SR) = sqrt((1 - gamma3*SR + (gamma4-1)/4 x SR**2) / (n-1))
         variance_term = 1 - gamma3 * sr_observed + (gamma4 - 1) / 4 * sr_observed**2
 
         if variance_term < 0:
@@ -183,7 +183,7 @@ class StatisticalTestsValidator(StatisticalValidator):
         significant at the given confidence level.
 
         Formula:
-        MinTRL = 1 + (1 - γ₃×SR + (γ₄-1)/4 × SR²) × (z_α / (SR - SR*))²
+        MinTRL = 1 + (1 - gamma3*SR + (gamma4-1)/4 x SR**2) x (z_alpha / (SR - SR*))**2
 
         Args:
             returns: Array of period returns

@@ -130,7 +130,7 @@ class StructureLabeler(Labeler):
         # Full window min = min(lookback_min, lookforward_min)
 
         lookback_window = self.lookback + 1  # Include current bar
-        lookforward_window = self.lookforward + 1  # Include current bar
+        self.lookforward + 1  # Include current bar
 
         # Lookback rolling (includes current bar, looks back)
         lookback_max = price.rolling_max(window_size=lookback_window, min_samples=1)
@@ -270,7 +270,7 @@ class ZigzagStructureLabeler(Labeler):
 
         **Adaptive (z-score)**: set ``min_swing_zscore`` to enable. Uses
         rolling volatility (std of log-returns) to compute a per-bar
-        threshold: ``threshold = zscore × vol × sqrt(vol_window)``.
+        threshold: ``threshold = zscore x vol x sqrt(vol_window)``.
 
     Algorithm:
         1. Find first significant swing to determine initial direction.
@@ -298,7 +298,7 @@ class ZigzagStructureLabeler(Labeler):
         # Fixed percentage
         labeler = ZigzagStructureLabeler(min_swing_pct=0.03, mask_to_signals=False)
 
-        # Adaptive threshold (z-score × rolling volatility)
+        # Adaptive threshold (z-score x rolling volatility)
         labeler = ZigzagStructureLabeler(
             min_swing_zscore=2.0,
             vol_window=500,
@@ -371,7 +371,7 @@ class ZigzagStructureLabeler(Labeler):
     # ------------------------------------------------------------------
 
     def _adaptive_thresholds(self, df: pl.DataFrame, prices: np.ndarray) -> np.ndarray:
-        """Compute per-bar thresholds: zscore × rolling_vol × sqrt(vol_window).
+        """Compute per-bar thresholds: zscore x rolling_vol x sqrt(vol_window).
 
         Uses Polars for rolling std computation.
         """
@@ -389,7 +389,7 @@ class ZigzagStructureLabeler(Labeler):
         # Compute thresholds
         vol_arr = df.select(rolling_vol.alias("vol"))["vol"].to_numpy()
 
-        # threshold = zscore × vol × sqrt(vol_window)
+        # threshold = zscore x vol x sqrt(vol_window)
         thresholds = self.min_swing_zscore * vol_arr * np.sqrt(self.vol_window)
 
         # Before we have enough data, use infinity (don't create pivots)

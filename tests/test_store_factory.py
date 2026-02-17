@@ -1,6 +1,5 @@
 """Tests for StoreFactory."""
 
-
 import pytest
 
 from signalflow.data.raw_store.base import RawDataStore

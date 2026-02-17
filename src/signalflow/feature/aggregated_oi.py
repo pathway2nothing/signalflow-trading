@@ -288,10 +288,7 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
             DataFrame with aggregated OI columns added.
         """
         # Filter to specified sources if provided
-        if self.sources is not None:
-            df_filtered = df.filter(pl.col(self.source_col).is_in(self.sources))
-        else:
-            df_filtered = df
+        df_filtered = df.filter(pl.col(self.source_col).is_in(self.sources)) if self.sources is not None else df
 
         # Step 1: Aggregate OI by timestamp (across all sources and pairs)
         agg_oi = (

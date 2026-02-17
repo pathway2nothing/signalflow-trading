@@ -6,7 +6,7 @@ from signalflow.core import SfComponentType
 
 
 @dataclass
-class RawDataSource(ABC):
+class RawDataSource(ABC):  # noqa: B024
     """Abstract base class for raw data sources.
 
     Defines the interface for data sources that provide market data

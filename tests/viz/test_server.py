@@ -71,7 +71,7 @@ class TestVizServer:
         try:
             # Second server should find next available port
             server2 = VizServer(simple_graph, port=14144)
-            url2 = server2.start(open_browser=False)
+            server2.start(open_browser=False)
 
             # Should be on a different port than the requested one
             assert server2.port > 14144

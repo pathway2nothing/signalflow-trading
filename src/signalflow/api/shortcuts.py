@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import polars as pl
+
 from signalflow.core import RawData
 
 if TYPE_CHECKING:

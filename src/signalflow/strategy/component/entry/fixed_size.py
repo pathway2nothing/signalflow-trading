@@ -40,10 +40,7 @@ class FixedSizeEntryRule(EntryRule):
         if open_count >= self.max_positions:
             return orders
 
-        if self.signal_type_map is not None:
-            actionable = list(self.signal_type_map.keys())
-        else:
-            actionable = self.signal_types
+        actionable = list(self.signal_type_map.keys()) if self.signal_type_map is not None else self.signal_types
 
         df = signals.value.filter(pl.col("signal_type").is_in(actionable))
 

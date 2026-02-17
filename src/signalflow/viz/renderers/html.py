@@ -20,7 +20,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SignalFlow Viz</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
     <style>
@@ -629,7 +630,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="controls">
                 <button class="control-btn" id="btn-fit" title="Fit to view">⊡</button>
                 <button class="control-btn" id="btn-zoom-in" title="Zoom in">+</button>
-                <button class="control-btn" id="btn-zoom-out" title="Zoom out">−</button>
+                <button class="control-btn" id="btn-zoom-out" title="Zoom out">-</button>
             </div>
             <div class="watermark">
                 Built with <a href="https://signalflow-trading.com" target="_blank">SignalFlow</a>

@@ -458,20 +458,20 @@ class BacktestConfig:
                     )
 
         # Aggregation weights validation
-        if self.aggregation and self.detectors:
-            if self.aggregation.weights:
-                if len(self.aggregation.weights) != len(self.detectors):
-                    issues.append(
-                        f"ERROR: Aggregation weights length ({len(self.aggregation.weights)}) "
-                        f"must match detector count ({len(self.detectors)})"
-                    )
+        if (
+            self.aggregation
+            and self.detectors
+            and self.aggregation.weights
+            and len(self.aggregation.weights) != len(self.detectors)
+        ):
+            issues.append(
+                f"ERROR: Aggregation weights length ({len(self.aggregation.weights)}) "
+                f"must match detector count ({len(self.detectors)})"
+            )
 
         # Validate TP/SL ratio
         exit_configs: list[ExitConfig] = []
-        if self.exits:
-            exit_configs = list(self.exits.values())
-        else:
-            exit_configs = [self.exit]
+        exit_configs = list(self.exits.values()) if self.exits else [self.exit]
         for cfg in exit_configs:
             if cfg.tp and cfg.sl and cfg.tp < cfg.sl:
                 issues.append(f"WARNING: TP ({cfg.tp:.1%}) < SL ({cfg.sl:.1%}), risk/reward < 1")

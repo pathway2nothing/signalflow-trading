@@ -32,7 +32,7 @@ class MultiSourceExtractor(BaseExtractor):
             }
         )
 
-        for data_type in self.raw.keys():
+        for data_type in self.raw:
             sources = self.raw.sources(data_type)
 
             if len(sources) == 1 and sources[0] == "default":

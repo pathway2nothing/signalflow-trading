@@ -114,9 +114,9 @@ class InformativenessReport:
     """Container for informativeness analysis results.
 
     Attributes:
-        raw_mi: Full MI results (feature × horizon × target).
+        raw_mi: Full MI results (feature x horizon x target).
         composite_scores: Aggregated scores per feature, ranked.
-        score_matrix: Pivoted Feature × (Horizon, Target) matrix.
+        score_matrix: Pivoted Feature x (Horizon, Target) matrix.
         global_events: Global event detection results (if enabled).
         metadata: Analysis configuration and statistics.
     """
@@ -223,7 +223,7 @@ class FeatureInformativenessAnalyzer:
             )
 
         # 3-4. Compute MI and rolling stability
-        logger.info(f"Computing MI for {len(feature_columns)} features × {len(target_meta)} targets...")
+        logger.info(f"Computing MI for {len(feature_columns)} features x {len(target_meta)} targets...")
         mi_rows = self._compute_all_mi(df, feature_columns, target_meta)
         raw_mi = pl.DataFrame(mi_rows)
 
@@ -355,10 +355,7 @@ class FeatureInformativenessAnalyzer:
             t_win = target[start:end]
 
             # Check fill rate
-            if np.issubdtype(f_win.dtype, np.floating):
-                valid = np.isfinite(f_win).sum()
-            else:
-                valid = len(f_win)
+            valid = np.isfinite(f_win).sum() if np.issubdtype(f_win.dtype, np.floating) else len(f_win)
 
             if valid < min_fill:
                 continue
@@ -431,7 +428,7 @@ class FeatureInformativenessAnalyzer:
         return result
 
     def _build_score_matrix(self, raw_mi: pl.DataFrame) -> pl.DataFrame:
-        """Build pivoted Feature × (Horizon, Target) matrix."""
+        """Build pivoted Feature x (Horizon, Target) matrix."""
         if raw_mi.height == 0:
             return pl.DataFrame()
 

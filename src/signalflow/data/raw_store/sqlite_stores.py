@@ -68,7 +68,7 @@ class SqliteRawStore(RawDataStore):
 
     @property
     def _all_column_names(self) -> list[str]:
-        return ["pair", "timestamp"] + self._columns
+        return ["pair", "timestamp", *self._columns]
 
     def _col_sql_type(self, col: str) -> str:
         if col in _SQL_TYPES:
@@ -121,7 +121,7 @@ class SqliteRawStore(RawDataStore):
             return
         n_cols = len(self._all_column_names)
         placeholders = ", ".join(["?"] * n_cols)
-        rows = [(pair, normalize_ts(k["timestamp"])) + tuple(k.get(c) for c in self._columns) for k in klines]
+        rows = [(pair, normalize_ts(k["timestamp"]), *tuple(k.get(c) for c in self._columns)) for k in klines]
         self._con.executemany(
             f"INSERT OR REPLACE INTO ohlcv VALUES ({placeholders})",
             rows,

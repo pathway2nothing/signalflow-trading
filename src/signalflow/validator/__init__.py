@@ -11,16 +11,16 @@ from signalflow.validator.sklearn_validator import (
 )
 
 __all__ = [
-    # Base
-    "SignalValidator",
-    "SklearnValidatorBase",
-    # Specific validators
-    "LightGBMValidator",
-    "XGBoostValidator",
-    "RandomForestValidator",
-    "LogisticRegressionValidator",
-    "SVMValidator",
     # Auto-select
     "AutoSelectValidator",
+    # Specific validators
+    "LightGBMValidator",
+    "LogisticRegressionValidator",
+    "RandomForestValidator",
+    "SVMValidator",
+    # Base
+    "SignalValidator",
     "SklearnSignalValidator",  # backward compat
+    "SklearnValidatorBase",
+    "XGBoostValidator",
 ]

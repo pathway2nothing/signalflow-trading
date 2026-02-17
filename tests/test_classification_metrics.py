@@ -52,10 +52,7 @@ def _make_signals_and_labels(n=20, pair="BTCUSDT", accuracy=0.7):
         true_label = 1 if i % 2 == 0 else 0
 
         # Prediction matches true label with given accuracy
-        if np.random.random() < accuracy:
-            pred = 1 if true_label == 1 else -1
-        else:
-            pred = -1 if true_label == 1 else 1
+        pred = (1 if true_label == 1 else -1) if np.random.random() < accuracy else -1 if true_label == 1 else 1
 
         rows_signals.append(
             {
@@ -153,7 +150,7 @@ class TestSignalClassificationMetricCompute:
         metric = SignalClassificationMetric()
         raw = _make_raw_data()
         signals, labels = _make_signals_and_labels(n=100)
-        result, ctx = metric.compute(raw, signals, labels=labels)
+        result, _ctx = metric.compute(raw, signals, labels=labels)
 
         assert result is not None
         assert "quant" in result

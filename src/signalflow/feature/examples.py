@@ -48,8 +48,8 @@ class ExampleRsiFeature(Feature):
     period: int = 14
     price_col: str = "close"
 
-    requires = ["{price_col}"]
-    outputs = ["rsi_{period}"]
+    requires: ClassVar[list[str]] = ["{price_col}"]
+    outputs: ClassVar[list[str]] = ["rsi_{period}"]
 
     test_params: ClassVar[list[dict]] = [
         {"period": 14},
@@ -100,8 +100,8 @@ class ExampleSmaFeature(Feature):
     period: int = 20
     price_col: str = "close"
 
-    requires = ["{price_col}"]
-    outputs = ["sma_{period}"]
+    requires: ClassVar[list[str]] = ["{price_col}"]
+    outputs: ClassVar[list[str]] = ["sma_{period}"]
 
     test_params: ClassVar[list[dict]] = [
         {"period": 20},
@@ -151,8 +151,8 @@ class ExampleGlobalMeanRsiFeature(GlobalFeature):
     price_col: str = "close"
     add_diff: bool = False
 
-    requires = ["{price_col}"]
-    outputs = ["global_mean_rsi_{period}"]
+    requires: ClassVar[list[str]] = ["{price_col}"]
+    outputs: ClassVar[list[str]] = ["global_mean_rsi_{period}"]
 
     test_params: ClassVar[list[dict]] = [
         {"period": 14},

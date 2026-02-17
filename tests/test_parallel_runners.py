@@ -333,7 +333,7 @@ class TestBarSignalsInRuntime:
         )
 
         raw_data, signals = make_test_data(["BTCUSDT"], n_bars=5)
-        result = runner.run(raw_data, signals)
+        runner.run(raw_data, signals)
 
         # Should have called exit rule with _bar_signals in runtime
         assert len(call_states) == 5

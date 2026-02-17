@@ -149,7 +149,7 @@ class TestProcessFillsLogging:
         broker.process_fills(entry_fills, [entry_order], state)
 
         # Create exit
-        position = list(state.portfolio.open_positions())[0]
+        position = next(iter(state.portfolio.open_positions()))
         exit_order = Order(pair="BTCUSDT", side="SELL", qty=0.1, position_id=position.id)
         ts2 = datetime(2024, 1, 1, 13, 0, 0)
         prices_exit = {"BTCUSDT": 46000.0}
@@ -204,7 +204,7 @@ class TestInheritedBehavior:
         broker.process_fills(fills, [order], state)
 
         assert len(state.portfolio.open_positions()) == 1
-        position = list(state.portfolio.open_positions())[0]
+        position = next(iter(state.portfolio.open_positions()))
         assert position.pair == "BTCUSDT"
         assert position.qty == 0.1
 
@@ -237,6 +237,6 @@ class TestInheritedBehavior:
         ts2 = datetime(2024, 1, 1, 13, 0, 0)
         broker.mark_positions(state, new_prices, ts2)
 
-        position = list(state.portfolio.open_positions())[0]
+        position = next(iter(state.portfolio.open_positions()))
         assert position.last_price == 46000.0
         assert position.last_time == ts2
