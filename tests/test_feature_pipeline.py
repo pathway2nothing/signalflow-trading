@@ -95,3 +95,73 @@ class TestFeaturePipelineOutputCols:
         assert "sma_5" in result.columns
         assert "global_mean_rsi_14" in result.columns
         assert len(result) == len(ohlcv_100_bars)
+
+
+class TestFeaturePipelineValidation:
+    def test_missing_required_column_raises(self):
+        """Test validation raises error for missing dependencies."""
+        from dataclasses import dataclass
+        from typing import ClassVar
+
+        from signalflow.feature.base import Feature
+
+        @dataclass
+        class FeatureRequiringMissingCol(Feature):
+            requires: ClassVar[list[str]] = ["nonexistent_column"]
+            outputs: ClassVar[list[str]] = ["out"]
+
+            def compute_pair(self, df):
+                return df
+
+        with pytest.raises(ValueError, match="requires"):
+            FeaturePipeline(features=[FeatureRequiringMissingCol()])
+
+
+class TestFeaturePipelineRun:
+    def test_run_from_raw_data_view(self, raw_data):
+        """Test run() method with RawDataView."""
+        from signalflow.core import RawDataView
+
+        raw_view = RawDataView(raw_data)
+        pipe = FeaturePipeline(features=[ExampleSmaFeature(period=5)])
+        result = pipe.run(raw_view)
+
+        assert "sma_5" in result.columns
+        # Get the actual DataFrame from accessor
+        spot_df = raw_data.spot.to_polars()
+        assert len(result) == len(spot_df)
+
+    def test_run_with_string_data_type(self, raw_data):
+        """Test run() with string raw_data_type."""
+        from signalflow.core import RawDataView
+
+        raw_view = RawDataView(raw_data)
+        pipe = FeaturePipeline(features=[ExampleSmaFeature(period=5)], raw_data_type="spot")
+        result = pipe.run(raw_view)
+
+        assert "sma_5" in result.columns
+
+
+class TestFeaturePipelineToMermaid:
+    def test_to_mermaid_basic(self):
+        """Test to_mermaid() generates valid diagram."""
+        pipe = FeaturePipeline(features=[ExampleSmaFeature(period=5)])
+        mermaid = pipe.to_mermaid()
+
+        assert "graph LR" in mermaid
+        assert "subgraph Input" in mermaid
+        assert "close" in mermaid  # SMA requires close
+        assert "sma_5" in mermaid  # Output column
+
+    def test_to_mermaid_multiple_features(self):
+        """Test to_mermaid() with multiple features."""
+        pipe = FeaturePipeline(
+            features=[
+                ExampleRsiFeature(period=14),
+                ExampleSmaFeature(period=5),
+            ]
+        )
+        mermaid = pipe.to_mermaid()
+
+        assert "rsi_14" in mermaid
+        assert "sma_5" in mermaid
