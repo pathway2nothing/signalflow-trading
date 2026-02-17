@@ -7,6 +7,7 @@ from signalflow.analytic.strategy.extended_metrics import (
     RiskRewardMetric,
     SortinoRatioMetric,
 )
+from signalflow.analytic.strategy.grid_metrics import GridMetrics
 from signalflow.analytic.strategy.main_strategy_metrics import (
     BalanceAllocationMetric,
     DrawdownMetric,
@@ -31,6 +32,8 @@ __all__ = [
     "CalmarRatioMetric",
     "DrawdownMetric",
     "ExpectancyMetric",
+    # Grid metrics
+    "GridMetrics",
     "MaxConsecutiveMetric",
     # Portfolio metrics
     "PortfolioExposureMetric",
