@@ -94,3 +94,72 @@ class TestGlobalFeature:
     def test_output_cols_prefix(self):
         f = DummyFeature()
         assert f.output_cols(prefix="pre_") == ["pre_dummy_out"]
+
+
+class TestGlobalFeatureSourceMethods:
+    """Tests for GlobalFeature.get_source_data() and iter_sources()."""
+
+    @pytest.fixture
+    def mock_raw_data(self):
+        """Create a mock RawData with nested structure for testing."""
+        from unittest.mock import MagicMock
+
+        # Create mock DataFrames for different sources
+        binance_df = pl.DataFrame({"pair": ["BTCUSDT"], "close": [100.0]})
+        okx_df = pl.DataFrame({"pair": ["BTCUSDT"], "close": [101.0]})
+
+        # Create mock accessor for perpetual data type
+        perpetual_accessor = MagicMock()
+        perpetual_accessor.sources = ["binance", "okx"]
+        perpetual_accessor.binance = binance_df
+        perpetual_accessor.okx = okx_df
+        perpetual_accessor.__contains__ = lambda self, key: key in ["binance", "okx"]
+
+        # Create mock RawData
+        raw = MagicMock()
+        raw.perpetual = perpetual_accessor
+        raw.__contains__ = lambda self, key: key == "perpetual"
+        raw.get = MagicMock(side_effect=lambda dt, source=None: binance_df if source == "binance" else okx_df if source == "okx" else binance_df)
+
+        return raw
+
+    def test_get_source_data_with_specific_source(self, mock_raw_data):
+        """Test get_source_data with explicit source parameter."""
+        f = GlobalFeature()
+        f.get_source_data(mock_raw_data, "perpetual", source="binance")
+        mock_raw_data.get.assert_called_with("perpetual", source="binance")
+
+    def test_get_source_data_default_source(self, mock_raw_data):
+        """Test get_source_data without source (uses default)."""
+        f = GlobalFeature()
+        f.get_source_data(mock_raw_data, "perpetual")
+        mock_raw_data.get.assert_called_with("perpetual")
+
+    def test_iter_sources_all_sources(self, mock_raw_data):
+        """Test iter_sources iterates all available sources."""
+        f = GlobalFeature(sources=None)  # Use all sources
+        results = list(f.iter_sources(mock_raw_data, "perpetual"))
+        assert len(results) == 2
+        assert results[0][0] == "binance"
+        assert results[1][0] == "okx"
+
+    def test_iter_sources_specific_sources(self, mock_raw_data):
+        """Test iter_sources with specific sources list."""
+        f = GlobalFeature(sources=["okx"])
+        results = list(f.iter_sources(mock_raw_data, "perpetual"))
+        assert len(results) == 1
+        assert results[0][0] == "okx"
+
+    def test_iter_sources_missing_data_type(self, mock_raw_data):
+        """Test iter_sources with non-existent data type returns empty."""
+        f = GlobalFeature()
+        results = list(f.iter_sources(mock_raw_data, "nonexistent"))
+        assert len(results) == 0
+
+    def test_iter_sources_skips_missing_source(self, mock_raw_data):
+        """Test iter_sources skips sources not present in accessor."""
+        f = GlobalFeature(sources=["binance", "missing_source"])
+        results = list(f.iter_sources(mock_raw_data, "perpetual"))
+        # Only binance should be yielded since "missing_source" is not in accessor
+        assert len(results) == 1
+        assert results[0][0] == "binance"

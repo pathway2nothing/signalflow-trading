@@ -17,11 +17,13 @@ def _vol_df(n=300, pair="BTCUSDT"):
     timestamps = [base_ts + timedelta(minutes=i) for i in range(n)]
     rng = np.random.default_rng(42)
     # Low vol -> high vol -> low vol
-    vol = np.concatenate([
-        rng.uniform(0.01, 0.02, n // 3),
-        rng.uniform(0.05, 0.10, n // 3),
-        rng.uniform(0.01, 0.02, n - 2 * (n // 3)),
-    ])
+    vol = np.concatenate(
+        [
+            rng.uniform(0.01, 0.02, n // 3),
+            rng.uniform(0.05, 0.10, n // 3),
+            rng.uniform(0.01, 0.02, n - 2 * (n // 3)),
+        ]
+    )
     return pl.DataFrame(
         {
             "pair": [pair] * n,
