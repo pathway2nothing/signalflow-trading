@@ -117,6 +117,15 @@ class BacktestResult:
         return len(self.trades) if self.trades else 0
 
     @property
+    def trades_df(self) -> pl.DataFrame:
+        """Trades as a Polars DataFrame."""
+        from signalflow.core.containers.portfolio import Portfolio
+
+        if not self.trades:
+            return pl.DataFrame()
+        return Portfolio.trades_to_pl(self.trades)
+
+    @property
     def final_capital(self) -> float:
         """Final capital after backtest."""
         return float(getattr(self.state, "capital", 0.0))

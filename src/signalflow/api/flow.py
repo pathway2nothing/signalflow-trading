@@ -1066,11 +1066,13 @@ class FlowBuilder:
         if self._entry_config:
             from signalflow.strategy.component.entry.signal import SignalEntryRule
 
-            max_pos = self._entry_config.get("max_positions", 10)
-            size = self._entry_config.get("size", 100.0)
+            max_pos = self._entry_config.get("max_positions") or 10
+            size = self._entry_config.get("size")
+            if size is None:
+                size = 100.0
             entry_rules.append(
                 SignalEntryRule(
-                    base_position_size=float(size) if size else 100.0,
+                    base_position_size=float(size),
                     max_total_positions=max_pos,
                 )
             )

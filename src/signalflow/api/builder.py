@@ -1104,7 +1104,9 @@ class BacktestBuilder:
             rule_cls = SignalEntryRule
 
         # Calculate position size
-        size = config.get("size", 100.0)
+        size = config.get("size")
+        if size is None:
+            size = 100.0
         size_pct = config.get("size_pct")
         if size_pct:
             size = self._capital * size_pct
