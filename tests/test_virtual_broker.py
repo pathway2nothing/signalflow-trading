@@ -167,6 +167,25 @@ class TestLedgerDataFrames:
         df = broker.order_log_df()
         assert df.height == 0
 
+    def test_fill_log_df_empty(self, broker: VirtualRealtimeBroker) -> None:
+        df = broker.fill_log_df()
+        assert df.height == 0
+
+    def test_equity_curve_df_empty(self, broker: VirtualRealtimeBroker) -> None:
+        df = broker.equity_curve_df()
+        assert df.height == 0
+
+    def test_equity_curve_df_populated(self, broker: VirtualRealtimeBroker, state: StrategyState) -> None:
+        prices = {"BTCUSDT": 45000.0}
+        ts = datetime(2024, 1, 1, 12, 0, 0)
+        broker.mark_positions(state, prices, ts)
+
+        df = broker.equity_curve_df()
+        assert df.height == 1
+        assert "ts" in df.columns
+        assert "equity" in df.columns
+        assert "cash" in df.columns
+
     def test_order_log_df_populated(self, broker: VirtualRealtimeBroker) -> None:
         orders = [
             Order(pair="BTCUSDT", side="BUY", qty=0.1),
@@ -192,6 +211,69 @@ class TestLedgerDataFrames:
         assert "order_id" in df.columns
         assert "price" in df.columns
         assert "fee" in df.columns
+
+
+class TestRiskManagerIntegration:
+    """Tests for risk manager integration."""
+
+    def test_risk_manager_rejects_orders(self, strategy_store: InMemoryStrategyStore, state: StrategyState) -> None:
+        """Test that risk manager can reject orders."""
+        from unittest.mock import MagicMock
+
+        # Create mock risk manager that rejects all orders
+        mock_risk_manager = MagicMock()
+        mock_result = MagicMock()
+        mock_result.allowed = False
+        mock_result.passed_orders = []
+        mock_result.violations = [("TestLimit", "Order rejected for test")]
+        mock_risk_manager.check.return_value = mock_result
+
+        broker = VirtualRealtimeBroker(
+            executor=VirtualSpotExecutor(fee_rate=0.001, slippage_pct=0.0),
+            store=strategy_store,
+            risk_manager=mock_risk_manager,
+        )
+        broker._last_state = state  # Set last state for risk check
+
+        order = Order(pair="BTCUSDT", side="BUY", qty=0.1)
+        prices = {"BTCUSDT": 45000.0}
+        ts = datetime(2024, 1, 1, 12, 0, 0)
+
+        fills = broker.submit_orders([order], prices, ts)
+
+        assert len(fills) == 0
+        assert len(broker.order_log) == 0
+
+    def test_risk_manager_allows_partial_orders(self, strategy_store: InMemoryStrategyStore, state: StrategyState) -> None:
+        """Test that risk manager can pass some orders."""
+        from unittest.mock import MagicMock
+
+        # Create broker with mock risk manager
+        mock_risk_manager = MagicMock()
+        mock_result = MagicMock()
+        mock_result.allowed = True
+
+        broker = VirtualRealtimeBroker(
+            executor=VirtualSpotExecutor(fee_rate=0.001, slippage_pct=0.0),
+            store=strategy_store,
+            risk_manager=mock_risk_manager,
+        )
+        broker._last_state = state
+
+        order1 = Order(pair="BTCUSDT", side="BUY", qty=0.1)
+        order2 = Order(pair="ETHUSDT", side="BUY", qty=1.0)
+
+        # Mock returns only the first order as passed
+        mock_result.passed_orders = [order1]
+        mock_risk_manager.check.return_value = mock_result
+
+        prices = {"BTCUSDT": 45000.0, "ETHUSDT": 3000.0}
+        ts = datetime(2024, 1, 1, 12, 0, 0)
+
+        fills = broker.submit_orders([order1, order2], prices, ts)
+
+        assert len(fills) == 1  # Only one order passed
+        assert len(broker.order_log) == 1
 
 
 class TestInheritedBehavior:
