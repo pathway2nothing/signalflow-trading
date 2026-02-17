@@ -253,3 +253,80 @@ class TestProbabilisticSharpeRatio:
         # With all losing trades vs benchmark of 0, PSR should be < 0.5
         assert st_result.psr is not None
         assert st_result.psr < 0.5
+
+
+class TestComputeSharpe:
+    """Tests for _compute_sharpe edge cases."""
+
+    def test_compute_sharpe_zero_std(self):
+        """Test Sharpe with constant returns (zero std)."""
+        validator = StatisticalTestsValidator()
+        returns = np.array([0.01, 0.01, 0.01, 0.01, 0.01])
+        sr = validator._compute_sharpe(returns)
+        assert sr == 0.0  # Zero std case
+
+    def test_compute_sharpe_single_return(self):
+        """Test Sharpe with single return."""
+        validator = StatisticalTestsValidator()
+        returns = np.array([0.01])
+        sr = validator._compute_sharpe(returns)
+        assert sr == 0.0
+
+
+class TestSimplePSR:
+    """Tests for _simple_psr fallback method."""
+
+    def test_simple_psr_single_return(self):
+        """Test simple PSR with single return."""
+        validator = StatisticalTestsValidator()
+        returns = np.array([0.01])
+        psr = validator._simple_psr(returns, 0.5)
+        assert psr == 0.5  # Uninformative
+
+    def test_simple_psr_positive_sr(self):
+        """Test simple PSR with positive Sharpe ratio."""
+        validator = StatisticalTestsValidator(sr_benchmark=0.0)
+        returns = np.array([0.01, 0.02, 0.015, 0.018, 0.012])
+        psr = validator._simple_psr(returns, 1.0)
+        assert psr > 0.5
+
+
+class TestMinTRLEdgeCases:
+    """Tests for _minimum_track_record_length edge cases."""
+
+    def test_mintrl_sr_below_benchmark(self):
+        """Test MinTRL when SR <= benchmark."""
+        validator = StatisticalTestsValidator(sr_benchmark=1.0)
+        returns = np.array([0.01, 0.02, -0.01, 0.015, 0.005] * 10)
+        sr = 0.5  # Below benchmark
+
+        min_trl = validator._minimum_track_record_length(returns, sr)
+        assert min_trl is None
+
+    def test_mintrl_few_returns(self):
+        """Test MinTRL with only 2 returns."""
+        validator = StatisticalTestsValidator()
+        returns = np.array([0.01, 0.02])
+        sr = 0.5
+
+        min_trl = validator._minimum_track_record_length(returns, sr)
+        assert min_trl is None
+
+    def test_mintrl_sr_equal_benchmark(self):
+        """Test MinTRL when SR equals benchmark exactly."""
+        validator = StatisticalTestsValidator(sr_benchmark=0.5)
+        returns = np.array([0.01, 0.02, 0.03] * 10)
+
+        min_trl = validator._minimum_track_record_length(returns, 0.5)
+        assert min_trl is None  # Cannot be significant if SR == benchmark
+
+
+class TestPSREdgeCases:
+    """Tests for _probabilistic_sharpe_ratio edge cases."""
+
+    def test_psr_two_returns(self):
+        """Test PSR with exactly 2 returns (n < 3)."""
+        validator = StatisticalTestsValidator()
+        returns = np.array([0.01, 0.02])
+        psr = validator._probabilistic_sharpe_ratio(returns, 0.5)
+        assert psr == 0.5  # Uninformative
