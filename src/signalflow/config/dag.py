@@ -1,7 +1,16 @@
-"""DAG-based flow configuration with automatic input/output inference.
+"""Flow configuration with automatic dependency inference.
 
-This module provides a DAG (Directed Acyclic Graph) configuration system
-where node connections are inferred from inputs/outputs declarations.
+This module provides a Flow configuration system (DAG-based) where node
+connections are inferred from inputs/outputs declarations.
+
+Terminology (Kubeflow-inspired):
+- Node: A processing unit (loader, detector, strategy, etc.)
+- Dependency: Connection between nodes with artifact type
+- Artifact: Data passed between nodes (ohlcv, signals, trades, etc.)
+- Flow: The complete DAG of nodes and dependencies
+- compile(): Resolve dependencies and validate
+- plan(): Get execution order
+- run(): Execute the flow
 
 Supports complex flows with:
 - Multiple loaders (each with its own store)
@@ -11,18 +20,17 @@ Supports complex flows with:
 - Strategy with multiple entry/exit rules, model-based decisions, metrics
 
 Example:
-    >>> from signalflow.config.dag import FlowDAG, Node
+    >>> from signalflow.config import Flow, Node
     >>>
-    >>> dag = FlowDAG.from_dict({
+    >>> flow = Flow.from_dict({
     ...     "nodes": {
     ...         "binance_loader": {"type": "data/loader", "config": {"exchange": "binance"}},
-    ...         "bybit_loader": {"type": "data/loader", "config": {"exchange": "bybit"}},
     ...         "sma_detector": {"type": "signals/detector", "name": "sma_cross"},
-    ...         "rsi_detector": {"type": "signals/detector", "name": "rsi", "training_only": True},
-    ...         "validator": {"type": "signals/validator"},
     ...         "strategy": {"type": "strategy"},
     ...     }
     ... })
+    >>> flow.compile()  # Resolve dependencies
+    >>> flow.plan()     # Get execution order
 """
 
 from __future__ import annotations
@@ -30,7 +38,10 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from signalflow.backtest import BacktestResult
 
 
 # ── Enums for execution modes ────────────────────────────────────────
@@ -99,6 +110,55 @@ SIGNAL_PRIORITY = ["validated_signals", "signals"]
 PREFER_VALIDATED_TYPES = {"strategy", "strategy/entry", "strategy/model"}
 
 
+# ── Artifact ────────────────────────────────────────────────────────
+
+
+@dataclass
+class Artifact:
+    """Data passed between nodes in a Flow.
+
+    Artifacts represent the data flowing through the DAG.
+    Each artifact has a name (type) and optional schema/storage hints.
+
+    Attributes:
+        name: Artifact type name (e.g., 'ohlcv', 'signals', 'trades')
+        dtype: Python/pandas type hint (e.g., 'DataFrame', 'SignalSeries')
+        schema: Optional schema for validation
+        storage: Storage hint for orchestrators ('memory', 'parquet', 'duckdb')
+        producer: Node ID that produces this artifact
+    """
+
+    name: str
+    dtype: str = "DataFrame"
+    schema: dict[str, Any] | None = None
+    storage: str = "memory"
+    producer: str | None = None
+
+    @classmethod
+    def from_output(cls, name: str, producer: str) -> Artifact:
+        """Create artifact from node output."""
+        # Infer dtype from artifact name
+        dtype_map = {
+            "ohlcv": "DataFrame",
+            "signals": "SignalSeries",
+            "validated_signals": "SignalSeries",
+            "training_signals": "SignalSeries",
+            "labels": "Series",
+            "features": "DataFrame",
+            "trades": "TradeList",
+            "metrics": "dict",
+            "positions": "PositionList",
+        }
+        return cls(
+            name=name,
+            dtype=dtype_map.get(name, "DataFrame"),
+            producer=producer,
+        )
+
+
+# ── Node ────────────────────────────────────────────────────────────
+
+
 @dataclass
 class Node:
     """A node in the flow DAG.
@@ -164,53 +224,75 @@ class Node:
 
 
 @dataclass
-class Edge:
-    """An edge connecting two nodes.
+class Dependency:
+    """A dependency connecting two nodes via an artifact.
+
+    Dependencies represent the flow of data between nodes.
+    Each dependency carries an artifact type.
 
     Attributes:
-        source: Source node ID
-        target: Target node ID
-        data_type: Type of data flowing (e.g., 'ohlcv', 'signals')
+        source: Source node ID (producer)
+        target: Target node ID (consumer)
+        artifact: Artifact type being passed (e.g., 'ohlcv', 'signals')
         source_output: Specific output port (for multi-output nodes)
         target_input: Specific input port (for multi-input nodes)
     """
 
     source: str
     target: str
-    data_type: str = ""
+    artifact: str = ""  # Artifact type (was data_type)
     source_output: str | None = None
     target_input: str | None = None
 
+    @property
+    def data_type(self) -> str:
+        """Backward compatibility alias for artifact."""
+        return self.artifact
+
+
+# Backward compatibility alias
+Edge = Dependency
+
 
 @dataclass
-class FlowDAG:
-    """DAG-based flow configuration.
+class Flow:
+    """Flow configuration with automatic dependency inference.
 
-    Supports automatic edge inference based on node inputs/outputs.
+    A Flow is a DAG of nodes connected by dependencies (edges).
+    Dependencies can be auto-inferred from node inputs/outputs.
 
     Attributes:
         id: Flow identifier
         name: Human-readable name
         nodes: Dict of node_id → Node
-        edges: List of edges (auto-inferred if not provided)
+        dependencies: List of dependencies (auto-inferred if not provided)
         config: Global flow config (capital, fee, etc.)
+        _compiled: Whether compile() has been called
+        _artifacts: Cached artifacts after compile()
     """
 
     id: str
     name: str = ""
     nodes: dict[str, Node] = field(default_factory=dict)
-    edges: list[Edge] = field(default_factory=list)
+    dependencies: list[Dependency] = field(default_factory=list)
     config: dict[str, Any] = field(default_factory=dict)
+    _compiled: bool = field(default=False, repr=False)
+    _artifacts: dict[str, Artifact] = field(default_factory=dict, repr=False)
+
+    @property
+    def edges(self) -> list[Dependency]:
+        """Backward compatibility alias for dependencies."""
+        return self.dependencies
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> FlowDAG:
-        """Create FlowDAG from dict with auto-inference.
+    def from_dict(cls, data: dict[str, Any]) -> Flow:
+        """Create Flow from dict with auto-inference.
 
         Args:
-            data: Dict with 'nodes' and optional 'edges', 'config'
+            data: Dict with 'nodes' and optional 'dependencies'/'edges', 'config'
 
         Returns:
-            FlowDAG with inferred edges if not provided
+            Flow with inferred dependencies if not provided
         """
         flow_id = data.get("id", data.get("flow_id", "flow"))
         name = data.get("name", data.get("flow_name", flow_id))
@@ -222,46 +304,46 @@ class FlowDAG:
         for node_id, node_data in nodes_data.items():
             nodes[node_id] = Node.from_dict(node_id, node_data)
 
-        # Parse or infer edges
-        edges_data = data.get("edges")
-        if edges_data is not None:
-            # Explicit edges provided
-            edges = [
-                Edge(
+        # Parse or infer dependencies (support both 'dependencies' and 'edges')
+        deps_data = data.get("dependencies") or data.get("edges")
+        if deps_data is not None:
+            # Explicit dependencies provided
+            dependencies = [
+                Dependency(
                     source=e.get("source", e.get("from", "")),
                     target=e.get("target", e.get("to", "")),
-                    data_type=e.get("data_type", ""),
+                    artifact=e.get("artifact", e.get("data_type", "")),
                     source_output=e.get("source_output"),
                     target_input=e.get("target_input"),
                 )
-                for e in edges_data
+                for e in deps_data
             ]
         else:
-            # Auto-infer edges
-            edges = cls._infer_edges(nodes)
+            # Auto-infer dependencies
+            dependencies = cls._infer_dependencies(nodes)
 
         return cls(
             id=flow_id,
             name=name,
             nodes=nodes,
-            edges=edges,
+            dependencies=dependencies,
             config=data.get("config", {}),
         )
 
     @classmethod
-    def _infer_edges(cls, nodes: dict[str, Node]) -> list[Edge]:
-        """Infer edges based on node inputs/outputs.
+    def _infer_dependencies(cls, nodes: dict[str, Node]) -> list[Dependency]:
+        """Infer dependencies based on node inputs/outputs.
 
         Algorithm:
-        1. Build a map of data_type → producer nodes
+        1. Build a map of artifact_type → producer nodes
         2. For each consumer, find producers for its required inputs
-        3. Create edges and warn about auto-connections
+        3. Create dependencies and warn about auto-connections
         4. Skip training_only nodes when connecting to strategy
         """
-        edges: list[Edge] = []
+        dependencies: list[Dependency] = []
         warnings_issued: list[str] = []
 
-        # Build producer map: data_type → list of (node_id, node)
+        # Build producer map: artifact_type → list of (node_id, node)
         producers: dict[str, list[tuple[str, Node]]] = {}
         for node_id, node in nodes.items():
             for output in node.get_outputs():
@@ -292,10 +374,10 @@ class FlowDAG:
                             ):
                                 continue
 
-                            edges.append(Edge(
+                            dependencies.append(Dependency(
                                 source=producer_id,
                                 target=consumer_id,
-                                data_type=candidate,
+                                artifact=candidate,
                             ))
                             producer_found = True
 
@@ -318,7 +400,12 @@ class FlowDAG:
         for msg in warnings_issued:
             warnings.warn(msg, UserWarning, stacklevel=3)
 
-        return edges
+        return dependencies
+
+    @classmethod
+    def _infer_edges(cls, nodes: dict[str, Node]) -> list[Dependency]:
+        """Backward compatibility alias for _infer_dependencies."""
+        return cls._infer_dependencies(nodes)
 
     def get_loaders(self) -> list[Node]:
         """Get all data loader nodes."""
@@ -340,16 +427,26 @@ class FlowDAG:
         strategies = [n for n in self.nodes.values() if n.type == "strategy"]
         return strategies[0] if strategies else None
 
-    def topological_sort(self) -> list[str]:
-        """Return nodes in topological order (for execution)."""
+    def compile(self) -> list[str]:
+        """Compile the flow: resolve dependencies and return execution order.
+
+        This validates the DAG structure and returns nodes in topological order.
+        After compile(), artifacts are cached for inspection.
+
+        Returns:
+            List of node IDs in execution order
+
+        Raises:
+            ValueError: If cycle detected in DAG
+        """
         # Build adjacency list
         graph: dict[str, list[str]] = {node_id: [] for node_id in self.nodes}
         in_degree: dict[str, int] = {node_id: 0 for node_id in self.nodes}
 
-        for edge in self.edges:
-            if edge.source in graph and edge.target in graph:
-                graph[edge.source].append(edge.target)
-                in_degree[edge.target] += 1
+        for dep in self.dependencies:
+            if dep.source in graph and dep.target in graph:
+                graph[dep.source].append(dep.target)
+                in_degree[dep.target] += 1
 
         # Kahn's algorithm
         queue = [n for n, d in in_degree.items() if d == 0]
@@ -368,16 +465,31 @@ class FlowDAG:
             cycle_nodes = set(self.nodes.keys()) - set(result)
             raise ValueError(f"Cycle detected in DAG: {cycle_nodes}")
 
+        # Cache artifacts
+        self._artifacts = {}
+        for node_id, node in self.nodes.items():
+            for output in node.get_outputs():
+                self._artifacts[f"{node_id}.{output}"] = Artifact.from_output(output, node_id)
+
+        self._compiled = True
         return result
 
-    def get_execution_plan(self) -> list[dict[str, Any]]:
-        """Get execution plan with node configs in topological order."""
-        order = self.topological_sort()
-        plan = []
+    def topological_sort(self) -> list[str]:
+        """Backward compatibility alias for compile()."""
+        return self.compile()
+
+    def plan(self) -> list[dict[str, Any]]:
+        """Get execution plan with node configs in topological order.
+
+        Returns:
+            List of node execution specs with id, type, config, etc.
+        """
+        order = self.compile()
+        execution_plan = []
 
         for node_id in order:
             node = self.nodes[node_id]
-            plan.append({
+            execution_plan.append({
                 "id": node_id,
                 "type": node.type,
                 "name": node.name,
@@ -387,10 +499,69 @@ class FlowDAG:
                 "training_only": node.training_only,
             })
 
-        return plan
+        return execution_plan
+
+    def get_execution_plan(self) -> list[dict[str, Any]]:
+        """Backward compatibility alias for plan()."""
+        return self.plan()
+
+    @property
+    def artifacts(self) -> dict[str, Artifact]:
+        """Get all artifacts in the flow.
+
+        Call compile() first to populate artifacts.
+        """
+        if not self._compiled:
+            self.compile()
+        return self._artifacts
+
+    def run(self, **kwargs: Any) -> BacktestResult:
+        """Execute the flow and return results.
+
+        This converts the Flow to a BacktestBuilder and runs it.
+
+        Args:
+            **kwargs: Additional arguments passed to BacktestBuilder
+
+        Returns:
+            BacktestResult from the backtest execution
+        """
+        from signalflow import Backtest
+
+        # Convert Flow to BacktestBuilder config
+        config = self._to_backtest_config()
+        config.update(kwargs)
+
+        return Backtest.from_dict(config).run()
+
+    def _to_backtest_config(self) -> dict[str, Any]:
+        """Convert Flow to BacktestBuilder-compatible config."""
+        config: dict[str, Any] = {
+            "flow_id": self.id,
+            "flow_name": self.name,
+            **self.config,
+        }
+
+        # Extract node configs
+        for node_id, node in self.nodes.items():
+            if node.type == "data/loader":
+                config["data"] = {
+                    "pairs": node.config.get("pairs", ["BTCUSDT"]),
+                    "timeframe": node.config.get("timeframe", "1h"),
+                    **node.config,
+                }
+            elif node.type == "signals/detector":
+                config["detector"] = {
+                    "type": node.name,
+                    **node.config,
+                }
+            elif node.type == "strategy":
+                config["strategy"] = node.config
+
+        return config
 
     def validate(self) -> list[str]:
-        """Validate DAG structure. Returns list of errors."""
+        """Validate Flow structure. Returns list of errors."""
         errors: list[str] = []
 
         # Check for required node types
@@ -399,19 +570,19 @@ class FlowDAG:
         if not any(t.startswith("data/") for t in types):
             errors.append("Flow must have at least one data/loader node")
 
-        # Check for cycles (via topological sort)
+        # Check for cycles (via compile)
         try:
-            self.topological_sort()
+            self.compile()
         except ValueError as e:
             errors.append(str(e))
 
-        # Check all edge references valid nodes
+        # Check all dependency references valid nodes
         node_ids = set(self.nodes.keys())
-        for edge in self.edges:
-            if edge.source not in node_ids:
-                errors.append(f"Edge references unknown source: {edge.source}")
-            if edge.target not in node_ids:
-                errors.append(f"Edge references unknown target: {edge.target}")
+        for dep in self.dependencies:
+            if dep.source not in node_ids:
+                errors.append(f"Dependency references unknown source: {dep.source}")
+            if dep.target not in node_ids:
+                errors.append(f"Dependency references unknown target: {dep.target}")
 
         # Strategy validation
         strategy = self.get_strategy_node()
@@ -439,18 +610,33 @@ class FlowDAG:
                 }
                 for node_id, node in self.nodes.items()
             },
+            "dependencies": [
+                {
+                    "source": d.source,
+                    "target": d.target,
+                    "artifact": d.artifact,
+                    "source_output": d.source_output,
+                    "target_input": d.target_input,
+                }
+                for d in self.dependencies
+            ],
+            # Backward compatibility
             "edges": [
                 {
-                    "source": e.source,
-                    "target": e.target,
-                    "data_type": e.data_type,
-                    "source_output": e.source_output,
-                    "target_input": e.target_input,
+                    "source": d.source,
+                    "target": d.target,
+                    "data_type": d.artifact,
+                    "source_output": d.source_output,
+                    "target_input": d.target_input,
                 }
-                for e in self.edges
+                for d in self.dependencies
             ],
             "config": self.config,
         }
+
+
+# Backward compatibility alias
+FlowDAG = Flow
 
 
 # ── Strategy Subgraph ────────────────────────────────────────────────

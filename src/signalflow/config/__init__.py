@@ -3,30 +3,39 @@
 This module provides unified config loading for all SignalFlow frontends
 (sf-kedro, sf-ui, CLI).
 
+Terminology (Kubeflow-inspired):
+- Flow: The complete DAG configuration
+- Node: A processing unit (loader, detector, strategy, etc.)
+- Dependency: Connection between nodes with artifact type
+- Artifact: Data passed between nodes (ohlcv, signals, trades, etc.)
+
 Example:
     >>> import signalflow as sf
     >>> config = sf.config.load("grid_sma", conf_path="./conf")
     >>> result = sf.Backtest.from_dict(config).run()
 
-    # Or with typed config:
-    >>> flow = sf.config.FlowConfig.from_dict(sf.config.load("grid_sma"))
-    >>> flow.detector.type
-    'example/sma_cross'
-
-    # Or with DAG config (auto-inferred edges):
-    >>> dag = sf.config.FlowDAG.from_dict({
+    # Or with Flow (DAG-style, auto-inferred dependencies):
+    >>> flow = sf.config.Flow.from_dict({
     ...     "nodes": {
     ...         "loader": {"type": "data/loader"},
     ...         "detector": {"type": "signals/detector"},
     ...     }
     ... })
-    >>> dag.edges  # auto-inferred: loader → detector
+    >>> flow.compile()  # Resolve dependencies
+    >>> flow.plan()     # Get execution order
+    >>> flow.run()      # Execute backtest
 """
 
 from signalflow.config.dag import (
-    Edge,
+    # New names (Kubeflow-inspired)
+    Artifact,
+    Dependency,
+    Flow,
+    # Backward compatibility aliases
+    Edge,  # alias for Dependency
+    FlowDAG,  # alias for Flow
+    # Other exports
     EntryMode,
-    FlowDAG,
     Node,
     SignalReconciliation,
     StrategySubgraph,
@@ -52,10 +61,15 @@ from signalflow.config.loader import (
 load = load_flow_config
 
 __all__ = [
-    # DAG config
-    "Edge",
+    # Flow config (new names)
+    "Artifact",
+    "Dependency",
+    "Flow",
+    # Backward compatibility
+    "Edge",  # alias for Dependency
+    "FlowDAG",  # alias for Flow
+    # Other DAG exports
     "EntryMode",
-    "FlowDAG",
     "Node",
     "SignalReconciliation",
     "StrategySubgraph",
