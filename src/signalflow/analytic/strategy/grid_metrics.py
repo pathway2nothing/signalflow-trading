@@ -70,10 +70,7 @@ class GridMetrics(StrategyMetric):
 
         # Weighted average entry price
         total_qty = sum(p.qty for p in open_positions)
-        if total_qty > 0:
-            avg_entry = sum(p.entry_price * p.qty for p in open_positions) / total_qty
-        else:
-            avg_entry = 0.0
+        avg_entry = sum(p.entry_price * p.qty for p in open_positions) / total_qty if total_qty > 0 else 0.0
 
         return {
             "grid_open_levels": float(n_open),
