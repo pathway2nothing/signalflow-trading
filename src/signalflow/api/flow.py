@@ -1070,12 +1070,13 @@ class FlowBuilder:
             size = self._entry_config.get("size")
             if size is None:
                 size = 100.0
-            entry_rules.append(
-                SignalEntryRule(
-                    base_position_size=float(size),
-                    max_total_positions=max_pos,
-                )
-            )
+            rule_kwargs: dict = {
+                "base_position_size": float(size),
+                "max_total_positions": max_pos,
+            }
+            if self._entry_config.get("entry_filters"):
+                rule_kwargs["entry_filters"] = self._entry_config["entry_filters"]
+            entry_rules.append(SignalEntryRule(**rule_kwargs))
 
         if self._exit_config:
             tp = self._exit_config.get("tp")
@@ -1096,6 +1097,11 @@ class FlowBuilder:
                 from signalflow.strategy.component.exit.trailing_stop import TrailingStopExit
 
                 exit_rules.append(TrailingStopExit(trail_pct=float(trailing)))
+
+            # Pre-built exit rule instances (from graph converter)
+            extra = self._exit_config.get("_extra_rules")
+            if extra:
+                exit_rules.extend(extra)
 
         # Defaults
         if not entry_rules:

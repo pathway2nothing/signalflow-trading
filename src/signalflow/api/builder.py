@@ -1111,11 +1111,16 @@ class BacktestBuilder:
         if size_pct:
             size = self._capital * size_pct
 
-        rule = rule_cls(
-            base_position_size=size,
-            max_positions_per_pair=config.get("max_per_pair", 1),
-            max_total_positions=config.get("max_positions", 10),
-        )
+        rule_kwargs: dict[str, Any] = {
+            "base_position_size": size,
+            "max_positions_per_pair": config.get("max_per_pair", 1),
+            "max_total_positions": config.get("max_positions", 10),
+        }
+        # Pass entry filters if provided (from graph converter)
+        if config.get("entry_filters"):
+            rule_kwargs["entry_filters"] = config["entry_filters"]
+
+        rule = rule_cls(**rule_kwargs)
 
         # Set source_detector for cross-referencing
         source_detector = config.get("source_detector")
@@ -1174,6 +1179,11 @@ class BacktestBuilder:
                 rules.append(time_cls(max_bars=time_limit))
             except KeyError:
                 pass
+
+        # Pre-built exit rule instances (from graph converter)
+        extra = config.get("_extra_rules")
+        if extra:
+            rules.extend(extra)
 
         # Default if nothing configured
         if not rules:
