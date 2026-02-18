@@ -79,6 +79,12 @@ def __getattr__(name: str):
 
         return viz
 
+    # Config module
+    if name == "config":
+        import signalflow.config as config
+
+        return config
+
     # Flow API (unified pipeline)
     if name == "flow":
         from signalflow.api.flow import flow
@@ -201,6 +207,7 @@ __all__ = [
     "analytic",
     "api",
     "backtest",
+    "config",
     "core",
     "data",
     "default_registry",

@@ -648,60 +648,108 @@ class BacktestBuilder:
 
     @classmethod
     def from_dict(cls, config: dict[str, Any]) -> BacktestBuilder:
-        """Reconstruct a builder from a config dict (inverse of ``to_dict()``).
+        """Reconstruct a builder from a config dict.
 
-        Detector instances are recreated from registry using class_name + params.
+        Supports two config formats:
+        1. Builder format (from ``to_dict()``): detectors, entry, exit
+        2. Flow config format: detector, strategy.entry_rules, strategy.exit_rules
+
+        Detector instances are recreated from registry using class_name/type + params.
         Data sources marked as ``_type: preloaded`` are skipped — caller must
         re-attach them via ``.data(raw=...)``.
 
         Args:
-            config: Config dict as produced by ``to_dict()``.
+            config: Config dict (from ``to_dict()`` or ``load_flow_config()``).
 
         Returns:
             Configured BacktestBuilder.
+
+        Example:
+            >>> # From flow config
+            >>> config = sf.config.load("grid_sma")
+            >>> builder = sf.Backtest.from_dict(config)
+
+            >>> # From builder config
+            >>> builder = sf.Backtest.from_dict(old_builder.to_dict())
         """
-        builder = cls(strategy_id=config.get("strategy_id", "backtest"))
+        # Determine strategy_id
+        strategy_id = config.get("strategy_id", "backtest")
+        if "strategy" in config and "strategy_id" in config["strategy"]:
+            strategy_id = config["strategy"]["strategy_id"]
+        if "flow_id" in config and strategy_id == "backtest":
+            strategy_id = config["flow_id"]
+
+        builder = cls(strategy_id=strategy_id)
 
         # Data (parameter-based only)
         if "data" in config:
-            builder.data(**config["data"])
+            data_cfg = config["data"]
+            # Flow config format has nested structure
+            if "pairs" in data_cfg and not any(k in data_cfg for k in ["exchange", "source"]):
+                # Don't call .data() for flow config - it just has pairs/timeframe
+                pass
+            else:
+                builder.data(**data_cfg)
         if "data_sources" in config:
             for name, src in config["data_sources"].items():
                 if isinstance(src, dict) and src.get("_type") == "preloaded":
                     continue
                 builder.data(name=name, **src)
 
-        # Detectors
+        # Detectors - handle both formats
         if "detectors" in config:
+            # Builder format: detectors dict
             for name, det_info in config["detectors"].items():
                 params = det_info.get("params", {})
                 class_name = det_info.get("class_name", name)
                 data_source = det_info.get("data_source")
-                # Try to find in registry by class_name or name
                 builder.detector(
                     class_name,
                     name=name,
                     data_source=data_source,
                     **params,
                 )
+        elif "detector" in config:
+            # Flow config format: single detector
+            det_cfg = config["detector"]
+            det_type = det_cfg.get("type", "")
+            det_params = {k: v for k, v in det_cfg.items() if k != "type"}
+            if det_type:
+                builder.detector(det_type, **det_params)
 
         # Aggregation
         if "aggregation" in config:
             builder.aggregation(**config["aggregation"])
 
-        # Entry
+        # Entry - handle both formats
         if "entry" in config:
             builder.entry(**config["entry"])
         if "entries" in config:
             for name, entry_cfg in config["entries"].items():
                 builder.entry(name=name, **entry_cfg)
 
-        # Exit
+        # Flow config format: strategy.entry_rules
+        if "strategy" in config and "entry_rules" in config["strategy"]:
+            entry_rules = config["strategy"]["entry_rules"]
+            if entry_rules:
+                rule = entry_rules[0]  # Use first rule
+                entry_cfg = cls._convert_entry_rule_to_config(rule)
+                builder.entry(**entry_cfg)
+
+        # Exit - handle both formats
         if "exit" in config:
             builder.exit(**config["exit"])
         if "exits" in config:
             for name, exit_cfg in config["exits"].items():
                 builder.exit(name=name, **exit_cfg)
+
+        # Flow config format: strategy.exit_rules
+        if "strategy" in config and "exit_rules" in config["strategy"]:
+            exit_rules = config["strategy"]["exit_rules"]
+            if exit_rules:
+                rule = exit_rules[0]  # Use first rule
+                exit_cfg = cls._convert_exit_rule_to_config(rule)
+                builder.exit(**exit_cfg)
 
         # Capital & fees
         if "capital" in config:
@@ -710,6 +758,84 @@ class BacktestBuilder:
             builder.fee(config["fee"])
 
         return builder
+
+    @classmethod
+    def _convert_entry_rule_to_config(cls, rule: dict[str, Any]) -> dict[str, Any]:
+        """Convert flow config entry_rule to builder entry config.
+
+        Handles entry_filters by instantiating them from registry.
+        """
+        config: dict[str, Any] = {
+            "size": rule.get("base_position_size", 100.0),
+            "max_positions": rule.get("max_total_positions", 10),
+            "max_per_pair": rule.get("max_positions_per_pair", 1),
+        }
+
+        # Copy additional params
+        for key in ["min_probability", "use_probability_sizing"]:
+            if key in rule:
+                config[key] = rule[key]
+
+        # Handle entry_filters
+        if "entry_filters" in rule:
+            filters = cls._instantiate_entry_filters(rule["entry_filters"])
+            if filters:
+                config["entry_filters"] = filters
+
+        return config
+
+    @classmethod
+    def _instantiate_entry_filters(cls, filters_config: list[dict[str, Any]]) -> list[Any]:
+        """Instantiate entry filters from config.
+
+        Args:
+            filters_config: List of filter configs with 'type' and params.
+
+        Returns:
+            List of instantiated EntryFilter objects.
+        """
+        from signalflow.core import SfComponentType, default_registry
+
+        filters = []
+        for filter_cfg in filters_config:
+            filter_type = filter_cfg.get("type", "")
+            if not filter_type:
+                continue
+
+            try:
+                filter_cls = default_registry.get(SfComponentType.STRATEGY_ENTRY_RULE, filter_type)
+                # Extract params (everything except 'type')
+                params = {k: v for k, v in filter_cfg.items() if k != "type"}
+                # Get valid dataclass fields
+                if hasattr(filter_cls, "__dataclass_fields__"):
+                    valid_fields = {f for f in filter_cls.__dataclass_fields__ if f != "component_type"}
+                    params = {k: v for k, v in params.items() if k in valid_fields}
+                filters.append(filter_cls(**params))
+            except (KeyError, TypeError) as e:
+                from loguru import logger
+
+                logger.warning(f"Could not instantiate entry filter '{filter_type}': {e}")
+
+        return filters
+
+    @classmethod
+    def _convert_exit_rule_to_config(cls, rule: dict[str, Any]) -> dict[str, Any]:
+        """Convert flow config exit_rule to builder exit config."""
+        config: dict[str, Any] = {}
+        rule_type = rule.get("type", "tp_sl")
+
+        if rule_type == "tp_sl":
+            if "take_profit_pct" in rule:
+                config["tp"] = rule["take_profit_pct"]
+            if "stop_loss_pct" in rule:
+                config["sl"] = rule["stop_loss_pct"]
+            if "trailing_stop_pct" in rule:
+                config["trailing"] = rule["trailing_stop_pct"]
+        else:
+            # Copy all params except type
+            config = {k: v for k, v in rule.items() if k != "type"}
+
+        return config
 
     @staticmethod
     def _serialize_data_params(params: dict[str, Any]) -> dict[str, Any]:
