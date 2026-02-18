@@ -81,7 +81,7 @@ DEFAULT_INPUTS: dict[str, list[str]] = {
     "feature/group": ["ohlcv"],
     "signals/detector": ["ohlcv"],  # May also use features, other detectors
     "signals/labeler": ["ohlcv", "signals"],
-    "signals/validator": ["signals", "labels"],  # features optional
+    "signals/validator": ["signals", "labels", "training_signals"],  # training_signals from training_only detectors
     "strategy/entry": ["signals"],
     "strategy/exit": ["positions"],  # Internal to strategy
     "strategy/model": ["ohlcv", "signals", "features", "positions"],
