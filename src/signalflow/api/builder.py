@@ -1367,34 +1367,6 @@ class BacktestBuilder:
             cancel_event=cancel_event,
         )
 
-    def visualize(
-        self,
-        *,
-        output: str | None = None,
-        format: str = "html",
-        show: bool = True,
-    ) -> str:
-        """
-        Visualize the configured pipeline.
-
-        Opens an interactive HTML visualization showing the data flow
-        from data sources through features to detector and runner.
-
-        Args:
-            output: Output file path (optional)
-            format: Output format ("html" or "mermaid")
-            show: Open in browser (HTML only)
-
-        Returns:
-            Rendered output string
-
-        Example:
-            >>> sf.Backtest("test").data(...).detector(...).visualize()
-        """
-        from signalflow import viz
-
-        return viz.pipeline(self, output=output, format=format, show=show)  # type: ignore[arg-type]
-
     def __repr__(self) -> str:
         parts = [f"strategy_id={self.strategy_id!r}"]
         if self._named_detectors:

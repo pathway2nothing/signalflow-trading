@@ -26,11 +26,25 @@ Example:
     >>> flow.run()      # Execute backtest
 """
 
+from signalflow.config.artifact_cache import ArtifactCache
+from signalflow.config.artifact_schema import (
+    ArtifactSchema,
+    ArtifactType,
+    ColumnSchema,
+    FEATURES_SCHEMA,
+    LABELS_SCHEMA,
+    OHLCV_SCHEMA,
+    SIGNALS_SCHEMA,
+    TRADES_SCHEMA,
+    get_schema,
+)
 from signalflow.config.dag import (
     # New names (Kubeflow-inspired)
     Artifact,
     Dependency,
     Flow,
+    FlowMode,
+    FlowRunResult,
     # Backward compatibility aliases
     Edge,  # alias for Dependency
     FlowDAG,  # alias for Flow
@@ -63,8 +77,14 @@ load = load_flow_config
 __all__ = [
     # Flow config (new names)
     "Artifact",
+    "ArtifactCache",
+    "ArtifactSchema",
+    "ArtifactType",
+    "ColumnSchema",
     "Dependency",
     "Flow",
+    "FlowMode",
+    "FlowRunResult",
     # Backward compatibility
     "Edge",  # alias for Dependency
     "FlowDAG",  # alias for Flow
@@ -73,6 +93,13 @@ __all__ = [
     "Node",
     "SignalReconciliation",
     "StrategySubgraph",
+    # Schema constants
+    "FEATURES_SCHEMA",
+    "LABELS_SCHEMA",
+    "OHLCV_SCHEMA",
+    "SIGNALS_SCHEMA",
+    "TRADES_SCHEMA",
+    "get_schema",
     # Chain config (legacy)
     "DataConfig",
     "DetectorConfig",

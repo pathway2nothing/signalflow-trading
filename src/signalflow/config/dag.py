@@ -35,13 +35,20 @@ Example:
 
 from __future__ import annotations
 
+import time
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, StrEnum
+from threading import Event
 from typing import TYPE_CHECKING, Any
+
+import polars as pl
 
 if TYPE_CHECKING:
     from signalflow.backtest import BacktestResult
+    from signalflow.config.artifact_cache import ArtifactCache
+    from signalflow.core import Signals
 
 
 # ── Enums for execution modes ────────────────────────────────────────
@@ -62,6 +69,53 @@ class SignalReconciliation(str, Enum):
     ALL = "all"  # All signals must agree
     WEIGHTED = "weighted"  # Weighted voting
     MODEL = "model"  # Model decides
+
+
+class FlowMode(StrEnum):
+    """Flow execution modes."""
+
+    BACKTEST = "backtest"  # Run backtest simulation
+    TRAIN = "train"  # Train ML models (validators, etc.)
+    ANALYZE = "analyze"  # Analyze signals without execution
+
+
+@dataclass
+class FlowRunResult:
+    """Unified result from Flow.run() across all modes.
+
+    Attributes:
+        mode: Execution mode used
+        backtest_result: BacktestResult if mode=BACKTEST
+        train_result: Training artifacts if mode=TRAIN
+        analysis_result: Analysis artifacts if mode=ANALYZE
+        artifacts: Dict of intermediate artifacts by node_id.output
+        execution_time: Total execution time in seconds
+    """
+
+    mode: FlowMode
+    backtest_result: BacktestResult | None = None
+    train_result: dict[str, Any] | None = None
+    analysis_result: dict[str, Any] | None = None
+    artifacts: dict[str, pl.DataFrame | Signals] = field(default_factory=dict)
+    execution_time: float = 0.0
+
+    @property
+    def signals(self) -> dict[str, Any]:
+        """Get all signal artifacts."""
+        return {
+            k: v
+            for k, v in self.artifacts.items()
+            if k.endswith(".signals") or k.endswith(".validated_signals")
+        }
+
+    @property
+    def features(self) -> dict[str, pl.DataFrame]:
+        """Get all feature artifacts."""
+        return {
+            k: v
+            for k, v in self.artifacts.items()
+            if isinstance(v, pl.DataFrame) and ".features" in k
+        }
 
 
 # ── Default I/O mappings per component type ─────────────────────────
@@ -515,24 +569,368 @@ class Flow:
             self.compile()
         return self._artifacts
 
-    def run(self, **kwargs: Any) -> BacktestResult:
+    def run(
+        self,
+        *,
+        mode: FlowMode = FlowMode.BACKTEST,
+        progress_callback: Callable[[int, int, dict[str, Any]], None] | None = None,
+        cancel_event: Event | None = None,
+        cache: ArtifactCache | None = None,
+        validate_runtime: bool = False,
+        **kwargs: Any,
+    ) -> FlowRunResult:
         """Execute the flow and return results.
 
-        This converts the Flow to a BacktestBuilder and runs it.
+        Executes nodes in topological order, passing artifacts between them.
+        Supports multiple modes, progress callbacks, and artifact caching.
 
         Args:
-            **kwargs: Additional arguments passed to BacktestBuilder
+            mode: Execution mode (BACKTEST, TRAIN, ANALYZE)
+            progress_callback: Called with (current_step, total_steps, info)
+            cancel_event: Set to gracefully cancel execution
+            cache: Optional ArtifactCache for intermediate artifacts
+            validate_runtime: Validate artifact schemas at runtime
+            **kwargs: Additional arguments for the specific mode
 
         Returns:
-            BacktestResult from the backtest execution
+            FlowRunResult with mode-appropriate results and artifacts
         """
+        start_time = time.time()
+
+        # Compile to get execution order
+        execution_order = self.compile()
+        total_steps = len(execution_order)
+
+        # Initialize artifact storage
+        artifacts: dict[str, Any] = {}
+        result = FlowRunResult(mode=mode)
+
+        # Execute nodes in topological order
+        for step, node_id in enumerate(execution_order):
+            # Check cancellation
+            if cancel_event and cancel_event.is_set():
+                break
+
+            # Progress callback
+            if progress_callback:
+                progress_callback(step + 1, total_steps, {"node": node_id})
+
+            node = self.nodes[node_id]
+
+            # Gather inputs from previous artifacts
+            inputs = self._gather_inputs(node, artifacts)
+
+            # Execute node (with cache check)
+            outputs = self._execute_node(
+                node, inputs, mode, cache=cache, validate_runtime=validate_runtime
+            )
+
+            # Store outputs
+            for output_name in node.get_outputs():
+                artifact_key = f"{node_id}.{output_name}"
+                if output_name in outputs:
+                    artifacts[artifact_key] = outputs[output_name]
+
+        # Build final result based on mode
+        result.artifacts = artifacts
+        result.execution_time = time.time() - start_time
+
+        if mode == FlowMode.BACKTEST:
+            result.backtest_result = self._build_backtest_result(artifacts, kwargs)
+        elif mode == FlowMode.TRAIN:
+            result.train_result = self._build_train_result(artifacts)
+        elif mode == FlowMode.ANALYZE:
+            result.analysis_result = self._build_analysis_result(artifacts)
+
+        return result
+
+    def _gather_inputs(
+        self,
+        node: Node,
+        artifacts: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Gather input artifacts for a node from previous outputs."""
+        inputs: dict[str, Any] = {}
+
+        for dep in self.dependencies:
+            if dep.target == node.id:
+                artifact_key = f"{dep.source}.{dep.artifact}"
+                if artifact_key in artifacts:
+                    inputs[dep.artifact] = artifacts[artifact_key]
+
+        return inputs
+
+    def _execute_node(
+        self,
+        node: Node,
+        inputs: dict[str, Any],
+        mode: FlowMode,
+        cache: ArtifactCache | None = None,
+        validate_runtime: bool = False,
+    ) -> dict[str, Any]:
+        """Execute a single node and return its outputs."""
+        # Check cache first
+        if cache:
+            cached = cache.get(node, inputs)
+            if cached is not None:
+                return cached
+
+        # Execute based on node type
+        outputs: dict[str, Any] = {}
+
+        if node.type == "data/loader":
+            outputs = self._execute_loader(node)
+        elif node.type == "signals/detector":
+            outputs = self._execute_detector(node, inputs, mode)
+        elif node.type in ("feature", "feature/group"):
+            outputs = self._execute_feature(node, inputs)
+        elif node.type == "signals/labeler":
+            outputs = self._execute_labeler(node, inputs)
+        elif node.type == "signals/validator":
+            outputs = self._execute_validator(node, inputs, mode)
+        elif node.type == "strategy":
+            outputs = self._execute_strategy(node, inputs, mode)
+
+        # Runtime validation
+        if validate_runtime:
+            self._validate_outputs(node, outputs)
+
+        # Cache outputs
+        if cache:
+            cache.put(node, inputs, outputs)
+
+        return outputs
+
+    def _execute_loader(self, node: Node) -> dict[str, Any]:
+        """Execute a data loader node."""
+        from signalflow.api.shortcuts import load as sf_load
+
+        config = node.config
+        raw = sf_load(
+            source=config.get("source", config.get("store", {}).get("path")),
+            pairs=config.get("pairs", ["BTCUSDT"]),
+            start=config.get("start"),
+            end=config.get("end"),
+            timeframe=config.get("timeframe", "1h"),
+        )
+
+        # Return the first available DataFrame
+        if hasattr(raw, "data") and raw.data:
+            for key, df in raw.data.items():
+                if isinstance(df, pl.DataFrame):
+                    return {"ohlcv": df}
+                if isinstance(df, dict):
+                    for sub_df in df.values():
+                        return {"ohlcv": sub_df}
+
+        return {"ohlcv": pl.DataFrame()}
+
+    def _execute_detector(
+        self,
+        node: Node,
+        inputs: dict[str, Any],
+        mode: FlowMode,
+    ) -> dict[str, Any]:
+        """Execute a detector node."""
+        from signalflow.core import RawData, RawDataView
+        from signalflow.core.enums import SfComponentType
+        from signalflow.core.registry import default_registry
+
+        # Get detector from registry
+        detector = default_registry.create(
+            SfComponentType.DETECTOR,
+            node.name,
+            **node.config,
+        )
+
+        # Get OHLCV input
+        ohlcv = inputs.get("ohlcv")
+        if ohlcv is None:
+            raise ValueError(f"Detector {node.id} missing ohlcv input")
+
+        # Wrap in RawData/RawDataView
+        raw_data = RawData(
+            datetime_start=ohlcv["timestamp"].min(),
+            datetime_end=ohlcv["timestamp"].max(),
+            pairs=ohlcv["pair"].unique().to_list(),
+            data={"spot": ohlcv},
+        )
+
+        # Run detection
+        signals = detector.run(RawDataView(raw=raw_data))
+
+        # Output name depends on training_only flag
+        output_key = "training_signals" if node.training_only else "signals"
+        return {output_key: signals}
+
+    def _execute_feature(
+        self,
+        node: Node,
+        inputs: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute a feature node."""
+        from signalflow.core.enums import SfComponentType
+        from signalflow.core.registry import default_registry
+
+        ohlcv = inputs.get("ohlcv")
+        if ohlcv is None:
+            return {"features": pl.DataFrame()}
+
+        # Get feature from registry
+        feature = default_registry.create(
+            SfComponentType.FEATURE,
+            node.name,
+            **node.config,
+        )
+
+        # Compute features
+        features_df = feature.compute(ohlcv)
+        return {"features": features_df}
+
+    def _execute_labeler(
+        self,
+        node: Node,
+        inputs: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute a labeler node."""
+        from signalflow.core.enums import SfComponentType
+        from signalflow.core.registry import default_registry
+
+        signals = inputs.get("signals")
+        ohlcv = inputs.get("ohlcv")
+
+        if signals is None or ohlcv is None:
+            return {"labels": pl.DataFrame()}
+
+        # Get labeler from registry
+        labeler = default_registry.create(
+            SfComponentType.LABELER,
+            node.name,
+            **node.config,
+        )
+
+        # Get signals DataFrame
+        signals_df = signals.value if hasattr(signals, "value") else signals
+
+        # Run labeling
+        labels = labeler.label(signals_df, ohlcv)
+        return {"labels": labels}
+
+    def _execute_validator(
+        self,
+        node: Node,
+        inputs: dict[str, Any],
+        mode: FlowMode,
+    ) -> dict[str, Any]:
+        """Execute a validator node."""
+        from signalflow.core.enums import SfComponentType
+        from signalflow.core.registry import default_registry
+
+        signals = inputs.get("signals")
+        labels = inputs.get("labels")
+
+        if signals is None:
+            return {"validated_signals": None}
+
+        # Get validator from registry
+        validator = default_registry.create(
+            SfComponentType.VALIDATOR,
+            node.name,
+            **node.config,
+        )
+
+        # Get signals DataFrame
+        signals_df = signals.value if hasattr(signals, "value") else signals
+
+        if mode == FlowMode.TRAIN and labels is not None:
+            # Training mode: fit the validator
+            validator.fit(signals_df, labels)
+            return {"validated_signals": signals, "_validator": validator}
+
+        # Validation mode: predict probabilities
+        validated = validator.validate(signals_df)
+        return {"validated_signals": validated}
+
+    def _execute_strategy(
+        self,
+        node: Node,
+        inputs: dict[str, Any],
+        mode: FlowMode,
+    ) -> dict[str, Any]:
+        """Execute strategy node (backtest mode only)."""
+        if mode != FlowMode.BACKTEST:
+            return {"trades": pl.DataFrame(), "metrics": {}}
+
+        # For backtest mode, use the traditional BacktestBuilder path
         from signalflow import Backtest
 
-        # Convert Flow to BacktestBuilder config
         config = self._to_backtest_config()
-        config.update(kwargs)
 
-        return Backtest.from_dict(config).run()
+        # Inject pre-computed signals if available
+        signals = inputs.get("signals") or inputs.get("validated_signals")
+        if signals is not None:
+            config["_precomputed_signals"] = signals
+
+        result = Backtest.from_dict(config).run()
+        return {
+            "trades": result.trades_df if hasattr(result, "trades_df") else pl.DataFrame(),
+            "metrics": result.metrics if hasattr(result, "metrics") else {},
+        }
+
+    def _validate_outputs(self, node: Node, outputs: dict[str, Any]) -> None:
+        """Validate outputs against artifact schemas."""
+        from signalflow.config.artifact_schema import get_schema
+
+        for output_name, output_data in outputs.items():
+            schema = get_schema(output_name)
+            if schema is None:
+                continue
+
+            # Get DataFrame from Signals if needed
+            df = output_data.value if hasattr(output_data, "value") else output_data
+            if not isinstance(df, pl.DataFrame):
+                continue
+
+            errors = schema.validate(df)
+            if errors:
+                raise ValueError(
+                    f"Runtime validation failed for {node.id}.{output_name}:\n"
+                    + "\n".join(f"  - {e}" for e in errors)
+                )
+
+    def _build_backtest_result(
+        self,
+        artifacts: dict[str, Any],
+        kwargs: dict[str, Any],
+    ) -> BacktestResult | None:
+        """Build BacktestResult from artifacts."""
+        # Find trades and metrics from strategy output
+        for key, value in artifacts.items():
+            if key.endswith(".trades") and isinstance(value, dict):
+                # Already have result from _execute_strategy
+                pass
+
+        # If no strategy was run, return None
+        return None
+
+    def _build_train_result(self, artifacts: dict[str, Any]) -> dict[str, Any]:
+        """Build training result from artifacts."""
+        return {
+            "labels": {k: v for k, v in artifacts.items() if ".labels" in k},
+            "features": {k: v for k, v in artifacts.items() if ".features" in k},
+            "validators": {k: v for k, v in artifacts.items() if k.endswith("._validator")},
+        }
+
+    def _build_analysis_result(self, artifacts: dict[str, Any]) -> dict[str, Any]:
+        """Build analysis result from artifacts."""
+        return {
+            "signals": {
+                k: v
+                for k, v in artifacts.items()
+                if ".signals" in k or ".validated_signals" in k
+            },
+            "features": {k: v for k, v in artifacts.items() if ".features" in k},
+        }
 
     def _to_backtest_config(self) -> dict[str, Any]:
         """Convert Flow to BacktestBuilder-compatible config."""

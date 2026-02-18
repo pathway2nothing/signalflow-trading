@@ -237,21 +237,54 @@ result = (
 
 **Aggregation modes:** `majority`, `weighted`, `unanimous`, `any`, `meta_labeling`
 
-## Pipeline Visualization
+## Flow-Based Execution (DAG)
 
-Inspect your backtest pipeline as an interactive DAG:
+Execute strategies as a DAG with multi-mode support, progress callbacks, and artifact caching:
 
 ```python
-builder = sf.Backtest("test").data(...).detector(...)
+from signalflow.config import Flow, FlowMode, ArtifactCache
 
-sf.viz.pipeline(builder)                    # Open interactive HTML
-sf.viz.pipeline(builder, output="dag.html") # Save to file
-sf.viz.serve(builder, port=4141)            # Local dev server
+# Define flow as DAG
+flow = Flow.from_dict({
+    "id": "my_flow",
+    "nodes": {
+        "loader": {"type": "data/loader", "config": {"pairs": ["BTCUSDT"]}},
+        "detector": {"type": "signals/detector", "name": "example/sma_cross"},
+        "strategy": {"type": "strategy", "config": {...}},
+    }
+})
+
+# Execute with caching and progress tracking
+cache = ArtifactCache(cache_mode="disk", cache_dir="./cache")
+
+result = flow.run(
+    mode=FlowMode.BACKTEST,
+    progress_callback=lambda step, total, info: print(f"{step}/{total}: {info['node']}"),
+    cache=cache,
+)
+
+# Access artifacts
+print(result.artifacts.keys())  # ['loader.ohlcv', 'detector.signals', ...]
+print(result.execution_time)    # 2.5 (seconds)
+print(cache.stats)              # {'mode': 'disk', 'entries': 3}
 ```
 
-```bash
-sf viz backtest.yaml           # From CLI
-sf viz backtest.yaml -o dag.html
+**Execution modes:** `FlowMode.BACKTEST`, `FlowMode.TRAIN`, `FlowMode.ANALYZE`
+
+### Artifact Schema Validation
+
+Type-safe validation for data flowing between nodes:
+
+```python
+from signalflow.config import OHLCV_SCHEMA, SIGNALS_SCHEMA
+
+# Validate DataFrame against schema
+errors = OHLCV_SCHEMA.validate(ohlcv_df)
+if errors:
+    print("Validation errors:", errors)
+
+# Runtime validation during flow execution
+result = flow.run(mode=FlowMode.BACKTEST, validate_runtime=True)
 ```
 
 ## Core Architecture: The Signal Pipeline
@@ -286,7 +319,7 @@ The framework implements a modular three-stage processing logic:
 
 * **OHLCV Resampling**: Unified timeframe conversion across 8 exchanges with auto-detection and smart timeframe selection.
 
-* **Pipeline Visualization**: Interactive D3.js DAG viewer, Mermaid diagram export, and local dev server for inspecting backtest pipelines.
+* **Flow-Based Execution**: DAG-based strategy execution with multi-mode support (backtest, train, analyze), progress callbacks, cancellation, and artifact caching.
 
 * **Paper Trading Ready**: Real-time `RealtimeRunner` with monitoring, alerts, and virtual execution for risk-free validation.
 
@@ -331,7 +364,6 @@ validated_signals = validator.validate_signals(signals, features)
 * **Data**: `polars`, `pandas`, `duckdb`
 * **ML/Compute**: `pytorch`, `lightning`, `scikit-learn`, `numba`, `optuna`
 * **Technical Analysis**: `pandas-ta`
-* **Visualization**: `d3.js`, `dagre`
 * **CLI**: `click`, `pyyaml`
 
 
@@ -339,6 +371,7 @@ validated_signals = validator.validate_signals(signals, features)
 
 * `signalflow.api`: High-level fluent API (`Backtest`, `BacktestResult`, `load`)
 * `signalflow.cli`: Command-line interface
+* `signalflow.config`: Flow configuration (`Flow`, `FlowMode`, `ArtifactCache`, `ArtifactSchema`)
 * `signalflow.core`: Core data containers (`RawData`, `Signals`) and registries
 * `signalflow.data`: Exchange loaders (Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT), OHLCV resampling, DuckDB/SQLite/PostgreSQL storage
 * `signalflow.feature`: Feature extractors and technical indicator adapters
@@ -351,7 +384,6 @@ validated_signals = validator.validate_signals(signals, features)
   - **Model Integration**: Protocol-based ML/RL model integration
   - **Monitoring**: Real-time alerts and performance tracking
   - **Brokers**: Backtest, virtual, and live execution brokers
-* `signalflow.viz`: Interactive pipeline visualization (D3.js, Mermaid), graph extractors, local dev server
 
 ## Ecosystem
 

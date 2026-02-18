@@ -74,11 +74,6 @@ def __getattr__(name: str):
 
         return api
 
-    if name == "viz":
-        import signalflow.viz as viz
-
-        return viz
-
     # Config module
     if name == "config":
         import signalflow.config as config
@@ -222,5 +217,4 @@ __all__ = [
     "target",
     "utils",
     "validator",
-    "viz",
 ]
