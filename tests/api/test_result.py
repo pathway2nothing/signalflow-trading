@@ -25,7 +25,7 @@ class TestBacktestResultProperties:
         assert result.n_trades == 0
 
     def test_final_capital(self, sample_result):
-        """final_capital returns state.capital."""
+        """final_capital returns state.portfolio.cash."""
         assert sample_result.final_capital == 12000.0
 
     def test_initial_capital_from_config(self, sample_result):

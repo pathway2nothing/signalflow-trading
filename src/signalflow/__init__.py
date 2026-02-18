@@ -1,3 +1,8 @@
+# Allow sub-packages from other directories (sf-ta, sf-nn) to be found
+# under the signalflow namespace when they are on sys.path.
+import pkgutil
+__path__ = pkgutil.extend_path(__path__, __name__)
+
 from signalflow.core import (
     DataFrameType,
     Order,

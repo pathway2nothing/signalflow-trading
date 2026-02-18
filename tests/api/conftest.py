@@ -62,8 +62,8 @@ def sample_signals() -> Signals:
 def sample_state() -> StrategyState:
     """Create sample StrategyState."""
     state = MagicMock(spec=StrategyState)
-    state.capital = 12000.0
     state.portfolio = MagicMock(spec=Portfolio)
+    state.portfolio.cash = 12000.0
     state.portfolio.positions = {}
     return state
 

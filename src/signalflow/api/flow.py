@@ -66,6 +66,53 @@ class AggregationMode(StrEnum):
     META_LABELING = "meta_labeling"
 
 
+_MAX_PRICE_POINTS_PER_PAIR = 500
+
+
+def _json_safe_value(v: Any) -> Any:
+    """Convert a single value to JSON-safe type."""
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        return v.isoformat()
+    if isinstance(v, float) and (v != v or v == float("inf") or v == float("-inf")):
+        return None
+    if hasattr(v, "item"):
+        return v.item()
+    return v
+
+
+def _dataframe_to_json_safe(df: pl.DataFrame) -> list[dict[str, Any]]:
+    """Convert Polars DataFrame to JSON-safe list of dicts."""
+    rows = df.to_dicts()
+    return [{k: _json_safe_value(v) for k, v in row.items()} for row in rows]
+
+
+def _extract_price_data(raw: RawData) -> list[dict[str, Any]]:
+    """Extract downsampled close prices from RawData for price charting."""
+    result: list[dict[str, Any]] = []
+    for _key, df in raw.data.items():
+        if df is None or df.height == 0:
+            continue
+        # Need at minimum timestamp, close, pair
+        required = {"timestamp", "close", "pair"}
+        if not required.issubset(set(df.columns)):
+            continue
+
+        for pair in df.select("pair").unique().to_series().to_list():
+            pair_df = df.filter(pl.col("pair") == pair).sort("timestamp")
+            # Downsample if too many points
+            step = max(1, pair_df.height // _MAX_PRICE_POINTS_PER_PAIR)
+            sampled = pair_df.gather_every(step)
+            # Select OHLC columns if available, otherwise just close
+            cols = ["pair", "timestamp"]
+            for c in ["open", "high", "low", "close"]:
+                if c in sampled.columns:
+                    cols.append(c)
+            result.extend(_dataframe_to_json_safe(sampled.select(cols)))
+    return result
+
+
 @dataclass
 class FlowConfig:
     """Configuration snapshot of a Flow."""
@@ -103,6 +150,10 @@ class FlowResult:
     labels: pl.DataFrame | None = None
     predictions: pl.DataFrame | None = None
     trades: pl.DataFrame | None = None
+
+    # Chart data (serialized for API/UI)
+    equity_curve: list[dict[str, Any]] | None = None
+    price_data: list[dict[str, Any]] | None = None
 
     # Metadata
     flow_config: FlowConfig | None = None
@@ -212,6 +263,12 @@ class FlowResult:
 
         if self.trades is not None and self.trades.height > 0:
             result["trades"] = self.trades.to_dicts()
+
+        if self.equity_curve:
+            result["equity_curve"] = self.equity_curve
+
+        if self.price_data:
+            result["price_data"] = self.price_data
 
         if self.flow_config:
             result["config"] = {
@@ -769,6 +826,15 @@ class FlowBuilder:
             if backtest_result:
                 result.trades = backtest_result.trades_df
                 result.backtest_metrics = backtest_result.metrics
+
+                # Extract equity curve from metrics_df
+                if hasattr(backtest_result, "metrics_df") and backtest_result.metrics_df is not None:
+                    mdf = backtest_result.metrics_df
+                    if mdf.height > 0:
+                        result.equity_curve = _dataframe_to_json_safe(mdf)
+
+                # Extract downsampled close prices from raw data
+                result.price_data = _extract_price_data(raw)
 
         # 7. Compute metrics based on metric nodes
         self._compute_metrics(result)

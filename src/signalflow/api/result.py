@@ -127,8 +127,8 @@ class BacktestResult:
 
     @property
     def final_capital(self) -> float:
-        """Final capital after backtest."""
-        return float(getattr(self.state, "capital", 0.0))
+        """Final capital (cash) after backtest."""
+        return float(self.state.portfolio.cash)
 
     @property
     def initial_capital(self) -> float:
