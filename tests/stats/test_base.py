@@ -122,9 +122,11 @@ class TestExtractReturns:
         """Test extraction from metrics_df total_return column."""
         # Create mock result with metrics_df
         result = MagicMock()
-        result.metrics_df = pl.DataFrame({
-            "total_return": [0.0, 0.01, 0.03, 0.06, 0.10],
-        })
+        result.metrics_df = pl.DataFrame(
+            {
+                "total_return": [0.0, 0.01, 0.03, 0.06, 0.10],
+            }
+        )
         result.trades = []
         result.initial_capital = 10000.0
 

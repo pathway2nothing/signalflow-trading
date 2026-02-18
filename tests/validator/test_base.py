@@ -85,6 +85,7 @@ class TestSignalValidatorBase:
     def test_component_type(self):
         """Test component_type is set correctly."""
         from signalflow.core import SfComponentType
+
         assert SignalValidator.component_type == SfComponentType.VALIDATOR
 
     def test_custom_params(self):

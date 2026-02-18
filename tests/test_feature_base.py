@@ -119,7 +119,11 @@ class TestGlobalFeatureSourceMethods:
         raw = MagicMock()
         raw.perpetual = perpetual_accessor
         raw.__contains__ = lambda self, key: key == "perpetual"
-        raw.get = MagicMock(side_effect=lambda dt, source=None: binance_df if source == "binance" else okx_df if source == "okx" else binance_df)
+        raw.get = MagicMock(
+            side_effect=lambda dt, source=None: (
+                binance_df if source == "binance" else okx_df if source == "okx" else binance_df
+            )
+        )
 
         return raw
 

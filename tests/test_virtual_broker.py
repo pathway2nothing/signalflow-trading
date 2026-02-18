@@ -244,7 +244,9 @@ class TestRiskManagerIntegration:
         assert len(fills) == 0
         assert len(broker.order_log) == 0
 
-    def test_risk_manager_allows_partial_orders(self, strategy_store: InMemoryStrategyStore, state: StrategyState) -> None:
+    def test_risk_manager_allows_partial_orders(
+        self, strategy_store: InMemoryStrategyStore, state: StrategyState
+    ) -> None:
         """Test that risk manager can pass some orders."""
         from unittest.mock import MagicMock
 

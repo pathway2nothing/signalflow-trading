@@ -223,13 +223,15 @@ class TestFlowConfig:
         """Create FlowConfig from basic dict."""
         from signalflow.config import FlowConfig
 
-        config = FlowConfig.from_dict({
-            "flow_id": "test",
-            "flow_name": "Test Flow",
-            "description": "A test flow",
-            "capital": 50000,
-            "fee": 0.002,
-        })
+        config = FlowConfig.from_dict(
+            {
+                "flow_id": "test",
+                "flow_name": "Test Flow",
+                "description": "A test flow",
+                "capital": 50000,
+                "fee": 0.002,
+            }
+        )
 
         assert config.flow_id == "test"
         assert config.flow_name == "Test Flow"
@@ -241,14 +243,16 @@ class TestFlowConfig:
         """Create FlowConfig with detector."""
         from signalflow.config import FlowConfig
 
-        config = FlowConfig.from_dict({
-            "flow_id": "sma_test",
-            "detector": {
-                "type": "example/sma_cross",
-                "fast_period": 10,
-                "slow_period": 20,
-            },
-        })
+        config = FlowConfig.from_dict(
+            {
+                "flow_id": "sma_test",
+                "detector": {
+                    "type": "example/sma_cross",
+                    "fast_period": 10,
+                    "slow_period": 20,
+                },
+            }
+        )
 
         assert config.detector is not None
         assert config.detector.type == "example/sma_cross"
@@ -259,33 +263,35 @@ class TestFlowConfig:
         """Create FlowConfig with strategy config."""
         from signalflow.config import FlowConfig
 
-        config = FlowConfig.from_dict({
-            "flow_id": "grid_test",
-            "strategy": {
-                "strategy_id": "grid_sma",
-                "entry_rules": [
-                    {
-                        "type": "signal",
-                        "base_position_size": 200.0,
-                        "max_positions_per_pair": 5,
-                        "max_total_positions": 25,
-                        "entry_filters": [
-                            {
-                                "type": "price_distance_filter",
-                                "min_distance_pct": 0.02,
-                            }
-                        ],
-                    }
-                ],
-                "exit_rules": [
-                    {
-                        "type": "tp_sl",
-                        "take_profit_pct": 0.03,
-                        "stop_loss_pct": 0.01,
-                    }
-                ],
-            },
-        })
+        config = FlowConfig.from_dict(
+            {
+                "flow_id": "grid_test",
+                "strategy": {
+                    "strategy_id": "grid_sma",
+                    "entry_rules": [
+                        {
+                            "type": "signal",
+                            "base_position_size": 200.0,
+                            "max_positions_per_pair": 5,
+                            "max_total_positions": 25,
+                            "entry_filters": [
+                                {
+                                    "type": "price_distance_filter",
+                                    "min_distance_pct": 0.02,
+                                }
+                            ],
+                        }
+                    ],
+                    "exit_rules": [
+                        {
+                            "type": "tp_sl",
+                            "take_profit_pct": 0.03,
+                            "stop_loss_pct": 0.01,
+                        }
+                    ],
+                },
+            }
+        )
 
         assert config.strategy.strategy_id == "grid_sma"
         assert len(config.strategy.entry_rules) == 1
@@ -299,13 +305,15 @@ class TestFlowConfig:
         """Create FlowConfig with data config."""
         from signalflow.config import FlowConfig
 
-        config = FlowConfig.from_dict({
-            "flow_id": "data_test",
-            "data": {
-                "pairs": ["BTCUSDT", "ETHUSDT"],
-                "timeframe": "4h",
-            },
-        })
+        config = FlowConfig.from_dict(
+            {
+                "flow_id": "data_test",
+                "data": {
+                    "pairs": ["BTCUSDT", "ETHUSDT"],
+                    "timeframe": "4h",
+                },
+            }
+        )
 
         assert config.data.pairs == ["BTCUSDT", "ETHUSDT"]
         assert config.data.timeframe == "4h"
@@ -314,28 +322,26 @@ class TestFlowConfig:
         """Convert FlowConfig to BacktestBuilder config format."""
         from signalflow.config import FlowConfig
 
-        flow = FlowConfig.from_dict({
-            "flow_id": "grid_sma",
-            "detector": {
-                "type": "example/sma_cross",
-                "fast_period": 60,
-            },
-            "strategy": {
-                "entry_rules": [
-                    {
-                        "base_position_size": 100.0,
-                        "max_total_positions": 10,
-                        "entry_filters": [
-                            {"type": "price_distance_filter", "min_distance_pct": 0.02}
-                        ],
-                    }
-                ],
-                "exit_rules": [
-                    {"type": "tp_sl", "take_profit_pct": 0.03, "stop_loss_pct": 0.01}
-                ],
-            },
-            "capital": 10000,
-        })
+        flow = FlowConfig.from_dict(
+            {
+                "flow_id": "grid_sma",
+                "detector": {
+                    "type": "example/sma_cross",
+                    "fast_period": 60,
+                },
+                "strategy": {
+                    "entry_rules": [
+                        {
+                            "base_position_size": 100.0,
+                            "max_total_positions": 10,
+                            "entry_filters": [{"type": "price_distance_filter", "min_distance_pct": 0.02}],
+                        }
+                    ],
+                    "exit_rules": [{"type": "tp_sl", "take_profit_pct": 0.03, "stop_loss_pct": 0.01}],
+                },
+                "capital": 10000,
+            }
+        )
 
         config = flow.to_backtest_config()
 

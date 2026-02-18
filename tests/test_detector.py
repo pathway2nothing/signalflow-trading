@@ -342,9 +342,7 @@ class TestPreprocessFeatures:
         @dataclass
         class DetectorWithPipeline(SignalDetector):
             def __post_init__(self):
-                self.features = FeaturePipeline(
-                    features=[ExampleSmaFeature(period=3)]
-                )
+                self.features = FeaturePipeline(features=[ExampleSmaFeature(period=3)])
 
             def detect(self, features, context=None):
                 return _valid_signals(1)

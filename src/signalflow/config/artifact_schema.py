@@ -85,10 +85,7 @@ class ArtifactSchema:
             if actual_dtype == pl.Null and col_schema.nullable:
                 pass  # OK
             elif not self._dtype_compatible(actual_dtype, col_schema.dtype):
-                msg = (
-                    f"Column '{col_schema.name}' has dtype {actual_dtype}, "
-                    f"expected {col_schema.dtype}"
-                )
+                msg = f"Column '{col_schema.name}' has dtype {actual_dtype}, expected {col_schema.dtype}"
                 if strict:
                     raise ValueError(msg)
                 errors.append(msg)
@@ -102,9 +99,7 @@ class ArtifactSchema:
 
         # Check no unknown columns if allow_extra=False
         if not self.allow_extra:
-            known = {c.name for c in self.required_columns} | {
-                c.name for c in self.optional_columns
-            }
+            known = {c.name for c in self.required_columns} | {c.name for c in self.optional_columns}
             extra = set(df.columns) - known
             if extra:
                 msg = f"Unexpected columns: {extra}"
@@ -146,10 +141,7 @@ class ArtifactSchema:
             return True
 
         # Allow Float64 where Float32 expected, etc.
-        if isinstance(actual, type(expected)):
-            return True
-
-        return False
+        return isinstance(actual, type(expected))
 
 
 # ============================================================================

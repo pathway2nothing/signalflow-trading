@@ -12,11 +12,14 @@ class TestNode:
 
     def test_from_dict(self):
         """Create Node from dict."""
-        node = Node.from_dict("loader", {
-            "type": "data/loader",
-            "name": "binance/spot",
-            "config": {"exchange": "binance"},
-        })
+        node = Node.from_dict(
+            "loader",
+            {
+                "type": "data/loader",
+                "name": "binance/spot",
+                "config": {"exchange": "binance"},
+            },
+        )
 
         assert node.id == "loader"
         assert node.type == "data/loader"
@@ -50,14 +53,16 @@ class TestFlowDAG:
 
     def test_from_dict_basic(self):
         """Create FlowDAG from dict."""
-        dag = FlowDAG.from_dict({
-            "id": "test_flow",
-            "name": "Test Flow",
-            "nodes": {
-                "loader": {"type": "data/loader", "name": "binance/spot"},
-                "detector": {"type": "signals/detector", "name": "sma_cross"},
-            },
-        })
+        dag = FlowDAG.from_dict(
+            {
+                "id": "test_flow",
+                "name": "Test Flow",
+                "nodes": {
+                    "loader": {"type": "data/loader", "name": "binance/spot"},
+                    "detector": {"type": "signals/detector", "name": "sma_cross"},
+                },
+            }
+        )
 
         assert dag.id == "test_flow"
         assert dag.name == "Test Flow"
@@ -68,12 +73,14 @@ class TestFlowDAG:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
 
-            dag = FlowDAG.from_dict({
-                "nodes": {
-                    "loader": {"type": "data/loader"},
-                    "detector": {"type": "signals/detector"},
-                },
-            })
+            dag = FlowDAG.from_dict(
+                {
+                    "nodes": {
+                        "loader": {"type": "data/loader"},
+                        "detector": {"type": "signals/detector"},
+                    },
+                }
+            )
 
             # Should have edge: loader → detector (ohlcv)
             assert len(dag.edges) == 1
@@ -89,15 +96,17 @@ class TestFlowDAG:
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
 
-            dag = FlowDAG.from_dict({
-                "nodes": {
-                    "loader": {"type": "data/loader"},
-                    "detector": {"type": "signals/detector"},
-                    "labeler": {"type": "signals/labeler"},
-                    "validator": {"type": "signals/validator"},
-                    "strategy": {"type": "strategy"},
-                },
-            })
+            dag = FlowDAG.from_dict(
+                {
+                    "nodes": {
+                        "loader": {"type": "data/loader"},
+                        "detector": {"type": "signals/detector"},
+                        "labeler": {"type": "signals/labeler"},
+                        "validator": {"type": "signals/validator"},
+                        "strategy": {"type": "strategy"},
+                    },
+                }
+            )
 
             # Check edges exist
             edge_pairs = [(e.source, e.target) for e in dag.edges]
@@ -110,15 +119,17 @@ class TestFlowDAG:
 
     def test_explicit_edges(self):
         """Explicit edges are used when provided."""
-        dag = FlowDAG.from_dict({
-            "nodes": {
-                "loader": {"type": "data/loader"},
-                "detector": {"type": "signals/detector"},
-            },
-            "edges": [
-                {"source": "loader", "target": "detector", "data_type": "custom"},
-            ],
-        })
+        dag = FlowDAG.from_dict(
+            {
+                "nodes": {
+                    "loader": {"type": "data/loader"},
+                    "detector": {"type": "signals/detector"},
+                },
+                "edges": [
+                    {"source": "loader", "target": "detector", "data_type": "custom"},
+                ],
+            }
+        )
 
         # No auto-inference when edges provided
         assert len(dag.edges) == 1
@@ -126,18 +137,20 @@ class TestFlowDAG:
 
     def test_topological_sort(self):
         """Topological sort returns correct order."""
-        dag = FlowDAG.from_dict({
-            "nodes": {
-                "loader": {"type": "data/loader"},
-                "detector": {"type": "signals/detector"},
-                "strategy": {"type": "strategy"},
-            },
-            "edges": [
-                {"source": "loader", "target": "detector"},
-                {"source": "detector", "target": "strategy"},
-                {"source": "loader", "target": "strategy"},
-            ],
-        })
+        dag = FlowDAG.from_dict(
+            {
+                "nodes": {
+                    "loader": {"type": "data/loader"},
+                    "detector": {"type": "signals/detector"},
+                    "strategy": {"type": "strategy"},
+                },
+                "edges": [
+                    {"source": "loader", "target": "detector"},
+                    {"source": "detector", "target": "strategy"},
+                    {"source": "loader", "target": "strategy"},
+                ],
+            }
+        )
 
         order = dag.topological_sort()
 
@@ -148,43 +161,49 @@ class TestFlowDAG:
 
     def test_cycle_detection(self):
         """Detect cycles in DAG."""
-        dag = FlowDAG.from_dict({
-            "nodes": {
-                "a": {"type": "data/loader"},
-                "b": {"type": "signals/detector"},
-                "c": {"type": "strategy"},
-            },
-            "edges": [
-                {"source": "a", "target": "b"},
-                {"source": "b", "target": "c"},
-                {"source": "c", "target": "a"},  # Cycle!
-            ],
-        })
+        dag = FlowDAG.from_dict(
+            {
+                "nodes": {
+                    "a": {"type": "data/loader"},
+                    "b": {"type": "signals/detector"},
+                    "c": {"type": "strategy"},
+                },
+                "edges": [
+                    {"source": "a", "target": "b"},
+                    {"source": "b", "target": "c"},
+                    {"source": "c", "target": "a"},  # Cycle!
+                ],
+            }
+        )
 
         with pytest.raises(ValueError, match="Cycle detected"):
             dag.topological_sort()
 
     def test_validate_missing_loader(self):
         """Validate catches missing data loader."""
-        dag = FlowDAG.from_dict({
-            "nodes": {
-                "detector": {"type": "signals/detector"},
-            },
-        })
+        dag = FlowDAG.from_dict(
+            {
+                "nodes": {
+                    "detector": {"type": "signals/detector"},
+                },
+            }
+        )
 
         errors = dag.validate()
         assert any("data/loader" in e for e in errors)
 
     def test_validate_invalid_edge(self):
         """Validate catches invalid edge references."""
-        dag = FlowDAG.from_dict({
-            "nodes": {
-                "loader": {"type": "data/loader"},
-            },
-            "edges": [
-                {"source": "loader", "target": "nonexistent"},
-            ],
-        })
+        dag = FlowDAG.from_dict(
+            {
+                "nodes": {
+                    "loader": {"type": "data/loader"},
+                },
+                "edges": [
+                    {"source": "loader", "target": "nonexistent"},
+                ],
+            }
+        )
 
         errors = dag.validate()
         assert any("unknown target" in e for e in errors)
@@ -194,12 +213,14 @@ class TestFlowDAG:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
-            dag = FlowDAG.from_dict({
-                "nodes": {
-                    "loader": {"type": "data/loader", "config": {"pairs": ["BTCUSDT"]}},
-                    "detector": {"type": "signals/detector", "name": "sma_cross"},
-                },
-            })
+            dag = FlowDAG.from_dict(
+                {
+                    "nodes": {
+                        "loader": {"type": "data/loader", "config": {"pairs": ["BTCUSDT"]}},
+                        "detector": {"type": "signals/detector", "name": "sma_cross"},
+                    },
+                }
+            )
 
         plan = dag.get_execution_plan()
 
@@ -211,13 +232,15 @@ class TestFlowDAG:
 
     def test_to_dict(self):
         """Serialize DAG to dict."""
-        dag = FlowDAG.from_dict({
-            "id": "test",
-            "nodes": {
-                "loader": {"type": "data/loader"},
-            },
-            "edges": [{"source": "a", "target": "b"}],
-        })
+        dag = FlowDAG.from_dict(
+            {
+                "id": "test",
+                "nodes": {
+                    "loader": {"type": "data/loader"},
+                },
+                "edges": [{"source": "a", "target": "b"}],
+            }
+        )
 
         data = dag.to_dict()
 
@@ -297,14 +320,16 @@ class TestSignalPriority:
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
 
-            dag = FlowDAG.from_dict({
-                "nodes": {
-                    "loader": {"type": "data/loader"},
-                    "detector": {"type": "signals/detector"},
-                    "validator": {"type": "signals/validator"},
-                    "strategy": {"type": "strategy"},
-                },
-            })
+            dag = FlowDAG.from_dict(
+                {
+                    "nodes": {
+                        "loader": {"type": "data/loader"},
+                        "detector": {"type": "signals/detector"},
+                        "validator": {"type": "signals/validator"},
+                        "strategy": {"type": "strategy"},
+                    },
+                }
+            )
 
             # Find edge to strategy
             strategy_inputs = [e for e in dag.edges if e.target == "strategy"]

@@ -28,15 +28,17 @@ def _make_raw_data_view(n: int = 200, pairs: list[str] | None = None) -> RawData
                 price *= 1.15  # 15% spike
             else:
                 price *= np.exp(np.random.randn() * 0.005)
-            rows.append({
-                "pair": pair,
-                "timestamp": base + timedelta(minutes=i),
-                "open": price,
-                "high": price * 1.01,
-                "low": price * 0.99,
-                "close": price,
-                "volume": 1000.0 + np.random.rand() * 100,
-            })
+            rows.append(
+                {
+                    "pair": pair,
+                    "timestamp": base + timedelta(minutes=i),
+                    "open": price,
+                    "high": price * 1.01,
+                    "low": price * 0.99,
+                    "close": price,
+                    "volume": 1000.0 + np.random.rand() * 100,
+                }
+            )
 
     df = pl.DataFrame(rows)
     raw = RawData(
@@ -192,15 +194,17 @@ class TestZScoreAnomalyDetectorCustomTarget:
         for i in range(200):
             # Create volume spike at i=150
             volume = 10000 if i == 150 else 1000 + np.random.rand() * 100
-            rows.append({
-                "pair": "BTCUSDT",
-                "timestamp": base + timedelta(minutes=i),
-                "open": 100.0,
-                "high": 101.0,
-                "low": 99.0,
-                "close": 100.0,
-                "volume": volume,
-            })
+            rows.append(
+                {
+                    "pair": "BTCUSDT",
+                    "timestamp": base + timedelta(minutes=i),
+                    "open": 100.0,
+                    "high": 101.0,
+                    "low": 99.0,
+                    "close": 100.0,
+                    "volume": volume,
+                }
+            )
 
         df = pl.DataFrame(rows)
         raw = RawData(

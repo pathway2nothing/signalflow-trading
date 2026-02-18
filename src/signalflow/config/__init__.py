@@ -28,28 +28,28 @@ Example:
 
 from signalflow.config.artifact_cache import ArtifactCache
 from signalflow.config.artifact_schema import (
-    ArtifactSchema,
-    ArtifactType,
-    ColumnSchema,
     FEATURES_SCHEMA,
     LABELS_SCHEMA,
     OHLCV_SCHEMA,
     SIGNALS_SCHEMA,
     TRADES_SCHEMA,
+    ArtifactSchema,
+    ArtifactType,
+    ColumnSchema,
     get_schema,
 )
 from signalflow.config.dag import (
     # New names (Kubeflow-inspired)
     Artifact,
     Dependency,
-    Flow,
-    FlowMode,
-    FlowRunResult,
     # Backward compatibility aliases
     Edge,  # alias for Dependency
-    FlowDAG,  # alias for Flow
     # Other exports
     EntryMode,
+    Flow,
+    FlowDAG,  # alias for Flow
+    FlowMode,
+    FlowRunResult,
     Node,
     SignalReconciliation,
     StrategySubgraph,
@@ -75,42 +75,36 @@ from signalflow.config.loader import (
 load = load_flow_config
 
 __all__ = [
-    # Flow config (new names)
-    "Artifact",
-    "ArtifactCache",
-    "ArtifactSchema",
-    "ArtifactType",
-    "ColumnSchema",
-    "Dependency",
-    "Flow",
-    "FlowMode",
-    "FlowRunResult",
-    # Backward compatibility
-    "Edge",  # alias for Dependency
-    "FlowDAG",  # alias for Flow
-    # Other DAG exports
-    "EntryMode",
-    "Node",
-    "SignalReconciliation",
-    "StrategySubgraph",
-    # Schema constants
     "FEATURES_SCHEMA",
     "LABELS_SCHEMA",
     "OHLCV_SCHEMA",
     "SIGNALS_SCHEMA",
     "TRADES_SCHEMA",
-    "get_schema",
-    # Chain config (legacy)
+    "Artifact",
+    "ArtifactCache",
+    "ArtifactSchema",
+    "ArtifactType",
+    "ColumnSchema",
     "DataConfig",
+    "Dependency",
     "DetectorConfig",
+    "Edge",
     "EntryFilterConfig",
+    "EntryMode",
     "EntryRuleConfig",
     "ExitRuleConfig",
+    "Flow",
     "FlowConfig",
+    "FlowDAG",
+    "FlowMode",
+    "FlowRunResult",
+    "Node",
+    "SignalReconciliation",
     "StrategyConfig",
-    # Loader utilities
+    "StrategySubgraph",
     "deep_merge",
     "get_flow_info",
+    "get_schema",
     "list_flows",
     "load",
     "load_flow_config",

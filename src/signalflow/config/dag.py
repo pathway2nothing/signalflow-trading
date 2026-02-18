@@ -39,7 +39,7 @@ import time
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum, StrEnum
+from enum import StrEnum
 from threading import Event
 from typing import TYPE_CHECKING, Any
 
@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 # ── Enums for execution modes ────────────────────────────────────────
 
 
-class EntryMode(str, Enum):
+class EntryMode(StrEnum):
     """How multiple entry rules are combined."""
 
     SEQUENTIAL = "sequential"  # Check in order, first match wins
@@ -62,7 +62,7 @@ class EntryMode(str, Enum):
     VOTING = "voting"  # All vote, majority wins
 
 
-class SignalReconciliation(str, Enum):
+class SignalReconciliation(StrEnum):
     """How multiple signal sources are reconciled in strategy."""
 
     ANY = "any"  # Any signal triggers entry
@@ -102,20 +102,12 @@ class FlowRunResult:
     @property
     def signals(self) -> dict[str, Any]:
         """Get all signal artifacts."""
-        return {
-            k: v
-            for k, v in self.artifacts.items()
-            if k.endswith(".signals") or k.endswith(".validated_signals")
-        }
+        return {k: v for k, v in self.artifacts.items() if k.endswith(".signals") or k.endswith(".validated_signals")}
 
     @property
     def features(self) -> dict[str, pl.DataFrame]:
         """Get all feature artifacts."""
-        return {
-            k: v
-            for k, v in self.artifacts.items()
-            if isinstance(v, pl.DataFrame) and ".features" in k
-        }
+        return {k: v for k, v in self.artifacts.items() if isinstance(v, pl.DataFrame) and ".features" in k}
 
 
 # ── Default I/O mappings per component type ─────────────────────────
@@ -422,25 +414,21 @@ class Flow:
                                 continue
 
                             # Skip training_only detectors for strategy nodes
-                            if (
-                                producer.training_only
-                                and consumer.type in PREFER_VALIDATED_TYPES
-                            ):
+                            if producer.training_only and consumer.type in PREFER_VALIDATED_TYPES:
                                 continue
 
-                            dependencies.append(Dependency(
-                                source=producer_id,
-                                target=consumer_id,
-                                artifact=candidate,
-                            ))
+                            dependencies.append(
+                                Dependency(
+                                    source=producer_id,
+                                    target=consumer_id,
+                                    artifact=candidate,
+                                )
+                            )
                             producer_found = True
 
                             # Warn about auto-connection
                             if consumer.inputs is None:
-                                msg = (
-                                    f"Auto-connected '{producer_id}' → '{consumer_id}' "
-                                    f"(data: {candidate})"
-                                )
+                                msg = f"Auto-connected '{producer_id}' → '{consumer_id}' (data: {candidate})"
                                 warnings_issued.append(msg)
                         if producer_found:
                             break  # Found producer for this input type
@@ -543,15 +531,17 @@ class Flow:
 
         for node_id in order:
             node = self.nodes[node_id]
-            execution_plan.append({
-                "id": node_id,
-                "type": node.type,
-                "name": node.name,
-                "config": node.config,
-                "inputs": node.get_inputs(),
-                "outputs": node.get_outputs(),
-                "training_only": node.training_only,
-            })
+            execution_plan.append(
+                {
+                    "id": node_id,
+                    "type": node.type,
+                    "name": node.name,
+                    "config": node.config,
+                    "inputs": node.get_inputs(),
+                    "outputs": node.get_outputs(),
+                    "training_only": node.training_only,
+                }
+            )
 
         return execution_plan
 
@@ -621,9 +611,7 @@ class Flow:
             inputs = self._gather_inputs(node, artifacts)
 
             # Execute node (with cache check)
-            outputs = self._execute_node(
-                node, inputs, mode, cache=cache, validate_runtime=validate_runtime
-            )
+            outputs = self._execute_node(node, inputs, mode, cache=cache, validate_runtime=validate_runtime)
 
             # Store outputs
             for output_name in node.get_outputs():
@@ -716,7 +704,7 @@ class Flow:
 
         # Return the first available DataFrame
         if hasattr(raw, "data") and raw.data:
-            for key, df in raw.data.items():
+            for _key, df in raw.data.items():
                 if isinstance(df, pl.DataFrame):
                     return {"ohlcv": df}
                 if isinstance(df, dict):
@@ -894,8 +882,7 @@ class Flow:
             errors = schema.validate(df)
             if errors:
                 raise ValueError(
-                    f"Runtime validation failed for {node.id}.{output_name}:\n"
-                    + "\n".join(f"  - {e}" for e in errors)
+                    f"Runtime validation failed for {node.id}.{output_name}:\n" + "\n".join(f"  - {e}" for e in errors)
                 )
 
     def _build_backtest_result(
@@ -924,11 +911,7 @@ class Flow:
     def _build_analysis_result(self, artifacts: dict[str, Any]) -> dict[str, Any]:
         """Build analysis result from artifacts."""
         return {
-            "signals": {
-                k: v
-                for k, v in artifacts.items()
-                if ".signals" in k or ".validated_signals" in k
-            },
+            "signals": {k: v for k, v in artifacts.items() if ".signals" in k or ".validated_signals" in k},
             "features": {k: v for k, v in artifacts.items() if ".features" in k},
         }
 
@@ -941,7 +924,7 @@ class Flow:
         }
 
         # Extract node configs
-        for node_id, node in self.nodes.items():
+        for _node_id, node in self.nodes.items():
             if node.type == "data/loader":
                 config["data"] = {
                     "pairs": node.config.get("pairs", ["BTCUSDT"]),
@@ -1099,9 +1082,7 @@ class StrategySubgraph:
             strategy_model=config.get("strategy_model"),
             fallback_entry=config.get("fallback_entry"),
             fallback_exit=config.get("fallback_exit"),
-            signal_reconciliation=SignalReconciliation(
-                config.get("signal_reconciliation", "any")
-            ),
+            signal_reconciliation=SignalReconciliation(config.get("signal_reconciliation", "any")),
             metrics=config.get("metrics", []),
         )
 
@@ -1119,11 +1100,13 @@ class StrategySubgraph:
                 warnings.warn(
                     "strategy_model without fallback_entry - model failures will block entries",
                     UserWarning,
+                    stacklevel=2,
                 )
             if not self.fallback_exit:
                 warnings.warn(
                     "strategy_model without fallback_exit - model failures will block exits",
                     UserWarning,
+                    stacklevel=2,
                 )
 
         return errors

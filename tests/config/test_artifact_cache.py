@@ -23,22 +23,28 @@ def sample_node():
 @pytest.fixture
 def sample_inputs():
     return {
-        "ohlcv": pl.DataFrame({
-            "pair": ["BTCUSDT"] * 3,
-            "timestamp": [datetime(2024, 1, i) for i in range(1, 4)],
-            "close": [100.0, 101.0, 102.0],
-        })
+        "ohlcv": pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"] * 3,
+                "timestamp": [datetime(2024, 1, i) for i in range(1, 4)],
+                "close": [100.0, 101.0, 102.0],
+            }
+        )
     }
 
 
 @pytest.fixture
 def sample_outputs():
     return {
-        "signals": Signals(pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 2)],
-            "signal_type": [1],
-        }))
+        "signals": Signals(
+            pl.DataFrame(
+                {
+                    "pair": ["BTCUSDT"],
+                    "timestamp": [datetime(2024, 1, 2)],
+                    "signal_type": [1],
+                }
+            )
+        )
     }
 
 
@@ -74,18 +80,22 @@ class TestArtifactCacheMemory:
     def test_different_inputs_different_key(self, sample_node):
         cache = ArtifactCache(cache_mode="memory")
         inputs1 = {
-            "ohlcv": pl.DataFrame({
-                "pair": ["BTCUSDT"],
-                "timestamp": [datetime(2024, 1, 1)],
-                "close": [100.0],
-            })
+            "ohlcv": pl.DataFrame(
+                {
+                    "pair": ["BTCUSDT"],
+                    "timestamp": [datetime(2024, 1, 1)],
+                    "close": [100.0],
+                }
+            )
         }
         inputs2 = {
-            "ohlcv": pl.DataFrame({
-                "pair": ["ETHUSDT"],  # Different pair
-                "timestamp": [datetime(2024, 1, 1)],
-                "close": [100.0],
-            })
+            "ohlcv": pl.DataFrame(
+                {
+                    "pair": ["ETHUSDT"],  # Different pair
+                    "timestamp": [datetime(2024, 1, 1)],
+                    "close": [100.0],
+                }
+            )
         }
         key1 = cache.cache_key(sample_node, inputs1)
         key2 = cache.cache_key(sample_node, inputs2)
@@ -123,9 +133,7 @@ class TestArtifactCacheDisk:
         assert "signals" in result
 
     def test_dataframe_roundtrip(self, tmp_path, sample_node, sample_inputs):
-        outputs = {
-            "features": pl.DataFrame({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0]})
-        }
+        outputs = {"features": pl.DataFrame({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0]})}
         cache = ArtifactCache(cache_mode="disk", cache_dir=tmp_path)
         cache.put(sample_node, sample_inputs, outputs)
 
@@ -145,9 +153,7 @@ class TestArtifactCacheDisk:
         assert result_df.shape == original_df.shape
 
     def test_dict_roundtrip(self, tmp_path, sample_node, sample_inputs):
-        outputs = {
-            "metrics": {"accuracy": 0.95, "f1": 0.88}
-        }
+        outputs = {"metrics": {"accuracy": 0.95, "f1": 0.88}}
         cache = ArtifactCache(cache_mode="disk", cache_dir=tmp_path)
         cache.put(sample_node, sample_inputs, outputs)
 
@@ -222,11 +228,15 @@ class TestDataSignature:
         assert isinstance(sig, str)
 
     def test_signals_signature(self):
-        signals = Signals(pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "signal_type": [1],
-        }))
+        signals = Signals(
+            pl.DataFrame(
+                {
+                    "pair": ["BTCUSDT"],
+                    "timestamp": [datetime(2024, 1, 1)],
+                    "signal_type": [1],
+                }
+            )
+        )
         sig = ArtifactCache._data_signature(signals)
         assert len(sig) == 8
 

@@ -41,25 +41,29 @@ class TestArtifactSchema:
 
     def test_valid_ohlcv(self):
         """Valid OHLCV data passes validation."""
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "open": [100.0],
-            "high": [105.0],
-            "low": [95.0],
-            "close": [102.0],
-            "volume": [1000.0],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "open": [100.0],
+                "high": [105.0],
+                "low": [95.0],
+                "close": [102.0],
+                "volume": [1000.0],
+            }
+        )
         errors = OHLCV_SCHEMA.validate(df)
         assert errors == []
 
     def test_missing_column(self):
         """Missing required column produces error."""
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            # Missing OHLCV columns
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                # Missing OHLCV columns
+            }
+        )
         errors = OHLCV_SCHEMA.validate(df)
         assert any("open" in e for e in errors)
         assert any("high" in e for e in errors)
@@ -69,29 +73,33 @@ class TestArtifactSchema:
 
     def test_wrong_dtype(self):
         """Wrong dtype produces error."""
-        df = pl.DataFrame({
-            "pair": [123],  # Should be string
-            "timestamp": [datetime(2024, 1, 1)],
-            "open": [100.0],
-            "high": [105.0],
-            "low": [95.0],
-            "close": [102.0],
-            "volume": [1000.0],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": [123],  # Should be string
+                "timestamp": [datetime(2024, 1, 1)],
+                "open": [100.0],
+                "high": [105.0],
+                "low": [95.0],
+                "close": [102.0],
+                "volume": [1000.0],
+            }
+        )
         errors = OHLCV_SCHEMA.validate(df)
         assert any("pair" in e and "dtype" in e for e in errors)
 
     def test_null_in_non_nullable(self):
         """Null in non-nullable column produces error."""
-        df = pl.DataFrame({
-            "pair": [None],  # Should not be null
-            "timestamp": [datetime(2024, 1, 1)],
-            "open": [100.0],
-            "high": [105.0],
-            "low": [95.0],
-            "close": [102.0],
-            "volume": [1000.0],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": [None],  # Should not be null
+                "timestamp": [datetime(2024, 1, 1)],
+                "open": [100.0],
+                "high": [105.0],
+                "low": [95.0],
+                "close": [102.0],
+                "volume": [1000.0],
+            }
+        )
         errors = OHLCV_SCHEMA.validate(df)
         assert any("null" in e.lower() for e in errors)
 
@@ -103,16 +111,18 @@ class TestArtifactSchema:
 
     def test_extra_columns_allowed(self):
         """Extra columns are allowed by default."""
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "open": [100.0],
-            "high": [105.0],
-            "low": [95.0],
-            "close": [102.0],
-            "volume": [1000.0],
-            "extra_col": ["ignored"],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "open": [100.0],
+                "high": [105.0],
+                "low": [95.0],
+                "close": [102.0],
+                "volume": [1000.0],
+                "extra_col": ["ignored"],
+            }
+        )
         errors = OHLCV_SCHEMA.validate(df)
         assert errors == []
 
@@ -123,10 +133,12 @@ class TestArtifactSchema:
             required_columns=(ColumnSchema("pair", "string"),),
             allow_extra=False,
         )
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "unexpected": [1],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "unexpected": [1],
+            }
+        )
         errors = schema.validate(df)
         assert any("Unexpected" in e for e in errors)
 
@@ -135,32 +147,38 @@ class TestSignalsSchema:
     """Tests for SIGNALS_SCHEMA."""
 
     def test_valid_signals(self):
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "signal_type": [1],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "signal_type": [1],
+            }
+        )
         errors = SIGNALS_SCHEMA.validate(df)
         assert errors == []
 
     def test_null_signal_type_allowed(self):
         """Null signal_type is valid (means no signal)."""
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "signal_type": [None],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "signal_type": [None],
+            }
+        )
         errors = SIGNALS_SCHEMA.validate(df)
         assert errors == []
 
     def test_with_probability(self):
         """Signals with probability column."""
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "signal_type": [1],
-            "probability": [0.8],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "signal_type": [1],
+                "probability": [0.8],
+            }
+        )
         errors = SIGNALS_SCHEMA.validate(df)
         assert errors == []
 
@@ -169,23 +187,27 @@ class TestFeaturesSchema:
     """Tests for FEATURES_SCHEMA."""
 
     def test_valid_features(self):
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "sma_20": [100.0],
-            "rsi_14": [50.0],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "sma_20": [100.0],
+                "rsi_14": [50.0],
+            }
+        )
         errors = FEATURES_SCHEMA.validate(df)
         assert errors == []
 
     def test_dynamic_columns_allowed(self):
         """Feature columns are dynamic (allow_extra=True)."""
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "any_feature_name": [1.0],
-            "another_feature": [2.0],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "any_feature_name": [1.0],
+                "another_feature": [2.0],
+            }
+        )
         errors = FEATURES_SCHEMA.validate(df)
         assert errors == []
 
@@ -194,21 +216,25 @@ class TestLabelsSchema:
     """Tests for LABELS_SCHEMA."""
 
     def test_valid_labels(self):
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "label": [1],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "label": [1],
+            }
+        )
         errors = LABELS_SCHEMA.validate(df)
         assert errors == []
 
     def test_null_label_allowed(self):
         """Null label is valid."""
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "label": [None],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "label": [None],
+            }
+        )
         errors = LABELS_SCHEMA.validate(df)
         assert errors == []
 
@@ -217,21 +243,25 @@ class TestTradesSchema:
     """Tests for TRADES_SCHEMA."""
 
     def test_valid_trades(self):
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+            }
+        )
         errors = TRADES_SCHEMA.validate(df)
         assert errors == []
 
     def test_with_pnl(self):
-        df = pl.DataFrame({
-            "pair": ["BTCUSDT"],
-            "timestamp": [datetime(2024, 1, 1)],
-            "pnl": [100.0],
-            "entry_price": [50000.0],
-            "exit_price": [51000.0],
-        })
+        df = pl.DataFrame(
+            {
+                "pair": ["BTCUSDT"],
+                "timestamp": [datetime(2024, 1, 1)],
+                "pnl": [100.0],
+                "entry_price": [50000.0],
+                "exit_price": [51000.0],
+            }
+        )
         errors = TRADES_SCHEMA.validate(df)
         assert errors == []
 

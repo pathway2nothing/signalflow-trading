@@ -16,7 +16,6 @@ import polars as pl
 
 if TYPE_CHECKING:
     from signalflow.config.dag import Node
-    from signalflow.core import Signals
 
 CacheMode = Literal["memory", "disk", "none"]
 
