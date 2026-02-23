@@ -89,27 +89,70 @@ def _dataframe_to_json_safe(df: pl.DataFrame) -> list[dict[str, Any]]:
 
 
 def _extract_price_data(raw: RawData) -> list[dict[str, Any]]:
-    """Extract downsampled close prices from RawData for price charting."""
+    """Extract downsampled OHLC prices from RawData for price charting.
+
+    Handles both flat (data_type → DataFrame) and nested
+    (data_type → source → DataFrame) RawData structures.
+    When downsampling, properly aggregates OHLC bars rather than
+    just picking every Nth candle.
+    """
     result: list[dict[str, Any]] = []
-    for _key, df in raw.data.items():
-        if df is None or df.height == 0:
+
+    # Collect all DataFrames from raw.data (may be flat or nested)
+    dataframes: list[pl.DataFrame] = []
+    for _key, value in raw.data.items():
+        if value is None:
             continue
-        # Need at minimum timestamp, close, pair
+        if isinstance(value, pl.DataFrame):
+            dataframes.append(value)
+        elif isinstance(value, dict):
+            for _src, df in value.items():
+                if isinstance(df, pl.DataFrame):
+                    dataframes.append(df)
+
+    for df in dataframes:
+        if df.height == 0:
+            continue
         required = {"timestamp", "close", "pair"}
         if not required.issubset(set(df.columns)):
             continue
 
+        has_ohlc = {"open", "high", "low", "close"}.issubset(set(df.columns))
+
         for pair in df.select("pair").unique().to_series().to_list():
             pair_df = df.filter(pl.col("pair") == pair).sort("timestamp")
-            # Downsample if too many points
-            step = max(1, pair_df.height // _MAX_PRICE_POINTS_PER_PAIR)
-            sampled = pair_df.gather_every(step)
-            # Select OHLC columns if available, otherwise just close
+            n = pair_df.height
+
+            if n <= _MAX_PRICE_POINTS_PER_PAIR:
+                sampled = pair_df
+            else:
+                # Properly aggregate OHLC when downsampling
+                group_size = max(1, n // _MAX_PRICE_POINTS_PER_PAIR)
+                idx = pl.Series("_grp", [i // group_size for i in range(n)])
+                grouped = pair_df.with_columns(idx)
+
+                agg_exprs = [
+                    pl.col("pair").first(),
+                    pl.col("timestamp").first(),
+                    pl.col("close").last(),
+                ]
+                if has_ohlc:
+                    agg_exprs.extend([
+                        pl.col("open").first(),
+                        pl.col("high").max(),
+                        pl.col("low").min(),
+                    ])
+
+                sampled = grouped.group_by("_grp", maintain_order=True).agg(
+                    agg_exprs
+                ).drop("_grp")
+
             cols = ["pair", "timestamp"]
             for c in ["open", "high", "low", "close"]:
                 if c in sampled.columns:
                     cols.append(c)
             result.extend(_dataframe_to_json_safe(sampled.select(cols)))
+
     return result
 
 
@@ -127,6 +170,37 @@ class FlowConfig:
     metrics: list[str]
     capital: float
     fee: float
+
+
+def _enrich_trades_with_pnl(trades: list[dict[str, Any]]) -> None:
+    """Add ``pnl`` field to exit trades by pairing with entry trades via position_id."""
+    entries_by_pos: dict[str, list[dict[str, Any]]] = {}
+    for t in trades:
+        meta = t.get("meta") or {}
+        if isinstance(meta, dict) and meta.get("type") == "entry":
+            pos_id = t.get("position_id")
+            if pos_id:
+                entries_by_pos.setdefault(pos_id, []).append(t)
+
+    for t in trades:
+        meta = t.get("meta") or {}
+        if not isinstance(meta, dict) or meta.get("type") != "exit":
+            continue
+        pos_id = t.get("position_id")
+        entries = entries_by_pos.get(pos_id, [])  # type: ignore[arg-type]
+        if not entries:
+            continue
+        # Sum all entry notional and fees for this position
+        entry_notional = sum(e["price"] * e["qty"] for e in entries)
+        entry_fees = sum(e.get("fee", 0) for e in entries)
+        exit_notional = t["price"] * t["qty"]
+        exit_fee = t.get("fee", 0)
+        # Long (entry=BUY): pnl = exit - entry - fees
+        # Short (entry=SELL): pnl = entry - exit - fees
+        if entries[0].get("side") == "BUY":
+            t["pnl"] = exit_notional - entry_notional - entry_fees - exit_fee
+        else:
+            t["pnl"] = entry_notional - exit_notional - entry_fees - exit_fee
 
 
 @dataclass
@@ -158,6 +232,9 @@ class FlowResult:
     # Metadata
     flow_config: FlowConfig | None = None
     execution_time: float = 0.0
+    warnings: list[str] | None = None
+    data_start: str | None = None
+    data_end: str | None = None
 
     # For walk-forward mode
     fold_results: list[FlowResult] | None = None
@@ -262,7 +339,9 @@ class FlowResult:
         result["execution_time"] = self.execution_time
 
         if self.trades is not None and self.trades.height > 0:
-            result["trades"] = self.trades.to_dicts()
+            trade_dicts = self.trades.to_dicts()
+            _enrich_trades_with_pnl(trade_dicts)
+            result["trades"] = trade_dicts
 
         if self.equity_curve:
             result["equity_curve"] = self.equity_curve
@@ -276,11 +355,20 @@ class FlowResult:
                 "run_mode": self.flow_config.run_mode.value,
                 "capital": self.flow_config.capital,
             }
+        if self.data_start or self.data_end:
+            cfg = result.setdefault("config", {})
+            if self.data_start:
+                cfg["data_start"] = self.data_start
+            if self.data_end:
+                cfg["data_end"] = self.data_end
 
         if self.window_results:
             result["window_results"] = [wr.to_json_dict() for wr in self.window_results]
         if self.fold_results:
             result["fold_results"] = [fr.to_json_dict() for fr in self.fold_results]
+
+        if self.warnings:
+            result["warnings"] = self.warnings
 
         return result
 
@@ -799,6 +887,12 @@ class FlowBuilder:
 
         # 1. Resolve data
         raw = self._resolve_data()
+
+        # Extract actual data period from RawData
+        if hasattr(raw, "datetime_start") and raw.datetime_start:
+            result.data_start = raw.datetime_start.isoformat() if hasattr(raw.datetime_start, "isoformat") else str(raw.datetime_start)
+        if hasattr(raw, "datetime_end") and raw.datetime_end:
+            result.data_end = raw.datetime_end.isoformat() if hasattr(raw.datetime_end, "isoformat") else str(raw.datetime_end)
 
         # 2. Compute features
         features_df = None
