@@ -67,6 +67,8 @@ class AggregationMode(StrEnum):
 
 
 _MAX_PRICE_POINTS_PER_PAIR = 500
+_MAX_FEATURE_POINTS_PER_PAIR = 500
+_OHLCV_COLUMNS = {"open", "high", "low", "close", "volume"}
 
 
 def _json_safe_value(v: Any) -> Any:
@@ -203,6 +205,37 @@ def _enrich_trades_with_pnl(trades: list[dict[str, Any]]) -> None:
             t["pnl"] = entry_notional - exit_notional - entry_fees - exit_fee
 
 
+def _downsample_detector_features(
+    features_map: dict[str, pl.DataFrame],
+) -> dict[str, list[dict[str, Any]]]:
+    """Downsample detector features for JSON serialization.
+
+    Keeps only computed feature columns (not raw OHLCV), plus timestamp and pair.
+    Limits to _MAX_FEATURE_POINTS_PER_PAIR per pair.
+    """
+    result: dict[str, list[dict[str, Any]]] = {}
+    for det_name, df in features_map.items():
+        # Keep feature columns + timestamp + pair
+        feature_cols = [c for c in df.columns if c not in _OHLCV_COLUMNS]
+        if not {"timestamp", "pair"}.issubset(set(feature_cols)):
+            continue
+        if len(feature_cols) <= 2:  # only timestamp + pair, no features
+            continue
+        fdf = df.select(feature_cols)
+
+        per_pair: list[dict[str, Any]] = []
+        for pair in fdf.select("pair").unique().to_series().to_list():
+            pair_df = fdf.filter(pl.col("pair") == pair).sort("timestamp")
+            n = pair_df.height
+            if n > _MAX_FEATURE_POINTS_PER_PAIR:
+                step = max(1, n // _MAX_FEATURE_POINTS_PER_PAIR)
+                pair_df = pair_df.gather_every(step)
+            per_pair.extend(_dataframe_to_json_safe(pair_df))
+        if per_pair:
+            result[det_name] = per_pair
+    return result
+
+
 @dataclass
 class FlowResult:
     """Container for Flow execution results.
@@ -224,6 +257,7 @@ class FlowResult:
     labels: pl.DataFrame | None = None
     predictions: pl.DataFrame | None = None
     trades: pl.DataFrame | None = None
+    detector_features: dict[str, pl.DataFrame] | None = None
 
     # Chart data (serialized for API/UI)
     equity_curve: list[dict[str, Any]] | None = None
@@ -366,6 +400,9 @@ class FlowResult:
             result["window_results"] = [wr.to_json_dict() for wr in self.window_results]
         if self.fold_results:
             result["fold_results"] = [fr.to_json_dict() for fr in self.fold_results]
+
+        if self.detector_features:
+            result["detector_features"] = _downsample_detector_features(self.detector_features)
 
         if self.warnings:
             result["warnings"] = self.warnings
@@ -900,9 +937,11 @@ class FlowBuilder:
             features_df = self._compute_features(raw)
             result.features = features_df
 
-        # 3. Detect signals
-        signals = self._resolve_signals(raw)
+        # 3. Detect signals (capturing preprocessed features)
+        signals, det_features = self._resolve_signals(raw)
         result.signals = signals
+        if det_features:
+            result.detector_features = det_features
 
         # 4. Apply labeling (if configured)
         labels_df = None
@@ -1362,8 +1401,10 @@ class FlowBuilder:
                 result.features = test_features
 
             # Detect signals on test data
-            test_signals = self._resolve_signals(test_raw)
+            test_signals, det_features = self._resolve_signals(test_raw)
             result.signals = test_signals
+            if det_features:
+                result.detector_features = det_features
 
             # Train validator on train data and validate test signals
             if train_start is not None and train_end is not None and self._named_validators and self._named_labelers:
@@ -1371,7 +1412,7 @@ class FlowBuilder:
 
                 # Compute features and labels on train data
                 train_features = self._compute_features(train_raw) if self._feature_pipelines else None
-                train_signals = self._resolve_signals(train_raw)
+                train_signals, _ = self._resolve_signals(train_raw)
                 train_labels = self._compute_labels(train_raw, train_signals) if self._named_labelers else None
 
                 if train_features is not None and train_labels is not None and train_features.height > 0:
@@ -1481,31 +1522,43 @@ class FlowBuilder:
 
         return df
 
-    def _resolve_signals(self, raw: RawData) -> Signals:
-        """Detect signals from all detectors."""
+    def _resolve_signals(self, raw: RawData) -> tuple[Signals, dict[str, pl.DataFrame]]:
+        """Detect signals from all detectors, capturing preprocessed features."""
+        detector_features_map: dict[str, pl.DataFrame] = {}
+
         if self._signals is not None:
-            return self._signals
+            return self._signals, detector_features_map
 
         if not self._named_detectors:
-            # Return empty signals
-            return Signals(pl.DataFrame(schema={"timestamp": pl.Datetime, "pair": pl.Utf8, "signal": pl.Int8}))
+            empty = Signals(pl.DataFrame(schema={"timestamp": pl.Datetime, "pair": pl.Utf8, "signal": pl.Int8}))
+            return empty, detector_features_map
 
         from signalflow.core.containers.raw_data_view import RawDataView
 
         view = RawDataView(raw=raw)
         signals_list = []
 
-        for _name, detector in self._named_detectors.items():
-            signals = detector.run(view)
+        for name, detector in self._named_detectors.items():
+            # Inline the detector pipeline to capture preprocessed features
+            feats = detector.preprocess(view, context=None)
+            feats = detector._normalize_index(feats)
+            detector._validate_features(feats)
+
+            signals = detector.detect(feats, context=None)
+            detector._validate_signals(signals)
+
+            if detector.keep_only_latest_per_pair:
+                signals = detector._keep_only_latest(signals)
+
             signals_list.append(signals)
+            detector_features_map[name] = feats
 
         if len(signals_list) == 1:
-            return signals_list[0]
+            return signals_list[0], detector_features_map
 
-        # Merge signals
         from functools import reduce
 
-        return reduce(lambda a, b: a + b, signals_list)
+        return reduce(lambda a, b: a + b, signals_list), detector_features_map
 
     def _compute_labels(self, raw: RawData, signals: Signals) -> pl.DataFrame:
         """Compute labels from all labelers."""

@@ -813,15 +813,17 @@ class TestFlowBuilderHelpers:
     def test_resolve_signals_empty(self, sample_raw_data):
         """_resolve_signals returns empty Signals if no detectors."""
         builder = flow().data(raw=sample_raw_data)
-        signals = builder._resolve_signals(sample_raw_data)
+        signals, det_features = builder._resolve_signals(sample_raw_data)
         assert isinstance(signals, Signals)
         assert signals.value.height == 0
+        assert det_features == {}
 
     def test_resolve_signals_precomputed(self, sample_raw_data, sample_signals):
         """_resolve_signals returns pre-computed signals."""
         builder = flow().data(raw=sample_raw_data).signals(sample_signals)
-        signals = builder._resolve_signals(sample_raw_data)
+        signals, det_features = builder._resolve_signals(sample_raw_data)
         assert signals is sample_signals
+        assert det_features == {}
 
     def test_compute_feature_metrics(self, sample_raw_data):
         """_compute_feature_metrics returns dict."""
@@ -1071,10 +1073,14 @@ class TestFlowBuilderAdditional:
         assert "lgbm" in repr_str
 
     def test_resolve_signals_single_detector(self, sample_raw_data):
-        """_resolve_signals with single detector."""
+        """_resolve_signals with single detector captures features."""
         builder = flow().data(raw=sample_raw_data).detector("example/sma_cross")
-        signals = builder._resolve_signals(sample_raw_data)
+        signals, det_features = builder._resolve_signals(sample_raw_data)
         assert isinstance(signals, Signals)
+        assert "default" in det_features
+        feats_df = det_features["default"]
+        assert "timestamp" in feats_df.columns
+        assert "pair" in feats_df.columns
 
     def test_compute_features_single_pipeline(self, sample_raw_data):
         """_compute_features transforms data through pipeline."""
