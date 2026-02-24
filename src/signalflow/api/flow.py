@@ -68,7 +68,7 @@ class AggregationMode(StrEnum):
 
 _MAX_PRICE_POINTS_PER_PAIR = 500
 _MAX_FEATURE_POINTS_PER_PAIR = 500
-_OHLCV_COLUMNS = {"open", "high", "low", "close", "volume"}
+_OHLCV_COLUMNS = {"open", "high", "low", "close", "volume", "trades"}
 
 
 def _json_safe_value(v: Any) -> Any:
