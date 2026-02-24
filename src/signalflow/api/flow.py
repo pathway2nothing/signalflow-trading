@@ -25,6 +25,7 @@ from pathlib import Path
 from threading import Event
 from typing import TYPE_CHECKING, Any, ClassVar, Self
 
+import numpy as np
 import polars as pl
 
 from signalflow.api.exceptions import (
@@ -67,7 +68,7 @@ class AggregationMode(StrEnum):
 
 
 _MAX_PRICE_POINTS_PER_PAIR = 500
-_MAX_FEATURE_POINTS_PER_PAIR = 500
+_MAX_FEATURE_POINTS_PER_PAIR = 2000
 _OHLCV_COLUMNS = {"open", "high", "low", "close", "volume", "trades"}
 
 
@@ -205,12 +206,53 @@ def _enrich_trades_with_pnl(trades: list[dict[str, Any]]) -> None:
             t["pnl"] = entry_notional - exit_notional - entry_fees - exit_fee
 
 
+def _lttb_indices(y: np.ndarray, target: int) -> list[int]:
+    """Largest Triangle Three Buckets downsampling.
+
+    Returns *target* indices that best preserve the visual shape of *y*.
+    """
+    n = len(y)
+    if n <= target:
+        return list(range(n))
+
+    indices = [0]
+    bucket_size = (n - 2) / (target - 2)
+
+    a = 0  # previous selected index
+    for i in range(1, target - 1):
+        # Next bucket boundaries
+        b_start = int((i - 1) * bucket_size) + 1
+        b_end = int(i * bucket_size) + 1
+        # Average of the bucket after this one (lookahead)
+        c_start = int(i * bucket_size) + 1
+        c_end = int((i + 1) * bucket_size) + 1
+        c_end = min(c_end, n)
+        avg_y = float(np.nanmean(y[c_start:c_end])) if c_end > c_start else 0.0
+
+        # Pick the point in current bucket with largest triangle area
+        best_idx = b_start
+        best_area = -1.0
+        for j in range(b_start, min(b_end, n)):
+            area = abs(
+                (j - a) * (avg_y - y[a]) - (float(np.nan_to_num(y[j])) - y[a]) * (c_start - a)
+            )
+            if area > best_area:
+                best_area = area
+                best_idx = j
+        indices.append(best_idx)
+        a = best_idx
+
+    indices.append(n - 1)
+    return indices
+
+
 def _downsample_detector_features(
     features_map: dict[str, pl.DataFrame],
 ) -> dict[str, list[dict[str, Any]]]:
     """Downsample detector features for JSON serialization.
 
     Keeps only computed feature columns (not raw OHLCV), plus timestamp and pair.
+    Uses LTTB (Largest Triangle Three Buckets) to preserve visual shape.
     Limits to _MAX_FEATURE_POINTS_PER_PAIR per pair.
     """
     result: dict[str, list[dict[str, Any]]] = {}
@@ -228,8 +270,11 @@ def _downsample_detector_features(
             pair_df = fdf.filter(pl.col("pair") == pair).sort("timestamp")
             n = pair_df.height
             if n > _MAX_FEATURE_POINTS_PER_PAIR:
-                step = max(1, n // _MAX_FEATURE_POINTS_PER_PAIR)
-                pair_df = pair_df.gather_every(step)
+                # Use first numeric feature column for LTTB pivot
+                num_cols = [c for c in feature_cols if c not in ("timestamp", "pair")]
+                y = pair_df[num_cols[0]].fill_null(0).to_numpy()
+                idx = _lttb_indices(y, _MAX_FEATURE_POINTS_PER_PAIR)
+                pair_df = pair_df[idx]
             per_pair.extend(_dataframe_to_json_safe(pair_df))
         if per_pair:
             result[det_name] = per_pair
