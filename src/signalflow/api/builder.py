@@ -884,18 +884,34 @@ class BacktestBuilder:
             MissingDataError: If data not configured
             MissingDetectorError: If detector/signals not configured
         """
+        from loguru import logger as _logger
         from signalflow.api.result import BacktestResult
 
         # 1. Resolve data
         raw = self._resolve_data()
+        _logger.info(
+            "Data: {} pairs, {} → {}",
+            len(raw.pairs) if hasattr(raw, "pairs") else "?",
+            getattr(raw, "datetime_start", "?"),
+            getattr(raw, "datetime_end", "?"),
+        )
 
         # 2. Resolve signals (with multi-detector support)
         merged_signals, named_signals = self._resolve_signals(raw)
+        _logger.info(
+            "Signals: {} total, detectors: [{}]",
+            merged_signals.value.height if merged_signals else 0,
+            ", ".join(named_signals.keys()) if named_signals else "none",
+        )
 
         # 3. Build components from registry
         entry_rules = self._build_entry_rules()
         exit_rules = self._build_exit_rules()
         broker = self._build_broker()
+        _logger.info(
+            "Strategy: {} entry rule(s), {} exit rule(s), capital=${:,.0f}",
+            len(entry_rules), len(exit_rules), self._capital,
+        )
 
         # 4. Create and run runner
         runner = self._build_runner(
@@ -910,6 +926,8 @@ class BacktestBuilder:
             signals=merged_signals,
             named_signals=named_signals if named_signals else None,
         )
+        n_trades = len(getattr(runner, "trades", []))
+        _logger.info("Backtest done: {} trades", n_trades)
 
         # 5. Wrap in BacktestResult
         return BacktestResult(
@@ -1099,6 +1117,10 @@ class BacktestBuilder:
         """Detect signals from all detectors and merge."""
         # Pre-computed signals
         if self._signals is not None:
+            # Build named dict from detectors for source_detector cross-referencing
+            if self._named_detectors:
+                named = {name: self._signals for name in self._named_detectors}
+                return self._signals, named
             return self._signals, {}
 
         # Multi-detector mode
@@ -1356,12 +1378,26 @@ class BacktestBuilder:
 
             runner_cls = BacktestRunner
 
+        # Default strategy metrics for equity curve & drawdown tracking
+        from signalflow.analytic.strategy.main_strategy_metrics import (
+            DrawdownMetric,
+            TotalReturnMetric,
+            WinRateMetric,
+        )
+
+        metrics = [
+            TotalReturnMetric(initial_capital=self._capital),
+            DrawdownMetric(),
+            WinRateMetric(),
+        ]
+
         return runner_cls(
             strategy_id=self.strategy_id,
             broker=broker,
             entry_rules=entry_rules,
             exit_rules=exit_rules,
             initial_capital=self._capital,
+            metrics=metrics,
             show_progress=self._show_progress,
             progress_callback=progress_callback,
             cancel_event=cancel_event,

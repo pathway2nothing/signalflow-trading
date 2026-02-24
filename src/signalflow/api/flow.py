@@ -314,6 +314,7 @@ class FlowResult:
     warnings: list[str] | None = None
     data_start: str | None = None
     data_end: str | None = None
+    strategy_summary: dict[str, Any] | None = None
 
     # For walk-forward mode
     fold_results: list[FlowResult] | None = None
@@ -414,6 +415,7 @@ class FlowResult:
         if self.backtest_metrics:
             result["metrics"] = self.backtest_metrics if isinstance(self.backtest_metrics, dict) else {}
 
+        result["n_signals"] = self.signals.value.height if self.signals and hasattr(self.signals, "value") else 0
         result["n_trades"] = self.trades.height if self.trades is not None else 0
         result["execution_time"] = self.execution_time
 
@@ -451,6 +453,9 @@ class FlowResult:
 
         if self.warnings:
             result["warnings"] = self.warnings
+
+        if self.strategy_summary:
+            result["strategy_summary"] = self.strategy_summary
 
         return result
 
@@ -967,8 +972,16 @@ class FlowBuilder:
         """Execute single run."""
         result = FlowResult()
 
+        from loguru import logger as _logger
+
         # 1. Resolve data
         raw = self._resolve_data()
+        _logger.info(
+            "Data loaded: {} pairs, {} to {}",
+            len(raw.pairs) if hasattr(raw, "pairs") else "?",
+            getattr(raw, "datetime_start", "?"),
+            getattr(raw, "datetime_end", "?"),
+        )
 
         # Extract actual data period from RawData
         if hasattr(raw, "datetime_start") and raw.datetime_start:
@@ -981,10 +994,16 @@ class FlowBuilder:
         if self._feature_pipelines:
             features_df = self._compute_features(raw)
             result.features = features_df
+            _logger.info("Features computed: {} pipeline(s)", len(self._feature_pipelines))
 
         # 3. Detect signals (capturing preprocessed features)
         signals, det_features = self._resolve_signals(raw)
         result.signals = signals
+        _logger.info(
+            "Signal detection: {} signals from {} detector(s)",
+            signals.value.height if signals else 0,
+            len(self._named_detectors),
+        )
         if det_features:
             result.detector_features = det_features
 
@@ -1000,10 +1019,17 @@ class FlowBuilder:
 
         # 6. Run backtest (if strategy configured)
         if self._entry_config or self._exit_config or not self._metric_nodes:
+            _logger.info("Running backtest...")
             backtest_result = self._run_backtest(raw, signals, progress_callback, cancel_event)
             if backtest_result:
                 result.trades = backtest_result.trades_df
                 result.backtest_metrics = backtest_result.metrics
+                n_trades = len(backtest_result.trades) if hasattr(backtest_result, "trades") else 0
+                _logger.info(
+                    "Backtest complete: {} trades, final capital ${:,.0f}",
+                    n_trades,
+                    backtest_result.metrics.get("final_capital", 0) if backtest_result.metrics else 0,
+                )
 
                 # Extract equity curve from metrics_df
                 if hasattr(backtest_result, "metrics_df") and backtest_result.metrics_df is not None:
@@ -1013,6 +1039,9 @@ class FlowBuilder:
 
                 # Extract downsampled close prices from raw data
                 result.price_data = _extract_price_data(raw)
+
+        # 6b. Capture strategy configuration summary
+        result.strategy_summary = self._build_strategy_summary()
 
         # 7. Compute metrics based on metric nodes
         self._compute_metrics(result)
@@ -1657,6 +1686,9 @@ class FlowBuilder:
 
         builder = BacktestBuilder(strategy_id=self.strategy_id)
         builder._raw = raw
+        # Propagate named detectors so _resolve_signals returns proper named_signals
+        # (pre-computed _signals returns empty dict, breaking source_detector lookup)
+        builder._named_detectors = dict(self._named_detectors)
         builder._signals = signals
         builder._entry_config = self._entry_config
         builder._exit_config = self._exit_config
@@ -1664,6 +1696,59 @@ class FlowBuilder:
         builder._fee = self._fee
 
         return builder.run(progress_callback=progress_callback, cancel_event=cancel_event)
+
+    def _build_strategy_summary(self) -> dict[str, Any]:
+        """Build a JSON-safe summary of the strategy configuration."""
+        summary: dict[str, Any] = {
+            "capital": self._capital,
+            "fee": self._fee,
+        }
+
+        # Detectors
+        if self._named_detectors:
+            summary["detectors"] = list(self._named_detectors.keys())
+
+        # Features
+        if self._feature_pipelines:
+            summary["feature_pipelines"] = list(self._feature_pipelines.keys())
+
+        # Entry config (safe keys only)
+        if self._entry_config:
+            entry = {}
+            for k, v in self._entry_config.items():
+                if k.startswith("_"):
+                    continue
+                if isinstance(v, (str, int, float, bool, type(None))):
+                    entry[k] = v
+                elif isinstance(v, list) and all(isinstance(x, str) for x in v):
+                    entry[k] = v
+            if entry:
+                summary["entry"] = entry
+
+        # Exit config (safe keys, serialize rule instances)
+        if self._exit_config:
+            exit_info: dict[str, Any] = {}
+            for k, v in self._exit_config.items():
+                if k == "_extra_rules":
+                    exit_info["custom_rules"] = [
+                        {
+                            "type": type(r).__name__,
+                            **{
+                                f.name: getattr(r, f.name)
+                                for f in r.__dataclass_fields__.values()
+                                if f.name != "component_type"
+                                and isinstance(getattr(r, f.name, None), (str, int, float, bool, type(None)))
+                            },
+                        }
+                        for r in v
+                        if hasattr(r, "__dataclass_fields__")
+                    ]
+                elif isinstance(v, (str, int, float, bool, type(None))):
+                    exit_info[k] = v
+            if exit_info:
+                summary["exit"] = exit_info
+
+        return summary
 
     def _compute_metrics(self, result: FlowResult) -> None:
         """Compute metrics based on configured metric nodes."""
