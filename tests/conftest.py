@@ -1,9 +1,18 @@
 """Shared fixtures for signalflow tests."""
 
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import polars as pl
 import pytest
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _cleanup_duckdb_files():
+    """Remove raw_data_*.duckdb files that loaders create with default paths."""
+    yield
+    for f in Path.cwd().glob("raw_data_*.duckdb"):
+        f.unlink(missing_ok=True)
 
 
 @pytest.fixture
