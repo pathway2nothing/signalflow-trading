@@ -1343,6 +1343,9 @@ class FlowBuilder:
             size = self._entry_config.get("size")
             if size is None:
                 size = 100.0
+            size_pct = self._entry_config.get("size_pct")
+            if size_pct:
+                size = self._capital * size_pct
             rule_kwargs: dict = {
                 "base_position_size": float(size),
                 "max_total_positions": max_pos,

@@ -917,10 +917,18 @@ class BacktestBuilder:
         )
 
         # 4. Create and run runner
+        # Infer data_key from actual RawData keys (default "spot" may not exist
+        # when data is e.g. "perpetual" from futures stores).
+        data_key = "spot"
+        if raw and raw.data:
+            if "spot" not in raw.data:
+                data_key = next(iter(raw.data.keys()), "spot")
+
         runner = self._build_runner(
             broker,
             entry_rules,
             exit_rules,
+            data_key=data_key,
             progress_callback=progress_callback,
             cancel_event=cancel_event,
         )
@@ -1370,6 +1378,7 @@ class BacktestBuilder:
         entry_rules: list[Any],
         exit_rules: list[Any],
         *,
+        data_key: str = "spot",
         progress_callback: Callable[[int, int, dict[str, Any]], None] | None = None,
         cancel_event: Event | None = None,
     ) -> Any:
@@ -1401,6 +1410,7 @@ class BacktestBuilder:
             exit_rules=exit_rules,
             initial_capital=self._capital,
             metrics=metrics,
+            data_key=data_key,
             show_progress=self._show_progress,
             progress_callback=progress_callback,
             cancel_event=cancel_event,
