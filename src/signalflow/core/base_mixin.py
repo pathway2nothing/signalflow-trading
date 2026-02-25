@@ -93,9 +93,7 @@ class SfTorchModuleMixin(ABC):
 
     @classmethod
     @abstractmethod
-    def search_space(
-        cls, model_size: Literal["small", "medium", "large"] = "small"
-    ) -> dict:
+    def search_space(cls, model_size: Literal["small", "medium", "large"] = "small") -> dict:
         """Return hyperparameter search space for tuning.
 
         Describes tunable parameters with their types and bounds.

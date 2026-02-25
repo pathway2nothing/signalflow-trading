@@ -885,6 +885,7 @@ class BacktestBuilder:
             MissingDetectorError: If detector/signals not configured
         """
         from loguru import logger as _logger
+
         from signalflow.api.result import BacktestResult
 
         # 1. Resolve data
@@ -910,7 +911,9 @@ class BacktestBuilder:
         broker = self._build_broker()
         _logger.info(
             "Strategy: {} entry rule(s), {} exit rule(s), capital=${:,.0f}",
-            len(entry_rules), len(exit_rules), self._capital,
+            len(entry_rules),
+            len(exit_rules),
+            self._capital,
         )
 
         # 4. Create and run runner

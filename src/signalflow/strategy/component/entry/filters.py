@@ -372,19 +372,16 @@ class PriceDistanceFilter(EntryFilter):
 
                 if direction == "long" and pct > -self.min_distance_pct:
                     return False, (
-                        f"price too close to position @{entry_price:.2f}: "
-                        f"{pct:.2%} > -{self.min_distance_pct:.2%}"
+                        f"price too close to position @{entry_price:.2f}: {pct:.2%} > -{self.min_distance_pct:.2%}"
                     )
                 elif direction == "short" and pct < self.min_distance_pct:
                     return False, (
-                        f"price too close to position @{entry_price:.2f}: "
-                        f"{pct:.2%} < {self.min_distance_pct:.2%}"
+                        f"price too close to position @{entry_price:.2f}: {pct:.2%} < {self.min_distance_pct:.2%}"
                     )
             else:
                 if abs(pct) < self.min_distance_pct:
                     return False, (
-                        f"price too close to position @{entry_price:.2f}: "
-                        f"|{pct:.2%}| < {self.min_distance_pct:.2%}"
+                        f"price too close to position @{entry_price:.2f}: |{pct:.2%}| < {self.min_distance_pct:.2%}"
                     )
 
         return True, ""

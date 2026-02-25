@@ -140,15 +140,15 @@ def _extract_price_data(raw: RawData) -> list[dict[str, Any]]:
                     pl.col("close").last(),
                 ]
                 if has_ohlc:
-                    agg_exprs.extend([
-                        pl.col("open").first(),
-                        pl.col("high").max(),
-                        pl.col("low").min(),
-                    ])
+                    agg_exprs.extend(
+                        [
+                            pl.col("open").first(),
+                            pl.col("high").max(),
+                            pl.col("low").min(),
+                        ]
+                    )
 
-                sampled = grouped.group_by("_grp", maintain_order=True).agg(
-                    agg_exprs
-                ).drop("_grp")
+                sampled = grouped.group_by("_grp", maintain_order=True).agg(agg_exprs).drop("_grp")
 
             cols = ["pair", "timestamp"]
             for c in ["open", "high", "low", "close"]:
@@ -233,9 +233,7 @@ def _lttb_indices(y: np.ndarray, target: int) -> list[int]:
         best_idx = b_start
         best_area = -1.0
         for j in range(b_start, min(b_end, n)):
-            area = abs(
-                (j - a) * (avg_y - y[a]) - (float(np.nan_to_num(y[j])) - y[a]) * (c_start - a)
-            )
+            area = abs((j - a) * (avg_y - y[a]) - (float(np.nan_to_num(y[j])) - y[a]) * (c_start - a))
             if area > best_area:
                 best_area = area
                 best_idx = j
@@ -985,9 +983,11 @@ class FlowBuilder:
 
         # Extract actual data period from RawData
         if hasattr(raw, "datetime_start") and raw.datetime_start:
-            result.data_start = raw.datetime_start.isoformat() if hasattr(raw.datetime_start, "isoformat") else str(raw.datetime_start)
+            ds = raw.datetime_start
+            result.data_start = ds.isoformat() if hasattr(ds, "isoformat") else str(ds)
         if hasattr(raw, "datetime_end") and raw.datetime_end:
-            result.data_end = raw.datetime_end.isoformat() if hasattr(raw.datetime_end, "isoformat") else str(raw.datetime_end)
+            de = raw.datetime_end
+            result.data_end = de.isoformat() if hasattr(de, "isoformat") else str(de)
 
         # 2. Compute features
         features_df = None
@@ -1718,9 +1718,9 @@ class FlowBuilder:
             for k, v in self._entry_config.items():
                 if k.startswith("_"):
                     continue
-                if isinstance(v, (str, int, float, bool, type(None))):
-                    entry[k] = v
-                elif isinstance(v, list) and all(isinstance(x, str) for x in v):
+                is_scalar = isinstance(v, (str, int, float, bool, type(None)))
+                is_str_list = isinstance(v, list) and all(isinstance(x, str) for x in v)
+                if is_scalar or is_str_list:
                     entry[k] = v
             if entry:
                 summary["entry"] = entry
