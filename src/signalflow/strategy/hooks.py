@@ -29,8 +29,12 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-import httpx
 from loguru import logger
+
+try:
+    import httpx
+except ImportError:
+    httpx = None  # type: ignore[assignment]
 
 
 class HookEvent(StrEnum):
@@ -159,6 +163,9 @@ class TelegramHookHandler(BaseHookHandler):
 
     async def send(self, event: HookEvent, context: dict[str, Any]) -> bool:
         """Send Telegram message."""
+        if httpx is None:
+            logger.error("httpx is required for Telegram hooks: pip install httpx")
+            return False
         if not self.bot_token or not self.chat_id:
             logger.warning("Telegram hook missing bot_token or chat_id")
             return False
@@ -214,6 +221,9 @@ class SlackHookHandler(BaseHookHandler):
 
     async def send(self, event: HookEvent, context: dict[str, Any]) -> bool:
         """Send Slack message."""
+        if httpx is None:
+            logger.error("httpx is required for Slack hooks: pip install httpx")
+            return False
         if not self.webhook_url:
             logger.warning("Slack hook missing webhook_url")
             return False
@@ -268,6 +278,9 @@ class WebhookHookHandler(BaseHookHandler):
 
     async def send(self, event: HookEvent, context: dict[str, Any]) -> bool:
         """Send webhook request."""
+        if httpx is None:
+            logger.error("httpx is required for webhook hooks: pip install httpx")
+            return False
         if not self.url:
             logger.warning("Webhook hook missing url")
             return False

@@ -52,6 +52,17 @@ import signalflow.utils as utils
 import signalflow.validator as validators
 from signalflow.feature import Feature, FeaturePipeline, GlobalFeature, OffsetFeature
 
+# Re-assign semantic decorators after submodule imports.
+# `import signalflow.detector` binds the submodule to `signalflow.detector`,
+# shadowing the `detector` decorator imported from signalflow.core above.
+# Same issue for `feature`, `exit`, `validator`.  Re-importing restores them.
+from signalflow.core.decorators import (  # noqa: E402, F811
+    detector,
+    exit,
+    feature,
+    validator,
+)
+
 # =============================================================================
 # Lazy imports for high-level API
 # =============================================================================
