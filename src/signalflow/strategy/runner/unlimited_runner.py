@@ -80,7 +80,7 @@ class UnlimitedResults:
 
 
 @dataclass
-@sf.executor("runner/unlimited")
+@executor("runner/unlimited")
 class UnlimitedBalanceRunner(StrategyRunner):
     """Unlimited balance runner with vectorized exit detection.
 

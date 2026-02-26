@@ -54,7 +54,13 @@ from signalflow.core.enums import (
     SignalCategory,
     SignalType,
 )
-from signalflow.core.registry import SignalFlowRegistry, default_registry, get_component
+from signalflow.core.registry import (
+    ComponentInfo,
+    SignalFlowRegistry,
+    default_registry,
+    get_component,
+    get_component_info,
+)
 from signalflow.core.signal_transform import SignalsTransform
 
 __all__ = [
@@ -78,9 +84,11 @@ __all__ = [
     "StrategyState",
     "Trade",
     # Registry
+    "ComponentInfo",
     "SignalFlowRegistry",
     "default_registry",
     "get_component",
+    "get_component_info",
     # Semantic decorators (new API)
     "alert",
     "data_source",

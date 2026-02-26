@@ -20,6 +20,40 @@ _BUILTIN_RAW_DATA_TYPES: dict[str, set[str]] = {
 
 
 @dataclass
+class ComponentInfo:
+    """Metadata about a registered component.
+
+    Stores the class reference along with extracted documentation
+    for UI display and introspection.
+
+    Attributes:
+        cls: The registered component class.
+        docstring: Full class docstring (or empty string if none).
+        summary: First line of docstring (short description).
+        module: Module path where the class is defined.
+    """
+
+    cls: type[Any]
+    docstring: str = ""
+    summary: str = ""
+    module: str = ""
+
+    @classmethod
+    def from_class(cls, component_cls: type[Any]) -> "ComponentInfo":
+        """Create ComponentInfo by extracting metadata from a class."""
+        docstring = (component_cls.__doc__ or "").strip()
+        lines = docstring.split("\n")
+        summary = lines[0] if lines else ""
+        module = getattr(component_cls, "__module__", "")
+        return cls(
+            cls=component_cls,
+            docstring=docstring,
+            summary=summary,
+            module=module,
+        )
+
+
+@dataclass
 class SignalFlowRegistry:
     """Component registry for dynamic component discovery and instantiation.
 
@@ -32,7 +66,7 @@ class SignalFlowRegistry:
     are pre-registered; users can add custom types via ``register_raw_data_type()``.
 
     Registry structure:
-        component_type -> name -> class
+        component_type -> name -> ComponentInfo (class + metadata)
 
     Supported component types:
         - DETECTOR: Signal detection classes
@@ -44,8 +78,8 @@ class SignalFlowRegistry:
         - EXECUTOR: Order execution engines
 
     Attributes:
-        _items (dict[SfComponentType, dict[str, Type[Any]]]):
-            Internal storage mapping component types to name-class pairs.
+        _items (dict[SfComponentType, dict[str, ComponentInfo]]):
+            Internal storage mapping component types to name-ComponentInfo pairs.
         _raw_data_types (dict[str, set[str]]):
             Mapping of raw data type names to their required column sets.
 
@@ -58,6 +92,11 @@ class SignalFlowRegistry:
             name="lob",
             columns=["pair", "timestamp", "bid", "ask", "bid_size", "ask_size"],
         )
+
+        # Get component info with docstring for UI
+        info = default_registry.get_info(SfComponentType.DETECTOR, "sma_cross")
+        print(info.summary)    # "Detects SMA crossover signals."
+        print(info.docstring)  # Full docstring with Args, Example, etc.
 
         # Get columns for any type
         cols = default_registry.get_raw_data_columns("spot")
@@ -75,7 +114,7 @@ class SignalFlowRegistry:
         Semantic decorators (@sf.detector, @sf.feature, etc.) for automatic registration.
     """
 
-    _items: dict[SfComponentType, dict[str, type[Any]]] = field(default_factory=dict)
+    _items: dict[SfComponentType, dict[str, ComponentInfo]] = field(default_factory=dict)
     _raw_data_types: dict[str, set[str]] = field(
         default_factory=lambda: {k: v.copy() for k, v in _BUILTIN_RAW_DATA_TYPES.items()}
     )
@@ -171,7 +210,8 @@ class SignalFlowRegistry:
     def register(self, component_type: SfComponentType, name: str, cls: type[Any], *, override: bool = False) -> None:
         """Register a class under (component_type, name).
 
-        Stores class in registry for later lookup and instantiation.
+        Stores class with metadata (docstring, module) in registry for later
+        lookup, instantiation, and UI display.
         Names are normalized to lowercase for case-insensitive lookup.
 
         Args:
@@ -217,7 +257,8 @@ class SignalFlowRegistry:
         if key in self._items[component_type] and override:
             logger.warning(f"Overriding {component_type.value}:{key} with {cls.__name__}")
 
-        self._items[component_type][key] = cls
+        # Store class with extracted metadata
+        self._items[component_type][key] = ComponentInfo.from_class(cls)
 
     def get(self, component_type: SfComponentType, name: str) -> type[Any]:
         """Get a registered class by key.
@@ -252,6 +293,45 @@ class SignalFlowRegistry:
             except KeyError as e:
                 print(f"Component not found: {e}")
                 # Shows: "Component not found: DETECTOR:unknown. Available: [sma_cross, ...]"
+            ```
+        """
+        self._discover_if_needed()
+        self._ensure(component_type)
+        key = name.lower()
+        try:
+            return self._items[component_type][key].cls
+        except KeyError as e:
+            available = ", ".join(sorted(self._items[component_type]))
+            raise KeyError(f"Component not found: {component_type.value}:{key}. Available: [{available}]") from e
+
+    def get_info(self, component_type: SfComponentType, name: str) -> ComponentInfo:
+        """Get full component info including docstring.
+
+        Use this method when you need metadata for UI display or
+        documentation generation.
+
+        Args:
+            component_type (SfComponentType): Type of component to lookup.
+            name (str): Component name (case-insensitive).
+
+        Returns:
+            ComponentInfo: Full metadata including class, docstring, summary, module.
+
+        Raises:
+            KeyError: If component not found.
+
+        Example:
+            ```python
+            # Get info for UI tooltip
+            info = registry.get_info(SfComponentType.DETECTOR, "sma_cross")
+            print(info.summary)     # "Detects SMA crossover signals."
+            print(info.docstring)   # Full docstring
+            print(info.module)      # "signalflow.detector.sma_cross"
+
+            # Use in sf-ui component browser
+            for name in registry.list(SfComponentType.FEATURE):
+                info = registry.get_info(SfComponentType.FEATURE, name)
+                display_component_card(name, info.summary, info.docstring)
             ```
         """
         self._discover_if_needed()
@@ -469,17 +549,21 @@ class SignalFlowRegistry:
 
         Returns:
             Schema dict with keys: ``name``, ``class_name``, ``component_type``,
-            ``description``, ``parameters``, ``requires``, ``outputs``.
+            ``description``, ``docstring``, ``module``, ``parameters``,
+            ``requires``, ``outputs``.
 
         Raises:
             KeyError: If component not found.
 
         Example:
             >>> schema = registry.get_schema(SfComponentType.DETECTOR, "example/sma_cross")
+            >>> print(schema["description"])  # Short summary
+            >>> print(schema["docstring"])    # Full docstring for UI
             >>> for p in schema["parameters"]:
             ...     print(f"{p['name']}: {p['type']} = {p['default']}")
         """
-        cls = self.get(component_type, name)
+        info = self.get_info(component_type, name)
+        cls = info.cls
 
         parameters: list[dict[str, Any]] = []
         if dataclasses.is_dataclass(cls):
@@ -507,15 +591,13 @@ class SignalFlowRegistry:
         requires = getattr(cls, "requires", [])
         outputs = getattr(cls, "outputs", [])
 
-        # First line of docstring as description
-        doc = (cls.__doc__ or "").strip()
-        description = doc.split("\n")[0] if doc else ""
-
         return {
             "name": name,
             "class_name": cls.__name__,
             "component_type": component_type.value,
-            "description": description,
+            "description": info.summary,
+            "docstring": info.docstring,
+            "module": info.module,
             "parameters": parameters,
             "requires": list(requires) if requires else [],
             "outputs": list(outputs) if outputs else [],
@@ -627,3 +709,8 @@ Example:
 def get_component(type: SfComponentType, name: str) -> type[Any]:
     """Get a registered component by type and name."""
     return default_registry.get(type, name)
+
+
+def get_component_info(type: SfComponentType, name: str) -> ComponentInfo:
+    """Get component info including docstring for UI display."""
+    return default_registry.get_info(type, name)
