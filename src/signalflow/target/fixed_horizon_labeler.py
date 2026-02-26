@@ -3,12 +3,12 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import SignalType, sf_component
+from signalflow.core import SignalType, labeler
 from signalflow.target.base import Labeler
 
 
 @dataclass
-@sf_component(name="fixed_horizon")
+@labeler("fixed_horizon")
 class FixedHorizonLabeler(Labeler):
     """
     Fixed-Horizon Labeling:

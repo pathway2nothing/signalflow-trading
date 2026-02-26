@@ -2,12 +2,13 @@
 
 from dataclasses import dataclass
 
-from signalflow.core import Order, Position, PositionType, StrategyState, sf_component
+import signalflow as sf
+from signalflow.core import Order, Position, PositionType, StrategyState
 from signalflow.strategy.component.base import ExitRule
 
 
 @dataclass
-@sf_component(name="grid_exit")
+@sf.exit("grid_exit")
 class GridExit(ExitRule):
     """Exit rule that manages the grid as a whole.
 

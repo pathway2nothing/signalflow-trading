@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import SfComponentType, sf_component
+from signalflow.core import feature
 from signalflow.feature.base import GlobalFeature
 
 if TYPE_CHECKING:
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-@sf_component(name="aggregated_oi")
+@feature("aggregated_oi")
 class AggregatedOpenInterest(GlobalFeature):
     """Computes aggregated open interest across all pairs.
 
@@ -47,7 +47,6 @@ class AggregatedOpenInterest(GlobalFeature):
         ```
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.FEATURE
     requires: ClassVar[list[str]] = ["{oi_col}"]
     outputs: ClassVar[list[str]] = ["agg_oi", "agg_oi_change", "agg_oi_zscore"]
 
@@ -123,7 +122,7 @@ class AggregatedOpenInterest(GlobalFeature):
 
 
 @dataclass
-@sf_component(name="aggregated_oi_multi_source")
+@feature("aggregated_oi_multi_source")
 class AggregatedOpenInterestMultiSource(GlobalFeature):
     """Aggregated open interest from multiple data sources (exchanges).
 
@@ -170,7 +169,6 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
         ```
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.FEATURE
     requires: ClassVar[list[str]] = ["{oi_col}", "{source_col}"]
     outputs: ClassVar[list[str]] = [
         "agg_oi_total",

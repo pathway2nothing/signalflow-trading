@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 
-from signalflow.core import ExitPriority, Order, Position, StrategyState, sf_component
+from signalflow.core import ExitPriority, Order, Position, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
 
 
 @dataclass
-@sf_component(name="composite_exit")
+@exit("composite_exit")
 class CompositeExit(ExitRule):
     """Combines multiple exit rules with configurable priority.
 

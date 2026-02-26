@@ -6,11 +6,11 @@ import polars as pl
 from loguru import logger
 
 from signalflow.analytic.base import SignalMetric
-from signalflow.core import RawData, Signals, sf_component
+from signalflow.core import RawData, Signals, signal_metric
 
 
 @dataclass
-@sf_component(name="pair")
+@signal_metric("pair")
 class SignalPairPrice(SignalMetric):
     """Visualize signals overlaid on price chart for specified pairs."""
 

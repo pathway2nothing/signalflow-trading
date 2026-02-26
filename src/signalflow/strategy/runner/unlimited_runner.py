@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any
 
 import polars as pl
 from loguru import logger
@@ -12,8 +12,7 @@ from loguru import logger
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core.decorators import sf_component
-from signalflow.core.enums import SfComponentType
+from signalflow.core import executor
 from signalflow.strategy.component.base import EntryRule
 from signalflow.strategy.runner.base import StrategyRunner
 
@@ -81,7 +80,7 @@ class UnlimitedResults:
 
 
 @dataclass
-@sf_component(name="runner/unlimited", override=True)
+@sf.executor("runner/unlimited")
 class UnlimitedBalanceRunner(StrategyRunner):
     """Unlimited balance runner with vectorized exit detection.
 
@@ -113,8 +112,6 @@ class UnlimitedBalanceRunner(StrategyRunner):
         fee_rate: Trading fee rate
         show_progress: Show progress bar
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_RUNNER
 
     strategy_id: str = "unlimited"
     broker: Any = None  # Not used

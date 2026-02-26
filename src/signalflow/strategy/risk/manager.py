@@ -10,8 +10,7 @@ from loguru import logger
 
 from signalflow.core.containers.order import Order
 from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core.decorators import sf_component
-from signalflow.core.enums import SfComponentType
+import signalflow as sf
 from signalflow.strategy.risk.limits import RiskLimit
 
 
@@ -33,7 +32,7 @@ class RiskCheckResult:
 
 
 @dataclass
-@sf_component(name="risk_manager")
+@sf.risk("risk_manager")
 class RiskManager:
     """Central risk orchestrator.
 
@@ -72,7 +71,6 @@ class RiskManager:
             broker.submit_orders(result.passed_orders, prices, ts)
     """
 
-    component_type: SfComponentType = SfComponentType.STRATEGY_RISK
     limits: list[RiskLimit] = field(default_factory=list)
     mode: str = "reject_all"  # "reject_all" | "filter"
     halted: bool = field(default=False, init=False, repr=False)

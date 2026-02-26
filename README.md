@@ -329,7 +329,11 @@ The framework implements a modular three-stage processing logic:
 
 * **Strategy Monitoring**: Built-in alert system (drawdown, stuck positions, signal quality) for real-time oversight.
 
-* **Flexible Extensibility**: Easily add custom features via the `@sf_component` registry.
+* **Flexible Extensibility**: Easily add custom components via semantic decorators:
+  - For detectors: `@sf.detector("name")`
+  - For features: `@sf.feature("name")`
+  - For validators: `@sf.validator("name")`
+  - For strategies: `@sf.strategy("name")`
 
 
 ## Signal Detection Example

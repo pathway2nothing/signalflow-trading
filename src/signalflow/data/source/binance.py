@@ -37,7 +37,7 @@ from pathlib import Path
 import aiohttp
 from loguru import logger
 
-from signalflow.core import sf_component
+from signalflow.core import data_source
 from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.source._helpers import (
     TIMEFRAME_MS,
@@ -49,7 +49,7 @@ from signalflow.data.source.base import RawDataLoader, RawDataSource
 
 
 @dataclass
-@sf_component(name="binance")
+@data_source("binance")
 class BinanceClient(RawDataSource):
     """Async client for Binance REST API.
 
@@ -328,7 +328,7 @@ class BinanceClient(RawDataSource):
 
 
 @dataclass
-@sf_component(name="binance/spot")
+@data_source("binance/spot")
 class BinanceSpotLoader(RawDataLoader):
     """Downloads and stores Binance spot OHLCV data for fixed timeframe.
 
@@ -496,7 +496,7 @@ class BinanceSpotLoader(RawDataLoader):
 
 
 @dataclass
-@sf_component(name="binance/futures-usdt")
+@data_source("binance/futures-usdt")
 class BinanceFuturesUsdtLoader(RawDataLoader):
     """Downloads and stores Binance USDT-M Futures OHLCV data.
 
@@ -652,7 +652,7 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
 
 
 @dataclass
-@sf_component(name="binance/futures-coin")
+@data_source("binance/futures-coin")
 class BinanceFuturesCoinLoader(RawDataLoader):
     """Downloads and stores Binance COIN-M Futures OHLCV data.
 

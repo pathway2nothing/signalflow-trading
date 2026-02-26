@@ -11,13 +11,13 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import Signals, sf_component
+from signalflow.core import Signals, detector
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="percentile_regime_detector")
+@detector("percentile_regime_detector")
 class PercentileRegimeDetector(SignalDetector):
     """Percentile-based regime detector on any feature.
 

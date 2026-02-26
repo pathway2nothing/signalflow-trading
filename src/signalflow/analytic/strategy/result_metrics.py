@@ -14,11 +14,11 @@ from plotly.subplots import make_subplots
 from scipy import stats
 
 from signalflow.analytic.base import StrategyMetric
-from signalflow.core import RawData, StrategyState, sf_component
+from signalflow.core import RawData, StrategyState, strategy_metric
 
 
 @dataclass
-@sf_component(name="result_main", override=True)
+@strategy_metric("result_main")
 class StrategyMainResult(StrategyMetric):
     """Strategy-level visualization based on results['metrics_df'] (Polars DataFrame)."""
 
@@ -257,7 +257,7 @@ class StrategyMainResult(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="result_distribution", override=True)
+@strategy_metric("result_distribution")
 class StrategyDistributionResult(StrategyMetric):
     """Returns distribution and monthly heatmap visualization."""
 
@@ -467,7 +467,7 @@ class StrategyDistributionResult(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="result_equity", override=True)
+@strategy_metric("result_equity")
 class StrategyEquityResult(StrategyMetric):
     """Equity curve with optional benchmark comparison."""
 
@@ -578,7 +578,7 @@ class StrategyEquityResult(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="result_pair", override=True)
+@strategy_metric("result_pair")
 class StrategyPairResult(StrategyMetric):
     """Pair visualization with price line, entry/exit markers, and net position size."""
 

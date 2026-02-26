@@ -23,16 +23,33 @@ from signalflow.core import (
     Trade,
     default_registry,
     get_component,
+    # Semantic decorators (new API) - use as @sf.detector, @sf.entry, etc.
+    alert,
+    data_source,
+    data_store,
+    detector,
+    entry,
+    executor,
+    exit,
+    feature,
+    labeler,
+    register,
+    risk,
+    signal_metric,
+    strategy_metric,
+    strategy_store,
+    validator,
+    # Legacy (deprecated)
     sf_component,
 )
 import signalflow.analytic as analytic
 import signalflow.data as data
-import signalflow.detector as detector
-import signalflow.feature as feature
+import signalflow.detector as detectors
+import signalflow.feature as features
 import signalflow.strategy as strategy
 import signalflow.target as target
 import signalflow.utils as utils
-import signalflow.validator as validator
+import signalflow.validator as validators
 from signalflow.feature import Feature, FeaturePipeline, GlobalFeature, OffsetFeature
 
 # =============================================================================
@@ -168,59 +185,85 @@ def __getattr__(name: str):
 
 
 __all__ = [
+    # High-level API
     "Backtest",
     "BacktestBuilder",
     "BacktestMetrics",
     "BacktestResult",
-    "DailyLossLimit",
-    "DataFrameType",
-    "Feature",
-    "FeatureMetrics",
-    "FeaturePipeline",
     "FlowBuilder",
     "FlowResult",
-    "GlobalFeature",
+    "backtest",
+    "flow",
+    "load",
+    "load_artifact",
+    # Metrics nodes
+    "FeatureMetrics",
     "LabelMetrics",
     "LiveMetrics",
-    "MaxLeverageLimit",
-    "MaxPositionsLimit",
-    "OffsetFeature",
+    "SignalMetrics",
+    "ValidationMetrics",
+    # Containers
     "Order",
     "OrderFill",
-    "PairExposureLimit",
     "Portfolio",
     "Position",
-    "PositionType",
     "RawData",
     "RawDataType",
     "RawDataView",
-    "RiskLimit",
-    "RiskManager",
-    "SfComponentType",
-    "SfTorchModuleMixin",
-    "SignalMetrics",
-    "SignalType",
     "Signals",
-    "SignalsTransform",
     "StrategyState",
     "Trade",
-    "ValidationMetrics",
+    # Enums
+    "DataFrameType",
+    "PositionType",
+    "SfComponentType",
+    "SignalType",
+    # Features
+    "Feature",
+    "FeaturePipeline",
+    "GlobalFeature",
+    "OffsetFeature",
+    # Risk
+    "DailyLossLimit",
+    "MaxLeverageLimit",
+    "MaxPositionsLimit",
+    "PairExposureLimit",
+    "RiskLimit",
+    "RiskManager",
+    # Registry
+    "default_registry",
+    "get_component",
+    # Semantic decorators (new API) - @sf.detector, @sf.entry, etc.
+    "alert",
+    "data_source",
+    "data_store",
+    "detector",
+    "entry",
+    "executor",
+    "exit",
+    "feature",
+    "labeler",
+    "register",
+    "risk",
+    "signal_metric",
+    "strategy_metric",
+    "strategy_store",
+    "validator",
+    # Legacy decorator (deprecated)
+    "sf_component",
+    # Sub-packages
     "analytic",
     "api",
-    "backtest",
     "config",
     "core",
     "data",
-    "default_registry",
-    "detector",
-    "feature",
-    "flow",
-    "get_component",
-    "load",
-    "load_artifact",
-    "sf_component",
+    "detectors",
+    "features",
     "strategy",
     "target",
     "utils",
-    "validator",
+    "validators",
+    # Other
+    "SfTorchModuleMixin",
+    "SignalsTransform",
 ]

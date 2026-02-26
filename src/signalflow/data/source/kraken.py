@@ -8,7 +8,7 @@ from pathlib import Path
 import aiohttp
 from loguru import logger
 
-from signalflow.core import sf_component
+from signalflow.core import data_source
 from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.source._helpers import (
     TIMEFRAME_MS,
@@ -50,7 +50,7 @@ _KRAKEN_FUTURES_INTERVAL_MAP: dict[str, str] = {
 
 
 @dataclass
-@sf_component(name="kraken")
+@data_source("kraken")
 class KrakenClient(RawDataSource):
     """Async client for Kraken REST APIs (spot and futures).
 
@@ -573,7 +573,7 @@ class KrakenClient(RawDataSource):
 
 
 @dataclass
-@sf_component(name="kraken/spot")
+@data_source("kraken/spot")
 class KrakenSpotLoader(RawDataLoader):
     """Downloads and stores Kraken spot OHLCV data.
 
@@ -723,7 +723,7 @@ class KrakenSpotLoader(RawDataLoader):
 
 
 @dataclass
-@sf_component(name="kraken/futures")
+@data_source("kraken/futures")
 class KrakenFuturesLoader(RawDataLoader):
     """Downloads and stores Kraken futures OHLCV data.
 

@@ -14,16 +14,15 @@ import polars as pl
 from signalflow.core import (
     RawDataType,
     RawDataView,
-    SfComponentType,
     SignalCategory,
     Signals,
-    sf_component,
+    detector,
 )
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="funding/rate_transition")
+@detector("funding/rate_transition")
 class FundingRateDetector(SignalDetector):
     """Detects long entries when funding rate transitions from positive to negative.
 
@@ -43,7 +42,6 @@ class FundingRateDetector(SignalDetector):
         funding_col: Column name for funding rate data.
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
     signal_category: SignalCategory = SignalCategory.PRICE_DIRECTION
     raw_data_type: RawDataType | str = RawDataType.PERPETUAL
 

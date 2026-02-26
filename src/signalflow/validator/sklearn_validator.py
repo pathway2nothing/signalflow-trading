@@ -18,7 +18,7 @@ from typing import Any, ClassVar
 import numpy as np
 import polars as pl
 
-from signalflow.core import Signals, sf_component
+from signalflow.core import Signals, validator
 from signalflow.utils import build_optuna_params, import_model_class
 from signalflow.validator.base import SignalValidator
 
@@ -350,7 +350,7 @@ class SklearnValidatorBase(SignalValidator):
 
 
 @dataclass
-@sf_component(name="validator/lightgbm")
+@validator("validator/lightgbm")
 class LightGBMValidator(SklearnValidatorBase):
     """LightGBM-based signal validator.
 
@@ -423,7 +423,7 @@ class LightGBMValidator(SklearnValidatorBase):
 
 
 @dataclass
-@sf_component(name="validator/xgboost")
+@validator("validator/xgboost")
 class XGBoostValidator(SklearnValidatorBase):
     """XGBoost-based signal validator.
 
@@ -492,7 +492,7 @@ class XGBoostValidator(SklearnValidatorBase):
 
 
 @dataclass
-@sf_component(name="validator/random_forest")
+@validator("validator/random_forest")
 class RandomForestValidator(SklearnValidatorBase):
     """Random Forest-based signal validator.
 
@@ -541,7 +541,7 @@ class RandomForestValidator(SklearnValidatorBase):
 
 
 @dataclass
-@sf_component(name="validator/logistic_regression")
+@validator("validator/logistic_regression")
 class LogisticRegressionValidator(SklearnValidatorBase):
     """Logistic Regression-based signal validator.
 
@@ -586,7 +586,7 @@ class LogisticRegressionValidator(SklearnValidatorBase):
 
 
 @dataclass
-@sf_component(name="validator/svm")
+@validator("validator/svm")
 class SVMValidator(SklearnValidatorBase):
     """Support Vector Machine-based signal validator.
 
@@ -638,7 +638,7 @@ AUTO_SELECT_VALIDATORS = [
 
 
 @dataclass
-@sf_component(name="validator/auto")
+@validator("validator/auto")
 class AutoSelectValidator(SklearnValidatorBase):
     """Auto-selecting signal validator.
 

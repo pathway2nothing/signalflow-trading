@@ -12,13 +12,13 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, sf_component
+from signalflow.core import RawDataView, Signals, detector
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="structure_detector")
+@detector("structure_detector")
 class StructureDetector(SignalDetector):
     """Detects local price structure (tops/bottoms) in real-time.
 

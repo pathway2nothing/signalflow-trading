@@ -5,7 +5,7 @@ import numpy as np
 import polars as pl
 from numba import njit, prange
 
-from signalflow.core import SignalType, sf_component
+from signalflow.core import SignalType, labeler
 from signalflow.target.base import Labeler
 
 
@@ -49,7 +49,7 @@ def _find_first_hit_static(
 
 
 @dataclass
-@sf_component(name="take_profit")
+@labeler("take_profit")
 class TakeProfitLabeler(Labeler):
     """First-touch labeling with symmetric fixed-percentage barriers.
 

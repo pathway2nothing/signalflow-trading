@@ -10,7 +10,7 @@ import pandas as pd
 import polars as pl
 from loguru import logger
 
-from signalflow.core import RawData, SfComponentType, sf_component
+from signalflow.core import RawData, SfComponentType, data_store
 from signalflow.core.registry import default_registry
 from signalflow.data.raw_store._schema import (
     CORE_COLUMNS,
@@ -41,7 +41,7 @@ _SQL_TYPES: dict[str, str] = {
 
 
 @dataclass
-@sf_component(name="sqlite/spot")
+@data_store("sqlite/spot")
 class SqliteRawStore(RawDataStore):
     """SQLite storage backend for raw market data.
 

@@ -5,19 +5,18 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import ClassVar
 
 from signalflow.core.containers.order import Order, OrderFill
 from signalflow.core.containers.position import Position
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-from signalflow.core.decorators import sf_component
-from signalflow.core.enums import PositionType, SfComponentType
+from signalflow.core import executor
+from signalflow.core.enums import PositionType
 from signalflow.strategy.broker.base import Broker
 
 
 @dataclass
-@sf_component(name="backtest", override=True)
+@executor("backtest")
 class BacktestBroker(Broker):
     """
     Broker for backtesting - handles order execution, position management, and state persistence.
@@ -28,8 +27,6 @@ class BacktestBroker(Broker):
         3. Apply fills to positions
         4. Persist state
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_BROKER
 
     def create_position(self, order: Order, fill: OrderFill) -> Position:
         """Create a new position from an order fill."""

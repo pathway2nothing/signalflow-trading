@@ -61,7 +61,7 @@ component registry, data containers, and pipeline patterns.
 
 ## Architecture
 
-All packages share the SignalFlow component registry via the `@sf_component` decorator.
+All packages share the SignalFlow component registry via semantic decorators (e.g., `@sf.detector`, `@sf.feature`, `@sf.entry`, `@sf.exit`).
 This means indicators from signalflow-ta and validators from signalflow-nn are
 automatically discoverable by the core framework:
 

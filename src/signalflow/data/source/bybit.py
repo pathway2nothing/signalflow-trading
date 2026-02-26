@@ -8,7 +8,7 @@ from pathlib import Path
 import aiohttp
 from loguru import logger
 
-from signalflow.core import sf_component
+from signalflow.core import data_source
 from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.source._helpers import (
     TIMEFRAME_MS,
@@ -35,7 +35,7 @@ _BYBIT_INTERVAL_MAP: dict[str, str] = {
 
 
 @dataclass
-@sf_component(name="bybit")
+@data_source("bybit")
 class BybitClient(RawDataSource):
     """Async client for Bybit v5 REST API.
 
@@ -327,7 +327,7 @@ class BybitClient(RawDataSource):
 
 
 @dataclass
-@sf_component(name="bybit/spot")
+@data_source("bybit/spot")
 class BybitSpotLoader(RawDataLoader):
     """Downloads and stores Bybit spot OHLCV data.
 
@@ -474,7 +474,7 @@ class BybitSpotLoader(RawDataLoader):
 
 
 @dataclass
-@sf_component(name="bybit/futures")
+@data_source("bybit/futures")
 class BybitFuturesLoader(RawDataLoader):
     """Downloads and stores Bybit futures OHLCV data.
 
@@ -626,7 +626,7 @@ class BybitFuturesLoader(RawDataLoader):
 
 
 @dataclass
-@sf_component(name="bybit/futures-inverse")
+@data_source("bybit/futures-inverse")
 class BybitFuturesInverseLoader(RawDataLoader):
     """Downloads and stores Bybit inverse (coin-margined) perpetual OHLCV data.
 

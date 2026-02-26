@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 import numpy as np
 import polars as pl
 
-from signalflow.core import sf_component
+from signalflow.core import feature
 from signalflow.feature.base import Feature, GlobalFeature
 
 
@@ -30,7 +30,7 @@ def _normalize_zscore(values: np.ndarray, window: int) -> np.ndarray:
 
 
 @dataclass
-@sf_component(name="example/rsi")
+@feature("example/rsi")
 class ExampleRsiFeature(Feature):
     """Relative Strength Index.
 
@@ -93,7 +93,7 @@ class ExampleRsiFeature(Feature):
 
 
 @dataclass
-@sf_component(name="example/sma")
+@feature("example/sma")
 class ExampleSmaFeature(Feature):
     """Simple Moving Average."""
 
@@ -134,7 +134,7 @@ class ExampleSmaFeature(Feature):
 
 
 @dataclass
-@sf_component(name="example/global_rsi")
+@feature("example/global_rsi")
 class ExampleGlobalMeanRsiFeature(GlobalFeature):
     """Mean RSI across all pairs per timestamp.
 

@@ -4,13 +4,13 @@ from dataclasses import dataclass, field
 
 import polars as pl
 
-from signalflow.core import Order, Signals, SignalType, StrategyState, sf_component
+from signalflow.core import Order, Signals, SignalType, StrategyState, entry
 from signalflow.core.signal_registry import DIRECTIONAL_SIGNAL_MAP
 from signalflow.strategy.component.base import EntryRule
 
 
 @dataclass
-@sf_component(name="fixed_size_entry")
+@entry("fixed_size_entry")
 class FixedSizeEntryRule(EntryRule):
     """Simple entry rule with fixed position size.
 

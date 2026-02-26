@@ -5,11 +5,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from signalflow.analytic.base import StrategyMetric
-from signalflow.core import StrategyState, sf_component
+from signalflow.core import StrategyState, strategy_metric
 
 
 @dataclass
-@sf_component(name="total_return", override=True)
+@strategy_metric("total_return")
 class TotalReturnMetric(StrategyMetric):
     """Computes total return metrics for the portfolio."""
 
@@ -38,7 +38,7 @@ class TotalReturnMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="balance_allocation", override=True)
+@strategy_metric("balance_allocation")
 class BalanceAllocationMetric(StrategyMetric):
     initial_capital: float = 10000.0
 
@@ -60,7 +60,7 @@ class BalanceAllocationMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="drawdown", override=True)
+@strategy_metric("drawdown")
 class DrawdownMetric(StrategyMetric):
     _peak_equity: float = 0.0
     _max_drawdown: float = 0.0
@@ -90,7 +90,7 @@ class DrawdownMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="win_rate", override=True)
+@strategy_metric("win_rate")
 class WinRateMetric(StrategyMetric):
     def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
         closed_positions = [p for p in state.portfolio.positions.values() if p.is_closed]
@@ -107,7 +107,7 @@ class WinRateMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="sharpe_ratio", override=True)
+@strategy_metric("sharpe_ratio")
 class SharpeRatioMetric(StrategyMetric):
     initial_capital: float = 10000.0
     window_size: int = 100

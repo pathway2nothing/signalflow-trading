@@ -12,13 +12,13 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, sf_component
+from signalflow.core import RawDataView, Signals, detector
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="volatility_detector")
+@detector("volatility_detector")
 class VolatilityDetector(SignalDetector):
     """Detects volatility regime shifts in real-time (backward-looking only).
 

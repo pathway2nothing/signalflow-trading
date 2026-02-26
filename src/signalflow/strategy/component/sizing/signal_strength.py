@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from signalflow.core import sf_component
+from signalflow.core import entry
 from signalflow.strategy.component.sizing.base import PositionSizer, SignalContext
 
 if TYPE_CHECKING:
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-@sf_component(name="signal_strength_sizer")
+@entry("signal_strength_sizer")
 class SignalStrengthSizer(PositionSizer):
     """Size proportional to signal probability/strength.
 

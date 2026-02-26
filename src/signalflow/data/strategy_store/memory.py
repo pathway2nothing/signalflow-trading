@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 
-from signalflow.core import Position, StrategyState, Trade, sf_component
+from signalflow.core import Position, StrategyState, Trade, strategy_store
 from signalflow.data.strategy_store._serialization import (
     state_from_json as _state_from_json,
 )
@@ -13,7 +13,7 @@ from signalflow.data.strategy_store._serialization import (
 from signalflow.data.strategy_store.base import StrategyStore
 
 
-@sf_component(name="memory/strategy")
+@strategy_store("memory/strategy")
 class InMemoryStrategyStore(StrategyStore):
     """In-memory implementation of strategy persistence.
 

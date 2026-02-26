@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from signalflow.analytic.base import StrategyMetric
-from signalflow.core import StrategyState, sf_component
+from signalflow.core import StrategyState, strategy_metric
 
 
 @dataclass
-@sf_component(name="portfolio_exposure", override=True)
+@strategy_metric("portfolio_exposure")
 class PortfolioExposureMetric(StrategyMetric):
     """Track portfolio exposure, leverage, and concentration per bar.
 
@@ -38,7 +38,7 @@ class PortfolioExposureMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="portfolio_pnl_breakdown", override=True)
+@strategy_metric("portfolio_pnl_breakdown")
 class PortfolioPnLBreakdownMetric(StrategyMetric):
     """Per-pair PnL breakdown for multi-asset strategies.
 

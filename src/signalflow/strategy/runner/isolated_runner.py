@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 from joblib import Parallel, delayed
@@ -14,8 +14,7 @@ from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-from signalflow.core.decorators import sf_component
-from signalflow.core.enums import SfComponentType
+import signalflow as sf
 from signalflow.strategy.component.base import EntryRule, ExitRule
 from signalflow.strategy.runner.base import StrategyRunner
 
@@ -249,7 +248,7 @@ def _run_pair_backtest(
 
 
 @dataclass
-@sf_component(name="runner/isolated", override=True)
+@sf.executor("runner/isolated")
 class IsolatedBalanceRunner(StrategyRunner):
     """Parallel backtest runner with isolated balance per pair.
 
@@ -271,8 +270,6 @@ class IsolatedBalanceRunner(StrategyRunner):
         fee_rate: Trading fee rate
         show_progress: Show progress bar
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_RUNNER
 
     strategy_id: str = "isolated_backtest"
     broker: Any = None

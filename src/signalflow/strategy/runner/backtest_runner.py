@@ -9,15 +9,15 @@ from typing import Any
 import polars as pl
 
 from signalflow.analytic import StrategyMetric
-from signalflow.core import SfComponentType, Signals, StrategyState, sf_component
+import signalflow as sf
+from signalflow.core import Signals, StrategyState
 from signalflow.strategy.component.base import EntryRule
 from signalflow.strategy.runner.base import StrategyRunner
 
 
 @dataclass
-@sf_component(name="backtest", override=True)
+@sf.executor("backtest")
 class BacktestRunner(StrategyRunner):
-    component_type = SfComponentType.STRATEGY_RUNNER
     strategy_id: str = "backtest"
     broker: Any = None
     entry_rules: list[EntryRule] = field(default_factory=list)

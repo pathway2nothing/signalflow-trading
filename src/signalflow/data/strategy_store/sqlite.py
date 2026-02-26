@@ -4,7 +4,7 @@ import sqlite3
 from collections.abc import Iterable
 from datetime import datetime
 
-from signalflow.core import Position, StrategyState, Trade, sf_component
+from signalflow.core import Position, StrategyState, Trade, strategy_store
 from signalflow.data.strategy_store._serialization import state_from_json as _state_from_json
 from signalflow.data.strategy_store._serialization import to_json as _to_json
 from signalflow.data.strategy_store.base import StrategyStore
@@ -23,7 +23,7 @@ sqlite3.register_adapter(datetime, _adapt_datetime)
 sqlite3.register_converter("TIMESTAMP", _convert_datetime)
 
 
-@sf_component(name="sqlite/strategy")
+@strategy_store("sqlite/strategy")
 class SqliteStrategyStore(StrategyStore):
     """SQLite implementation of strategy persistence. Zero extra deps."""
 

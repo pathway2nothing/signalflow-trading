@@ -18,7 +18,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import sf_component
+from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
 from signalflow.target.base import Labeler
 
@@ -26,7 +26,7 @@ from signalflow.target.base import Labeler
 
 
 @dataclass
-@sf_component(name="structure")
+@labeler("structure")
 class StructureLabeler(Labeler):
     """Label local tops and bottoms using a symmetric window.
 
@@ -251,7 +251,7 @@ class StructureLabeler(Labeler):
 
 
 @dataclass
-@sf_component(name="zigzag_structure")
+@labeler("zigzag_structure")
 class ZigzagStructureLabeler(Labeler):
     """Label local tops and bottoms using a full-series zigzag algorithm.
 

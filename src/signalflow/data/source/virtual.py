@@ -10,7 +10,7 @@ from typing import Any
 
 from loguru import logger
 
-from signalflow.core.decorators import sf_component
+from signalflow.core import data_source
 from signalflow.data.source.base import RawDataLoader
 
 _TIMEFRAME_MINUTES: dict[str, int] = {
@@ -178,7 +178,7 @@ def generate_crossover_data(
 
 
 @dataclass
-@sf_component(name="virtual/spot")
+@data_source("virtual/spot")
 class VirtualDataProvider(RawDataLoader):
     """Generates and streams synthetic OHLCV data into a store.
 

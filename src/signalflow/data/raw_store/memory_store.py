@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 import polars as pl
 
-from signalflow.core import SfComponentType, sf_component
+from signalflow.core import SfComponentType, data_store
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.registry import default_registry
 from signalflow.data.raw_store._schema import polars_schema, resolve_columns
@@ -15,7 +15,7 @@ from signalflow.data.raw_store.base import RawDataStore
 
 
 @dataclass
-@sf_component(name="memory/spot")
+@data_store("memory/spot")
 class InMemoryRawStore(RawDataStore):
     """In-memory storage backend for raw market data.
 

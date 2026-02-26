@@ -8,11 +8,11 @@ from datetime import datetime
 import numpy as np
 
 from signalflow.analytic.base import StrategyMetric
-from signalflow.core import StrategyState, sf_component
+from signalflow.core import StrategyState, strategy_metric
 
 
 @dataclass
-@sf_component(name="sortino_ratio", override=True)
+@strategy_metric("sortino_ratio")
 class SortinoRatioMetric(StrategyMetric):
     """Computes Sortino ratio using only downside volatility."""
 
@@ -55,7 +55,7 @@ class SortinoRatioMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="calmar_ratio", override=True)
+@strategy_metric("calmar_ratio")
 class CalmarRatioMetric(StrategyMetric):
     """Computes Calmar ratio (return / max drawdown)."""
 
@@ -88,7 +88,7 @@ class CalmarRatioMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="profit_factor", override=True)
+@strategy_metric("profit_factor")
 class ProfitFactorMetric(StrategyMetric):
     """Computes profit factor (gross profit / gross loss)."""
 
@@ -116,7 +116,7 @@ class ProfitFactorMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="average_trade", override=True)
+@strategy_metric("average_trade")
 class AverageTradeMetric(StrategyMetric):
     """Computes average profit, loss, and trade duration."""
 
@@ -160,7 +160,7 @@ class AverageTradeMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="expectancy", override=True)
+@strategy_metric("expectancy")
 class ExpectancyMetric(StrategyMetric):
     """Computes trade expectancy (win_rate * avg_win - loss_rate * avg_loss)."""
 
@@ -189,7 +189,7 @@ class ExpectancyMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="risk_reward", override=True)
+@strategy_metric("risk_reward")
 class RiskRewardMetric(StrategyMetric):
     """Computes risk/reward ratio (avg_win / avg_loss)."""
 
@@ -214,7 +214,7 @@ class RiskRewardMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="max_consecutive", override=True)
+@strategy_metric("max_consecutive")
 class MaxConsecutiveMetric(StrategyMetric):
     """Tracks maximum consecutive wins and losses."""
 

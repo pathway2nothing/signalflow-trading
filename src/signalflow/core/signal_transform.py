@@ -75,11 +75,10 @@ class SignalsTransform(Protocol):
     Example:
         ```python
         # Register transform in registry
-        from signalflow.core import sf_component
+        import signalflow as sf
 
-        @sf_component(name="cooldown_filter")
+        @sf.register("cooldown_filter")
         class CooldownFilter:
-            component_type = SfComponentType.SIGNALS_TRANSFORM
             name = "cooldown_filter"
 
             def __init__(self, cooldown_minutes: int = 60):
@@ -122,7 +121,7 @@ class SignalsTransform(Protocol):
 
     See Also:
         Signals: Container class with apply() and pipe() methods.
-        sf_component: Decorator for registering transforms.
+        @sf.register: Generic decorator for registering components.
     """
 
     name: str

@@ -41,7 +41,7 @@ flowchart TB
 
 ## Strategy Metrics
 
-Strategy metrics compute performance indicators during backtesting. All metrics inherit from `StrategyMetric` and are registered via `@sf_component`.
+Strategy metrics compute performance indicators during backtesting. All metrics inherit from `StrategyMetric` and are registered via semantic decorators (e.g., `@sf.metric("name")`).
 
 ### Base Class
 

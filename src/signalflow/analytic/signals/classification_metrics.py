@@ -17,11 +17,11 @@ from sklearn.metrics import (
 )
 
 from signalflow.analytic.base import SignalMetric
-from signalflow.core import RawData, Signals, sf_component
+from signalflow.core import RawData, Signals, signal_metric
 
 
 @dataclass
-@sf_component(name="classification")
+@signal_metric("classification")
 class SignalClassificationMetric(SignalMetric):
     """Analyze signal classification performance against labels.
 

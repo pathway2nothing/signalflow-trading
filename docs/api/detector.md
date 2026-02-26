@@ -55,9 +55,9 @@ All detectors extend SignalDetector with `signal_category=MARKET_WIDE`.
 
 ```
 SignalDetector (signal_category=MARKET_WIDE)
-    ├── AgreementDetector         @sf_component("market/agreement")
-    ├── MarketZScoreDetector      @sf_component("market/zscore")
-    └── MarketCusumDetector       @sf_component("market/cusum")
+    ├── AgreementDetector         @sf.detector("market/agreement")
+    ├── MarketZScoreDetector      @sf.detector("market/zscore")
+    └── MarketCusumDetector       @sf.detector("market/cusum")
 ```
 
 ### Usage

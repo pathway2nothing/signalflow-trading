@@ -420,12 +420,12 @@ Adding a new signal category requires minimal changes:
 
 ```python
 from dataclasses import dataclass
-from signalflow.core import sf_component
+import signalflow as sf
 from signalflow.core.enums import SignalCategory
 from signalflow.target.base import Labeler
 
 @dataclass
-@sf_component(name="my_custom_labeler")
+@sf.labeler("my_custom_labeler")
 class MyLabeler(Labeler):
     signal_category = SignalCategory.MARKET_WIDE  # or any category
 
@@ -444,12 +444,12 @@ class MyLabeler(Labeler):
 
 ```python
 from dataclasses import dataclass, field
-from signalflow.core import sf_component
+import signalflow as sf
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 @dataclass
-@sf_component(name="my_custom_detector")
+@sf.detector("my_custom_detector")
 class MyDetector(SignalDetector):
     signal_category = SignalCategory.MARKET_WIDE
     allowed_signal_types: set[str] | None = field(

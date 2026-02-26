@@ -293,13 +293,13 @@ from datetime import datetime
 from typing import Optional, Iterable
 import polars as pl
 
-from signalflow.core import sf_component, SfComponentType
+import signalflow as sf
 from signalflow.core.containers.raw_data import RawData
 from signalflow.data.raw_store.base import RawDataStore
 
 
 @dataclass
-@sf_component(name="parquet/spot")
+@sf.data_store("parquet/spot")
 class ParquetRawStore(RawDataStore):
     """Parquet file storage backend."""
 

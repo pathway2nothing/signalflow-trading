@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
-from signalflow.core import Order, Position, PositionType, StrategyState, sf_component
+from signalflow.core import Order, Position, PositionType, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
 
 
 @dataclass
-@sf_component(name="trailing_stop")
+@exit("trailing_stop")
 class TrailingStopExit(ExitRule):
     """Trailing stop exit rule.
 

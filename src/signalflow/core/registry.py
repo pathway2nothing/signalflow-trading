@@ -72,7 +72,7 @@ class SignalFlowRegistry:
         Use default_registry singleton for application-wide registration.
 
     See Also:
-        sf_component: Decorator for automatic component registration.
+        Semantic decorators (@sf.detector, @sf.feature, etc.) for automatic registration.
     """
 
     _items: dict[SfComponentType, dict[str, type[Any]]] = field(default_factory=dict)
@@ -103,13 +103,13 @@ class SignalFlowRegistry:
 
         Walks all sub-modules of the ``signalflow`` package using
         :func:`pkgutil.walk_packages` and imports them.  Because
-        :func:`sf_component` registers classes at import time, importing
+        semantic decorators register classes at import time, importing
         a module is sufficient to populate the registry.
 
         External packages can expose components via the
         ``signalflow.components`` entry-point group.  Each entry-point
         should reference a module (not a callable); importing it triggers
-        registration through the ``@sf_component`` decorator.
+        registration through semantic decorators.
 
         This method is idempotent - subsequent calls are no-ops once
         ``_discovered`` is ``True``.
@@ -121,7 +121,7 @@ class SignalFlowRegistry:
             # Explicit discovery (normally automatic on first get/list)
             default_registry.autodiscover()
 
-            # All @sf_component-decorated classes are now registered
+            # All decorated classes are now registered
             print(default_registry.snapshot())
             ```
         """

@@ -6,12 +6,12 @@ import numpy as np
 import polars as pl
 from sklearn.linear_model import Ridge
 
-from signalflow import sf_component
+from signalflow.core import feature
 from signalflow.feature.base import Feature
 
 
 @dataclass
-@sf_component(name="forecast/linreg", override=True)
+@feature("forecast/linreg")
 class LinRegForecastFeature(Feature):
     """Enhanced linear regression forecast with trend and mean-reversion features.
 

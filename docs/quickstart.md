@@ -499,10 +499,11 @@ print(f"Trades: {len(runner.trades)}, Final capital: ${state.capital:.2f}")
 Register and discover components dynamically:
 
 ```python
-from signalflow.core import sf_component, default_registry, SfComponentType
+import signalflow as sf
+from signalflow.core import default_registry, SfComponentType
 from signalflow.detector import SignalDetector
 
-@sf_component(name="my_detector")
+@sf.detector("my_detector")
 class MyCustomDetector(SignalDetector):
     def detect(self, features, context=None):
         # Your signal detection logic

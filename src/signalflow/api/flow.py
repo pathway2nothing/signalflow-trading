@@ -34,10 +34,9 @@ from signalflow.api.exceptions import (
 )
 from signalflow.core import (
     RawData,
-    SfComponentType,
     Signals,
     default_registry,
-    sf_component,
+    strategy_metric,
 )
 
 if TYPE_CHECKING:
@@ -2112,61 +2111,55 @@ def flow(strategy_id: str = "flow") -> FlowBuilder:
 
 # Metric node classes
 @dataclass
-@sf_component(name="flow_feature_metrics")
+@strategy_metric("flow_feature_metrics")
 class FeatureMetrics:
     """Metric node for feature analysis: correlation, importance, distribution."""
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_correlation: bool = True
     include_importance: bool = True
 
 
 @dataclass
-@sf_component(name="flow_signal_metrics")
+@strategy_metric("flow_signal_metrics")
 class SignalMetrics:
     """Metric node for signal analysis: frequency, clustering, timing."""
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_frequency: bool = True
     include_clustering: bool = True
 
 
 @dataclass
-@sf_component(name="flow_label_metrics")
+@strategy_metric("flow_label_metrics")
 class LabelMetrics:
     """Metric node for label analysis: win rate distribution, holding time."""
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_distribution: bool = True
     include_holding_time: bool = True
 
 
 @dataclass
-@sf_component(name="flow_validation_metrics")
+@strategy_metric("flow_validation_metrics")
 class ValidationMetrics:
     """Metric node for validation analysis: confusion matrix, feature importance."""
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_confusion_matrix: bool = True
     include_feature_importance: bool = True
 
 
 @dataclass
-@sf_component(name="flow_backtest_metrics")
+@strategy_metric("flow_backtest_metrics")
 class BacktestMetrics:
     """Metric node for full backtest analysis: equity curve, drawdown, Sharpe."""
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_equity_curve: bool = True
     include_drawdown: bool = True
 
 
 @dataclass
-@sf_component(name="flow_live_metrics")
+@strategy_metric("flow_live_metrics")
 class LiveMetrics:
     """Metric node for live trading analysis: latency, fill rate, slippage."""
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
     include_latency: bool = True
     include_slippage: bool = True
 

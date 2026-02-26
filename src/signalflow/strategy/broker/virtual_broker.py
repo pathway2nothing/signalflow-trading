@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 from loguru import logger
@@ -12,8 +12,7 @@ from loguru import logger
 from signalflow.core.containers.order import Order, OrderFill
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-from signalflow.core.decorators import sf_component
-from signalflow.core.enums import SfComponentType
+import signalflow as sf
 from signalflow.strategy.broker.backtest import BacktestBroker
 
 if TYPE_CHECKING:
@@ -21,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-@sf_component(name="virtual/realtime", override=True)
+@sf.executor("virtual/realtime")
 class VirtualRealtimeBroker(BacktestBroker):
     """Broker for paper trading with structured order/fill logging.
 
@@ -42,8 +41,6 @@ class VirtualRealtimeBroker(BacktestBroker):
         )
         runner = RealtimeRunner(broker=broker, ...)
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_BROKER
 
     risk_manager: RiskManager | None = None
 

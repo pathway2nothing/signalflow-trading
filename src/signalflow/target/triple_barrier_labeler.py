@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 from numba import njit, prange
 
-from signalflow.core import SignalType, sf_component
+from signalflow.core import SignalType, labeler
 from signalflow.target.base import Labeler
 
 
@@ -45,7 +45,7 @@ def _find_first_hit(
 
 
 @dataclass
-@sf_component(name="triple_barrier")
+@labeler("triple_barrier")
 class TripleBarrierLabeler(Labeler):
     """
     Triple-Barrier Labeling (De Prado), Numba-accelerated.

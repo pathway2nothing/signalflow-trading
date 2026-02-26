@@ -4,13 +4,13 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import Signals, sf_component
+from signalflow.core import Signals, detector
 from signalflow.detector import SignalDetector
 from signalflow.feature import ExampleSmaFeature
 
 
 @dataclass
-@sf_component(name="example/sma_cross")
+@detector("example/sma_cross")
 class ExampleSmaCrossDetector(SignalDetector):
     """SMA crossover signal detector.
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from signalflow.core import sf_component
+from signalflow.core import entry
 from signalflow.strategy.component.sizing.base import PositionSizer, SignalContext
 
 if TYPE_CHECKING:
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-@sf_component(name="volatility_target_sizer")
+@entry("volatility_target_sizer")
 class VolatilityTargetSizer(PositionSizer):
     """Target specific portfolio volatility per position.
 

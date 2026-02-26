@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 
-from signalflow.core import Order, PositionType, Signals, SignalType, sf_component
+from signalflow.core import Order, PositionType, Signals, SignalType, entry, exit
 from signalflow.strategy.component.base import EntryRule, ExitRule
 from signalflow.strategy.model.context import ModelContext
 from signalflow.strategy.model.decision import StrategyAction, StrategyDecision
@@ -53,7 +53,7 @@ def _get_cached_decisions(state: StrategyState) -> list[StrategyDecision] | None
 
 
 @dataclass
-@sf_component(name="model_entry")
+@entry("model_entry")
 class ModelEntryRule(EntryRule):
     """Entry rule that delegates to an external model.
 
@@ -184,7 +184,7 @@ class ModelEntryRule(EntryRule):
 
 
 @dataclass
-@sf_component(name="model_exit")
+@exit("model_exit")
 class ModelExitRule(ExitRule):
     """Exit rule that uses cached model decisions.
 

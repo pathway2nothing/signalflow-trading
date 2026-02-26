@@ -5,12 +5,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import ClassVar
 
 from signalflow.core.containers.order import Order
 from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core.decorators import sf_component
-from signalflow.core.enums import SfComponentType
+import signalflow as sf
 
 
 @dataclass
@@ -21,7 +19,6 @@ class RiskLimit(ABC):
     ``(allowed, reason)`` — identical pattern to ``EntryFilter``.
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_RISK
     enabled: bool = True
 
     @abstractmethod
@@ -37,7 +34,7 @@ class RiskLimit(ABC):
 
 
 @dataclass
-@sf_component(name="risk/max_leverage")
+@sf.risk("risk/max_leverage")
 class MaxLeverageLimit(RiskLimit):
     """Reject orders that would push leverage above a threshold.
 
@@ -75,7 +72,7 @@ class MaxLeverageLimit(RiskLimit):
 
 
 @dataclass
-@sf_component(name="risk/max_positions")
+@sf.risk("risk/max_positions")
 class MaxPositionsLimit(RiskLimit):
     """Reject orders that would exceed the total open position count.
 
@@ -100,7 +97,7 @@ class MaxPositionsLimit(RiskLimit):
 
 
 @dataclass
-@sf_component(name="risk/pair_exposure")
+@sf.risk("risk/pair_exposure")
 class PairExposureLimit(RiskLimit):
     """Limit notional exposure per pair.
 
@@ -140,7 +137,7 @@ class PairExposureLimit(RiskLimit):
 
 
 @dataclass
-@sf_component(name="risk/daily_loss")
+@sf.risk("risk/daily_loss")
 class DailyLossLimit(RiskLimit):
     """Circuit breaker — halt all trading after exceeding daily loss.
 

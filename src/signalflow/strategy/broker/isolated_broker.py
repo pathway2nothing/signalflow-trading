@@ -5,19 +5,18 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import ClassVar
 
 from signalflow.core.containers.order import Order, OrderFill
 from signalflow.core.containers.position import Position
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-from signalflow.core.decorators import sf_component
-from signalflow.core.enums import PositionType, SfComponentType
+from signalflow.core import executor
+from signalflow.core.enums import PositionType
 from signalflow.strategy.broker.base import Broker
 
 
 @dataclass
-@sf_component(name="isolated_backtest", override=True)
+@executor("isolated_backtest")
 class IsolatedBacktestBroker(Broker):
     """Broker variant for isolated balance mode.
 
@@ -30,8 +29,6 @@ class IsolatedBacktestBroker(Broker):
         store: State persistence implementation
         fee_rate: Trading fee rate (e.g., 0.001 = 0.1%)
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_BROKER
 
     pair: str = ""
 

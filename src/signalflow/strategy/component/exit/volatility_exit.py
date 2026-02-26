@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
-from signalflow.core import Order, Position, PositionType, StrategyState, sf_component
+from signalflow.core import Order, Position, PositionType, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
 
 
 @dataclass
-@sf_component(name="volatility_exit")
+@exit("volatility_exit")
 class VolatilityExit(ExitRule):
     """Dynamic TP/SL based on recent volatility (ATR).
 

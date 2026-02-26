@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar
 
 import polars as pl
 
-from signalflow.core import SfComponentType, Signals, sf_component
+from signalflow.core import Signals, entry
 
 _INACTIVE = frozenset({"none"})
 
@@ -36,7 +35,7 @@ class VotingMode(str, Enum):  # noqa: UP042
 
 
 @dataclass
-@sf_component(name="signal_aggregator")
+@entry("signal_aggregator")
 class SignalAggregator:
     """Combine signals from multiple detectors.
 
@@ -59,8 +58,6 @@ class SignalAggregator:
         >>> aggregator = SignalAggregator(voting_mode=VotingMode.META_LABELING)
         >>> combined = aggregator.aggregate([detector_signals, validator_signals])
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_ENTRY_RULE
 
     voting_mode: VotingMode = VotingMode.MAJORITY
     min_agreement: float = 0.5

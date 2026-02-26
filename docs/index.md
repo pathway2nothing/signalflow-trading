@@ -250,12 +250,13 @@ print(f"Trades: {len(runner.trades)}, Final capital: ${state.capital:.2f}")
 Core data processing uses Polars for extreme efficiency on large datasets, with seamless Pandas compatibility for prototyping.
 
 ### :octicons-plug-16: Component Registry
-All components (detectors, validators, features) are registered via `@sf_component` decorator for easy customization:
+All components (detectors, validators, features) are registered via semantic decorators for easy customization:
 
 ```python
-from signalflow.core import sf_component, SignalDetector
+import signalflow as sf
+from signalflow.detector import SignalDetector
 
-@sf_component(name="my_detector")
+@sf.detector("my_detector")
 class CustomDetector(SignalDetector):
     def detect(self, data):
         # Your logic here
@@ -339,7 +340,7 @@ The main library with foundational components:
 - **7 Exchange Sources**: Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT
 - DuckDB, SQLite, and PostgreSQL storage backends
 - Backtesting infrastructure with modular entry/exit rules
-- Component registry system (`@sf_component`)
+- Component registry system (semantic decorators like `@sf.detector`, `@sf.feature`)
 
 ### [signalflow-ta](ecosystem/signalflow-ta.md) (Technical Analysis) :material-chart-bell-curve-cumulative:
 199+ technical indicators across 8 modules:

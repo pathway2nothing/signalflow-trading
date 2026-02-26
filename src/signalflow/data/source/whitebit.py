@@ -8,7 +8,7 @@ from pathlib import Path
 import aiohttp
 from loguru import logger
 
-from signalflow.core import sf_component
+from signalflow.core import data_source
 from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.source._helpers import (
     TIMEFRAME_MS,
@@ -56,7 +56,7 @@ _TIMEFRAME_SECONDS: dict[str, int] = {
 
 
 @dataclass
-@sf_component(name="whitebit")
+@data_source("whitebit")
 class WhitebitClient(RawDataSource):
     """Async client for WhiteBIT REST API.
 
@@ -399,7 +399,7 @@ class WhitebitClient(RawDataSource):
 
 
 @dataclass
-@sf_component(name="whitebit/spot")
+@data_source("whitebit/spot")
 class WhitebitSpotLoader(RawDataLoader):
     """Downloads and stores WhiteBIT spot OHLCV data.
 
@@ -555,7 +555,7 @@ class WhitebitSpotLoader(RawDataLoader):
 
 
 @dataclass
-@sf_component(name="whitebit/futures")
+@data_source("whitebit/futures")
 class WhitebitFuturesLoader(RawDataLoader):
     """Downloads and stores WhiteBIT futures/perpetual OHLCV data.
 

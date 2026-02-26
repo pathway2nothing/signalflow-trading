@@ -10,13 +10,13 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, sf_component
+from signalflow.core import RawDataView, Signals, detector
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="zscore_anomaly_detector")
+@detector("zscore_anomaly_detector")
 class ZScoreAnomalyDetector(SignalDetector):
     """Z-score based anomaly detector on any feature.
 

@@ -63,14 +63,27 @@ class ComponentNotFoundError(SignalFlowError):
         else:
             lines.append("No components registered for this type.")
 
+        # Suggest appropriate semantic decorator
+        decorator_map = {
+            "DETECTOR": "sf.detector",
+            "FEATURE": "sf.feature",
+            "VALIDATOR": "sf.validator",
+            "LABELER": "sf.labeler",
+            "STRATEGY_ENTRY_RULE": "sf.entry",
+            "STRATEGY_EXIT_RULE": "sf.exit",
+            "SIGNAL_METRIC": "sf.signal_metric",
+            "STRATEGY_METRIC": "sf.strategy_metric",
+        }
+        dec = decorator_map.get(self.component_type.name, "sf.register")
+
         lines.extend(
             [
                 "",
-                "To register a custom component, use @sf_component decorator:",
+                "To register a custom component, use semantic decorators:",
                 "",
-                "  from signalflow.core import sf_component, SfComponentType",
+                "  import signalflow as sf",
                 "",
-                f"  @sf_component(SfComponentType.{self.component_type.name}, 'my/{self.name}')",
+                f"  @{dec}('my/{self.name}')",
                 "  class MyComponent:",
                 "      ...",
             ]

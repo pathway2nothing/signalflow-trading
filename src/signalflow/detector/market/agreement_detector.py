@@ -13,14 +13,13 @@ from typing import Any, ClassVar
 import polars as pl
 from loguru import logger
 
-from signalflow.core import RawDataView, Signals
-from signalflow.core.decorators import sf_component
-from signalflow.core.enums import SfComponentType, SignalCategory
+from signalflow.core import RawDataView, Signals, detector
+from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="market_wide/agreement")
+@detector("market_wide/agreement")
 class AgreementDetector(SignalDetector):
     """Detects timestamps where cross-pair return agreement is abnormally high.
 
@@ -64,8 +63,6 @@ class AgreementDetector(SignalDetector):
         signals affect all pairs simultaneously. The signal has a synthetic
         "ALL" pair.
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
 
     signal_category: SignalCategory = SignalCategory.MARKET_WIDE
     allowed_signal_types: set[str] | None = field(default_factory=lambda: {"synchronization"})

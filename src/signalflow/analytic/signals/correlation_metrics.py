@@ -13,11 +13,11 @@ from plotly.subplots import make_subplots
 from scipy import stats
 
 from signalflow.analytic.base import SignalMetric
-from signalflow.core import RawData, Signals, sf_component
+from signalflow.core import RawData, Signals, signal_metric
 
 
 @dataclass
-@sf_component(name="correlation")
+@signal_metric("correlation")
 class SignalCorrelationMetric(SignalMetric):
     """Analyze correlation between signal strength and actual returns.
 
@@ -350,7 +350,7 @@ class SignalCorrelationMetric(SignalMetric):
 
 
 @dataclass
-@sf_component(name="timing")
+@signal_metric("timing")
 class SignalTimingMetric(SignalMetric):
     """Analyze optimal holding period for signals.
 

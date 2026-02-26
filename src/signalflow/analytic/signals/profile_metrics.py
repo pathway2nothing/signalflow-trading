@@ -9,11 +9,11 @@ from loguru import logger
 from plotly.subplots import make_subplots
 
 from signalflow.analytic.base import SignalMetric
-from signalflow.core import RawData, Signals, sf_component
+from signalflow.core import RawData, Signals, signal_metric
 
 
 @dataclass
-@sf_component(name="profile")
+@signal_metric("profile")
 class SignalProfileMetric(SignalMetric):
     """Analyze post-signal price behavior profiles with statistical aggregations.
 

@@ -18,7 +18,7 @@ from signalflow.core.containers.raw_data_view import RawDataView
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-from signalflow.core.decorators import sf_component
+import signalflow as sf
 from signalflow.strategy.component.base import EntryRule, ExitRule
 from signalflow.strategy.runner.base import StrategyRunner
 
@@ -39,7 +39,7 @@ _TIMEFRAME_MINUTES: dict[str, int] = {
 
 
 @dataclass
-@sf_component(name="realtime_runner")
+@sf.executor("realtime_runner")
 class RealtimeRunner(StrategyRunner):
     """Async paper/live trading runner.
 

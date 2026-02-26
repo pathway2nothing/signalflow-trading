@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 
-from signalflow.core import Position, StrategyState, Trade, sf_component
+from signalflow.core import Position, StrategyState, Trade, strategy_store
 from signalflow.data.strategy_store._serialization import state_from_json as _state_from_json
 from signalflow.data.strategy_store._serialization import to_json as _to_json
 from signalflow.data.strategy_store.base import StrategyStore
@@ -19,7 +19,7 @@ except ImportError:
 _PG_MISSING_MSG = "psycopg is required for PostgreSQL stores. Install with: pip install signalflow-trading[postgres]"
 
 
-@sf_component(name="postgres/strategy")
+@strategy_store("postgres/strategy")
 class PgStrategyStore(StrategyStore):
     """PostgreSQL implementation of strategy persistence.
 

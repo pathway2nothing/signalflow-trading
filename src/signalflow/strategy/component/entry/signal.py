@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from signalflow.core import Order, Position, Signals, SignalType, StrategyState, sf_component
+from signalflow.core import Order, Position, Signals, SignalType, StrategyState, entry
 from signalflow.core.signal_registry import DIRECTIONAL_SIGNAL_MAP
 from signalflow.strategy.component.base import EntryRule
 from signalflow.strategy.component.sizing.base import PositionSizer, SignalContext
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-@sf_component(name="signal", override=True)
+@entry("signal")
 class SignalEntryRule(EntryRule):
     """Signal-based entry rule with injectable sizer and filters.
 

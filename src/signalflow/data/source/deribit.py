@@ -8,7 +8,7 @@ from pathlib import Path
 import aiohttp
 from loguru import logger
 
-from signalflow.core import sf_component
+from signalflow.core import data_source
 from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.source._helpers import (
     TIMEFRAME_MS,
@@ -37,7 +37,7 @@ _DERIBIT_INTERVAL_MAP: dict[str, str] = {
 
 
 @dataclass
-@sf_component(name="deribit")
+@data_source("deribit")
 class DeribitClient(RawDataSource):
     """Async client for Deribit REST API (JSON-RPC 2.0).
 
@@ -329,7 +329,7 @@ class DeribitClient(RawDataSource):
 
 
 @dataclass
-@sf_component(name="deribit/futures")
+@data_source("deribit/futures")
 class DeribitFuturesLoader(RawDataLoader):
     """Downloads and stores Deribit futures/perpetual OHLCV data.
 

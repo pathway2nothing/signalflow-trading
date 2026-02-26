@@ -22,12 +22,13 @@ RawDataView → preprocess() → detect() → Signals
 from dataclasses import dataclass
 import polars as pl
 
-from signalflow.core import Signals, sf_component
+import signalflow as sf
+from signalflow.core import Signals
 from signalflow.detector import SignalDetector
 
 
 @dataclass
-@sf_component(name="my/rsi_oversold")
+@sf.detector("my/rsi_oversold")
 class RsiOversoldDetector(SignalDetector):
     """Detect oversold conditions using RSI."""
 
@@ -224,7 +225,7 @@ Detect cross-pair events (all pairs affected simultaneously):
 
 ```python
 @dataclass
-@sf_component(name="my/market_panic")
+@sf.detector("my/market_panic")
 class MarketPanicDetector(SignalDetector):
     signal_category = SignalCategory.MARKET_WIDE
     allowed_signal_types: set[str] | None = field(
@@ -342,13 +343,13 @@ Optional columns:
 
 ## Best Practices
 
-### 1. Use @sf_component decorator
+### 1. Use @sf.detector decorator
 
 Register your detector for serialization:
 
 ```python
 @dataclass
-@sf_component(name="my_namespace/detector_name")
+@sf.detector("my_namespace/detector_name")
 class MyDetector(SignalDetector):
     ...
 ```
@@ -402,14 +403,14 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import polars as pl
-
-from signalflow.core import RawDataView, Signals, sf_component
+import signalflow as sf
+from signalflow.core import RawDataView, Signals
 from signalflow.core.enums import SignalCategory
 from signalflow.detector import SignalDetector
 
 
 @dataclass
-@sf_component(name="technical/bollinger_bands")
+@sf.detector("technical/bollinger_bands")
 class BollingerBandsDetector(SignalDetector):
     """Detect overbought/oversold using Bollinger Bands.
 

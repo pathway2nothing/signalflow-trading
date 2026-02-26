@@ -3,12 +3,12 @@ from typing import ClassVar, Literal
 
 import polars as pl
 
-from signalflow.core import sf_component
+from signalflow.core import feature
 from signalflow.feature.base import Feature
 
 
 @dataclass
-@sf_component(name="atr")
+@feature("atr")
 class ATRFeature(Feature):
     """Average True Range (ATR) feature.
 

@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import sf_component
+from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
 from signalflow.target.base import Labeler
 
@@ -223,7 +223,7 @@ def _trend_scan(
 
 
 @dataclass
-@sf_component(name="trend_scanning")
+@labeler("trend_scanning")
 class TrendScanningLabeler(Labeler):
     """Label bars using De Prado's trend scanning method.
 

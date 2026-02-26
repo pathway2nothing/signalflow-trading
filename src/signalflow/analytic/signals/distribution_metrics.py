@@ -8,11 +8,11 @@ from loguru import logger
 from plotly.subplots import make_subplots
 
 from signalflow.analytic.base import SignalMetric
-from signalflow.core import RawData, Signals, sf_component
+from signalflow.core import RawData, Signals, signal_metric
 
 
 @dataclass
-@sf_component(name="distribution")
+@signal_metric("distribution")
 class SignalDistributionMetric(SignalMetric):
     """Analyze signal distribution across pairs and time."""
 

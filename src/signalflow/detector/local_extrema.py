@@ -11,13 +11,13 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import Signals, sf_component
+from signalflow.core import Signals, detector
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="local_extrema_detector")
+@detector("local_extrema_detector")
 class LocalExtremaDetector(SignalDetector):
     """Local price extrema detector (tops/bottoms) with confirmation.
 

@@ -8,7 +8,7 @@ from pathlib import Path
 import aiohttp
 from loguru import logger
 
-from signalflow.core import sf_component
+from signalflow.core import data_source
 from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.source._helpers import (
     TIMEFRAME_MS,
@@ -53,7 +53,7 @@ def _to_okx_inst_id(pair: str, suffix: str = "") -> str:
 
 
 @dataclass
-@sf_component(name="okx")
+@data_source("okx")
 class OkxClient(RawDataSource):
     """Async client for OKX v5 REST API.
 
@@ -339,7 +339,7 @@ class OkxClient(RawDataSource):
 
 
 @dataclass
-@sf_component(name="okx/spot")
+@data_source("okx/spot")
 class OkxSpotLoader(RawDataLoader):
     """Downloads and stores OKX spot OHLCV data.
 
@@ -489,7 +489,7 @@ class OkxSpotLoader(RawDataLoader):
 
 
 @dataclass
-@sf_component(name="okx/futures")
+@data_source("okx/futures")
 class OkxFuturesLoader(RawDataLoader):
     """Downloads and stores OKX futures/swap OHLCV data.
 

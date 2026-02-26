@@ -196,30 +196,27 @@ class SfComponentType(StrEnum):
 
     Example:
         ```python
-        from signalflow.core import sf_component
-        from signalflow.core.enums import SfComponentType
+        import signalflow as sf
         from signalflow.detector import SignalDetector
 
-        # Register detector
-        @sf_component(name="my_detector")
+        # Register detector with semantic decorator
+        @sf.detector("my_detector")
         class MyDetector(SignalDetector):
-            component_type = SfComponentType.DETECTOR
             # ... implementation
 
-        # Register extractor
-        @sf_component(name="my_feature")
-        class MyExtractor(FeatureExtractor):
-            component_type = SfComponentType.FEATURE_EXTRACTOR
+        # Register feature
+        @sf.feature("my_feature")
+        class MyFeature(Feature):
             # ... implementation
 
         # Register exit rule
-        @sf_component(name="my_exit")
+        @sf.exit("my_exit")
         class MyExit(ExitRule):
-            component_type = SfComponentType.STRATEGY_EXIT_RULE
             # ... implementation
 
         # Use in registry
         from signalflow.core.registry import default_registry
+        from signalflow.core.enums import SfComponentType
 
         detector = default_registry.create(
             SfComponentType.DETECTOR,

@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
-from signalflow.core import Order, Position, PositionType, StrategyState, sf_component
+from signalflow.core import Order, Position, PositionType, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
 
 
 @dataclass
-@sf_component(name="time_exit")
+@exit("time_exit")
 class TimeBasedExit(ExitRule):
     """Exit positions after a fixed holding period."""
 

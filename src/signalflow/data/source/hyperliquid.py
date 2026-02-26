@@ -8,7 +8,7 @@ from pathlib import Path
 import aiohttp
 from loguru import logger
 
-from signalflow.core import sf_component
+from signalflow.core import data_source
 from signalflow.data.raw_store import DuckDbSpotStore
 from signalflow.data.source._helpers import (
     TIMEFRAME_MS,
@@ -37,7 +37,7 @@ _HYPERLIQUID_INTERVAL_MAP: dict[str, str] = {
 
 
 @dataclass
-@sf_component(name="hyperliquid")
+@data_source("hyperliquid")
 class HyperliquidClient(RawDataSource):
     """Async client for Hyperliquid REST API.
 
@@ -310,7 +310,7 @@ class HyperliquidClient(RawDataSource):
 
 
 @dataclass
-@sf_component(name="hyperliquid/futures")
+@data_source("hyperliquid/futures")
 class HyperliquidFuturesLoader(RawDataLoader):
     """Downloads and stores Hyperliquid perpetual OHLCV data.
 

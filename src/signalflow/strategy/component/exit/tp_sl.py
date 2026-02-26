@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
-from signalflow.core import Order, Position, PositionType, StrategyState, sf_component
+from signalflow.core import Order, Position, PositionType, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
 
 
 @dataclass
-@sf_component(name="tp_sl", override=True)
+@exit("tp_sl")
 class TakeProfitStopLossExit(ExitRule):
     """
     Exit rule based on take-profit and stop-loss levels.

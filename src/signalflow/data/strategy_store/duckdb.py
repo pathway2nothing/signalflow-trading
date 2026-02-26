@@ -6,14 +6,14 @@ from datetime import datetime
 
 import duckdb
 
-from signalflow.core import Position, StrategyState, Trade, sf_component
+from signalflow.core import Position, StrategyState, Trade, strategy_store
 from signalflow.data.strategy_store._serialization import state_from_json as _state_from_json
 from signalflow.data.strategy_store._serialization import to_json as _to_json
 from signalflow.data.strategy_store.base import StrategyStore
 from signalflow.data.strategy_store.schema import SCHEMA_SQL
 
 
-@sf_component(name="duckdb/strategy")
+@strategy_store("duckdb/strategy")
 class DuckDbStrategyStore(StrategyStore):
     """DuckDB implementation of strategy persistence.
 

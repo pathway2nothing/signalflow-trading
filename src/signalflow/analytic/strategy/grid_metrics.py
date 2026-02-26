@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from signalflow.analytic.base import StrategyMetric
-from signalflow.core import PositionType, StrategyState, sf_component
+from signalflow.core import PositionType, StrategyState, strategy_metric
 
 
 @dataclass
-@sf_component(name="grid_metrics", override=True)
+@strategy_metric("grid_metrics")
 class GridMetrics(StrategyMetric):
     """Track grid-specific performance metrics per bar.
 

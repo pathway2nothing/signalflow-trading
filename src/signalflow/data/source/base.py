@@ -1,8 +1,5 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar
-
-from signalflow.core import SfComponentType
 
 
 @dataclass
@@ -27,16 +24,13 @@ class RawDataSource(ABC):  # noqa: B024
         - File sources (CSV, Parquet, etc.)
         - Database connections
 
-    Attributes:
-        component_type (ClassVar[SfComponentType]): Always RAW_DATA_SOURCE for registry.
-
     Example:
         ```python
-        from signalflow.core import sf_component, SfComponentType
+        import signalflow as sf
         from dataclasses import dataclass
 
         @dataclass
-        @sf_component(name="binance_spot")
+        @sf.data_source("binance_spot")
         class BinanceSpotSource(RawDataSource):
             '''Binance Spot API source'''
             api_key: str = ""
@@ -62,9 +56,11 @@ class RawDataSource(ABC):  # noqa: B024
 
     Example:
         ```python
+        import signalflow as sf
+
         # File-based source
         @dataclass
-        @sf_component(name="csv_source")
+        @sf.data_source("csv_source")
         class CsvSource(RawDataSource):
             '''CSV file source'''
             file_path: Path
@@ -75,7 +71,7 @@ class RawDataSource(ABC):  # noqa: B024
 
         # Database source
         @dataclass
-        @sf_component(name="postgres_source")
+        @sf.data_source("postgres_source")
         class PostgresSource(RawDataSource):
             '''PostgreSQL database source'''
             host: str
@@ -91,14 +87,14 @@ class RawDataSource(ABC):  # noqa: B024
     Note:
         Source classes are typically passive configuration containers.
         Active data retrieval is handled by RawDataLoader implementations.
-        Use @sf_component decorator to register sources in the registry.
+        Use @sf.data_source decorator to register sources in the registry.
 
     See Also:
         RawDataLoader: Active component that uses sources to download data.
         RawDataStore: Storage backend for persisting downloaded data.
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.RAW_DATA_SOURCE
+    pass
 
 
 class RawDataLoader(ABC):
@@ -106,7 +102,7 @@ class RawDataLoader(ABC):
 
     Defines the interface for loading market data from sources and
     storing it in persistent storage. Loaders orchestrate the data
-    pipeline: source → transformation → storage.
+    pipeline: source -> transformation -> storage.
 
     Key responsibilities:
         - Download data from sources (download)
@@ -121,16 +117,13 @@ class RawDataLoader(ABC):
         3. Gap filling: Detect and fill missing periods
         4. Validation: Ensure data quality and completeness
 
-    Attributes:
-        component_type (ClassVar[SfComponentType]): Always RAW_DATA_LOADER for registry.
-
     Example:
         ```python
-        from signalflow.core import sf_component, SfComponentType
+        import signalflow as sf
         from signalflow.data.raw_store import DuckDbSpotStore
         from datetime import datetime
 
-        @sf_component(name="binance_spot_loader")
+        @sf.data_source("binance_spot_loader")
         class BinanceSpotLoader(RawDataLoader):
             '''Loads Binance spot data'''
 
@@ -211,7 +204,7 @@ class RawDataLoader(ABC):
         RawDataFactory: Creates RawData from stored data.
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.RAW_DATA_LOADER
+    pass
 
     @abstractmethod
     def download(self, **kwargs):

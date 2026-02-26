@@ -7,13 +7,13 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, sf_component
+from signalflow.core import RawDataView, Signals, detector
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="anomaly_detector")
+@detector("anomaly_detector")
 class AnomalyDetector(SignalDetector):
     """Detects anomalous price movements in real-time (backward-looking only).
 
