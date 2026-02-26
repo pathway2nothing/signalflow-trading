@@ -1393,15 +1393,39 @@ class BacktestBuilder:
         # Default strategy metrics for equity curve & drawdown tracking
         from signalflow.analytic.strategy.main_strategy_metrics import (
             DrawdownMetric,
+            SharpeRatioMetric,
             TotalReturnMetric,
             WinRateMetric,
         )
 
-        metrics = [
+        metrics: list[Any] = [
             TotalReturnMetric(initial_capital=self._capital),
             DrawdownMetric(),
             WinRateMetric(),
+            SharpeRatioMetric(),
         ]
+
+        # Extended metrics for richer analytics
+        try:
+            from signalflow.analytic.strategy.extended_metrics import (
+                CalmarRatioMetric,
+                ExpectancyMetric,
+                MaxConsecutiveMetric,
+                ProfitFactorMetric,
+                RiskRewardMetric,
+                SortinoRatioMetric,
+            )
+
+            metrics.extend([
+                SortinoRatioMetric(),
+                CalmarRatioMetric(),
+                ProfitFactorMetric(),
+                ExpectancyMetric(),
+                RiskRewardMetric(),
+                MaxConsecutiveMetric(),
+            ])
+        except ImportError:
+            pass
 
         return runner_cls(
             strategy_id=self.strategy_id,

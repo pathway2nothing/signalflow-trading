@@ -175,6 +175,76 @@ class FlowConfig:
     fee: float
 
 
+def pair_trades_by_position(
+    trades: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Pair entry/exit trades by ``position_id``.
+
+    Returns:
+        Dict of ``{position_id: {"entries": [...], "exit": {...} | None,
+        "pnl": float | None}}``.
+    """
+    entries_by_pos: dict[str, list[dict[str, Any]]] = {}
+    exits_by_pos: dict[str, dict[str, Any]] = {}
+
+    for t in trades:
+        meta = t.get("meta") or {}
+        pos_id = t.get("position_id")
+        if not pos_id:
+            continue
+        if isinstance(meta, dict) and meta.get("type") == "entry":
+            entries_by_pos.setdefault(pos_id, []).append(t)
+        elif isinstance(meta, dict) and meta.get("type") == "exit":
+            exits_by_pos[pos_id] = t
+
+    result: dict[str, dict[str, Any]] = {}
+    all_pos_ids = set(entries_by_pos.keys()) | set(exits_by_pos.keys())
+    for pos_id in all_pos_ids:
+        entries = entries_by_pos.get(pos_id, [])
+        exit_trade = exits_by_pos.get(pos_id)
+        pnl: float | None = None
+        if entries and exit_trade:
+            entry_notional = sum(e["price"] * e["qty"] for e in entries)
+            entry_fees = sum(e.get("fee", 0) for e in entries)
+            exit_notional = exit_trade["price"] * exit_trade["qty"]
+            exit_fee = exit_trade.get("fee", 0)
+            if entries[0].get("side") == "BUY":
+                pnl = exit_notional - entry_notional - entry_fees - exit_fee
+            else:
+                pnl = entry_notional - exit_notional - entry_fees - exit_fee
+        result[pos_id] = {"entries": entries, "exit": exit_trade, "pnl": pnl}
+    return result
+
+
+def compute_trade_pnl(
+    entries: list[dict[str, Any]], exit_trade: dict[str, Any]
+) -> float:
+    """Compute PnL for a single closed position.
+
+    Args:
+        entries: List of entry trade dicts for this position.
+        exit_trade: The exit trade dict.
+
+    Returns:
+        PnL in quote currency (positive = profit).
+    """
+    entry_notional = sum(e["price"] * e["qty"] for e in entries)
+    entry_fees = sum(e.get("fee", 0) for e in entries)
+    exit_notional = exit_trade["price"] * exit_trade["qty"]
+    exit_fee = exit_trade.get("fee", 0)
+    if entries[0].get("side") == "BUY":
+        return exit_notional - entry_notional - entry_fees - exit_fee
+    return entry_notional - exit_notional - entry_fees - exit_fee
+
+
+def enrich_trades_with_pnl(trades: list[dict[str, Any]]) -> None:
+    """Add ``pnl`` field to exit trades by pairing with entry trades via position_id.
+
+    Mutates the trade dicts in-place.
+    """
+    _enrich_trades_with_pnl(trades)
+
+
 def _enrich_trades_with_pnl(trades: list[dict[str, Any]]) -> None:
     """Add ``pnl`` field to exit trades by pairing with entry trades via position_id."""
     entries_by_pos: dict[str, list[dict[str, Any]]] = {}
@@ -310,6 +380,7 @@ class FlowResult:
     flow_config: FlowConfig | None = None
     execution_time: float = 0.0
     warnings: list[str] | None = None
+    data_warnings: list[dict[str, Any]] | None = None
     data_start: str | None = None
     data_end: str | None = None
     strategy_summary: dict[str, Any] | None = None
@@ -451,6 +522,9 @@ class FlowResult:
 
         if self.warnings:
             result["warnings"] = self.warnings
+
+        if self.data_warnings:
+            result["data_warnings"] = self.data_warnings
 
         if self.strategy_summary:
             result["strategy_summary"] = self.strategy_summary
@@ -1565,6 +1639,189 @@ class FlowBuilder:
         }
 
     # =========================================================================
+    # Public Pipeline Stage Access
+    # =========================================================================
+
+    def resolve_data(self) -> RawData:
+        """Resolve and load data sources.
+
+        Returns:
+            Loaded RawData from configured data sources.
+
+        Raises:
+            MissingDataError: If no data source is configured.
+        """
+        return self._resolve_data()
+
+    def compute_features(self, raw: RawData | None = None) -> pl.DataFrame:
+        """Compute features from all configured pipelines.
+
+        Args:
+            raw: Pre-loaded RawData. If None, resolves from config.
+
+        Returns:
+            DataFrame with computed features.
+
+        Raises:
+            MissingDataError: If no data and raw is None.
+            ConfigurationError: If no feature pipelines configured.
+        """
+        if raw is None:
+            raw = self._resolve_data()
+        if not self._feature_pipelines:
+            raise ConfigurationError("No feature pipelines configured")
+        return self._compute_features(raw)
+
+    def resolve_signals(
+        self, raw: RawData | None = None
+    ) -> tuple[Signals, dict[str, pl.DataFrame]]:
+        """Detect signals from all detectors, capturing preprocessed features.
+
+        Args:
+            raw: Pre-loaded RawData. If None, resolves from config.
+
+        Returns:
+            Tuple of (merged signals, detector feature map).
+        """
+        if raw is None:
+            raw = self._resolve_data()
+        return self._resolve_signals(raw)
+
+    def compute_labels(
+        self,
+        raw: RawData | None = None,
+        signals: Signals | None = None,
+    ) -> pl.DataFrame:
+        """Compute labels from all configured labelers.
+
+        Args:
+            raw: Pre-loaded RawData. If None, resolves from config.
+            signals: Pre-computed signals. If None, resolves from detectors.
+
+        Returns:
+            DataFrame with labels.
+
+        Raises:
+            ConfigurationError: If no labelers configured.
+        """
+        if raw is None:
+            raw = self._resolve_data()
+        if signals is None:
+            signals, _ = self._resolve_signals(raw)
+        if not self._named_labelers:
+            raise ConfigurationError("No labelers configured")
+        return self._compute_labels(raw, signals)
+
+    def build_rules(self) -> tuple[list, list]:
+        """Build entry/exit rule instances from the current configuration.
+
+        Returns:
+            Tuple of (entry_rules, exit_rules).
+        """
+        return self._build_strategy_rules()
+
+    # =========================================================================
+    # Public Config Introspection & Mutation
+    # =========================================================================
+
+    def update_config(
+        self,
+        *,
+        detector: dict[str, Any] | None = None,
+        entry: dict[str, Any] | None = None,
+        exit: dict[str, Any] | None = None,
+    ) -> Self:
+        """Update component parameters after initial configuration.
+
+        Useful for hyperparameter tuning — mutate params without
+        rebuilding the entire builder.
+
+        Args:
+            detector: Dict of {param_name: value} applied to all detectors.
+            entry: Dict of {param_name: value} merged into entry config.
+            exit: Dict of {param_name: value} merged into exit config.
+
+        Returns:
+            Self for method chaining.
+        """
+        if detector:
+            for _name, det in self._named_detectors.items():
+                for k, v in detector.items():
+                    if hasattr(det, k):
+                        setattr(det, k, v)
+
+        if entry and self._entry_config:
+            for k, v in entry.items():
+                if k in self._entry_config:
+                    self._entry_config[k] = v
+
+        if exit and self._exit_config:
+            for k, v in exit.items():
+                if k in self._exit_config:
+                    self._exit_config[k] = v
+
+        return self
+
+    def get_tunable_params(self) -> dict[str, dict[str, Any]]:
+        """Extract tunable parameters with their current values and types.
+
+        Returns:
+            Dict of ``{param_name: {"value": current, "type": "int"|"float",
+            "source": "detector"|"entry"|"exit"}}``.
+        """
+        import dataclasses as _dc
+
+        params: dict[str, dict[str, Any]] = {}
+
+        # Detector params
+        for _name, det in self._named_detectors.items():
+            if _dc.is_dataclass(det):
+                for f in _dc.fields(det):
+                    if f.name.startswith("_") or f.name == "component_type":
+                        continue
+                    val = getattr(det, f.name, None)
+                    if isinstance(val, int) and val > 0:
+                        params[f.name] = {
+                            "value": val,
+                            "type": "int",
+                            "source": "detector",
+                            "low": max(1, val // 2),
+                            "high": val * 2,
+                        }
+                    elif isinstance(val, float) and val > 0:
+                        params[f.name] = {
+                            "value": val,
+                            "type": "float",
+                            "source": "detector",
+                            "low": val * 0.5,
+                            "high": val * 2.0,
+                        }
+
+        # Entry params
+        for k, v in self._entry_config.items():
+            if k.startswith("_"):
+                continue
+            if isinstance(v, int) and v > 0:
+                params[k] = {"value": v, "type": "int", "source": "entry",
+                             "low": max(1, v // 2), "high": v * 2}
+            elif isinstance(v, float) and v > 0:
+                params[k] = {"value": v, "type": "float", "source": "entry",
+                             "low": v * 0.5, "high": v * 2.0}
+
+        # Exit params
+        for k, v in self._exit_config.items():
+            if k.startswith("_"):
+                continue
+            if isinstance(v, int) and v > 0:
+                params[k] = {"value": v, "type": "int", "source": "exit",
+                             "low": max(1, v // 2), "high": v * 2}
+            elif isinstance(v, float) and v > 0:
+                params[k] = {"value": v, "type": "float", "source": "exit",
+                             "low": v * 0.5, "high": v * 2.0}
+
+        return params
+
+    # =========================================================================
     # Private Helpers
     # =========================================================================
 
@@ -1927,5 +2184,9 @@ __all__ = [
     "RunMode",
     "SignalMetrics",
     "ValidationMetrics",
+    # Public utilities
+    "compute_trade_pnl",
+    "enrich_trades_with_pnl",
     "flow",
+    "pair_trades_by_position",
 ]

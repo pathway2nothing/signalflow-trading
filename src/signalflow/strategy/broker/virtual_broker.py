@@ -177,3 +177,84 @@ class VirtualRealtimeBroker(BacktestBroker):
         if not self._equity_curve:
             return pl.DataFrame()
         return pl.DataFrame(self._equity_curve)
+
+    @property
+    def equity_curve(self) -> list[dict[str, Any]]:
+        """Raw equity curve records."""
+        return self._equity_curve
+
+    @property
+    def last_state(self) -> StrategyState | None:
+        """Last known strategy state (from most recent mark_positions)."""
+        return getattr(self, "_last_state", None)
+
+    def get_account_summary(self, initial_capital: float = 10_000.0) -> dict[str, Any]:
+        """Get current account summary.
+
+        Args:
+            initial_capital: Starting capital for PnL calculation.
+
+        Returns:
+            Dict with balance, equity, open_positions, total_pnl, return_pct.
+        """
+        state = self.last_state
+        eq = self._equity_curve
+
+        if state and eq:
+            last = eq[-1]
+            equity = last.get("equity", initial_capital)
+            cash = last.get("cash", initial_capital)
+        elif state:
+            cash = state.portfolio.cash if hasattr(state.portfolio, "cash") else initial_capital
+            equity = cash
+        else:
+            cash = initial_capital
+            equity = initial_capital
+
+        n_open = 0
+        if state and hasattr(state.portfolio, "open_positions"):
+            n_open = len(state.portfolio.open_positions())
+
+        return {
+            "initial_capital": initial_capital,
+            "balance": round(cash, 2),
+            "equity": round(equity, 2),
+            "open_positions": n_open,
+            "total_pnl": round(equity - initial_capital, 2),
+            "return_pct": round((equity - initial_capital) / initial_capital, 4) if initial_capital > 0 else 0,
+        }
+
+    def get_open_positions(self) -> list[dict[str, Any]]:
+        """Get open positions in a serializable format.
+
+        Returns:
+            List of position dicts with pair, side, entry_price, size, pnl.
+        """
+        state = self.last_state
+        if not state or not hasattr(state.portfolio, "open_positions"):
+            return []
+
+        result: list[dict[str, Any]] = []
+        for pos in state.portfolio.open_positions():
+            entry_price = getattr(pos, "entry_price", 0)
+            last_price = getattr(pos, "last_price", entry_price)
+            qty = getattr(pos, "qty", 0)
+
+            from signalflow.core.containers.position import PositionType
+
+            is_long = getattr(pos, "position_type", PositionType.LONG) == PositionType.LONG
+            pnl = (last_price - entry_price) * qty if is_long else (entry_price - last_price) * qty
+            notional = entry_price * qty
+            pnl_pct = pnl / notional if notional > 0 else 0
+
+            result.append({
+                "id": getattr(pos, "id", ""),
+                "pair": getattr(pos, "pair", ""),
+                "side": "long" if is_long else "short",
+                "entry_price": round(entry_price, 6),
+                "size": round(qty, 8),
+                "entry_time": pos.entry_time.isoformat() if getattr(pos, "entry_time", None) else None,
+                "pnl": round(pnl, 4),
+                "pnl_pct": round(pnl_pct, 4),
+            })
+        return result
