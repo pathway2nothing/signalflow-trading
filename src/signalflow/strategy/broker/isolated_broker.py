@@ -6,11 +6,11 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
+from signalflow.core import executor
 from signalflow.core.containers.order import Order, OrderFill
 from signalflow.core.containers.position import Position
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-from signalflow.core import executor
 from signalflow.core.enums import PositionType
 from signalflow.strategy.broker.base import Broker
 

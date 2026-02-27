@@ -344,6 +344,7 @@ class HooksManager:
 
     handlers: dict[HookEvent, list[BaseHookHandler]] = field(default_factory=dict)
     enabled: bool = True
+    _background_tasks: set[asyncio.Task] = field(default_factory=set, repr=False)
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> HooksManager:
@@ -401,7 +402,9 @@ class HooksManager:
         else:
             # Fire and forget
             for task in tasks:
-                asyncio.create_task(task)
+                bg_task = asyncio.create_task(task)
+                self._background_tasks.add(bg_task)
+                bg_task.add_done_callback(self._background_tasks.discard)
             return [True] * len(handlers)
 
     def trigger_sync(self, event: HookEvent, context: dict[str, Any]) -> list[bool]:
@@ -418,7 +421,9 @@ class HooksManager:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 # Schedule as task
-                asyncio.create_task(self.trigger(event, context, wait=False))
+                bg_task = asyncio.create_task(self.trigger(event, context, wait=False))
+                self._background_tasks.add(bg_task)
+                bg_task.add_done_callback(self._background_tasks.discard)
                 return [True]
             else:
                 return loop.run_until_complete(self.trigger(event, context, wait=True))

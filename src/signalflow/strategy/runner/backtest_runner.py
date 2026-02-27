@@ -8,8 +8,8 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.analytic import StrategyMetric
 import signalflow as sf
+from signalflow.analytic import StrategyMetric
 from signalflow.core import Signals, StrategyState
 from signalflow.strategy.component.base import EntryRule
 from signalflow.strategy.runner.base import StrategyRunner

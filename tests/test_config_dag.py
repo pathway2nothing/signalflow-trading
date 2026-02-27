@@ -4,7 +4,7 @@ import warnings
 
 import pytest
 
-from signalflow.config.dag import Edge, FlowDAG, Node, StrategySubgraph
+from signalflow.config.dag import FlowDAG, Node, StrategySubgraph
 
 
 class TestNode:

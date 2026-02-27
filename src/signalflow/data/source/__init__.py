@@ -47,18 +47,11 @@ from signalflow.data.source.binance import (
 from signalflow.data.source.virtual import VirtualDataProvider, generate_crossover_data, generate_ohlcv
 
 __all__ = [
-    # Base classes
-    "RawDataLoader",
-    "RawDataSource",
     # Binance (built-in reference implementation)
     "BinanceClient",
     "BinanceFuturesCoinLoader",
     "BinanceFuturesUsdtLoader",
     "BinanceSpotLoader",
-    # Virtual (testing)
-    "VirtualDataProvider",
-    "generate_crossover_data",
-    "generate_ohlcv",
     # Extended exchanges (lazy imports via __getattr__)
     "BinanceStocksClient",
     "BinanceStocksLoader",
@@ -76,9 +69,16 @@ __all__ = [
     "OkxClient",
     "OkxFuturesLoader",
     "OkxSpotLoader",
+    # Base classes
+    "RawDataLoader",
+    "RawDataSource",
+    # Virtual (testing)
+    "VirtualDataProvider",
     "WhitebitClient",
     "WhitebitFuturesLoader",
     "WhitebitSpotLoader",
+    "generate_crossover_data",
+    "generate_ohlcv",
 ]
 
 
@@ -118,10 +118,10 @@ def __getattr__(name: str):
             module_path = _EXTENDED_EXCHANGES[name]
             module = __import__(module_path, fromlist=[name])
             return getattr(module, name)
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 f"{name} requires signalflow-data package. Install with:\n"
                 f"  pip install git+https://github.com/yourorg/sf-data.git"
-            )
+            ) from err
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -920,8 +920,7 @@ class BacktestBuilder:
         # Infer data_key from actual RawData keys (default "spot" may not exist
         # when data is e.g. "perpetual" from futures stores).
         data_key = "spot"
-        if raw and raw.data:
-            if "spot" not in raw.data:
+        if raw and raw.data and "spot" not in raw.data:
                 data_key = next(iter(raw.data.keys()), "spot")
 
         runner = self._build_runner(

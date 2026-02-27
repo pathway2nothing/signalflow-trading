@@ -243,14 +243,14 @@ class AlertManager:
         """
         results: list[AlertResult] = []
 
-        for alert in self.alerts:
-            if not alert.enabled:
+        for alert_instance in self.alerts:
+            if not alert_instance.enabled:
                 continue
 
             try:
-                result = alert.check(state, signals, ts)
+                result = alert_instance.check(state, signals, ts)
             except Exception:
-                logger.exception(f"Alert check failed: {alert.__class__.__name__}")
+                logger.exception(f"Alert check failed: {alert_instance.__class__.__name__}")
                 continue
 
             if result is not None:

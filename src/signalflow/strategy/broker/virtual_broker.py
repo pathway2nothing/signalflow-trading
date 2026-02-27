@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 from loguru import logger
 
+import signalflow as sf
 from signalflow.core.containers.order import Order, OrderFill
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-import signalflow as sf
 from signalflow.strategy.broker.backtest import BacktestBroker
 
 if TYPE_CHECKING:

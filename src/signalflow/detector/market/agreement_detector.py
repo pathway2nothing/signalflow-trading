@@ -8,7 +8,7 @@ macro event (interest rate decision, regulatory news, etc.).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any
 
 import polars as pl
 from loguru import logger

@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import polars as pl
-import pytest
 
 from signalflow.analytic.stats.base import (
     SimulationConfig,

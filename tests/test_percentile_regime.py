@@ -95,7 +95,7 @@ class TestPercentileRegimeDetector:
             assert required <= set(result.value.columns)
 
     def test_custom_signal_names(self):
-        df = _vol_df(300)
+        _df = _vol_df(300)
         d = PercentileRegimeDetector(
             lookback_window=50,
             signal_high="extreme_vol",

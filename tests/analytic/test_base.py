@@ -68,7 +68,7 @@ class TestSignalMetric:
         """__call__ passes labels to compute and plot."""
         metric = SignalMetric()
         labels = pl.DataFrame({"label": [1, 0, 1]})
-        computed_metrics, plots = metric(sample_raw_data, sample_signals, labels=labels)
+        computed_metrics, _plots = metric(sample_raw_data, sample_signals, labels=labels)
         assert computed_metrics == {}
 
 

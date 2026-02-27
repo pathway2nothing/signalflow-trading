@@ -41,10 +41,10 @@ from signalflow.data.strategy_store.memory import InMemoryStrategyStore
 __all__ = [
     "DuckDbStrategyStore",
     "InMemoryStrategyStore",
-    "StrategyStore",
+    "PgStrategyStore",
     # Extended stores (lazy imports via __getattr__)
     "SqliteStrategyStore",
-    "PgStrategyStore",
+    "StrategyStore",
 ]
 
 
@@ -60,10 +60,10 @@ def __getattr__(name: str):  # type: ignore[misc]
             module_path = _EXTENDED_STORES[name]
             module = __import__(module_path, fromlist=[name])
             return getattr(module, name)
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 f"{name} requires signalflow-data package. Install with:\n"
                 f"  pip install git+https://github.com/yourorg/sf-data.git"
-            )
+            ) from err
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -7,7 +7,7 @@ positive (longs paying shorts) to negative (shorts paying longs).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any
 
 import polars as pl
 

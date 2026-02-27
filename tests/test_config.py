@@ -1,7 +1,6 @@
 """Tests for signalflow.config module."""
 
 import os
-import tempfile
 from pathlib import Path
 
 import pytest

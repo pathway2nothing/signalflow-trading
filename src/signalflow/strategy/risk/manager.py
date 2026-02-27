@@ -8,9 +8,9 @@ from typing import Any
 
 from loguru import logger
 
+import signalflow as sf
 from signalflow.core.containers.order import Order
 from signalflow.core.containers.strategy_state import StrategyState
-import signalflow as sf
 from signalflow.strategy.risk.limits import RiskLimit
 
 

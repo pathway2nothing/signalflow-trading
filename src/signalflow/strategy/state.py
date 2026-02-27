@@ -1075,9 +1075,7 @@ class StateManager:
         """Check if pair is on cooldown."""
         state = await self.backend.get_signal_state()
         cooldown = state.cooldowns.get(pair)
-        if cooldown and datetime.utcnow() < cooldown:
-            return True
-        return False
+        return bool(cooldown and datetime.utcnow() < cooldown)
 
     # Heartbeat
     async def heartbeat(self) -> None:

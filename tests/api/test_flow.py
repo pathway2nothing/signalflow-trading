@@ -1,7 +1,6 @@
 """Tests for FlowBuilder and FlowResult."""
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import polars as pl
@@ -22,7 +21,6 @@ from signalflow.api.flow import (
     flow,
 )
 from signalflow.core import RawData, Signals
-
 
 # ===========================================================================
 # FlowResult Tests
@@ -981,7 +979,6 @@ class TestFlowBuilderAdditional:
 
     def test_filter_raw_data_with_nested_structure(self, sample_raw_data):
         """_filter_raw_data handles nested multi-source structure."""
-        from signalflow.core import RawData
 
         # Create RawData with nested structure
         base = datetime(2024, 1, 1)

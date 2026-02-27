@@ -3,7 +3,6 @@
 from datetime import datetime
 
 from signalflow.core.containers.order import Order
-from signalflow.core.containers.portfolio import Portfolio
 from signalflow.core.containers.position import Position
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.enums import PositionType
@@ -13,7 +12,7 @@ from signalflow.strategy.risk.limits import (
     MaxPositionsLimit,
     PairExposureLimit,
 )
-from signalflow.strategy.risk.manager import RiskCheckResult, RiskManager
+from signalflow.strategy.risk.manager import RiskManager
 
 
 def _state(cash: float = 10000.0, positions: list[Position] | None = None) -> StrategyState:
@@ -82,7 +81,7 @@ class TestMaxLeverageLimit:
     def test_zero_equity_no_orders(self):
         state = _state(cash=0.0)
         limit = MaxLeverageLimit(max_leverage=3.0)
-        ok, reason = limit.check([], state, PRICES, TS)
+        ok, _reason = limit.check([], state, PRICES, TS)
         assert ok
 
 
@@ -93,7 +92,7 @@ class TestMaxPositionsLimit:
     def test_passes_under_limit(self):
         state = _state(positions=[_long()])
         limit = MaxPositionsLimit(max_positions=5)
-        ok, reason = limit.check([_order()], state, PRICES, TS)
+        ok, _reason = limit.check([_order()], state, PRICES, TS)
         assert ok
 
     def test_rejects_over_limit(self):
@@ -121,7 +120,7 @@ class TestPairExposureLimit:
     def test_passes_under_limit(self):
         state = _state(cash=100000.0)
         limit = PairExposureLimit(max_pair_pct=0.25)
-        ok, reason = limit.check([_order(qty=0.1)], state, PRICES, TS)
+        ok, _reason = limit.check([_order(qty=0.1)], state, PRICES, TS)
         assert ok
 
     def test_rejects_over_pair_exposure(self):
@@ -143,7 +142,7 @@ class TestPairExposureLimit:
         state = _state(cash=10000.0, positions=[pos])
         limit = PairExposureLimit(max_pair_pct=0.25)
         # New 2500 entry = total 5000 on 12500 equity => 40% > 25%
-        ok, reason = limit.check([_order(qty=0.05)], state, PRICES, TS)
+        ok, _reason = limit.check([_order(qty=0.05)], state, PRICES, TS)
         assert not ok
 
 

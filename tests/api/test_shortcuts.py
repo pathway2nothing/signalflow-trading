@@ -1,7 +1,6 @@
 """Tests for signalflow.api.shortcuts module."""
 
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import polars as pl

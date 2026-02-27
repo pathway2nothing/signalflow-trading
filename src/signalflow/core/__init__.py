@@ -38,12 +38,12 @@ from signalflow.core.decorators import (
     labeler,
     register,
     risk,
+    # Legacy (deprecated)
+    sf_component,
     signal_metric,
     strategy_metric,
     strategy_store,
     validator,
-    # Legacy (deprecated)
-    sf_component,
 )
 from signalflow.core.enums import (
     DataFrameType,
@@ -64,50 +64,50 @@ from signalflow.core.registry import (
 from signalflow.core.signal_transform import SignalsTransform
 
 __all__ = [
+    # Registry
+    "ComponentInfo",
     # Enums
     "DataFrameType",
     "ExitPriority",
-    "PositionType",
-    "RawDataType",
-    "SfComponentType",
-    "SignalCategory",
-    "SignalType",
     # Containers
     "Order",
     "OrderFill",
     "Portfolio",
     "Position",
+    "PositionType",
     "RawData",
     "RawDataLazy",
+    "RawDataType",
     "RawDataView",
+    "SfComponentType",
+    # Other
+    "SfTorchModuleMixin",
+    "SignalCategory",
+    "SignalFlowRegistry",
+    "SignalType",
     "Signals",
+    "SignalsTransform",
     "StrategyState",
     "Trade",
-    # Registry
-    "ComponentInfo",
-    "SignalFlowRegistry",
-    "default_registry",
-    "get_component",
-    "get_component_info",
     # Semantic decorators (new API)
     "alert",
     "data_source",
     "data_store",
+    "default_registry",
     "detector",
     "entry",
     "executor",
     "exit",
     "feature",
+    "get_component",
+    "get_component_info",
     "labeler",
     "register",
     "risk",
+    # Legacy decorator (deprecated)
+    "sf_component",
     "signal_metric",
     "strategy_metric",
     "strategy_store",
     "validator",
-    # Legacy decorator (deprecated)
-    "sf_component",
-    # Other
-    "SfTorchModuleMixin",
-    "SignalsTransform",
 ]

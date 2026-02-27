@@ -440,23 +440,23 @@ def _infer_component_type(cls: type) -> SfComponentType | None:
 # =============================================================================
 
 __all__ = [
-    # Semantic decorators (new API)
-    "feature",
-    "detector",
-    "validator",
-    "labeler",
-    "entry",
-    "exit",
-    "signal_metric",
-    "strategy_metric",
     "alert",
     "data_source",
     "data_store",
-    "strategy_store",
+    "detector",
+    "entry",
     "executor",
-    "risk",
+    "exit",
+    # Semantic decorators (new API)
+    "feature",
+    "labeler",
     # Generic
     "register",
+    "risk",
     # Legacy (deprecated)
     "sf_component",
+    "signal_metric",
+    "strategy_metric",
+    "strategy_store",
+    "validator",
 ]

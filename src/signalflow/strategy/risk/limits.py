@@ -6,9 +6,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 
+import signalflow as sf
 from signalflow.core.containers.order import Order
 from signalflow.core.containers.strategy_state import StrategyState
-import signalflow as sf
 
 
 @dataclass

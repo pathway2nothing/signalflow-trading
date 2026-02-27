@@ -39,7 +39,7 @@ class ComponentInfo:
     module: str = ""
 
     @classmethod
-    def from_class(cls, component_cls: type[Any]) -> "ComponentInfo":
+    def from_class(cls, component_cls: type[Any]) -> ComponentInfo:
         """Create ComponentInfo by extracting metadata from a class."""
         docstring = (component_cls.__doc__ or "").strip()
         lines = docstring.split("\n")

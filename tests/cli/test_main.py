@@ -1,6 +1,5 @@
 """Tests for signalflow.cli.main module."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,10 +11,6 @@ from signalflow.cli.main import (
     _show_plots,
     cli,
     init,
-    list_all,
-    list_detectors,
-    list_features,
-    list_metrics,
     main,
     run,
     validate,
@@ -154,7 +149,7 @@ detector:
 
         with patch("signalflow.cli.config.BacktestConfig") as mock_cls:
             mock_cls.from_yaml.return_value = mock_config
-            result = runner.invoke(run, [str(config_path), "--quiet"])
+            _result = runner.invoke(run, [str(config_path), "--quiet"])
 
         assert mock_config.show_progress is False
 
@@ -346,7 +341,6 @@ class TestListCommands:
 
     def test_list_all(self, runner):
         """list all shows all component types."""
-        from signalflow.core import SfComponentType
 
         with patch("signalflow.core.default_registry") as mock_reg:
             mock_reg.list.return_value = ["item1", "item2"]
@@ -427,10 +421,12 @@ class TestInitCommand:
 
     def test_init_creates_file(self, runner, tmp_path):
         """init creates sample config file."""
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            with patch("signalflow.cli.config.generate_sample_config") as mock_gen:
-                mock_gen.return_value = "# Sample config\nstrategy_id: sample"
-                result = runner.invoke(init, ["--output", "test.yaml"])
+        with (
+            runner.isolated_filesystem(temp_dir=tmp_path),
+            patch("signalflow.cli.config.generate_sample_config") as mock_gen,
+        ):
+            mock_gen.return_value = "# Sample config\nstrategy_id: sample"
+            result = runner.invoke(init, ["--output", "test.yaml"])
 
         assert result.exit_code == 0
         assert "Created" in result.output
@@ -459,10 +455,12 @@ class TestInitCommand:
 
     def test_init_default_filename(self, runner, tmp_path):
         """init uses default filename."""
-        with runner.isolated_filesystem(temp_dir=tmp_path):
-            with patch("signalflow.cli.config.generate_sample_config") as mock_gen:
-                mock_gen.return_value = "# Sample"
-                result = runner.invoke(init)
+        with (
+            runner.isolated_filesystem(temp_dir=tmp_path),
+            patch("signalflow.cli.config.generate_sample_config") as mock_gen,
+        ):
+            mock_gen.return_value = "# Sample"
+            result = runner.invoke(init)
 
         assert result.exit_code == 0
 

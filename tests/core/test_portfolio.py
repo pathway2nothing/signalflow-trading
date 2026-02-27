@@ -2,9 +2,6 @@
 
 from datetime import datetime
 
-import polars as pl
-import pytest
-
 from signalflow.core.containers.portfolio import Portfolio
 from signalflow.core.containers.position import Position
 from signalflow.core.containers.trade import Trade

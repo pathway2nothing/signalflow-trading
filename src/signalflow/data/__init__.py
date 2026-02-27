@@ -57,12 +57,12 @@ from signalflow.data.store_factory import StoreFactory
 # Auto-import extended exchanges from signalflow-data if available
 # This triggers @data_source decorators to register components
 try:
-    import signalflow.data.source.binance_stocks  # noqa: F401
-    import signalflow.data.source.okx  # noqa: F401
-    import signalflow.data.source.bybit  # noqa: F401
-    import signalflow.data.source.kraken  # noqa: F401
-    import signalflow.data.source.deribit  # noqa: F401
-    import signalflow.data.source.hyperliquid  # noqa: F401
+    import signalflow.data.source.binance_stocks
+    import signalflow.data.source.bybit
+    import signalflow.data.source.deribit
+    import signalflow.data.source.hyperliquid
+    import signalflow.data.source.kraken
+    import signalflow.data.source.okx
     import signalflow.data.source.whitebit  # noqa: F401
 except ImportError:
     # signalflow-data not installed, extended exchanges unavailable

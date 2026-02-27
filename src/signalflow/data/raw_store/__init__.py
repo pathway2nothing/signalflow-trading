@@ -40,12 +40,12 @@ __all__ = [
     "DuckDbSpotStore",
     "InMemoryRawStore",
     "InMemorySpotStore",
+    "PgRawStore",
+    "PgSpotStore",
     "RawDataStore",
     # Extended stores (lazy imports via __getattr__)
     "SqliteRawStore",
     "SqliteSpotStore",
-    "PgRawStore",
-    "PgSpotStore",
 ]
 
 
@@ -63,10 +63,10 @@ def __getattr__(name: str):  # type: ignore[misc]
             module_path = _EXTENDED_STORES[name]
             module = __import__(module_path, fromlist=[name])
             return getattr(module, name)
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 f"{name} requires signalflow-data package. Install with:\n"
                 f"  pip install git+https://github.com/yourorg/sf-data.git"
-            )
+            ) from err
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -9,10 +9,10 @@ from typing import Any
 import polars as pl
 from loguru import logger
 
+from signalflow.core import executor
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core import executor
 from signalflow.strategy.component.base import EntryRule
 from signalflow.strategy.runner.base import StrategyRunner
 

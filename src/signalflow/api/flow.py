@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from threading import Event
-from typing import TYPE_CHECKING, Any, ClassVar, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 import polars as pl
