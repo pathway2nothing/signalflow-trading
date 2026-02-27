@@ -60,6 +60,8 @@ __all__ = [
     "generate_crossover_data",
     "generate_ohlcv",
     # Extended exchanges (lazy imports via __getattr__)
+    "BinanceStocksClient",
+    "BinanceStocksLoader",
     "BybitClient",
     "BybitFuturesInverseLoader",
     "BybitFuturesLoader",
@@ -83,6 +85,9 @@ __all__ = [
 def __getattr__(name: str):
     """Lazy import extended exchanges from signalflow-data if available."""
     _EXTENDED_EXCHANGES = {
+        # Binance Stocks
+        "BinanceStocksClient": "signalflow.data.source.binance_stocks",
+        "BinanceStocksLoader": "signalflow.data.source.binance_stocks",
         # OKX
         "OkxClient": "signalflow.data.source.okx",
         "OkxSpotLoader": "signalflow.data.source.okx",

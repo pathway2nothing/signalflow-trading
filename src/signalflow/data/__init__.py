@@ -57,6 +57,7 @@ from signalflow.data.store_factory import StoreFactory
 # Auto-import extended exchanges from signalflow-data if available
 # This triggers @data_source decorators to register components
 try:
+    import signalflow.data.source.binance_stocks  # noqa: F401
     import signalflow.data.source.okx  # noqa: F401
     import signalflow.data.source.bybit  # noqa: F401
     import signalflow.data.source.kraken  # noqa: F401

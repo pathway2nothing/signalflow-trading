@@ -496,8 +496,7 @@ class BinanceSpotLoader(RawDataLoader):
 
 
 @dataclass
-@data_source("binance/futures")  # Primary registry key (new standard)
-@data_source("binance/futures-usdt")  # Backward compatibility alias
+@data_source("binance/futures")
 class BinanceFuturesUsdtLoader(RawDataLoader):
     """Downloads and stores Binance USDT-M Futures OHLCV data.
 
@@ -653,8 +652,8 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
 
 
 @dataclass
-@data_source("binance/inverse")  # Primary registry key (new standard)
-@data_source("binance/futures-coin")  # Backward compatibility alias
+@dataclass
+@data_source("binance/inverse")
 class BinanceFuturesCoinLoader(RawDataLoader):
     """Downloads and stores Binance COIN-M Futures OHLCV data.
 
