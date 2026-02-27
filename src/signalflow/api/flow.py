@@ -34,6 +34,7 @@ from signalflow.api.exceptions import (
 )
 from signalflow.core import (
     RawData,
+    SfComponentType,
     Signals,
     default_registry,
     strategy_metric,
