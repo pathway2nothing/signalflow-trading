@@ -54,6 +54,19 @@ from signalflow.data.resample import (
 )
 from signalflow.data.store_factory import StoreFactory
 
+# Auto-import extended exchanges from signalflow-data if available
+# This triggers @data_source decorators to register components
+try:
+    import signalflow.data.source.okx  # noqa: F401
+    import signalflow.data.source.bybit  # noqa: F401
+    import signalflow.data.source.kraken  # noqa: F401
+    import signalflow.data.source.deribit  # noqa: F401
+    import signalflow.data.source.hyperliquid  # noqa: F401
+    import signalflow.data.source.whitebit  # noqa: F401
+except ImportError:
+    # signalflow-data not installed, extended exchanges unavailable
+    pass
+
 __all__ = [
     "EXCHANGE_TIMEFRAMES",
     "TIMEFRAME_MINUTES",

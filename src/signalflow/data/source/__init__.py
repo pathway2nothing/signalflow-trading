@@ -3,14 +3,20 @@
 Provides async clients and loaders for downloading historical OHLCV data
 from cryptocurrency exchanges.
 
-Supported Exchanges:
-    - Binance: Spot, USDT-M Futures, COIN-M Futures
+Built-in Exchanges:
+    - Binance: Spot, USDT-M Futures, COIN-M Futures (reference implementation)
+    - Virtual: Synthetic data for testing
+
+Extended Exchanges (via signalflow-data package):
     - Bybit: Spot, Linear Futures, Inverse Futures
     - OKX: Spot, Perpetual Swaps
     - Deribit: Futures/Perpetuals
     - Kraken: Spot, Futures
     - Hyperliquid: Perpetuals (DEX)
     - WhiteBIT: Spot, Futures
+
+Install extended exchanges:
+    pip install git+https://github.com/yourorg/sf-data.git
 
 Base Classes:
     RawDataSource: Abstract base for exchange API clients.
@@ -38,70 +44,79 @@ from signalflow.data.source.binance import (
     BinanceFuturesUsdtLoader,
     BinanceSpotLoader,
 )
-from signalflow.data.source.bybit import (
-    BybitClient,
-    BybitFuturesInverseLoader,
-    BybitFuturesLoader,
-    BybitSpotLoader,
-)
-from signalflow.data.source.deribit import (
-    DeribitClient,
-    DeribitFuturesLoader,
-)
-from signalflow.data.source.hyperliquid import (
-    HyperliquidClient,
-    HyperliquidFuturesLoader,
-)
-from signalflow.data.source.kraken import (
-    KrakenClient,
-    KrakenFuturesLoader,
-    KrakenSpotLoader,
-)
-from signalflow.data.source.okx import (
-    OkxClient,
-    OkxFuturesLoader,
-    OkxSpotLoader,
-)
 from signalflow.data.source.virtual import VirtualDataProvider, generate_crossover_data, generate_ohlcv
-from signalflow.data.source.whitebit import (
-    WhitebitClient,
-    WhitebitFuturesLoader,
-    WhitebitSpotLoader,
-)
 
 __all__ = [
-    # Binance
+    # Base classes
+    "RawDataLoader",
+    "RawDataSource",
+    # Binance (built-in reference implementation)
     "BinanceClient",
     "BinanceFuturesCoinLoader",
     "BinanceFuturesUsdtLoader",
     "BinanceSpotLoader",
-    # Bybit
+    # Virtual (testing)
+    "VirtualDataProvider",
+    "generate_crossover_data",
+    "generate_ohlcv",
+    # Extended exchanges (lazy imports via __getattr__)
     "BybitClient",
     "BybitFuturesInverseLoader",
     "BybitFuturesLoader",
     "BybitSpotLoader",
-    # Deribit
     "DeribitClient",
     "DeribitFuturesLoader",
-    # Hyperliquid
     "HyperliquidClient",
     "HyperliquidFuturesLoader",
-    # Kraken
     "KrakenClient",
     "KrakenFuturesLoader",
     "KrakenSpotLoader",
-    # OKX
     "OkxClient",
     "OkxFuturesLoader",
     "OkxSpotLoader",
-    "RawDataLoader",
-    "RawDataSource",
-    # Virtual
-    "VirtualDataProvider",
-    # WhiteBIT
     "WhitebitClient",
     "WhitebitFuturesLoader",
     "WhitebitSpotLoader",
-    "generate_crossover_data",
-    "generate_ohlcv",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy import extended exchanges from signalflow-data if available."""
+    _EXTENDED_EXCHANGES = {
+        # OKX
+        "OkxClient": "signalflow.data.source.okx",
+        "OkxSpotLoader": "signalflow.data.source.okx",
+        "OkxFuturesLoader": "signalflow.data.source.okx",
+        # Bybit
+        "BybitClient": "signalflow.data.source.bybit",
+        "BybitSpotLoader": "signalflow.data.source.bybit",
+        "BybitFuturesLoader": "signalflow.data.source.bybit",
+        "BybitFuturesInverseLoader": "signalflow.data.source.bybit",
+        # Kraken
+        "KrakenClient": "signalflow.data.source.kraken",
+        "KrakenSpotLoader": "signalflow.data.source.kraken",
+        "KrakenFuturesLoader": "signalflow.data.source.kraken",
+        # Deribit
+        "DeribitClient": "signalflow.data.source.deribit",
+        "DeribitFuturesLoader": "signalflow.data.source.deribit",
+        # Hyperliquid
+        "HyperliquidClient": "signalflow.data.source.hyperliquid",
+        "HyperliquidFuturesLoader": "signalflow.data.source.hyperliquid",
+        # WhiteBIT
+        "WhitebitClient": "signalflow.data.source.whitebit",
+        "WhitebitSpotLoader": "signalflow.data.source.whitebit",
+        "WhitebitFuturesLoader": "signalflow.data.source.whitebit",
+    }
+
+    if name in _EXTENDED_EXCHANGES:
+        try:
+            module_path = _EXTENDED_EXCHANGES[name]
+            module = __import__(module_path, fromlist=[name])
+            return getattr(module, name)
+        except ImportError:
+            raise ImportError(
+                f"{name} requires signalflow-data package. Install with:\n"
+                f"  pip install git+https://github.com/yourorg/sf-data.git"
+            )
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
