@@ -1,22 +1,22 @@
-import duckdb
-import polars as pl
-
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Iterable
-from loguru import logger
-import pandas as pd
 
-from signalflow.core import sf_component, SfComponentType, RawData
+import duckdb
+import pandas as pd
+import polars as pl
+from loguru import logger
+
+from signalflow.core import RawData, SfComponentType, data_store
 from signalflow.core.registry import default_registry
-from signalflow.data.raw_store.base import RawDataStore
 from signalflow.data.raw_store._schema import (
     CORE_COLUMNS,
     normalize_ts,
     polars_schema,
     resolve_columns,
 )
+from signalflow.data.raw_store.base import RawDataStore
 
 # Column name -> DuckDB SQL type.  Anything not listed defaults to DOUBLE.
 _SQL_TYPES: dict[str, str] = {
@@ -27,7 +27,7 @@ _SQL_TYPES: dict[str, str] = {
 
 
 @dataclass
-@sf_component(name="duckdb/spot")
+@data_store("duckdb/spot")
 class DuckDbRawStore(RawDataStore):
     """DuckDB storage backend for raw market data.
 
@@ -85,7 +85,7 @@ class DuckDbRawStore(RawDataStore):
     @property
     def _all_column_names(self) -> list[str]:
         """Full column list including pair and timestamp."""
-        return ["pair", "timestamp"] + self._columns
+        return ["pair", "timestamp", *self._columns]
 
     def _col_sql_type(self, col: str) -> str:
         """SQL type string for a column."""
@@ -159,7 +159,7 @@ class DuckDbRawStore(RawDataStore):
         # Build target table with spot columns (legacy databases are always spot)
         spot_cols = resolve_columns("spot")
         col_defs = ",\n                    ".join(
-            f"{c} {self._col_sql_type(c)}" for c in ["pair", "timestamp"] + spot_cols
+            f"{c} {self._col_sql_type(c)}" for c in ["pair", "timestamp", *spot_cols]
         )
         self._con.execute(f"""
             CREATE TABLE IF NOT EXISTS ohlcv_new (
@@ -221,11 +221,11 @@ class DuckDbRawStore(RawDataStore):
 
     def _kline_to_row(self, pair: str, k: dict) -> tuple:
         """Convert a kline dict to a positional tuple matching table columns."""
-        return (pair, k["timestamp"]) + tuple(k.get(c) for c in self._columns)
+        return (pair, k["timestamp"], *tuple(k.get(c) for c in self._columns))
 
     # ── Queries ───────────────────────────────────────────────────────
 
-    def get_time_bounds(self, pair: str) -> tuple[Optional[datetime], Optional[datetime]]:
+    def get_time_bounds(self, pair: str) -> tuple[datetime | None, datetime | None]:
         """Get earliest and latest timestamps for a pair."""
         result = self._con.execute(
             "SELECT MIN(timestamp), MAX(timestamp) FROM ohlcv WHERE pair = ?",
@@ -255,7 +255,7 @@ class DuckDbRawStore(RawDataStore):
 
         existing_times = {row[0] for row in existing}
         gaps: list[tuple[datetime, datetime]] = []
-        gap_start: Optional[datetime] = None
+        gap_start: datetime | None = None
         current = start
 
         while current <= end:
@@ -278,9 +278,9 @@ class DuckDbRawStore(RawDataStore):
     def load(
         self,
         pair: str,
-        hours: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        hours: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> pl.DataFrame:
         """Load data for a single trading pair."""
         col_list = ", ".join(self._columns)
@@ -313,9 +313,9 @@ class DuckDbRawStore(RawDataStore):
     def load_many(
         self,
         pairs: Iterable[str],
-        hours: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        hours: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> pl.DataFrame:
         """Batch load for multiple pairs."""
         pairs = list(pairs)
@@ -384,7 +384,7 @@ class DuckDbRawStore(RawDataStore):
         pairs: list[str],
         start: datetime,
         end: datetime,
-        data_key: Optional[str] = None,
+        data_key: str | None = None,
     ) -> RawData:
         """Convert store data to RawData container.
 

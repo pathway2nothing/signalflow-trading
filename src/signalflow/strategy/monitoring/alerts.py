@@ -5,14 +5,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, ClassVar
+from typing import Any
 
 from loguru import logger
 
+from signalflow.core import alert
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core.decorators import sf_component
-from signalflow.core.enums import SfComponentType
 
 
 @dataclass
@@ -68,7 +67,7 @@ class Alert(ABC):
 
 
 @dataclass
-@sf_component(name="alert/max_drawdown")
+@alert("alert/max_drawdown")
 class MaxDrawdownAlert(Alert):
     """Alert when drawdown exceeds threshold.
 
@@ -80,7 +79,6 @@ class MaxDrawdownAlert(Alert):
         critical_threshold: Drawdown level for critical alert (e.g. 0.10 = 10%).
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_ALERT
     warning_threshold: float = 0.05
     critical_threshold: float = 0.10
 
@@ -113,7 +111,7 @@ class MaxDrawdownAlert(Alert):
 
 
 @dataclass
-@sf_component(name="alert/no_signals")
+@alert("alert/no_signals")
 class NoSignalsAlert(Alert):
     """Alert when no signals detected for too many bars.
 
@@ -126,7 +124,6 @@ class NoSignalsAlert(Alert):
             before alerting.
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_ALERT
     max_bars_without_signal: int = 100
     _bars_since_signal: int = field(default=0, init=False, repr=False)
 
@@ -155,7 +152,7 @@ class NoSignalsAlert(Alert):
 
 
 @dataclass
-@sf_component(name="alert/stuck_position")
+@alert("alert/stuck_position")
 class StuckPositionAlert(Alert):
     """Alert when positions have been open too long.
 
@@ -166,7 +163,6 @@ class StuckPositionAlert(Alert):
         max_duration: Maximum duration a position should be open.
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_ALERT
     max_duration: timedelta = field(default_factory=lambda: timedelta(days=7))
 
     def check(
@@ -247,14 +243,14 @@ class AlertManager:
         """
         results: list[AlertResult] = []
 
-        for alert in self.alerts:
-            if not alert.enabled:
+        for alert_instance in self.alerts:
+            if not alert_instance.enabled:
                 continue
 
             try:
-                result = alert.check(state, signals, ts)
+                result = alert_instance.check(state, signals, ts)
             except Exception:
-                logger.exception(f"Alert check failed: {alert.__class__.__name__}")
+                logger.exception(f"Alert check failed: {alert_instance.__class__.__name__}")
                 continue
 
             if result is not None:

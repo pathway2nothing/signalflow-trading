@@ -12,13 +12,13 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, sf_component
+from signalflow.core import RawDataView, Signals, detector
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="volatility_detector")
+@detector("volatility_detector")
 class VolatilityDetector(SignalDetector):
     """Detects volatility regime shifts in real-time (backward-looking only).
 
@@ -115,12 +115,12 @@ class VolatilityDetector(SignalDetector):
         # Step 3-5: compute rolling percentile and classify per group
         # Polars doesn't have rolling_quantile with a rank, so we compute via numpy per group
         results = []
-        for pair_name, group in df.group_by(self.pair_col, maintain_order=True):
+        for _pair_name, group in df.group_by(self.pair_col, maintain_order=True):
             vol_arr = group["_realized_vol"].to_numpy().astype(np.float64)
             n = len(vol_arr)
 
-            signal_types = [None] * n
-            probabilities = [None] * n
+            signal_types: list[str | None] = [None] * n
+            probabilities: list[float | None] = [None] * n
 
             for t in range(n):
                 if np.isnan(vol_arr[t]):

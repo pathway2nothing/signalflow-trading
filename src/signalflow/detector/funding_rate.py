@@ -7,23 +7,22 @@ positive (longs paying shorts) to negative (shorts paying longs).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any
 
 import polars as pl
 
 from signalflow.core import (
-    RawDataView,
-    Signals,
-    SfComponentType,
-    SignalCategory,
     RawDataType,
-    sf_component,
+    RawDataView,
+    SignalCategory,
+    Signals,
+    detector,
 )
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="funding/rate_transition")
+@detector("funding/rate_transition")
 class FundingRateDetector(SignalDetector):
     """Detects long entries when funding rate transitions from positive to negative.
 
@@ -43,7 +42,6 @@ class FundingRateDetector(SignalDetector):
         funding_col: Column name for funding rate data.
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.DETECTOR
     signal_category: SignalCategory = SignalCategory.PRICE_DIRECTION
     raw_data_type: RawDataType | str = RawDataType.PERPETUAL
 

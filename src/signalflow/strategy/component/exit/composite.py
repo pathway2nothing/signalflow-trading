@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 
-from signalflow.core import ExitPriority, Order, Position, StrategyState, sf_component
+from signalflow.core import ExitPriority, Order, Position, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
 
 
 @dataclass
-@sf_component(name="composite_exit")
+@exit("composite_exit")
 class CompositeExit(ExitRule):
     """Combines multiple exit rules with configurable priority.
 
@@ -56,7 +56,7 @@ class CompositeExit(ExitRule):
         for rule, priority in sorted(self.rules, key=lambda x: x[1]):
             rule_orders = rule.check_exits(positions, prices, state)
             for order in rule_orders:
-                if order.position_id not in positions_handled:
+                if order.position_id is not None and order.position_id not in positions_handled:
                     # Add composite metadata
                     order.meta["composite_rule"] = rule.__class__.__name__
                     order.meta["composite_priority"] = priority
@@ -75,7 +75,7 @@ class CompositeExit(ExitRule):
             rule_orders = rule.check_exits(positions, prices, state)
             for order in rule_orders:
                 pos_id = order.position_id
-                if pos_id not in position_orders or priority < position_orders[pos_id][1]:
+                if pos_id is not None and (pos_id not in position_orders or priority < position_orders[pos_id][1]):
                     position_orders[pos_id] = (order, priority, rule.__class__.__name__)
 
         # Add composite metadata to final orders
@@ -100,8 +100,9 @@ class CompositeExit(ExitRule):
             rule_orders = rule.check_exits(positions, prices, state)
             exit_set: set[str] = set()
             for order in rule_orders:
-                exit_set.add(order.position_id)
-                order_map[order.position_id] = order
+                if order.position_id is not None:
+                    exit_set.add(order.position_id)
+                    order_map[order.position_id] = order
             exit_sets.append(exit_set)
 
         # Find intersection - positions all rules agree on

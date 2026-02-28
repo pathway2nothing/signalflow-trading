@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
+
 import pandas as pd
 import polars as pl
-from .raw_data import RawData
+
 from signalflow.core.enums import DataFrameType, RawDataType
+
+from .raw_data import RawData
 
 
 @dataclass
@@ -50,7 +53,7 @@ class RawDataView:
     cache_pandas: bool = False
     _pandas_cache: dict[str, pd.DataFrame] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize internal cache if needed."""
         if self._pandas_cache is None:
             self._pandas_cache = {}

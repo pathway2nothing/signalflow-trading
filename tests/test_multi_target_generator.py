@@ -6,14 +6,12 @@ from datetime import datetime, timedelta
 import polars as pl
 import pytest
 
+from signalflow.target.fixed_horizon_labeler import FixedHorizonLabeler
 from signalflow.target.multi_target_generator import (
-    DEFAULT_HORIZONS,
-    DEFAULT_TARGET_TYPES,
     HorizonConfig,
     MultiTargetGenerator,
     TargetType,
 )
-from signalflow.target.fixed_horizon_labeler import FixedHorizonLabeler
 
 
 def _make_ohlcv(n: int = 500, pairs: list[str] | None = None) -> pl.DataFrame:
@@ -84,7 +82,7 @@ class TestMultiTargetGenerator:
         df = _make_ohlcv(300)
         result = gen.generate(df)
         target_cols = [c for c in result.columns if c.startswith("target_")]
-        # 2 horizons × 3 targets = 6 columns
+        # 2 horizons x 3 targets = 6 columns
         assert len(target_cols) == 6
 
     def test_return_magnitude_non_negative(self):

@@ -1,12 +1,12 @@
 """Tests for signalflow.core.containers.raw_data.RawData."""
 
 import warnings
-
-import pytest
-import polars as pl
 from datetime import datetime
 
-from signalflow.core.containers.raw_data import RawData, DataTypeAccessor
+import polars as pl
+import pytest
+
+from signalflow.core.containers.raw_data import DataTypeAccessor, RawData
 
 
 class TestRawDataCreation:

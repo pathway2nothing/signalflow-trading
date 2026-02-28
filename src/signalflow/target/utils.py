@@ -101,7 +101,7 @@ def mask_targets_by_signals(
         return df
 
     # Get all unique timestamps for efficient index lookup
-    all_timestamps = df.select([pair_col, ts_col]).unique().sort([pair_col, ts_col])
+    df.select([pair_col, ts_col]).unique().sort([pair_col, ts_col])
 
     # Process per pair for correct masking
     masked_rows: list[pl.DataFrame] = []

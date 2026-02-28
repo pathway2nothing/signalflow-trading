@@ -31,16 +31,16 @@ Example:
 """
 
 from signalflow.detector.market.agreement_detector import AgreementDetector, GlobalEventDetector
+from signalflow.detector.market.cusum_detector import CusumEventDetector, MarketCusumDetector
 from signalflow.detector.market.zscore_detector import MarketZScoreDetector, ZScoreEventDetector
-from signalflow.detector.market.cusum_detector import MarketCusumDetector, CusumEventDetector
 
 __all__ = [
     # New names
     "AgreementDetector",
-    "MarketZScoreDetector",
-    "MarketCusumDetector",
+    "CusumEventDetector",
     # Backward compatibility aliases
     "GlobalEventDetector",
+    "MarketCusumDetector",
+    "MarketZScoreDetector",
     "ZScoreEventDetector",
-    "CusumEventDetector",
 ]

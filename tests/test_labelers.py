@@ -8,7 +8,6 @@ import pytest
 
 from signalflow.core.containers.signals import Signals
 from signalflow.core.enums import SignalType
-from signalflow.target.base import Labeler
 from signalflow.target.fixed_horizon_labeler import FixedHorizonLabeler
 
 
@@ -44,7 +43,7 @@ def _multi_pair_df(n=20):
 class TestLabelerBaseValidation:
     def test_not_dataframe_raises(self):
         labeler = FixedHorizonLabeler(horizon=5)
-        with pytest.raises(TypeError, match="pl.DataFrame"):
+        with pytest.raises(TypeError, match=r"pl\.DataFrame"):
             labeler.compute("not a df")
 
     def test_missing_pair_col_raises(self):
@@ -143,7 +142,7 @@ class TestFixedHorizonLabeler:
             }
         )
         # Empty group_by never calls compute_group, so "label" column is not produced
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             labeler.compute(empty)
 
     def test_multi_pair(self):

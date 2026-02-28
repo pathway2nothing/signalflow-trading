@@ -17,7 +17,7 @@ integrates directly with `FeaturePipeline` and the component registry.
 pip install signalflow-ta
 ```
 
-Requires `signalflow-trading >= 0.3.5`.
+Requires `signalflow-trading >= 0.5.0`.
 
 ---
 
@@ -108,11 +108,11 @@ Every indicator follows a consistent pattern:
 
 ```python
 from dataclasses import dataclass
-from signalflow.core import sf_component
+import signalflow as sf
 from signalflow.feature.base import Feature
 
 @dataclass
-@sf_component(name="momentum/rsi")
+@sf.feature("momentum/rsi")
 class RsiMom(Feature):
     period: int = 14
 

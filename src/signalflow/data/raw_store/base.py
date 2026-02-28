@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
-
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, ClassVar
-from signalflow.core import SfComponentType
-import polars as pl
+from typing import TYPE_CHECKING, ClassVar
+
 import pandas as pd
+import polars as pl
+
+from signalflow.core import SfComponentType
 
 if TYPE_CHECKING:
     from signalflow.core import RawData
@@ -86,7 +87,7 @@ class RawDataStore(ABC):
 
     @abstractmethod
     def load(
-        self, pair: str, hours: Optional[int] = None, start: Optional[datetime] = None, end: Optional[datetime] = None
+        self, pair: str, hours: int | None = None, start: datetime | None = None, end: datetime | None = None
     ) -> pl.DataFrame:
         """Load data for a single trading pair.
 
@@ -137,9 +138,9 @@ class RawDataStore(ABC):
     def load_many(
         self,
         pairs: list[str],
-        hours: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        hours: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> pl.DataFrame:
         """Load data for multiple trading pairs efficiently.
 
@@ -192,7 +193,7 @@ class RawDataStore(ABC):
 
     @abstractmethod
     def load_many_pandas(
-        self, pairs: list[str], start: Optional[datetime] = None, end: Optional[datetime] = None
+        self, pairs: list[str], start: datetime | None = None, end: datetime | None = None
     ) -> pd.DataFrame:
         """Load data for multiple pairs as Pandas DataFrame.
 
@@ -245,7 +246,7 @@ class RawDataStore(ABC):
         pass
 
     @abstractmethod
-    def get_time_bounds(self, pair: str) -> tuple[Optional[datetime], Optional[datetime]]:
+    def get_time_bounds(self, pair: str) -> tuple[datetime | None, datetime | None]:
         """Return the earliest and latest timestamp for a pair.
 
         Args:
@@ -304,7 +305,7 @@ class RawDataStore(ABC):
         pairs: list[str],
         start: datetime,
         end: datetime,
-        data_key: Optional[str] = None,
+        data_key: str | None = None,
     ) -> "RawData":
         """Convert store data to RawData container.
 

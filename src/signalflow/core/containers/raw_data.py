@@ -1,10 +1,9 @@
 import warnings
-
-import polars as pl
-
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Iterator
+
+import polars as pl
 
 
 class DataTypeAccessor:
@@ -37,7 +36,7 @@ class DataTypeAccessor:
         ```
     """
 
-    __slots__ = ("_sources", "_default", "_data_type")
+    __slots__ = ("_data_type", "_default", "_sources")
 
     def __init__(
         self,
@@ -51,7 +50,7 @@ class DataTypeAccessor:
 
     def __getattr__(self, source: str) -> pl.DataFrame:
         """Access source by attribute: raw.perpetual.binance."""
-        sources = object.__getattribute__(self, "_sources")
+        sources: dict[str, pl.DataFrame] = object.__getattribute__(self, "_sources")
         if source in sources:
             return sources[source]
         data_type = object.__getattribute__(self, "_data_type")
@@ -61,7 +60,8 @@ class DataTypeAccessor:
     @property
     def sources(self) -> list[str]:
         """List available source names."""
-        return list(self._sources.keys())
+        src: dict[str, pl.DataFrame] = object.__getattribute__(self, "_sources")
+        return list(src.keys())
 
     def to_polars(self) -> pl.DataFrame:
         """Return default source DataFrame with warning.
@@ -89,9 +89,10 @@ class DataTypeAccessor:
         )
         return self._sources[source]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple[str, pl.DataFrame]]:
         """Iterate over (source, DataFrame) pairs."""
-        return iter(self._sources.items())
+        src: dict[str, pl.DataFrame] = object.__getattribute__(self, "_sources")
+        return iter(src.items())
 
     def __len__(self) -> int:
         """Return number of sources."""
@@ -336,6 +337,20 @@ class RawData:
         """
         return key in self.data
 
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over data type keys.
+
+        Returns:
+            Iterator[str]: Iterator over dataset names.
+
+        Example:
+            ```python
+            for data_type in raw_data:
+                print(f"Dataset: {data_type}")
+            ```
+        """
+        return iter(self.data)
+
     def keys(self) -> Iterator[str]:
         """Return available dataset keys.
 
@@ -348,7 +363,7 @@ class RawData:
                 print(f"Dataset: {key}")
             ```
         """
-        return self.data.keys()
+        return iter(self.data.keys())
 
     def sources(self, data_type: str) -> list[str]:
         """Return available sources for a data type.
@@ -381,7 +396,7 @@ class RawData:
             return list(value.keys())
         raise TypeError(f"Invalid data structure for '{data_type}'")
 
-    def items(self):
+    def items(self) -> Iterator[tuple[str, pl.DataFrame | dict[str, pl.DataFrame]]]:
         """Return (key, dataset) pairs.
 
         Returns:
@@ -393,9 +408,9 @@ class RawData:
                 print(f"{name}: {df.shape}")
             ```
         """
-        return self.data.items()
+        return iter(self.data.items())
 
-    def values(self):
+    def values(self) -> Iterator[pl.DataFrame | dict[str, pl.DataFrame]]:
         """Return dataset values.
 
         Returns:
@@ -407,4 +422,4 @@ class RawData:
                 print(df.columns)
             ```
         """
-        return self.data.values()
+        return iter(self.data.values())

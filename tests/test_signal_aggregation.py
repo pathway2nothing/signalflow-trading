@@ -5,7 +5,7 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from signalflow.core import SignalType, Signals
+from signalflow.core import Signals, SignalType
 from signalflow.strategy.component.entry.aggregation import SignalAggregator, VotingMode
 
 

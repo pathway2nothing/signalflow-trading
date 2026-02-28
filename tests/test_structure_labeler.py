@@ -88,8 +88,8 @@ class TestStructureLabeler:
         labeler = StructureLabeler(lookforward=30, lookback=30, min_swing_pct=0.01, mask_to_signals=False)
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        has_top = any(l == "local_max" for l in labels)
-        has_bottom = any(l == "local_min" for l in labels)
+        has_top = any(lbl == "local_max" for lbl in labels)
+        has_bottom = any(lbl == "local_min" for lbl in labels)
         assert has_top, "Sine wave should have local tops"
         assert has_bottom, "Sine wave should have local bottoms"
 
@@ -98,7 +98,7 @@ class TestStructureLabeler:
         labeler = StructureLabeler(lookforward=30, lookback=30, min_swing_pct=0.02, mask_to_signals=False)
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        non_null = [l for l in labels if l is not None]
+        non_null = [lbl for lbl in labels if lbl is not None]
         assert len(non_null) == 0, "Flat market should have no structure labels"
 
     def test_labels_are_valid_values(self):
@@ -146,8 +146,8 @@ class TestStructureLabelerZScore:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        has_top = any(l == "local_max" for l in labels)
-        has_bottom = any(l == "local_min" for l in labels)
+        has_top = any(lbl == "local_max" for lbl in labels)
+        has_bottom = any(lbl == "local_min" for lbl in labels)
         assert has_top or has_bottom, "Z-score mode should detect extrema in sine wave"
 
     def test_zscore_flat_no_labels(self):
@@ -161,7 +161,7 @@ class TestStructureLabelerZScore:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        non_null = [l for l in labels if l is not None]
+        non_null = [lbl for lbl in labels if lbl is not None]
         assert len(non_null) == 0
 
     def test_zscore_adapts_to_volatility(self):
@@ -239,11 +239,11 @@ class TestZigzagStructureLabeler:
         labels = result["label"].to_list()
 
         # Extract non-null labels in order
-        pivots = [(i, l) for i, l in enumerate(labels) if l is not None]
+        pivots = [(i, lbl) for i, lbl in enumerate(labels) if lbl is not None]
         assert len(pivots) >= 2, "Should find at least 2 pivots"
 
-        has_top = any(l == "local_max" for _, l in pivots)
-        has_bottom = any(l == "local_min" for _, l in pivots)
+        has_top = any(lbl == "local_max" for _, lbl in pivots)
+        has_bottom = any(lbl == "local_min" for _, lbl in pivots)
         assert has_top and has_bottom
 
         # Verify strict alternation
@@ -258,7 +258,7 @@ class TestZigzagStructureLabeler:
         labeler = ZigzagStructureLabeler(min_swing_pct=0.02, mask_to_signals=False)
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        non_null = [l for l in labels if l is not None]
+        non_null = [lbl for lbl in labels if lbl is not None]
         assert len(non_null) == 0
 
     def test_valid_label_values(self):
@@ -337,8 +337,8 @@ class TestZigzagZScore:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        has_top = any(l == "local_max" for l in labels)
-        has_bottom = any(l == "local_min" for l in labels)
+        has_top = any(lbl == "local_max" for lbl in labels)
+        has_bottom = any(lbl == "local_min" for lbl in labels)
         assert has_top or has_bottom
 
     def test_zscore_alternation(self):
@@ -350,7 +350,7 @@ class TestZigzagZScore:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        pivots = [l for l in labels if l is not None]
+        pivots = [lbl for lbl in labels if lbl is not None]
 
         for j in range(1, len(pivots)):
             assert pivots[j] != pivots[j - 1], "Pivots must alternate in z-score mode"
@@ -364,7 +364,7 @@ class TestZigzagZScore:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        non_null = [l for l in labels if l is not None]
+        non_null = [lbl for lbl in labels if lbl is not None]
         assert len(non_null) == 0
 
     def test_zscore_adapts_to_volatility(self):

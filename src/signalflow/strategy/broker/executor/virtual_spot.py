@@ -1,25 +1,22 @@
 """Virtual executor for backtesting - simulates order fills at current prices."""
 
 from __future__ import annotations
+
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import ClassVar
-import uuid
 
-from signalflow.core.enums import SfComponentType
-from signalflow.core.decorators import sf_component
+from signalflow.core import executor
 
 
 @dataclass
-@sf_component(name="virtual/spot", override=True)
+@executor("virtual/spot")
 class VirtualSpotExecutor:
     """
     Simulates order execution for backtesting.
 
     Fills orders instantly at the provided price with configurable slippage.
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_EXECUTOR
 
     fee_rate: float = 0.001
     slippage_pct: float = 0.0
@@ -48,10 +45,7 @@ class VirtualSpotExecutor:
             if price is None or price <= 0:
                 continue
 
-            if order.side == "BUY":
-                fill_price = price * (1 + self.slippage_pct)
-            else:
-                fill_price = price * (1 - self.slippage_pct)
+            fill_price = price * (1 + self.slippage_pct) if order.side == "BUY" else price * (1 - self.slippage_pct)
 
             notional = fill_price * order.qty
             fee = notional * self.fee_rate

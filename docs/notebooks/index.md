@@ -11,7 +11,7 @@ Covers `sf.Backtest()`, `sf.backtest()`, and `BacktestResult`.
 
 ### [02 - Custom Detector](02_custom_detector.ipynb)
 Create your own signal detector from scratch. Covers the `SignalDetector` base class,
-`@sf_component` registration, multi-detector strategies, and signal aggregation.
+`@sf.detector` registration, multi-detector strategies, and signal aggregation.
 
 ### [03 - Data Loading & Resampling](03_data_loading.ipynb)
 Load market data from DuckDB stores, auto-detect timeframes, resample OHLCV data,

@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import ClassVar, Any
+from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl
 
-from signalflow.core import sf_component
+from signalflow.core import feature
 from signalflow.feature.base import Feature, GlobalFeature
 
 
@@ -30,7 +30,7 @@ def _normalize_zscore(values: np.ndarray, window: int) -> np.ndarray:
 
 
 @dataclass
-@sf_component(name="example/rsi")
+@feature("example/rsi")
 class ExampleRsiFeature(Feature):
     """Relative Strength Index.
 
@@ -48,8 +48,8 @@ class ExampleRsiFeature(Feature):
     period: int = 14
     price_col: str = "close"
 
-    requires = ["{price_col}"]
-    outputs = ["rsi_{period}"]
+    requires: ClassVar[list[str]] = ["{price_col}"]
+    outputs: ClassVar[list[str]] = ["rsi_{period}"]
 
     test_params: ClassVar[list[dict]] = [
         {"period": 14},
@@ -93,15 +93,15 @@ class ExampleRsiFeature(Feature):
 
 
 @dataclass
-@sf_component(name="example/sma")
+@feature("example/sma")
 class ExampleSmaFeature(Feature):
     """Simple Moving Average."""
 
     period: int = 20
     price_col: str = "close"
 
-    requires = ["{price_col}"]
-    outputs = ["sma_{period}"]
+    requires: ClassVar[list[str]] = ["{price_col}"]
+    outputs: ClassVar[list[str]] = ["sma_{period}"]
 
     test_params: ClassVar[list[dict]] = [
         {"period": 20},
@@ -134,7 +134,7 @@ class ExampleSmaFeature(Feature):
 
 
 @dataclass
-@sf_component(name="example/global_rsi")
+@feature("example/global_rsi")
 class ExampleGlobalMeanRsiFeature(GlobalFeature):
     """Mean RSI across all pairs per timestamp.
 
@@ -151,8 +151,8 @@ class ExampleGlobalMeanRsiFeature(GlobalFeature):
     price_col: str = "close"
     add_diff: bool = False
 
-    requires = ["{price_col}"]
-    outputs = ["global_mean_rsi_{period}"]
+    requires: ClassVar[list[str]] = ["{price_col}"]
+    outputs: ClassVar[list[str]] = ["global_mean_rsi_{period}"]
 
     test_params: ClassVar[list[dict]] = [
         {"period": 14},

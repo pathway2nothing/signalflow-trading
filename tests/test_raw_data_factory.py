@@ -2,15 +2,13 @@
 
 from datetime import datetime
 from pathlib import Path
-import tempfile
 
 import polars as pl
 import pytest
 
 from signalflow.core import RawData
 from signalflow.data.raw_data_factory import RawDataFactory
-from signalflow.data.raw_store import DuckDbSpotStore, DuckDbRawStore
-
+from signalflow.data.raw_store import DuckDbRawStore, DuckDbSpotStore
 
 TS = datetime(2024, 1, 1)
 
@@ -52,7 +50,7 @@ class TestRawDataFactoryFromDuckDb:
 
     def test_missing_pair_col_raises(self, tmp_path):
         db_path = tmp_path / "test.duckdb"
-        store = DuckDbSpotStore(db_path)
+        DuckDbSpotStore(db_path)
         klines = [
             {
                 "timestamp": datetime(2024, 1, 1),
@@ -64,7 +62,7 @@ class TestRawDataFactoryFromDuckDb:
             }
         ]
         # Manually create broken data
-        df = pl.DataFrame(klines)
+        pl.DataFrame(klines)
         # This would fail because pair column is missing
         # But we can't easily inject this into DuckDB
         # So just verify the validation logic

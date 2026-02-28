@@ -1,5 +1,4 @@
 # docs/hooks.py
-import os
 import tomllib
 
 
@@ -24,9 +23,7 @@ def define_env(env):
 def on_pre_page_macros(env):
     """Skip macro processing for notebook pages to avoid Jinja syntax conflicts."""
     page = env.page
-    if page and page.file.src_path.endswith(".ipynb"):
-        return False  # Skip macros for notebooks
-    return True
+    return not (page and page.file.src_path.endswith(".ipynb"))
 
 
 def on_post_page_macros(env):

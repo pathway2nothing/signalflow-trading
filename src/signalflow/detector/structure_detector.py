@@ -12,13 +12,13 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, sf_component
+from signalflow.core import RawDataView, Signals, detector
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="structure_detector")
+@detector("structure_detector")
 class StructureDetector(SignalDetector):
     """Detects local price structure (tops/bottoms) in real-time.
 
@@ -104,12 +104,12 @@ class StructureDetector(SignalDetector):
         """
         results = []
 
-        for pair_name, group in features.group_by(self.pair_col, maintain_order=True):
+        for _pair_name, group in features.group_by(self.pair_col, maintain_order=True):
             prices = group[self.price_col].to_numpy().astype(np.float64)
             n = len(prices)
 
-            signal_types = [None] * n
-            probabilities = [None] * n
+            signal_types: list[str | None] = [None] * n
+            probabilities: list[float | None] = [None] * n
 
             # Track last emitted extremum to avoid duplicates
             last_emitted_type = None
@@ -140,23 +140,25 @@ class StructureDetector(SignalDetector):
                 # Check local_max: max in search window, price dropped since
                 if max_val > 0 and p_current < max_val:
                     swing = (max_val - p_current) / max_val
-                    if swing >= self.min_swing_pct:
-                        if last_emitted_type != "local_max" or (t - last_emitted_idx) > self.lookback:
-                            signal_types[t] = "local_max"
-                            probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
-                            last_emitted_type = "local_max"
-                            last_emitted_idx = t
-                            continue
+                    if swing >= self.min_swing_pct and (
+                        last_emitted_type != "local_max" or (t - last_emitted_idx) > self.lookback
+                    ):
+                        signal_types[t] = "local_max"
+                        probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
+                        last_emitted_type = "local_max"
+                        last_emitted_idx = t
+                        continue
 
                 # Check local_min: min in search window, price risen since
                 if min_val > 0 and p_current > min_val:
                     swing = (p_current - min_val) / min_val
-                    if swing >= self.min_swing_pct:
-                        if last_emitted_type != "local_min" or (t - last_emitted_idx) > self.lookback:
-                            signal_types[t] = "local_min"
-                            probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
-                            last_emitted_type = "local_min"
-                            last_emitted_idx = t
+                    if swing >= self.min_swing_pct and (
+                        last_emitted_type != "local_min" or (t - last_emitted_idx) > self.lookback
+                    ):
+                        signal_types[t] = "local_min"
+                        probabilities[t] = min(1.0, swing / (self.min_swing_pct * 3))
+                        last_emitted_type = "local_min"
+                        last_emitted_idx = t
 
             group = group.with_columns(
                 [

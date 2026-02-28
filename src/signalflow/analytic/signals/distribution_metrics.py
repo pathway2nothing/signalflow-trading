@@ -1,18 +1,18 @@
-from typing import Dict, Any, Tuple
 from dataclasses import dataclass
+from typing import Any, cast
 
-import polars as pl
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import polars as pl
 from loguru import logger
+from plotly.subplots import make_subplots
 
-from signalflow.core import sf_component, RawData, Signals
 from signalflow.analytic.base import SignalMetric
+from signalflow.core import RawData, Signals, signal_metric
 
 
 @dataclass
-@sf_component(name="distribution")
+@signal_metric("distribution")
 class SignalDistributionMetric(SignalMetric):
     """Analyze signal distribution across pairs and time."""
 
@@ -27,7 +27,7 @@ class SignalDistributionMetric(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
         """Compute signal distribution metrics."""
 
         signals_df = signals.value
@@ -66,7 +66,7 @@ class SignalDistributionMetric(SignalMetric):
             actual_n_bars = min(self.n_bars, max(3, n_pairs // 5))
 
             if min_count == max_count:
-                bin_edges = [min_count - 0.5, max_count + 0.5]
+                bin_edges = np.array([min_count - 0.5, max_count + 0.5])
                 bin_labels = [f"{min_count}"]
             else:
                 bin_edges = np.linspace(min_count, max_count, actual_n_bars + 1)
@@ -74,10 +74,7 @@ class SignalDistributionMetric(SignalMetric):
                 for i in range(actual_n_bars):
                     lower = int(np.floor(bin_edges[i]))
                     upper = int(np.ceil(bin_edges[i + 1]))
-                    if lower == upper:
-                        label = f"{lower}"
-                    else:
-                        label = f"{lower}–{upper}"
+                    label = f"{lower}" if lower == upper else f"{lower}-{upper}"
                     bin_labels.append(label)
 
             binned = np.digitize(signal_counts, bin_edges[:-1]) - 1
@@ -110,7 +107,7 @@ class SignalDistributionMetric(SignalMetric):
             pl.col("signal_count")
             .rolling_sum(
                 window_size=self.rolling_window_minutes,
-                min_periods=1,
+                min_samples=1,
                 center=False,
             )
             .alias("rolling_sum")
@@ -122,7 +119,7 @@ class SignalDistributionMetric(SignalMetric):
                 pl.col("rolling_sum")
                 .rolling_mean(
                     window_size=ma_window_minutes,
-                    min_periods=1,
+                    min_samples=1,
                     center=True,
                 )
                 .alias("ma")
@@ -140,8 +137,8 @@ class SignalDistributionMetric(SignalMetric):
                 "min_signals_per_pair": min_count,
                 "max_signals_per_pair": max_count,
                 "total_pairs": n_pairs,
-                "mean_rolling_signals": float(mean_rolling) if mean_rolling else 0.0,
-                "max_rolling_signals": int(max_rolling) if max_rolling else 0,
+                "mean_rolling_signals": float(cast(float, mean_rolling)) if mean_rolling else 0.0,
+                "max_rolling_signals": int(cast(int, max_rolling)) if max_rolling else 0,
             },
             "series": {
                 "grouped": grouped_data,
@@ -160,15 +157,15 @@ class SignalDistributionMetric(SignalMetric):
         logger.info(
             f"Distribution computed: {n_pairs} pairs, "
             f"mean {mean_count:.1f} signals/pair, "
-            f"max rolling {max_rolling} signals/{self.rolling_window_minutes}min"
+            f"max rolling {max_rolling!s} signals/{self.rolling_window_minutes}min"
         )
 
         return computed_metrics, plots_context
 
     def plot(
         self,
-        computed_metrics: Dict[str, Any],
-        plots_context: Dict[str, Any],
+        computed_metrics: dict[str, Any] | None,
+        plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
@@ -189,14 +186,11 @@ class SignalDistributionMetric(SignalMetric):
         return fig
 
     @staticmethod
-    def _create_figure(plots_context):
+    def _create_figure(plots_context: dict[str, Any]) -> go.Figure:
         """Create subplot structure."""
         use_histogram = plots_context.get("use_histogram", True)
 
-        if use_histogram:
-            title1 = "Pairs Distribution by Signal Count"
-        else:
-            title1 = "Signal Count per Pair"
+        title1 = "Pairs Distribution by Signal Count" if use_histogram else "Signal Count per Pair"
 
         return make_subplots(
             rows=3,
@@ -212,7 +206,7 @@ class SignalDistributionMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_histogram(fig, metrics, plots_context):
+    def _add_histogram(fig: go.Figure, metrics: dict[str, Any], plots_context: dict[str, Any]) -> None:
         """Add histogram/bar chart of signal distribution."""
         grouped = metrics["series"]["grouped"]
         use_histogram = plots_context.get("use_histogram", True)
@@ -266,7 +260,7 @@ class SignalDistributionMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_sorted_signals(fig, metrics):
+    def _add_sorted_signals(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add sorted signal counts per pair."""
         signals_per_pair = metrics["series"]["signals_per_pair"]
 
@@ -311,7 +305,7 @@ class SignalDistributionMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_rolling_signals(fig, metrics, plots_context):
+    def _add_rolling_signals(fig: go.Figure, metrics: dict[str, Any], plots_context: dict[str, Any]) -> None:
         """Add rolling signal count over time."""
         signals_rolling = metrics["series"]["signals_rolling"]
 
@@ -359,7 +353,7 @@ class SignalDistributionMetric(SignalMetric):
                     col=1,
                 )
 
-    def _update_layout(self, fig, plots_context):
+    def _update_layout(self, fig: go.Figure, plots_context: dict[str, Any]) -> None:
         """Update figure layout and axes."""
         fig.update_yaxes(
             title_text="Signal Count",

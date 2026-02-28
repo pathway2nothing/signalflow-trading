@@ -1,19 +1,23 @@
 from __future__ import annotations
+
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from threading import Event
-from typing import Any, Callable, ClassVar
-from signalflow.core import SfComponentType, StrategyState, Signals, sf_component
-from signalflow.strategy.component.base import EntryRule, ExitRule
-from signalflow.analytic import StrategyMetric
-from signalflow.strategy.runner.base import StrategyRunner
 from datetime import datetime
+from threading import Event
+from typing import Any
+
 import polars as pl
+
+import signalflow as sf
+from signalflow.analytic import StrategyMetric
+from signalflow.core import Signals, StrategyState
+from signalflow.strategy.component.base import EntryRule
+from signalflow.strategy.runner.base import StrategyRunner
 
 
 @dataclass
-@sf_component(name="backtest", override=True)
+@sf.executor("backtest")
 class BacktestRunner(StrategyRunner):
-    component_type = SfComponentType.STRATEGY_RUNNER
     strategy_id: str = "backtest"
     broker: Any = None
     entry_rules: list[EntryRule] = field(default_factory=list)
@@ -34,15 +38,16 @@ class BacktestRunner(StrategyRunner):
     _trades: list = field(default_factory=list, init=False)
     _metrics_history: list[dict] = field(default_factory=list, init=False)
 
-    def run(
+    def run(  # type: ignore[override]
         self,
-        raw_data,
+        raw_data: Any,
         signals: Signals,
         state: StrategyState | None = None,
         named_signals: dict[str, Signals] | None = None,
-    ):
-        from signalflow.core.containers.strategy_state import StrategyState
+    ) -> StrategyState:
         from tqdm import tqdm
+
+        from signalflow.core.containers.strategy_state import StrategyState
 
         if state is None:
             state = StrategyState(strategy_id=self.strategy_id)
@@ -96,7 +101,7 @@ class BacktestRunner(StrategyRunner):
         return state
 
     def _build_price_lookup(self, df: pl.DataFrame) -> dict[datetime, dict[str, float]]:
-        lookup = {}
+        lookup: dict[datetime, dict[str, float]] = {}
         for row in df.select([self.ts_col, self.pair_col, self.price_col]).iter_rows():
             ts, pair, price = row
             if ts not in lookup:
@@ -105,7 +110,7 @@ class BacktestRunner(StrategyRunner):
         return lookup
 
     def _build_signal_lookup(self, signals_df: pl.DataFrame) -> dict[datetime, pl.DataFrame]:
-        lookup = {}
+        lookup: dict[datetime, pl.DataFrame] = {}
         if signals_df.height == 0:
             return lookup
 
@@ -172,7 +177,7 @@ class BacktestRunner(StrategyRunner):
         return state
 
     @property
-    def trades(self):
+    def trades(self) -> list[Any]:
         return self._trades
 
     @property

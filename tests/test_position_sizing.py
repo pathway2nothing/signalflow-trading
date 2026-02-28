@@ -15,7 +15,6 @@ from signalflow.strategy.component.sizing import (
     VolatilityTargetSizer,
 )
 
-
 # ── Fixtures ───────────────────────────────────────────────────────────────
 
 

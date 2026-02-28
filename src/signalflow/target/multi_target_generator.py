@@ -7,11 +7,9 @@ at different horizons and target types simultaneously.
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
 import polars as pl
 from loguru import logger
 
-from signalflow.core import SignalType
 from signalflow.target.base import Labeler
 from signalflow.target.triple_barrier_labeler import TripleBarrierLabeler
 
@@ -159,7 +157,7 @@ class MultiTargetGenerator:
 
     def _create_labeler(self, h: HorizonConfig) -> Labeler:
         """Instantiate a labeler for the given horizon."""
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "price_col": self.price_col,
             "pair_col": self.pair_col,
             "ts_col": self.ts_col,

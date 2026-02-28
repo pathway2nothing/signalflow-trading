@@ -1,7 +1,7 @@
 """Tests for signalflow.core.containers.portfolio.Portfolio."""
 
-import pytest
 import polars as pl
+import pytest
 
 from signalflow.core.containers.portfolio import Portfolio
 from signalflow.core.containers.position import Position

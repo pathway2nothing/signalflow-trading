@@ -3,21 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import polars as pl
 from joblib import Parallel, delayed
 from loguru import logger
 
-from signalflow.core.enums import SfComponentType
-from signalflow.core.decorators import sf_component
+import signalflow as sf
+from signalflow.analytic import StrategyMetric
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
 from signalflow.strategy.component.base import EntryRule, ExitRule
 from signalflow.strategy.runner.base import StrategyRunner
-from signalflow.analytic import StrategyMetric
 
 if TYPE_CHECKING:
     from signalflow.core.containers.position import Position
@@ -141,9 +140,10 @@ def _run_pair_backtest(
     metrics: list,
 ) -> PairResult:
     """Run backtest for single pair."""
-    from signalflow.strategy.broker.isolated_broker import IsolatedBacktestBroker
-    from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
     from signalflow.data.strategy_store.memory import InMemoryStrategyStore
+    from signalflow.strategy.broker.executor.base import OrderExecutor
+    from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
+    from signalflow.strategy.broker.isolated_broker import IsolatedBacktestBroker
 
     # Create isolated state
     state = StrategyState(strategy_id=f"{config['strategy_id']}_{pair}")
@@ -152,7 +152,7 @@ def _run_pair_backtest(
     # Create broker for this pair
     broker = IsolatedBacktestBroker(
         pair=pair,
-        executor=VirtualSpotExecutor(fee_rate=config.get("fee_rate", 0.001)),
+        executor=cast(OrderExecutor, VirtualSpotExecutor(fee_rate=config.get("fee_rate", 0.001))),
         store=InMemoryStrategyStore(),
     )
 
@@ -249,7 +249,7 @@ def _run_pair_backtest(
 
 
 @dataclass
-@sf_component(name="runner/isolated", override=True)
+@sf.executor("runner/isolated")
 class IsolatedBalanceRunner(StrategyRunner):
     """Parallel backtest runner with isolated balance per pair.
 
@@ -272,8 +272,6 @@ class IsolatedBalanceRunner(StrategyRunner):
         show_progress: Show progress bar
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_RUNNER
-
     strategy_id: str = "isolated_backtest"
     broker: Any = None
     entry_rules: list[EntryRule] = field(default_factory=list)
@@ -292,7 +290,7 @@ class IsolatedBalanceRunner(StrategyRunner):
     _trades: list[Trade] = field(default_factory=list, init=False)
     _metrics_history: list[dict] = field(default_factory=list, init=False)
 
-    def run(self, raw_data: RawData, signals: Signals, state: StrategyState | None = None) -> IsolatedResults:
+    def run(self, raw_data: RawData, signals: Signals, state: StrategyState | None = None) -> IsolatedResults:  # type: ignore[override]
         """Run parallel backtest with isolated balance per pair.
 
         Args:

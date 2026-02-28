@@ -1,10 +1,12 @@
 from dataclasses import dataclass
-from signalflow.core import Position, Order, StrategyState, PositionType, sf_component
+from typing import Literal, cast
+
+from signalflow.core import Order, Position, PositionType, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
 
 
 @dataclass
-@sf_component(name="tp_sl", override=True)
+@exit("tp_sl")
 class TakeProfitStopLossExit(ExitRule):
     """
     Exit rule based on take-profit and stop-loss levels.
@@ -57,7 +59,7 @@ class TakeProfitStopLossExit(ExitRule):
                     exit_reason = "stop_loss"
 
             if should_exit:
-                side = "SELL" if pos.position_type == PositionType.LONG else "BUY"
+                side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
                 order = Order(
                     pair=pos.pair,
                     side=side,

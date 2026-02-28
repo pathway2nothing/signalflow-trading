@@ -2,11 +2,11 @@
 
 from signalflow.core.enums import SignalCategory
 from signalflow.core.signal_registry import (
-    KNOWN_SIGNALS,
     DIRECTIONAL_SIGNAL_MAP,
-    get_known_signals,
+    KNOWN_SIGNALS,
     get_all_known_signals,
     get_directional_side,
+    get_known_signals,
 )
 
 

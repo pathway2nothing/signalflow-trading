@@ -11,13 +11,13 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, sf_component
+from signalflow.core import Signals, detector
 from signalflow.core.enums import SignalCategory
 from signalflow.detector.base import SignalDetector
 
 
 @dataclass
-@sf_component(name="percentile_regime_detector")
+@detector("percentile_regime_detector")
 class PercentileRegimeDetector(SignalDetector):
     """Percentile-based regime detector on any feature.
 
@@ -100,7 +100,7 @@ class PercentileRegimeDetector(SignalDetector):
         """
         results = []
 
-        for pair_name, group in features.group_by(self.pair_col, maintain_order=True):
+        for _pair_name, group in features.group_by(self.pair_col, maintain_order=True):
             arr = group[self.target_feature].to_numpy().astype(np.float64)
             n = len(arr)
 

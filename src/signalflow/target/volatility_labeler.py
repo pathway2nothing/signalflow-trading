@@ -13,13 +13,13 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import sf_component
+from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
 from signalflow.target.base import Labeler
 
 
 @dataclass
-@sf_component(name="volatility_regime")
+@labeler("volatility_regime")
 class VolatilityRegimeLabeler(Labeler):
     """Label bars by forward realized volatility regime.
 
@@ -190,7 +190,7 @@ class VolatilityRegimeLabeler(Labeler):
         df = s.struct.unnest()
         vals = df["val"].to_numpy()
         n = len(vals)
-        result = [None] * n
+        result: list[float | None] = [None] * n
 
         import numpy as np
 

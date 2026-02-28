@@ -9,13 +9,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import polars as pl
 
 from signalflow.core import RawData
 
 if TYPE_CHECKING:
-    from signalflow.detector.base import SignalDetector
     from signalflow.api.result import BacktestResult
+    from signalflow.detector.base import SignalDetector
 
 
 def load(
@@ -73,6 +75,8 @@ def load(
     if start_dt is None:
         raise ValueError("start date is required")
 
+    assert end_dt is not None, "end date must be a valid datetime"
+
     # Determine source type
     source_path = Path(source) if isinstance(source, str) else source
 
@@ -129,7 +133,7 @@ def backtest(
     tp: float = 0.02,
     sl: float = 0.01,
     capital: float = 10_000.0,
-    **kwargs,
+    **kwargs: Any,
 ) -> BacktestResult:
     """
     Quick backtest with minimal configuration.
@@ -201,6 +205,32 @@ def backtest(
     builder.capital(capital)
 
     return builder.run()
+
+
+def load_artifact(
+    path: str | Path,
+    name: str = "features",
+) -> pl.DataFrame:
+    """
+    Load a parquet artifact from a flow artifacts directory.
+
+    Args:
+        path: Path to artifacts directory
+        name: Artifact name (features, signals, labels, predictions, trades)
+
+    Returns:
+        Polars DataFrame
+
+    Example:
+        >>> features = sf.load_artifact("artifacts/my_flow", "features")
+        >>> trades = sf.load_artifact("artifacts/my_flow", "trades")
+    """
+    import polars as pl
+
+    artifact_path = Path(path) / f"{name}.parquet"
+    if not artifact_path.exists():
+        raise FileNotFoundError(f"Artifact not found: {artifact_path}")
+    return pl.read_parquet(artifact_path)
 
 
 def _parse_datetime(value: str | datetime | None) -> datetime | None:

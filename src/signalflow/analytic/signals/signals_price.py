@@ -1,26 +1,27 @@
-from signalflow.core import sf_component
-from signalflow.analytic.base import SignalMetric
-from typing import List, Dict, Any
+from dataclasses import dataclass
+from typing import Any
+
 import plotly.graph_objects as go
 import polars as pl
 from loguru import logger
-from signalflow.core import RawData, Signals
-from dataclasses import dataclass
+
+from signalflow.analytic.base import SignalMetric
+from signalflow.core import RawData, Signals, signal_metric
 
 
 @dataclass
-@sf_component(name="pair")
+@signal_metric("pair")
 class SignalPairPrice(SignalMetric):
     """Visualize signals overlaid on price chart for specified pairs."""
 
-    pairs: List[str] = None
+    pairs: list[str] | None = None
     buy_marker_color: str = "#00CC96"
     sell_marker_color: str = "#EF553B"
     price_line_color: str = "#2E86C1"
     marker_size: int = 13
     chart_height: int = 600
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Convert single pair string to list if needed."""
         if isinstance(self.pairs, str):
             self.pairs = [self.pairs]
@@ -30,7 +31,7 @@ class SignalPairPrice(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> Dict[str, Any]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Compute basic signal statistics per pair.
 
         Returns:
@@ -62,18 +63,21 @@ class SignalPairPrice(SignalMetric):
 
     def plot(
         self,
-        computed_metrics: Dict[str, Any],
-        plots_context: Dict[str, Any],
+        computed_metrics: dict[str, Any] | None,
+        plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> List[go.Figure]:
+    ) -> list[go.Figure]:
         """Generate price charts with signal overlays for each pair.
 
         Returns:
             List of figures, one per pair
         """
-        figures = []
+        figures: list[go.Figure] = []
+
+        if computed_metrics is None:
+            return figures
 
         if "spot" in raw_data:
             price_df = raw_data["spot"]
@@ -87,7 +91,7 @@ class SignalPairPrice(SignalMetric):
         price_df = price_df.with_columns(pl.col("timestamp").cast(pl.Datetime("us")))
         signals_df = signals_df.with_columns(pl.col("timestamp").cast(pl.Datetime("us")))
 
-        for pair in computed_metrics.keys():
+        for pair in computed_metrics:
             fig = self._plot_single_pair(
                 price_df=price_df, signals_df=signals_df, pair=pair, metrics=computed_metrics[pair]
             )
@@ -97,7 +101,7 @@ class SignalPairPrice(SignalMetric):
         return figures
 
     def _plot_single_pair(
-        self, price_df: pl.DataFrame, signals_df: pl.DataFrame, pair: str, metrics: Dict[str, int]
+        self, price_df: pl.DataFrame, signals_df: pl.DataFrame, pair: str, metrics: dict[str, int]
     ) -> go.Figure:
         """Create signal overlay chart for a single pair."""
 

@@ -1,9 +1,18 @@
 """Shared fixtures for signalflow tests."""
 
-import pytest
-import polars as pl
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import polars as pl
+import pytest
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _cleanup_duckdb_files():
+    """Remove raw_data_*.duckdb files that loaders create with default paths."""
+    yield
+    for f in Path.cwd().glob("raw_data_*.duckdb"):
+        f.unlink(missing_ok=True)
 
 
 @pytest.fixture
@@ -45,7 +54,7 @@ def sample_signals_df() -> pl.DataFrame:
 
 
 @pytest.fixture
-def raw_data(sample_ohlcv_df) -> "RawData":
+def raw_data(sample_ohlcv_df):
     """RawData instance with spot data."""
     from signalflow.core.containers.raw_data import RawData
 
@@ -160,7 +169,10 @@ def raw_store(request, tmp_path):
 
         store = DuckDbRawStore(db_path=db_path, timeframe="1m")
     else:
-        from signalflow.data.raw_store import SqliteRawStore
+        try:
+            from signalflow.data.raw_store import SqliteRawStore
+        except ImportError:
+            pytest.skip("SqliteRawStore requires signalflow-data package")
 
         store = SqliteRawStore(db_path=db_path, timeframe="1m")
 
@@ -179,7 +191,10 @@ def strategy_store(request, tmp_path):
 
         store = DuckDbStrategyStore(str(db_path))
     else:
-        from signalflow.data.strategy_store import SqliteStrategyStore
+        try:
+            from signalflow.data.strategy_store import SqliteStrategyStore
+        except ImportError:
+            pytest.skip("SqliteStrategyStore requires signalflow-data package")
 
         store = SqliteStrategyStore(str(db_path))
 

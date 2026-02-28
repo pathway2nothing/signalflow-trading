@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 import polars as pl
 
-from signalflow.core import Order, PositionType, Signals, SignalType, sf_component
+from signalflow.core import Order, PositionType, Signals, SignalType, entry, exit
 from signalflow.strategy.component.base import EntryRule, ExitRule
 from signalflow.strategy.model.context import ModelContext
 from signalflow.strategy.model.decision import StrategyAction, StrategyDecision
@@ -53,7 +53,7 @@ def _get_cached_decisions(state: StrategyState) -> list[StrategyDecision] | None
 
 
 @dataclass
-@sf_component(name="model_entry")
+@entry("model_entry")
 class ModelEntryRule(EntryRule):
     """Entry rule that delegates to an external model.
 
@@ -170,7 +170,8 @@ class ModelEntryRule(EntryRule):
         signal_type = signal_row.item(0, "signal_type")
 
         if self.signal_type_map is not None:
-            return self.signal_type_map.get(signal_type)
+            side = self.signal_type_map.get(signal_type)
+            return cast(OrderSide, side) if side is not None else None
 
         # Legacy behavior
         if signal_type == SignalType.RISE.value:
@@ -184,7 +185,7 @@ class ModelEntryRule(EntryRule):
 
 
 @dataclass
-@sf_component(name="model_exit")
+@exit("model_exit")
 class ModelExitRule(ExitRule):
     """Exit rule that uses cached model decisions.
 

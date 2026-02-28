@@ -1,9 +1,9 @@
 # Visualization
 
-Interactive pipeline visualization for SignalFlow, inspired by Kedro-Viz.
+Interactive pipeline visualization for SignalFlow.
 
 !!! info "Module"
-    `signalflow.viz` -- Available as `sf.viz.pipeline()`, `sf.viz.features()`, `sf.viz.serve()`.
+    `signalflow.viz` — Available as `sf.viz.pipeline()`, `sf.viz.features()`, `sf.viz.serve()`.
 
 ## Quick Example
 
@@ -30,29 +30,40 @@ sf.viz.serve(builder, port=4141)
 
 ## Functions
 
-::: signalflow.viz.pipeline
-    options:
-      show_root_heading: true
-      show_source: false
+### `sf.viz.pipeline(builder, format="html", show=True)`
 
-::: signalflow.viz.features
-    options:
-      show_root_heading: true
-      show_source: false
+Generate an interactive flow visualization of the pipeline.
 
-::: signalflow.viz.data_flow
-    options:
-      show_root_heading: true
-      show_source: false
+**Parameters:**
 
-::: signalflow.viz.serve
-    options:
-      show_root_heading: true
-      show_source: false
+- `builder` — A `Backtest` or `FlowBuilder` instance
+- `format` — Output format: `"html"` (D3.js interactive) or `"mermaid"` (text diagram)
+- `show` — Open in browser automatically (default: `True`)
 
-## Graph
+**Returns:** HTML string or Mermaid code when `show=False`
 
-::: signalflow.viz.graph.PipelineGraph
-    options:
-      show_root_heading: true
-      show_source: false
+### `sf.viz.features(pipeline, df)`
+
+Visualize feature distributions and correlations.
+
+**Parameters:**
+
+- `pipeline` — A `FeaturePipeline` instance
+- `df` — DataFrame with computed features
+
+### `sf.viz.data_flow(builder)`
+
+Visualize data flow through the pipeline nodes.
+
+**Parameters:**
+
+- `builder` — A `Backtest` or `FlowBuilder` instance
+
+### `sf.viz.serve(builder, port=4141)`
+
+Launch a local development server with live-reloading visualization.
+
+**Parameters:**
+
+- `builder` — A `Backtest` or `FlowBuilder` instance
+- `port` — Local server port (default: `4141`)

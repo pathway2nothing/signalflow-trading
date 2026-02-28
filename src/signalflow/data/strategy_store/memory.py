@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable, Optional
 
-from signalflow.core import sf_component, StrategyState, Position, Trade
-from signalflow.data.strategy_store.base import StrategyStore
+from signalflow.core import Position, StrategyState, Trade, strategy_store
 from signalflow.data.strategy_store._serialization import (
-    to_json as _to_json,
     state_from_json as _state_from_json,
 )
+from signalflow.data.strategy_store._serialization import (
+    to_json as _to_json,
+)
+from signalflow.data.strategy_store.base import StrategyStore
 
 
-@sf_component(name="memory/strategy")
+@strategy_store("memory/strategy")
 class InMemoryStrategyStore(StrategyStore):
     """In-memory implementation of strategy persistence.
 
@@ -28,7 +30,7 @@ class InMemoryStrategyStore(StrategyStore):
     def init(self) -> None:
         pass  # nothing to initialise
 
-    def load_state(self, strategy_id: str) -> Optional[StrategyState]:
+    def load_state(self, strategy_id: str) -> StrategyState | None:
         payload = self._states.get(strategy_id)
         if payload is None:
             return None

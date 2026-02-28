@@ -6,12 +6,12 @@ useful for detecting market-wide sentiment shifts.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import SfComponentType, sf_component
+from signalflow.core import feature
 from signalflow.feature.base import GlobalFeature
 
 if TYPE_CHECKING:
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-@sf_component(name="aggregated_oi")
+@feature("aggregated_oi")
 class AggregatedOpenInterest(GlobalFeature):
     """Computes aggregated open interest across all pairs.
 
@@ -47,7 +47,6 @@ class AggregatedOpenInterest(GlobalFeature):
         ```
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.FEATURE
     requires: ClassVar[list[str]] = ["{oi_col}"]
     outputs: ClassVar[list[str]] = ["agg_oi", "agg_oi_change", "agg_oi_zscore"]
 
@@ -123,7 +122,7 @@ class AggregatedOpenInterest(GlobalFeature):
 
 
 @dataclass
-@sf_component(name="aggregated_oi_multi_source")
+@feature("aggregated_oi_multi_source")
 class AggregatedOpenInterestMultiSource(GlobalFeature):
     """Aggregated open interest from multiple data sources (exchanges).
 
@@ -170,7 +169,6 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
         ```
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.FEATURE
     requires: ClassVar[list[str]] = ["{oi_col}", "{source_col}"]
     outputs: ClassVar[list[str]] = [
         "agg_oi_total",
@@ -186,7 +184,7 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
 
     def compute_from_raw(
         self,
-        raw: "RawData",
+        raw: RawData,
         context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
         """Compute aggregated OI directly from RawData.
@@ -288,10 +286,7 @@ class AggregatedOpenInterestMultiSource(GlobalFeature):
             DataFrame with aggregated OI columns added.
         """
         # Filter to specified sources if provided
-        if self.sources is not None:
-            df_filtered = df.filter(pl.col(self.source_col).is_in(self.sources))
-        else:
-            df_filtered = df
+        df_filtered = df.filter(pl.col(self.source_col).is_in(self.sources)) if self.sources is not None else df
 
         # Step 1: Aggregate OI by timestamp (across all sources and pairs)
         agg_oi = (

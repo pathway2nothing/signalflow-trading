@@ -6,12 +6,12 @@ import numpy as np
 import polars as pl
 from sklearn.linear_model import Ridge
 
-from signalflow import sf_component
+from signalflow.core import feature
 from signalflow.feature.base import Feature
 
 
 @dataclass
-@sf_component(name="forecast/linreg", override=True)
+@feature("forecast/linreg")
 class LinRegForecastFeature(Feature):
     """Enhanced linear regression forecast with trend and mean-reversion features.
 
@@ -39,17 +39,21 @@ class LinRegForecastFeature(Feature):
     forecast_horizon: int = 1
     min_samples: int = 50
 
-    requires = ["{source_col}"]
-    outputs = ["{source_col}_forecast", "{source_col}_forecast_change", "{source_col}_forecast_direction"]
+    requires: ClassVar[list[str]] = ["{source_col}"]
+    outputs: ClassVar[list[str]] = [
+        "{source_col}_forecast",
+        "{source_col}_forecast_change",
+        "{source_col}_forecast_direction",
+    ]
 
     test_params: ClassVar[list[dict]] = [
         {"source_col": "rsi_14", "n_lags": 10},
         {"source_col": "rsi_14", "n_lags": 5, "mean_window": 10},
     ]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.n_lags < 1:
-            raise ValueError(f"n_lags must be >= 1")
+            raise ValueError("n_lags must be >= 1")
 
     def _get_period_key(self, ts: datetime) -> tuple | None:
         if self.refit_period == "hour":

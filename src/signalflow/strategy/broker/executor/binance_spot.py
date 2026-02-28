@@ -1,10 +1,11 @@
-from signalflow.strategy.broker.executor.base import OrderExecutor
-from signalflow.core.decorators import sf_component
 from dataclasses import dataclass
+
+from signalflow.core import executor
+from signalflow.strategy.broker.executor.base import OrderExecutor
 
 
 @dataclass
-@sf_component(name="binance/spot")
+@executor("binance/spot")
 class BinanceSpotExecutor(OrderExecutor):
     """
     Binance executor for live trading.

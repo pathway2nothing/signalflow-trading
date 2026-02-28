@@ -1,18 +1,22 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
-from signalflow.core import StrategyState, sf_component
-from signalflow.analytic.base import StrategyMetric
+from typing import Any
+
 import numpy as np
+
+from signalflow.analytic.base import StrategyMetric
+from signalflow.core import StrategyState, strategy_metric
 
 
 @dataclass
-@sf_component(name="total_return", override=True)
+@strategy_metric("total_return")
 class TotalReturnMetric(StrategyMetric):
     """Computes total return metrics for the portfolio."""
 
     initial_capital: float = 10000.0
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         equity = state.portfolio.equity(prices=prices)
         cash = state.portfolio.cash
 
@@ -35,11 +39,11 @@ class TotalReturnMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="balance_allocation", override=True)
+@strategy_metric("balance_allocation")
 class BalanceAllocationMetric(StrategyMetric):
     initial_capital: float = 10000.0
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         equity = state.portfolio.equity(prices=prices)
         cash = state.portfolio.cash
 
@@ -57,7 +61,7 @@ class BalanceAllocationMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="drawdown", override=True)
+@strategy_metric("drawdown")
 class DrawdownMetric(StrategyMetric):
     _peak_equity: float = 0.0
     _max_drawdown: float = 0.0
@@ -66,7 +70,7 @@ class DrawdownMetric(StrategyMetric):
     def name(self) -> str:
         return "drawdown"
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         equity = state.portfolio.equity(prices=prices)
 
         if equity > self._peak_equity:
@@ -87,9 +91,9 @@ class DrawdownMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="win_rate", override=True)
+@strategy_metric("win_rate")
 class WinRateMetric(StrategyMetric):
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         closed_positions = [p for p in state.portfolio.positions.values() if p.is_closed]
 
         if not closed_positions:
@@ -104,18 +108,14 @@ class WinRateMetric(StrategyMetric):
 
 
 @dataclass
-@sf_component(name="sharpe_ratio", override=True)
+@strategy_metric("sharpe_ratio")
 class SharpeRatioMetric(StrategyMetric):
     initial_capital: float = 10000.0
     window_size: int = 100
     risk_free_rate: float = 0.0
-    _returns_history: list[float] = None
+    _returns_history: list[float] = field(default_factory=list)
 
-    def __post_init__(self):
-        self._returns_history = []
-
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
-        import numpy as np
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
 
         equity = state.portfolio.equity(prices=prices)
         current_return = (equity - self.initial_capital) / self.initial_capital

@@ -7,11 +7,10 @@ import numpy as np
 import polars as pl
 import pytest
 
-from signalflow.target.volatility_labeler import VolatilityRegimeLabeler
-from signalflow.target.trend_scanning import TrendScanningLabeler
 from signalflow.target.structure_labeler import StructureLabeler
+from signalflow.target.trend_scanning import TrendScanningLabeler
+from signalflow.target.volatility_labeler import VolatilityRegimeLabeler
 from signalflow.target.volume_labeler import VolumeRegimeLabeler
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 

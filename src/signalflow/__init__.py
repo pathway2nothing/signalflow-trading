@@ -1,34 +1,68 @@
+# Allow sub-packages from other directories (sf-ta, sf-nn) to be found
+# under the signalflow namespace when they are on sys.path.
+import pkgutil
+from typing import Any
+
+__path__ = pkgutil.extend_path(__path__, __name__)
+
 from signalflow.core import (
-    RawData,
-    Signals,
-    RawDataView,
-    Position,
-    Trade,
-    Portfolio,
-    StrategyState,
+    DataFrameType,
     Order,
     OrderFill,
-    SignalType,
+    Portfolio,
+    Position,
     PositionType,
-    SfComponentType,
-    DataFrameType,
+    RawData,
     RawDataType,
-    sf_component,
-    get_component,
-    default_registry,
+    RawDataView,
+    SfComponentType,
     SfTorchModuleMixin,
+    Signals,
     SignalsTransform,
+    SignalType,
+    StrategyState,
+    Trade,
+    default_registry,
+    get_component,
+    # Semantic decorators (new API) - use as @sf.detector, @sf.entry, etc.
+    alert,
+    data_source,
+    data_store,
+    detector,
+    entry,
+    executor,
+    exit,
+    feature,
+    labeler,
+    register,
+    risk,
+    signal_metric,
+    strategy_metric,
+    strategy_store,
+    validator,
+    # Legacy (deprecated)
+    sf_component,
 )
 import signalflow.analytic as analytic
 import signalflow.data as data
-import signalflow.detector as detector
-import signalflow.feature as feature
-from signalflow.feature import Feature, FeaturePipeline, GlobalFeature, OffsetFeature
-import signalflow.target as target
+import signalflow.detector as detectors
+import signalflow.feature as features
 import signalflow.strategy as strategy
+import signalflow.target as target
 import signalflow.utils as utils
-import signalflow.validator as validator
+import signalflow.validator as validators
+from signalflow.feature import Feature, FeaturePipeline, GlobalFeature, OffsetFeature
 
+# Re-assign semantic decorators after submodule imports.
+# `import signalflow.detector` binds the submodule to `signalflow.detector`,
+# shadowing the `detector` decorator imported from signalflow.core above.
+# Same issue for `feature`, `exit`, `validator`.  Re-importing restores them.
+from signalflow.core.decorators import (  # noqa: F811
+    detector,
+    exit,
+    feature,
+    validator,
+)
 
 # =============================================================================
 # Lazy imports for high-level API
@@ -38,7 +72,7 @@ import signalflow.validator as validator
 # etc.) must stay eager for autodiscover() to work correctly.
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy load API module components."""
     if name == "Backtest":
         from signalflow.api.builder import Backtest
@@ -65,64 +99,183 @@ def __getattr__(name: str):
 
         return load
 
+    if name == "load_artifact":
+        from signalflow.api.shortcuts import load_artifact
+
+        return load_artifact
+
     if name == "api":
         import signalflow.api as api
 
         return api
 
-    if name == "viz":
-        import signalflow.viz as viz
+    # Config module
+    if name == "config":
+        import signalflow.config as config
 
-        return viz
+        return config
+
+    # Flow API (unified pipeline)
+    if name == "flow":
+        from signalflow.api.flow import flow
+
+        return flow
+
+    if name == "FlowBuilder":
+        from signalflow.api.flow import FlowBuilder
+
+        return FlowBuilder
+
+    if name == "FlowResult":
+        from signalflow.api.flow import FlowResult
+
+        return FlowResult
+
+    # Metric nodes
+    if name == "FeatureMetrics":
+        from signalflow.api.flow import FeatureMetrics
+
+        return FeatureMetrics
+
+    if name == "SignalMetrics":
+        from signalflow.api.flow import SignalMetrics
+
+        return SignalMetrics
+
+    if name == "LabelMetrics":
+        from signalflow.api.flow import LabelMetrics
+
+        return LabelMetrics
+
+    if name == "ValidationMetrics":
+        from signalflow.api.flow import ValidationMetrics
+
+        return ValidationMetrics
+
+    if name == "BacktestMetrics":
+        from signalflow.api.flow import BacktestMetrics
+
+        return BacktestMetrics
+
+    if name == "LiveMetrics":
+        from signalflow.api.flow import LiveMetrics
+
+        return LiveMetrics
+
+    # Risk management
+    if name == "RiskManager":
+        from signalflow.strategy.risk.manager import RiskManager
+
+        return RiskManager
+
+    if name == "RiskLimit":
+        from signalflow.strategy.risk.limits import RiskLimit
+
+        return RiskLimit
+
+    if name == "MaxLeverageLimit":
+        from signalflow.strategy.risk.limits import MaxLeverageLimit
+
+        return MaxLeverageLimit
+
+    if name == "MaxPositionsLimit":
+        from signalflow.strategy.risk.limits import MaxPositionsLimit
+
+        return MaxPositionsLimit
+
+    if name == "PairExposureLimit":
+        from signalflow.strategy.risk.limits import PairExposureLimit
+
+        return PairExposureLimit
+
+    if name == "DailyLossLimit":
+        from signalflow.strategy.risk.limits import DailyLossLimit
+
+        return DailyLossLimit
 
     raise AttributeError(f"module 'signalflow' has no attribute {name!r}")
 
 
 __all__ = [
-    # Submodules
+    # High-level API
+    "Backtest",
+    "BacktestBuilder",
+    "BacktestMetrics",
+    "BacktestResult",
+    # Risk
+    "DailyLossLimit",
+    # Enums
+    "DataFrameType",
+    # Features
+    "Feature",
+    # Metrics nodes
+    "FeatureMetrics",
+    "FeaturePipeline",
+    "FlowBuilder",
+    "FlowResult",
+    "GlobalFeature",
+    "LabelMetrics",
+    "LiveMetrics",
+    "MaxLeverageLimit",
+    "MaxPositionsLimit",
+    "OffsetFeature",
+    # Containers
+    "Order",
+    "OrderFill",
+    "PairExposureLimit",
+    "Portfolio",
+    "Position",
+    "PositionType",
+    "RawData",
+    "RawDataType",
+    "RawDataView",
+    "RiskLimit",
+    "RiskManager",
+    "SfComponentType",
+    # Other
+    "SfTorchModuleMixin",
+    "SignalMetrics",
+    "SignalType",
+    "Signals",
+    "SignalsTransform",
+    "StrategyState",
+    "Trade",
+    "ValidationMetrics",
+    # Semantic decorators (new API) - @sf.detector, @sf.entry, etc.
+    "alert",
+    # Sub-packages
     "analytic",
     "api",
+    "backtest",
+    "config",
     "core",
     "data",
+    "data_source",
+    "data_store",
+    # Registry
+    "default_registry",
     "detector",
+    "detectors",
+    "entry",
+    "executor",
+    "exit",
     "feature",
+    "features",
+    "flow",
+    "get_component",
+    "labeler",
+    "load",
+    "load_artifact",
+    "register",
+    "risk",
+    # Legacy decorator (deprecated)
+    "sf_component",
+    "signal_metric",
     "strategy",
+    "strategy_metric",
+    "strategy_store",
     "target",
     "utils",
     "validator",
-    "viz",
-    # Core containers
-    "RawData",
-    "Signals",
-    "RawDataView",
-    "Position",
-    "Trade",
-    "Portfolio",
-    "StrategyState",
-    "Order",
-    "OrderFill",
-    # Enums
-    "SignalType",
-    "PositionType",
-    "SfComponentType",
-    "DataFrameType",
-    "RawDataType",
-    # Registry
-    "sf_component",
-    "get_component",
-    "default_registry",
-    # Features
-    "Feature",
-    "FeaturePipeline",
-    "GlobalFeature",
-    "OffsetFeature",
-    # Torch
-    "SfTorchModuleMixin",
-    "SignalsTransform",
-    # High-level API (lazy loaded)
-    "Backtest",
-    "BacktestBuilder",
-    "BacktestResult",
-    "backtest",
-    "load",
+    "validators",
 ]

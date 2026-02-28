@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import sf_component
+from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
 from signalflow.target.base import Labeler
 
@@ -142,7 +142,7 @@ if _HAS_NUMBA:
             best_w = np.nan
 
             L = min_lf
-            while L <= max_lf:
+            while max_lf >= L:
                 end = t + L
                 if end > n:
                     L += step
@@ -218,12 +218,13 @@ def _trend_scan(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Dispatch to numba or numpy implementation."""
     if _HAS_NUMBA:
-        return _trend_scan_numba(prices, min_lf, max_lf, step)
+        result: tuple[np.ndarray, np.ndarray] = _trend_scan_numba(prices, min_lf, max_lf, step)
+        return result
     return _trend_scan_numpy(prices, min_lf, max_lf, step)
 
 
 @dataclass
-@sf_component(name="trend_scanning")
+@labeler("trend_scanning")
 class TrendScanningLabeler(Labeler):
     """Label bars using De Prado's trend scanning method.
 
@@ -321,7 +322,7 @@ class TrendScanningLabeler(Labeler):
 
         # Assign labels based on t-statistic vs critical value
         n = len(prices)
-        labels = [None] * n
+        labels: list[str | None] = [None] * n
         for t in range(n):
             if np.isnan(t_stats[t]):
                 continue

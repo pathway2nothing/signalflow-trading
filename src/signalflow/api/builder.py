@@ -9,33 +9,34 @@ Supports multiple named instances of each component type
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import reduce
 from threading import Event
-from typing import TYPE_CHECKING, Any, Callable, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import polars as pl
 
-from signalflow.core import (
-    default_registry,
-    SfComponentType,
-    RawData,
-    Signals,
-)
 from signalflow.api.exceptions import (
     DetectorNotFoundError,
-    ValidatorNotFoundError,
     DuplicateComponentNameError,
+    InvalidParameterError,
     MissingDataError,
     MissingDetectorError,
-    InvalidParameterError,
+    ValidatorNotFoundError,
+)
+from signalflow.core import (
+    RawData,
+    SfComponentType,
+    Signals,
+    default_registry,
 )
 
 if TYPE_CHECKING:
+    from signalflow.api.result import BacktestResult
     from signalflow.detector.base import SignalDetector
     from signalflow.validator.base import SignalValidator
-    from signalflow.api.result import BacktestResult
 
 
 @dataclass
@@ -217,10 +218,7 @@ class BacktestBuilder:
 
         # Determine name
         if name is None:
-            if not self._named_detectors:
-                name = "default"
-            else:
-                name = f"detector_{len(self._named_detectors)}"
+            name = "default" if not self._named_detectors else f"detector_{len(self._named_detectors)}"
 
         if name in self._named_detectors:
             raise DuplicateComponentNameError("detector", name)
@@ -345,10 +343,7 @@ class BacktestBuilder:
             instance = validator
 
         if name is None:
-            if not self._named_validators:
-                name = "default"
-            else:
-                name = f"validator_{len(self._named_validators)}"
+            name = "default" if not self._named_validators else f"validator_{len(self._named_validators)}"
 
         if name in self._named_validators:
             raise DuplicateComponentNameError("validator", name)
@@ -653,60 +648,108 @@ class BacktestBuilder:
 
     @classmethod
     def from_dict(cls, config: dict[str, Any]) -> BacktestBuilder:
-        """Reconstruct a builder from a config dict (inverse of ``to_dict()``).
+        """Reconstruct a builder from a config dict.
 
-        Detector instances are recreated from registry using class_name + params.
+        Supports two config formats:
+        1. Builder format (from ``to_dict()``): detectors, entry, exit
+        2. Flow config format: detector, strategy.entry_rules, strategy.exit_rules
+
+        Detector instances are recreated from registry using class_name/type + params.
         Data sources marked as ``_type: preloaded`` are skipped — caller must
         re-attach them via ``.data(raw=...)``.
 
         Args:
-            config: Config dict as produced by ``to_dict()``.
+            config: Config dict (from ``to_dict()`` or ``load_flow_config()``).
 
         Returns:
             Configured BacktestBuilder.
+
+        Example:
+            >>> # From flow config
+            >>> config = sf.config.load("grid_sma")
+            >>> builder = sf.Backtest.from_dict(config)
+
+            >>> # From builder config
+            >>> builder = sf.Backtest.from_dict(old_builder.to_dict())
         """
-        builder = cls(strategy_id=config.get("strategy_id", "backtest"))
+        # Determine strategy_id
+        strategy_id = config.get("strategy_id", "backtest")
+        if "strategy" in config and "strategy_id" in config["strategy"]:
+            strategy_id = config["strategy"]["strategy_id"]
+        if "flow_id" in config and strategy_id == "backtest":
+            strategy_id = config["flow_id"]
+
+        builder = cls(strategy_id=strategy_id)
 
         # Data (parameter-based only)
         if "data" in config:
-            builder.data(**config["data"])
+            data_cfg = config["data"]
+            # Flow config format has nested structure
+            if "pairs" in data_cfg and not any(k in data_cfg for k in ["exchange", "source"]):
+                # Don't call .data() for flow config - it just has pairs/timeframe
+                pass
+            else:
+                builder.data(**data_cfg)
         if "data_sources" in config:
             for name, src in config["data_sources"].items():
                 if isinstance(src, dict) and src.get("_type") == "preloaded":
                     continue
                 builder.data(name=name, **src)
 
-        # Detectors
+        # Detectors - handle both formats
         if "detectors" in config:
+            # Builder format: detectors dict
             for name, det_info in config["detectors"].items():
                 params = det_info.get("params", {})
                 class_name = det_info.get("class_name", name)
                 data_source = det_info.get("data_source")
-                # Try to find in registry by class_name or name
                 builder.detector(
                     class_name,
                     name=name,
                     data_source=data_source,
                     **params,
                 )
+        elif "detector" in config:
+            # Flow config format: single detector
+            det_cfg = config["detector"]
+            det_type = det_cfg.get("type", "")
+            det_params = {k: v for k, v in det_cfg.items() if k != "type"}
+            if det_type:
+                builder.detector(det_type, **det_params)
 
         # Aggregation
         if "aggregation" in config:
             builder.aggregation(**config["aggregation"])
 
-        # Entry
+        # Entry - handle both formats
         if "entry" in config:
             builder.entry(**config["entry"])
         if "entries" in config:
             for name, entry_cfg in config["entries"].items():
                 builder.entry(name=name, **entry_cfg)
 
-        # Exit
+        # Flow config format: strategy.entry_rules
+        if "strategy" in config and "entry_rules" in config["strategy"]:
+            entry_rules = config["strategy"]["entry_rules"]
+            if entry_rules:
+                rule = entry_rules[0]  # Use first rule
+                entry_cfg = cls._convert_entry_rule_to_config(rule)
+                builder.entry(**entry_cfg)
+
+        # Exit - handle both formats
         if "exit" in config:
             builder.exit(**config["exit"])
         if "exits" in config:
             for name, exit_cfg in config["exits"].items():
                 builder.exit(name=name, **exit_cfg)
+
+        # Flow config format: strategy.exit_rules
+        if "strategy" in config and "exit_rules" in config["strategy"]:
+            exit_rules = config["strategy"]["exit_rules"]
+            if exit_rules:
+                rule = exit_rules[0]  # Use first rule
+                exit_cfg = cls._convert_exit_rule_to_config(rule)
+                builder.exit(**exit_cfg)
 
         # Capital & fees
         if "capital" in config:
@@ -715,6 +758,84 @@ class BacktestBuilder:
             builder.fee(config["fee"])
 
         return builder
+
+    @classmethod
+    def _convert_entry_rule_to_config(cls, rule: dict[str, Any]) -> dict[str, Any]:
+        """Convert flow config entry_rule to builder entry config.
+
+        Handles entry_filters by instantiating them from registry.
+        """
+        config: dict[str, Any] = {
+            "size": rule.get("base_position_size", 100.0),
+            "max_positions": rule.get("max_total_positions", 10),
+            "max_per_pair": rule.get("max_positions_per_pair", 1),
+        }
+
+        # Copy additional params
+        for key in ["min_probability", "use_probability_sizing"]:
+            if key in rule:
+                config[key] = rule[key]
+
+        # Handle entry_filters
+        if "entry_filters" in rule:
+            filters = cls._instantiate_entry_filters(rule["entry_filters"])
+            if filters:
+                config["entry_filters"] = filters
+
+        return config
+
+    @classmethod
+    def _instantiate_entry_filters(cls, filters_config: list[dict[str, Any]]) -> list[Any]:
+        """Instantiate entry filters from config.
+
+        Args:
+            filters_config: List of filter configs with 'type' and params.
+
+        Returns:
+            List of instantiated EntryFilter objects.
+        """
+        from signalflow.core import SfComponentType, default_registry
+
+        filters = []
+        for filter_cfg in filters_config:
+            filter_type = filter_cfg.get("type", "")
+            if not filter_type:
+                continue
+
+            try:
+                filter_cls = default_registry.get(SfComponentType.STRATEGY_ENTRY_RULE, filter_type)
+                # Extract params (everything except 'type')
+                params = {k: v for k, v in filter_cfg.items() if k != "type"}
+                # Get valid dataclass fields
+                if hasattr(filter_cls, "__dataclass_fields__"):
+                    valid_fields = {f for f in filter_cls.__dataclass_fields__ if f != "component_type"}
+                    params = {k: v for k, v in params.items() if k in valid_fields}
+                filters.append(filter_cls(**params))
+            except (KeyError, TypeError) as e:
+                from loguru import logger
+
+                logger.warning(f"Could not instantiate entry filter '{filter_type}': {e}")
+
+        return filters
+
+    @classmethod
+    def _convert_exit_rule_to_config(cls, rule: dict[str, Any]) -> dict[str, Any]:
+        """Convert flow config exit_rule to builder exit config."""
+        config: dict[str, Any] = {}
+        rule_type = rule.get("type", "tp_sl")
+
+        if rule_type == "tp_sl":
+            if "take_profit_pct" in rule:
+                config["tp"] = rule["take_profit_pct"]
+            if "stop_loss_pct" in rule:
+                config["sl"] = rule["stop_loss_pct"]
+            if "trailing_stop_pct" in rule:
+                config["trailing"] = rule["trailing_stop_pct"]
+        else:
+            # Copy all params except type
+            config = {k: v for k, v in rule.items() if k != "type"}
+
+        return config
 
     @staticmethod
     def _serialize_data_params(params: dict[str, Any]) -> dict[str, Any]:
@@ -763,24 +884,50 @@ class BacktestBuilder:
             MissingDataError: If data not configured
             MissingDetectorError: If detector/signals not configured
         """
+        from loguru import logger as _logger
+
         from signalflow.api.result import BacktestResult
 
         # 1. Resolve data
         raw = self._resolve_data()
+        _logger.info(
+            "Data: {} pairs, {} → {}",
+            len(raw.pairs) if hasattr(raw, "pairs") else "?",
+            getattr(raw, "datetime_start", "?"),
+            getattr(raw, "datetime_end", "?"),
+        )
 
         # 2. Resolve signals (with multi-detector support)
         merged_signals, named_signals = self._resolve_signals(raw)
+        _logger.info(
+            "Signals: {} total, detectors: [{}]",
+            merged_signals.value.height if merged_signals else 0,
+            ", ".join(named_signals.keys()) if named_signals else "none",
+        )
 
         # 3. Build components from registry
         entry_rules = self._build_entry_rules()
         exit_rules = self._build_exit_rules()
         broker = self._build_broker()
+        _logger.info(
+            "Strategy: {} entry rule(s), {} exit rule(s), capital=${:,.0f}",
+            len(entry_rules),
+            len(exit_rules),
+            self._capital,
+        )
 
         # 4. Create and run runner
+        # Infer data_key from actual RawData keys (default "spot" may not exist
+        # when data is e.g. "perpetual" from futures stores).
+        data_key = "spot"
+        if raw and raw.data and "spot" not in raw.data:
+            data_key = next(iter(raw.data.keys()), "spot")
+
         runner = self._build_runner(
             broker,
             entry_rules,
             exit_rules,
+            data_key=data_key,
             progress_callback=progress_callback,
             cancel_event=cancel_event,
         )
@@ -789,6 +936,8 @@ class BacktestBuilder:
             signals=merged_signals,
             named_signals=named_signals if named_signals else None,
         )
+        n_trades = len(getattr(runner, "trades", []))
+        _logger.info("Backtest done: {} trades", n_trades)
 
         # 5. Wrap in BacktestResult
         return BacktestResult(
@@ -835,7 +984,7 @@ class BacktestBuilder:
 
         # Check registry availability
         try:
-            default_registry.get(SfComponentType.STRATEGY_RUNNER, "backtest")
+            default_registry.get(SfComponentType.STRATEGY_EXECUTOR, "backtest")
         except KeyError:
             issues.append("ERROR: BacktestRunner not found in registry")
 
@@ -862,12 +1011,11 @@ class BacktestBuilder:
         # Validate aggregation weights
         if self._aggregation_config:
             weights = self._aggregation_config.get("weights")
-            if weights and len(self._named_detectors) > 1:
-                if len(weights) != len(self._named_detectors):
-                    issues.append(
-                        f"ERROR: Aggregation weights length ({len(weights)}) "
-                        f"must match detector count ({len(self._named_detectors)})"
-                    )
+            if weights and len(self._named_detectors) > 1 and len(weights) != len(self._named_detectors):
+                issues.append(
+                    f"ERROR: Aggregation weights length ({len(weights)}) "
+                    f"must match detector count ({len(self._named_detectors)})"
+                )
 
         # Validate TP/SL ratio (single mode)
         exit_configs = list(self._named_exits.values()) if self._named_exits else [self._exit_config]
@@ -891,10 +1039,13 @@ class BacktestBuilder:
         """Resolve a detector from instance or registry name."""
         if isinstance(detector, str):
             try:
-                return default_registry.create(
-                    SfComponentType.DETECTOR,
-                    detector,
-                    **kwargs,
+                return cast(
+                    "SignalDetector",
+                    default_registry.create(
+                        SfComponentType.DETECTOR,
+                        detector,
+                        **kwargs,
+                    ),
                 )
             except KeyError:
                 available = default_registry.list(SfComponentType.DETECTOR)
@@ -979,6 +1130,10 @@ class BacktestBuilder:
         """Detect signals from all detectors and merge."""
         # Pre-computed signals
         if self._signals is not None:
+            # Build named dict from detectors for source_detector cross-referencing
+            if self._named_detectors:
+                named = {name: self._signals for name in self._named_detectors}
+                return self._signals, named
             return self._signals, {}
 
         # Multi-detector mode
@@ -1110,16 +1265,35 @@ class BacktestBuilder:
             rule_cls = SignalEntryRule
 
         # Calculate position size
-        size = config.get("size", 100.0)
+        size = config.get("size")
+        if size is None:
+            size = 100.0
         size_pct = config.get("size_pct")
         if size_pct:
             size = self._capital * size_pct
 
-        rule = rule_cls(
-            base_position_size=size,
-            max_positions_per_pair=config.get("max_per_pair", 1),
-            max_total_positions=config.get("max_positions", 10),
+        rule_kwargs: dict[str, Any] = {
+            "base_position_size": size,
+            "max_positions_per_pair": config.get("max_per_pair", config.get("max_positions_per_pair", 1)),
+            "max_total_positions": config.get("max_positions", config.get("max_total_positions", 10)),
+        }
+        # Pass through optional fields supported by SignalEntryRule
+        _passthrough = (
+            "signal_type_map",
+            "allow_shorts",
+            "min_probability",
+            "use_probability_sizing",
+            "position_sizer",
+            "entry_filters",
+            "max_capital_usage",
+            "min_order_notional",
         )
+        for key in _passthrough:
+            val = config.get(key)
+            if val is not None:
+                rule_kwargs[key] = val
+
+        rule = rule_cls(**rule_kwargs)
 
         # Set source_detector for cross-referencing
         source_detector = config.get("source_detector")
@@ -1179,6 +1353,11 @@ class BacktestBuilder:
             except KeyError:
                 pass
 
+        # Pre-built exit rule instances (from graph converter)
+        extra = config.get("_extra_rules")
+        if extra:
+            rules.extend(extra)
+
         # Default if nothing configured
         if not rules:
             from signalflow.strategy.component.exit.tp_sl import TakeProfitStopLossExit
@@ -1201,9 +1380,10 @@ class BacktestBuilder:
             # Fallback to direct imports
             from signalflow.strategy.broker import BacktestBroker
             from signalflow.strategy.broker.executor import VirtualSpotExecutor
+            from signalflow.strategy.broker.executor.base import OrderExecutor
 
             return BacktestBroker(
-                executor=VirtualSpotExecutor(fee_rate=self._fee),
+                executor=cast(OrderExecutor, VirtualSpotExecutor(fee_rate=self._fee)),
                 store=InMemoryStrategyStore(),
             )
 
@@ -1213,16 +1393,56 @@ class BacktestBuilder:
         entry_rules: list[Any],
         exit_rules: list[Any],
         *,
+        data_key: str = "spot",
         progress_callback: Callable[[int, int, dict[str, Any]], None] | None = None,
         cancel_event: Event | None = None,
     ) -> Any:
         """Build runner from registry."""
         try:
-            runner_cls = default_registry.get(SfComponentType.STRATEGY_RUNNER, "backtest")
+            runner_cls = default_registry.get(SfComponentType.STRATEGY_EXECUTOR, "backtest")
         except KeyError:
             from signalflow.strategy.runner import BacktestRunner
 
             runner_cls = BacktestRunner
+
+        # Default strategy metrics for equity curve & drawdown tracking
+        from signalflow.analytic.strategy.main_strategy_metrics import (
+            DrawdownMetric,
+            SharpeRatioMetric,
+            TotalReturnMetric,
+            WinRateMetric,
+        )
+
+        metrics: list[Any] = [
+            TotalReturnMetric(initial_capital=self._capital),
+            DrawdownMetric(),
+            WinRateMetric(),
+            SharpeRatioMetric(),
+        ]
+
+        # Extended metrics for richer analytics
+        try:
+            from signalflow.analytic.strategy.extended_metrics import (
+                CalmarRatioMetric,
+                ExpectancyMetric,
+                MaxConsecutiveMetric,
+                ProfitFactorMetric,
+                RiskRewardMetric,
+                SortinoRatioMetric,
+            )
+
+            metrics.extend(
+                [
+                    SortinoRatioMetric(),
+                    CalmarRatioMetric(),
+                    ProfitFactorMetric(),
+                    ExpectancyMetric(),
+                    RiskRewardMetric(),
+                    MaxConsecutiveMetric(),
+                ]
+            )
+        except ImportError:
+            pass
 
         return runner_cls(
             strategy_id=self.strategy_id,
@@ -1230,38 +1450,12 @@ class BacktestBuilder:
             entry_rules=entry_rules,
             exit_rules=exit_rules,
             initial_capital=self._capital,
+            metrics=metrics,
+            data_key=data_key,
             show_progress=self._show_progress,
             progress_callback=progress_callback,
             cancel_event=cancel_event,
         )
-
-    def visualize(
-        self,
-        *,
-        output: str | None = None,
-        format: str = "html",
-        show: bool = True,
-    ) -> str:
-        """
-        Visualize the configured pipeline.
-
-        Opens an interactive HTML visualization showing the data flow
-        from data sources through features to detector and runner.
-
-        Args:
-            output: Output file path (optional)
-            format: Output format ("html" or "mermaid")
-            show: Open in browser (HTML only)
-
-        Returns:
-            Rendered output string
-
-        Example:
-            >>> sf.Backtest("test").data(...).detector(...).visualize()
-        """
-        from signalflow import viz
-
-        return viz.pipeline(self, output=output, format=format, show=show)  # type: ignore[arg-type]
 
     def __repr__(self) -> str:
         parts = [f"strategy_id={self.strategy_id!r}"]

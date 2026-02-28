@@ -33,14 +33,16 @@ from __future__ import annotations
 
 import hashlib
 import warnings
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Literal, Mapping
+from typing import TYPE_CHECKING, Literal, cast
 
 import polars as pl
 
 if TYPE_CHECKING:
+    from signalflow.core.containers.raw_data import RawData
     from signalflow.data.raw_store.base import RawDataStore
 
 
@@ -63,16 +65,16 @@ class LazyDataTypeAccessor:
         ```
     """
 
-    __slots__ = ("_lazy_raw", "_data_type")
+    __slots__ = ("_data_type", "_lazy_raw")
 
-    def __init__(self, lazy_raw: "RawDataLazy", data_type: str):
+    def __init__(self, lazy_raw: RawDataLazy, data_type: str):
         object.__setattr__(self, "_lazy_raw", lazy_raw)
         object.__setattr__(self, "_data_type", data_type)
 
     def __getattr__(self, source: str) -> pl.DataFrame:
         """Access source by attribute: raw.perpetual.binance."""
-        lazy_raw = object.__getattribute__(self, "_lazy_raw")
-        data_type = object.__getattribute__(self, "_data_type")
+        lazy_raw: RawDataLazy = object.__getattribute__(self, "_lazy_raw")
+        data_type: str = object.__getattribute__(self, "_data_type")
 
         if source not in lazy_raw._stores.get(data_type, {}):
             available = list(lazy_raw._stores.get(data_type, {}).keys())
@@ -89,8 +91,8 @@ class LazyDataTypeAccessor:
 
     def to_polars(self) -> pl.DataFrame:
         """Return default source DataFrame with warning."""
-        lazy_raw = object.__getattribute__(self, "_lazy_raw")
-        data_type = object.__getattribute__(self, "_data_type")
+        lazy_raw: RawDataLazy = object.__getattribute__(self, "_lazy_raw")
+        data_type: str = object.__getattribute__(self, "_data_type")
 
         sources = self.sources
         if not sources:
@@ -107,10 +109,10 @@ class LazyDataTypeAccessor:
         )
         return lazy_raw._load(data_type, source)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple[str, pl.DataFrame]]:
         """Iterate over (source, DataFrame) pairs. Loads all sources."""
-        lazy_raw = object.__getattribute__(self, "_lazy_raw")
-        data_type = object.__getattribute__(self, "_data_type")
+        lazy_raw: RawDataLazy = object.__getattribute__(self, "_lazy_raw")
+        data_type: str = object.__getattribute__(self, "_data_type")
 
         for source in self.sources:
             yield source, lazy_raw._load(data_type, source)
@@ -170,11 +172,11 @@ class RawDataLazy:
     cache_dir: Path | None = None
 
     # Internal: stores[data_type][source] -> RawDataStore
-    _stores: dict[str, dict[str, "RawDataStore"]] = field(default_factory=dict, repr=False)
+    _stores: dict[str, dict[str, RawDataStore]] = field(default_factory=dict, repr=False)
     # Internal: memory cache[data_type][source] -> DataFrame
     _memory_cache: dict[str, dict[str, pl.DataFrame]] = field(default_factory=dict, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize cache directory for disk mode."""
         if self.cache_mode == "disk" and self.cache_dir is None:
             import tempfile
@@ -186,14 +188,14 @@ class RawDataLazy:
     @classmethod
     def from_stores(
         cls,
-        stores: Mapping[str, "RawDataStore"],
+        stores: Mapping[str, RawDataStore],
         pairs: list[str],
         start: datetime,
         end: datetime,
         default_source: str | None = None,
         cache_mode: CacheMode = "memory",
         cache_dir: Path | None = None,
-    ) -> "RawDataLazy":
+    ) -> RawDataLazy:
         """Create lazy RawData from dict of stores.
 
         Args:
@@ -226,7 +228,7 @@ class RawDataLazy:
             ```
         """
         # Group stores by data_type
-        nested_stores: dict[str, dict[str, "RawDataStore"]] = {}
+        nested_stores: dict[str, dict[str, RawDataStore]] = {}
 
         for source_name, store in stores.items():
             data_type = getattr(store, "data_type", "unknown")
@@ -271,10 +273,8 @@ class RawDataLazy:
     def _load(self, data_type: str, source: str) -> pl.DataFrame:
         """Load data with caching based on cache_mode."""
         # Check memory cache first
-        if self.cache_mode == "memory":
-            if data_type in self._memory_cache:
-                if source in self._memory_cache[data_type]:
-                    return self._memory_cache[data_type][source]
+        if self.cache_mode == "memory" and data_type in self._memory_cache and source in self._memory_cache[data_type]:
+            return self._memory_cache[data_type][source]
 
         # Check disk cache
         if self.cache_mode == "disk":
@@ -306,7 +306,7 @@ class RawDataLazy:
 
         return df
 
-    def preload(self, data_types: list[str] | None = None, sources: list[str] | None = None) -> "RawDataLazy":
+    def preload(self, data_types: list[str] | None = None, sources: list[str] | None = None) -> RawDataLazy:
         """Preload specified data into cache.
 
         Useful to trigger loading before intensive computations.
@@ -335,7 +335,7 @@ class RawDataLazy:
 
         return self
 
-    def clear_cache(self) -> "RawDataLazy":
+    def clear_cache(self) -> RawDataLazy:
         """Clear all cached data.
 
         Returns:
@@ -426,7 +426,7 @@ class RawDataLazy:
 
     # ── Conversion ────────────────────────────────────────────────────
 
-    def to_raw_data(self) -> "RawData":
+    def to_raw_data(self) -> RawData:
         """Convert to eager RawData by loading all data.
 
         Returns:
@@ -451,7 +451,7 @@ class RawDataLazy:
             datetime_start=self.datetime_start,
             datetime_end=self.datetime_end,
             pairs=self.pairs,
-            data=nested_data,
+            data=cast(dict[str, pl.DataFrame | dict[str, pl.DataFrame]], nested_data),
             default_source=self.default_source,
         )
 

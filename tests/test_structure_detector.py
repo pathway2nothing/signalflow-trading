@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import polars as pl
-import pytest
 
 from signalflow.core import Signals
 from signalflow.core.enums import SignalCategory

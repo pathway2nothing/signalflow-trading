@@ -106,7 +106,7 @@ class TestTrendScanningLabeler:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        rise_count = sum(1 for l in labels if l == "rise")
+        rise_count = sum(1 for lbl in labels if lbl == "rise")
         assert rise_count > 0, "Expected rise labels in noisy uptrend"
 
     def test_downtrend_detected_as_fall(self):
@@ -132,7 +132,7 @@ class TestTrendScanningLabeler:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        fall_count = sum(1 for l in labels if l == "fall")
+        fall_count = sum(1 for lbl in labels if lbl == "fall")
         assert fall_count > 0, "Expected fall labels in noisy downtrend"
 
     def test_flat_market_mostly_null(self):
@@ -142,7 +142,7 @@ class TestTrendScanningLabeler:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        null_count = sum(1 for l in labels if l is None)
+        null_count = sum(1 for lbl in labels if lbl is None)
         # Most should be null in flat market with high critical value
         assert null_count > len(labels) * 0.5
 
@@ -153,8 +153,8 @@ class TestTrendScanningLabeler:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        has_rise = any(l == "rise" for l in labels)
-        has_fall = any(l == "fall" for l in labels)
+        has_rise = any(lbl == "rise" for lbl in labels)
+        has_fall = any(lbl == "fall" for lbl in labels)
         assert has_rise or has_fall, "V-shape should have at least one directional label"
 
     def test_meta_columns(self):
@@ -292,7 +292,7 @@ class TestTrendScanningLabeler:
         )
         result = labeler.compute(df)
         labels = result["label"].to_list()
-        non_null_count = sum(1 for l in labels if l is not None)
+        non_null_count = sum(1 for lbl in labels if lbl is not None)
         assert non_null_count < len(labels) * 0.5
 
 
@@ -321,7 +321,7 @@ class TestTrendScanNumpy:
         # Downtrend with noise
         rng = np.random.default_rng(42)
         prices = np.array([100.0 - i + rng.normal(0, 0.1) for i in range(50)], dtype=np.float64)
-        t_stats, best_windows = _trend_scan_numpy(prices, min_lf=3, max_lf=10, step=1)
+        t_stats, _best_windows = _trend_scan_numpy(prices, min_lf=3, max_lf=10, step=1)
 
         # Should have negative t-stats for downtrend
         valid_t_stats = t_stats[~np.isnan(t_stats)]
@@ -347,7 +347,7 @@ class TestTrendScanNumpy:
         from signalflow.target.trend_scanning import _trend_scan_numpy
 
         prices = np.array([100.0] * 30, dtype=np.float64)
-        t_stats, best_windows = _trend_scan_numpy(prices, min_lf=3, max_lf=10, step=1)
+        t_stats, _best_windows = _trend_scan_numpy(prices, min_lf=3, max_lf=10, step=1)
 
         # With constant prices, residuals are zero, so t-stats should be NaN or zero
         valid_t_stats = t_stats[~np.isnan(t_stats)]
@@ -363,9 +363,9 @@ class TestTrendScanNumpy:
         prices = 100.0 + 0.5 * np.arange(100) + rng.normal(0, 0.1, 100)
 
         # With step=1
-        t_stats_1, windows_1 = _trend_scan_numpy(prices, min_lf=5, max_lf=20, step=1)
+        t_stats_1, _windows_1 = _trend_scan_numpy(prices, min_lf=5, max_lf=20, step=1)
         # With step=5
-        t_stats_5, windows_5 = _trend_scan_numpy(prices, min_lf=5, max_lf=20, step=5)
+        t_stats_5, _windows_5 = _trend_scan_numpy(prices, min_lf=5, max_lf=20, step=5)
 
         assert len(t_stats_1) == len(t_stats_5)
         # Results may differ due to different window sizes tested
@@ -375,7 +375,7 @@ class TestTrendScanNumpy:
         from signalflow.target.trend_scanning import _trend_scan_numpy
 
         prices = np.array([100.0 + i for i in range(20)], dtype=np.float64)
-        t_stats, best_windows = _trend_scan_numpy(prices, min_lf=10, max_lf=15, step=1)
+        t_stats, _best_windows = _trend_scan_numpy(prices, min_lf=10, max_lf=15, step=1)
 
         # Last 15 elements can't have windows of size 15
         # Last 10 elements can't have windows of size 10

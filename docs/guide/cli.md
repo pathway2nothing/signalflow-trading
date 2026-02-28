@@ -267,10 +267,10 @@ To use custom detectors in YAML config, first register them:
 
 ```python
 # my_detectors.py
-from signalflow.core import sf_component, SfComponentType
+import signalflow as sf
 from signalflow.detector import SignalDetector
 
-@sf_component(SfComponentType.DETECTOR, "my_namespace/rsi_crossover")
+@sf.detector("my_namespace/rsi_crossover")
 class RsiCrossoverDetector(SignalDetector):
     def __init__(self, period: int = 14, overbought: float = 70, oversold: float = 30):
         self.period = period

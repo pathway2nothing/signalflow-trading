@@ -13,13 +13,13 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import sf_component
+from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
 from signalflow.target.base import Labeler
 
 
 @dataclass
-@sf_component(name="volume_regime")
+@labeler("volume_regime")
 class VolumeRegimeLabeler(Labeler):
     """Label bars by forward volume regime.
 

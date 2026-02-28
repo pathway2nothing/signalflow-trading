@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 import polars as pl
+
 from signalflow.core.signal_transform import SignalsTransform
 
 _NONE_SIGNAL = "none"  # Legacy inactive signal type (deprecated; prefer null)
@@ -63,7 +65,7 @@ class Signals:
 
     value: pl.DataFrame
 
-    def apply(self, transform: SignalsTransform) -> "Signals":
+    def apply(self, transform: SignalsTransform) -> Signals:
         """Apply a single transformation to signals.
 
         Args:
@@ -87,7 +89,7 @@ class Signals:
         out = transform(self.value)
         return Signals(out)
 
-    def pipe(self, *transforms: SignalsTransform) -> "Signals":
+    def pipe(self, *transforms: SignalsTransform) -> Signals:
         """Apply multiple transformations sequentially.
 
         Args:
@@ -110,7 +112,7 @@ class Signals:
             s = s.apply(t)
         return s
 
-    def __add__(self, other: "Signals") -> "Signals":
+    def __add__(self, other: Signals) -> Signals:
         """Merge two Signals objects.
 
         Merge rules:
@@ -185,7 +187,7 @@ class Signals:
             .alias("_priority")
         )
 
-        sort_cols = key_cols + ["_priority", "_src"]
+        sort_cols = [*key_cols, "_priority", "_src"]
         sort_desc = [False] * len(key_cols) + [True, True]
 
         merged = (

@@ -5,7 +5,7 @@ API reference for `signalflow.ta` — 199+ technical indicators.
 !!! info "Separate Package"
     Install with `pip install signalflow-ta`. See the [ecosystem page](../ecosystem/signalflow-ta.md) for usage guide, examples, and pipeline factories.
 
-All classes extend `signalflow.feature.base.Feature` and are registered via `@sf_component`. Import directly from `signalflow.ta`:
+All classes extend `signalflow.feature.base.Feature` and are registered via semantic decorators (e.g., `@sf.feature("name")`). Import directly from `signalflow.ta`:
 
 ```python
 import signalflow.ta as ta
@@ -20,7 +20,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Core (`signalflow.ta.momentum.core`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `RsiMom` | `momentum/rsi` | `period=14`, `source_col="close"` | `rsi_{period}` |
 | `RocMom` | `momentum/roc` | `period=12`, `source_col="close"` | `roc_{period}` |
@@ -29,7 +29,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Oscillators (`signalflow.ta.momentum.oscillators`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `StochMom` | `momentum/stoch` | `k_period=14`, `d_period=3` | `stoch_k_{k_period}`, `stoch_d_{k_period}` |
 | `StochRsiMom` | `momentum/stoch_rsi` | `period=14`, `k_period=3`, `d_period=3` | `stoch_rsi_k_{period}`, `stoch_rsi_d_{period}` |
@@ -40,7 +40,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### MACD Family (`signalflow.ta.momentum.macd`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `MacdMom` | `momentum/macd` | `fast=12`, `slow=26`, `signal=9` | `macd`, `macd_signal`, `macd_hist` |
 | `PpoMom` | `momentum/ppo` | `fast=12`, `slow=26`, `signal=9` | `ppo`, `ppo_signal`, `ppo_hist` |
@@ -49,7 +49,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Kinematics (`signalflow.ta.momentum.kinematics`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `AccelerationMom` | `momentum/acceleration` | `period=14` | `acceleration_{period}` |
 | `JerkMom` | `momentum/jerk` | `period=14` | `jerk_{period}` |
@@ -64,7 +64,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Smoothers (`signalflow.ta.overlap.smoothers`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `SmaSmooth` | `overlap/sma` | `period=20`, `source_col="close"` | `sma_{period}` |
 | `EmaSmooth` | `overlap/ema` | `period=20`, `source_col="close"` | `ema_{period}` |
@@ -80,7 +80,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Adaptive (`signalflow.ta.overlap.adaptive`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `KamaSmooth` | `overlap/kama` | `period=10`, `fast=2`, `slow=30` | `kama_{period}` |
 | `AlmaSmooth` | `overlap/alma` | `period=20`, `sigma=6.0`, `offset=0.85` | `alma_{period}` |
@@ -93,7 +93,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Price Transforms (`signalflow.ta.overlap.price`)
 
-| Class | `@sf_component` | Output |
+| Class | Registry Name | Output |
 |-------|----------------|--------|
 | `Hl2Price` | `overlap/hl2` | `hl2` |
 | `Hlc3Price` | `overlap/hlc3` | `hlc3` |
@@ -111,7 +111,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Range (`signalflow.ta.volatility.range`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `TrueRangeVol` | `volatility/true_range` | — | `true_range` |
 | `AtrVol` | `volatility/atr` | `period=14` | `atr_{period}` |
@@ -119,7 +119,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Bands (`signalflow.ta.volatility.bands`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `BollingerVol` | `volatility/bollinger` | `period=20`, `num_std=2.0` | `bb_upper`, `bb_middle`, `bb_lower`, `bb_width`, `bb_pct` |
 | `KeltnerVol` | `volatility/keltner` | `period=20`, `atr_period=10`, `multiplier=1.5` | `kc_upper`, `kc_middle`, `kc_lower` |
@@ -128,7 +128,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Measures (`signalflow.ta.volatility.measures`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `MassIndexVol` | `volatility/mass_index` | `fast=9`, `slow=25` | `mass_index` |
 | `UlcerIndexVol` | `volatility/ulcer_index` | `period=14` | `ulcer_index_{period}` |
@@ -137,7 +137,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Energy — Physics-Based (`signalflow.ta.volatility.energy`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `KineticEnergyVol` | `volatility/kinetic_energy` | `period=20` | `kinetic_energy_{period}` |
 | `PotentialEnergyVol` | `volatility/potential_energy` | `period=20` | `potential_energy_{period}` |
@@ -156,7 +156,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Cumulative (`signalflow.ta.volume.cumulative`)
 
-| Class | `@sf_component` | Output |
+| Class | Registry Name | Output |
 |-------|----------------|--------|
 | `ObvVolume` | `volume/obv` | `obv` |
 | `AdVolume` | `volume/ad` | `ad` |
@@ -166,7 +166,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Oscillators (`signalflow.ta.volume.oscillators`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `MfiVolume` | `volume/mfi` | `period=14` | `mfi_{period}` |
 | `CmfVolume` | `volume/cmf` | `period=20` | `cmf_{period}` |
@@ -176,7 +176,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Dynamics — Physics-Based (`signalflow.ta.volume.dynamics`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `MarketForceVolume` | `volume/market_force` | `period=14` | `market_force_{period}` |
 | `ImpulseVolume` | `volume/impulse` | `period=14` | `impulse_{period}` |
@@ -193,7 +193,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Strength (`signalflow.ta.trend.strength`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `AdxTrend` | `trend/adx` | `period=14` | `adx_{period}`, `di_plus`, `di_minus` |
 | `AroonTrend` | `trend/aroon` | `period=25` | `aroon_up`, `aroon_down`, `aroon_osc` |
@@ -211,7 +211,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Stops (`signalflow.ta.trend.stops`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `PsarTrend` | `trend/psar` | `af=0.02`, `max_af=0.2` | `psar` |
 | `SupertrendTrend` | `trend/supertrend` | `period=10`, `multiplier=3.0` | `supertrend`, `supertrend_dir` |
@@ -221,7 +221,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Detection (`signalflow.ta.trend.detection`)
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `IchimokuTrend` | `trend/ichimoku` | `tenkan=9`, `kijun=26`, `senkou=52` | `tenkan_sen`, `kijun_sen`, `senkou_a`, `senkou_b`, `chikou` |
 | `DpoTrend` | `trend/dpo` | `period=20` | `dpo_{period}` |
@@ -236,7 +236,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Dispersion
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `VarianceStat` | `stat/variance` | Rolling variance |
 | `StdStat` | `stat/std` | Rolling standard deviation |
@@ -250,7 +250,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Distribution
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `MedianStat` | `stat/median` | Rolling median |
 | `QuantileStat` | `stat/quantile` | Rolling quantile |
@@ -266,7 +266,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Memory & Diffusion
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `HurstStat` | `stat/hurst` | Hurst exponent (mean-reversion vs trend) |
 | `AutocorrStat` | `stat/autocorr` | Autocorrelation |
@@ -283,7 +283,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Cycle Analysis
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `InstAmplitudeStat` | `stat/inst_amplitude` | Instantaneous amplitude via Hilbert |
 | `InstPhaseStat` | `stat/inst_phase` | Instantaneous phase |
@@ -297,7 +297,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Complexity
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `PermutationEntropyStat` | `stat/permutation_entropy` | Bandt-Pompe permutation entropy |
 | `SampleEntropyStat` | `stat/sample_entropy` | Sample entropy |
@@ -307,7 +307,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Information Theory
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `KLDivergenceStat` | `stat/kl_divergence` | Kullback-Leibler divergence |
 | `JSDivergenceStat` | `stat/js_divergence` | Jensen-Shannon divergence |
@@ -317,7 +317,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Regression
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `CorrelationStat` | `stat/correlation` | Rolling Pearson correlation |
 | `BetaStat` | `stat/beta` | Rolling beta (vs benchmark) |
@@ -328,7 +328,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Realized Volatility
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `RealizedVolStat` | `stat/realized_vol` | Realized (close-to-close) volatility |
 | `ParkinsonVolStat` | `stat/parkinson_vol` | Parkinson range-based volatility |
@@ -338,7 +338,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### DSP / Signal Processing
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `SpectralFluxStat` | `stat/spectral_flux` | Spectral flux |
 | `ZeroCrossingRateStat` | `stat/zero_crossing_rate` | Zero crossing rate |
@@ -348,7 +348,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Control Theory
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `KalmanInnovationStat` | `stat/kalman_innovation` | Kalman filter innovation |
 | `ARCoefficientStat` | `stat/ar_coefficient` | Autoregressive coefficient |
@@ -358,7 +358,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ### Cross-Sectional
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `CrossSectionalStat` | `stat/cross_sectional` | Cross-sectional aggregation |
 
@@ -368,7 +368,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 `signalflow.ta.performance` — 2 indicators
 
-| Class | `@sf_component` | Parameters | Output |
+| Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
 | `LogReturn` | `performance/log_return` | `period=1` | `log_return_{period}` |
 | `PctReturn` | `performance/pct_return` | `period=1` | `pct_return_{period}` |
@@ -379,7 +379,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 `signalflow.ta.divergence` — 2 detectors
 
-| Class | `@sf_component` | Description |
+| Class | Registry Name | Description |
 |-------|----------------|-------------|
 | `RsiDivergence` | `divergence/rsi` | RSI-based divergence detector (regular & hidden) |
 | `MacdDivergence` | `divergence/macd` | MACD histogram divergence detector |

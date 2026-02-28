@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import fields
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
+
 from loguru import logger
 
 T = TypeVar("T")
@@ -28,12 +29,14 @@ class KwargsTolerantMixin:
 
         def wrapped_init(self: T, *args: Any, **kwargs2: Any) -> None:
             if not kwargs2:
-                return orig_init(self, *args)
+                orig_init(self, *args)
+                return
 
             try:
-                known = {f.name for f in fields(self)}
+                known = {f.name for f in fields(self)}  # type: ignore[arg-type]
             except TypeError:
-                return orig_init(self, *args, **kwargs2)
+                orig_init(self, *args, **kwargs2)
+                return
 
             unknown = {k: v for k, v in kwargs2.items() if k not in known}
             passed = {k: v for k, v in kwargs2.items() if k in known}
@@ -59,10 +62,10 @@ class KwargsTolerantMixin:
                 if not getattr(cls, "__ignore_unknown_kwargs__", True):
                     passed.update(unknown)
 
-            return orig_init(self, *args, **passed)
+            orig_init(self, *args, **passed)
 
         wrapped_init.__name__ = orig_init.__name__
         wrapped_init.__qualname__ = orig_init.__qualname__
         wrapped_init.__doc__ = orig_init.__doc__
 
-        setattr(cls, "__init__", wrapped_init)
+        cls.__init__ = wrapped_init  # type: ignore[method-assign]

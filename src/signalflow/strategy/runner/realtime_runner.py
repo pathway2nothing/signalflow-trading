@@ -3,21 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import signal
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any, cast
 
 import polars as pl
 from loguru import logger
 
+import signalflow as sf
 from signalflow.analytic import StrategyMetric
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.raw_data_view import RawDataView
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-from signalflow.core.decorators import sf_component
 from signalflow.strategy.component.base import EntryRule, ExitRule
 from signalflow.strategy.runner.base import StrategyRunner
 
@@ -38,7 +39,7 @@ _TIMEFRAME_MINUTES: dict[str, int] = {
 
 
 @dataclass
-@sf_component(name="realtime_runner")
+@sf.executor("realtime_runner")
 class RealtimeRunner(StrategyRunner):
     """Async paper/live trading runner.
 
@@ -152,10 +153,8 @@ class RealtimeRunner(StrategyRunner):
             # Graceful cleanup
             if sync_task is not None:
                 sync_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await sync_task
-                except asyncio.CancelledError:
-                    pass
 
             self._persist_cycle(state, trades=[], ts=state.last_ts)
             n_open = len(state.portfolio.open_positions()) if hasattr(state.portfolio, "open_positions") else 0
@@ -176,13 +175,11 @@ class RealtimeRunner(StrategyRunner):
             new_timestamps = self._poll_new_bars(state)
 
             if not new_timestamps:
-                try:
+                with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(
                         self._shutdown.wait(),
                         timeout=self.poll_interval_sec,
                     )
-                except asyncio.TimeoutError:
-                    pass
                 continue
 
             for ts in new_timestamps:
@@ -318,12 +315,11 @@ class RealtimeRunner(StrategyRunner):
             return []
 
         # Find the latest timestamp across all pairs
-        latest: Optional[datetime] = None
+        latest: datetime | None = None
         for pair in self.pairs:
             _, pair_max = self.raw_store.get_time_bounds(pair)
-            if pair_max is not None:
-                if latest is None or pair_max > latest:
-                    latest = pair_max
+            if pair_max is not None and (latest is None or pair_max > latest):
+                latest = pair_max
 
         if latest is None:
             return []
@@ -336,19 +332,18 @@ class RealtimeRunner(StrategyRunner):
             start = state.last_ts
         else:
             # First run - find earliest timestamp across all pairs
-            earliest: Optional[datetime] = None
+            earliest: datetime | None = None
             for pair in self.pairs:
                 pair_min, _ = self.raw_store.get_time_bounds(pair)
-                if pair_min is not None:
-                    if earliest is None or pair_min < earliest:
-                        earliest = pair_min
+                if pair_min is not None and (earliest is None or pair_min < earliest):
+                    earliest = pair_min
             start = earliest if earliest is not None else latest
         df = self.raw_store.load_many(self.pairs, start=start, end=latest)
 
         if df.height == 0:
             return []
 
-        timestamps = df.select(self.ts_col).unique().sort(self.ts_col).get_column(self.ts_col).to_list()
+        timestamps: list[datetime] = df.select(self.ts_col).unique().sort(self.ts_col).get_column(self.ts_col).to_list()
 
         # Filter out already-processed bar
         if state.last_ts is not None:
@@ -536,7 +531,119 @@ class RealtimeRunner(StrategyRunner):
         return self._trades
 
     @property
+    def bars_processed(self) -> int:
+        return self._bars_processed
+
+    @property
     def metrics_df(self) -> pl.DataFrame:
         if not self._metrics_history:
             return pl.DataFrame()
         return pl.DataFrame(self._metrics_history)
+
+    def get_state(self) -> dict[str, Any]:
+        """Get current runner state summary (thread-safe snapshot).
+
+        Returns:
+            Dict with bars_processed, n_trades, is_running.
+        """
+        return {
+            "bars_processed": self._bars_processed,
+            "n_trades": len(self._trades),
+            "is_running": not self._shutdown.is_set(),
+        }
+
+    def request_shutdown(self) -> None:
+        """Request graceful shutdown (public wrapper)."""
+        self._shutdown.set()
+
+    @classmethod
+    def from_builder(
+        cls,
+        builder: Any,
+        *,
+        raw_store: Any,
+        pairs: list[str],
+        session_id: str = "live",
+        timeframe: str = "1m",
+        poll_interval_sec: float = 5.0,
+        warmup_bars: int = 100,
+        fee: float | None = None,
+    ) -> tuple[RealtimeRunner, Any]:
+        """Build a RealtimeRunner from a configured FlowBuilder.
+
+        Reuses the builder's detector, entry/exit rules, capital, and fee
+        settings so that the UI doesn't have to duplicate rule-building logic.
+
+        Args:
+            builder: A configured ``FlowBuilder`` instance.
+            raw_store: DuckDB (or other) raw data store to poll for bars.
+            pairs: Trading pairs to monitor.
+            session_id: Strategy ID for this session.
+            timeframe: Candle timeframe.
+            poll_interval_sec: Polling interval.
+            warmup_bars: Historical bars for warmup.
+            fee: Override fee rate. If None, uses builder's fee.
+
+        Returns:
+            Tuple of ``(RealtimeRunner, VirtualRealtimeBroker)``.
+
+        Raises:
+            ConfigurationError: If builder has no detector configured.
+        """
+        from signalflow.api.exceptions import ConfigurationError
+        from signalflow.data.strategy_store.memory import InMemoryStrategyStore
+        from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
+        from signalflow.strategy.broker.virtual_broker import VirtualRealtimeBroker
+
+        # Detector
+        if not builder._named_detectors:
+            raise ConfigurationError("Builder must have at least one detector for live mode")
+        detector = next(iter(builder._named_detectors.values()))
+
+        # Entry/exit rules
+        entry_rules, exit_rules = builder.build_rules()
+
+        # Metrics
+        from signalflow.analytic.strategy.main_strategy_metrics import (
+            DrawdownMetric,
+            SharpeRatioMetric,
+            TotalReturnMetric,
+            WinRateMetric,
+        )
+
+        strategy_metrics = [
+            TotalReturnMetric(),
+            DrawdownMetric(),
+            WinRateMetric(),
+            SharpeRatioMetric(),
+        ]
+
+        # Broker
+        fee_rate = fee if fee is not None else builder._fee
+        store = InMemoryStrategyStore()
+        from signalflow.strategy.broker.executor.base import OrderExecutor
+
+        executor = cast(OrderExecutor, VirtualSpotExecutor(fee_rate=fee_rate, slippage_pct=0.0005))
+        broker = VirtualRealtimeBroker(executor=executor, store=store)
+
+        # Alert manager (set by UI graph_converter if alert nodes present)
+        alert_manager = getattr(builder, "_alert_manager", None)
+
+        runner = cls(
+            strategy_id=session_id,
+            pairs=pairs,
+            timeframe=timeframe,
+            initial_capital=builder._capital,
+            detector=detector,
+            broker=broker,
+            raw_store=raw_store,
+            strategy_store=store,
+            entry_rules=entry_rules,
+            exit_rules=exit_rules,
+            metrics=strategy_metrics,
+            poll_interval_sec=poll_interval_sec,
+            warmup_bars=warmup_bars,
+            alert_manager=alert_manager,
+        )
+
+        return runner, broker

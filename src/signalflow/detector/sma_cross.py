@@ -4,13 +4,13 @@ from typing import Any
 
 import polars as pl
 
-from signalflow.core import Signals, sf_component
+from signalflow.core import Signals, detector
 from signalflow.detector import SignalDetector
 from signalflow.feature import ExampleSmaFeature
 
 
 @dataclass
-@sf_component(name="example/sma_cross")
+@detector("example/sma_cross")
 class ExampleSmaCrossDetector(SignalDetector):
     """SMA crossover signal detector.
 
@@ -27,7 +27,7 @@ class ExampleSmaCrossDetector(SignalDetector):
 
     def __post_init__(self) -> None:
         if self.fast_period >= self.slow_period:
-            raise ValueError(f"fast_period must be < slow_period")
+            raise ValueError("fast_period must be < slow_period")
 
         self.fast_col = f"sma_{self.fast_period}"
         self.slow_col = f"sma_{self.slow_period}"

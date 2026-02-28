@@ -1,0 +1,152 @@
+"""Configuration loading utilities for SignalFlow.
+
+This module provides unified config loading for all SignalFlow frontends
+(sf-kedro, sf-ui, CLI).
+
+Terminology (Kubeflow-inspired):
+- Flow: The complete DAG configuration
+- Node: A processing unit (loader, detector, strategy, etc.)
+- Dependency: Connection between nodes with artifact type
+- Artifact: Data passed between nodes (ohlcv, signals, trades, etc.)
+
+Example:
+    >>> import signalflow as sf
+    >>> config = sf.config.load("grid_sma", conf_path="./conf")
+    >>> result = sf.Backtest.from_dict(config).run()
+
+    # Or with Flow (DAG-style, auto-inferred dependencies):
+    >>> flow = sf.config.Flow.from_dict({
+    ...     "nodes": {
+    ...         "loader": {"type": "data/loader"},
+    ...         "detector": {"type": "signals/detector"},
+    ...     }
+    ... })
+    >>> flow.compile()  # Resolve dependencies
+    >>> flow.plan()     # Get execution order
+    >>> flow.run()      # Execute backtest
+"""
+
+from signalflow.config.artifact_cache import ArtifactCache
+from signalflow.config.artifact_schema import (
+    FEATURES_SCHEMA,
+    LABELS_SCHEMA,
+    OHLCV_SCHEMA,
+    SIGNALS_SCHEMA,
+    TRADES_SCHEMA,
+    ArtifactSchema,
+    ArtifactType,
+    ColumnSchema,
+    get_schema,
+)
+from signalflow.config.dag import (
+    # New names (Kubeflow-inspired)
+    Artifact,
+    Dependency,
+    # Backward compatibility aliases
+    Edge,  # alias for Dependency
+    # Other exports
+    EntryMode,
+    Flow,
+    FlowDAG,  # alias for Flow
+    FlowMode,
+    FlowRunResult,
+    Node,
+    SignalReconciliation,
+    StrategySubgraph,
+)
+from signalflow.config.flow import (
+    DataConfig,
+    DetectorConfig,
+    EntryFilterConfig,
+    EntryRuleConfig,
+    ExitRuleConfig,
+    FlowConfig,
+    StrategyConfig,
+)
+from signalflow.config.loader import (
+    deep_merge,
+    get_flow_info,
+    list_flows,
+    load_flow_config,
+    load_yaml,
+)
+from signalflow.config.mode_config import (
+    ConfigFormat,
+    ModeConfig,
+    ResolvedFlowConfig,
+    deep_merge_with_operators,
+    detect_format,
+    extract_base_config,
+    extract_mode_config,
+    resolve_extends_chain,
+    resolve_flow_config,
+    resolve_params,
+)
+from signalflow.config.mode_config import FlowMode as ExecutionMode
+from signalflow.config.validation import (
+    FlowValidator,
+    ValidationResult,
+    validate_data,
+    validate_detector,
+    validate_flow_config,
+    validate_strategy,
+    validate_validator,
+)
+
+# Convenience alias
+load = load_flow_config
+
+__all__ = [
+    "FEATURES_SCHEMA",
+    "LABELS_SCHEMA",
+    "OHLCV_SCHEMA",
+    "SIGNALS_SCHEMA",
+    "TRADES_SCHEMA",
+    "Artifact",
+    "ArtifactCache",
+    "ArtifactSchema",
+    "ArtifactType",
+    "ColumnSchema",
+    "ConfigFormat",
+    "DataConfig",
+    "Dependency",
+    "DetectorConfig",
+    "Edge",
+    "EntryFilterConfig",
+    "EntryMode",
+    "EntryRuleConfig",
+    "ExecutionMode",
+    "ExitRuleConfig",
+    "Flow",
+    "FlowConfig",
+    "FlowDAG",
+    "FlowMode",
+    "FlowRunResult",
+    "FlowValidator",
+    "ModeConfig",
+    "Node",
+    "ResolvedFlowConfig",
+    "SignalReconciliation",
+    "StrategyConfig",
+    "StrategySubgraph",
+    "ValidationResult",
+    "deep_merge",
+    "deep_merge_with_operators",
+    "detect_format",
+    "extract_base_config",
+    "extract_mode_config",
+    "get_flow_info",
+    "get_schema",
+    "list_flows",
+    "load",
+    "load_flow_config",
+    "load_yaml",
+    "resolve_extends_chain",
+    "resolve_flow_config",
+    "resolve_params",
+    "validate_data",
+    "validate_detector",
+    "validate_flow_config",
+    "validate_strategy",
+    "validate_validator",
+]

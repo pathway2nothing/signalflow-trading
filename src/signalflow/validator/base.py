@@ -5,11 +5,10 @@ Signal validators (meta-labelers) predict the quality/risk of trading signals.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
 from pathlib import Path
+from typing import Any, ClassVar
 
 import polars as pl
-import numpy as np
 
 from signalflow.core import SfComponentType, Signals
 

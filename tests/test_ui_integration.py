@@ -7,14 +7,13 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from threading import Event
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import polars as pl
 import pytest
 
 from signalflow.core.enums import SfComponentType
 from signalflow.core.registry import SignalFlowRegistry
-
 
 # ─── Fixtures ───────────────────────────────────────────────────────────
 
@@ -178,9 +177,9 @@ class TestRegistryExportSchemas:
 
 class TestBacktestResultJsonExport:
     def _make_result(self, n_trades: int = 3, with_metrics_df: bool = True):
+        from signalflow.api.result import BacktestResult
         from signalflow.core.containers.raw_data import RawData
         from signalflow.core.containers.strategy_state import StrategyState
-        from signalflow.api.result import BacktestResult
 
         state = StrategyState(strategy_id="test")
         state.portfolio.cash = 11000.0
@@ -258,7 +257,6 @@ class TestBacktestResultJsonExport:
                 datetime.fromisoformat(trade["entry_time"])
 
     def test_to_json_dict_handles_inf_nan(self):
-        from signalflow.api.result import BacktestResult
 
         result = self._make_result(n_trades=0)
         d = result.to_json_dict()
@@ -273,10 +271,10 @@ class TestBacktestResultJsonExport:
 
 class TestBacktestRunnerProgress:
     def _make_runner(self, **kwargs):
-        from signalflow.strategy.runner.backtest_runner import BacktestRunner
+        from signalflow.data.strategy_store.memory import InMemoryStrategyStore
         from signalflow.strategy.broker.backtest import BacktestBroker
         from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
-        from signalflow.data.strategy_store.memory import InMemoryStrategyStore
+        from signalflow.strategy.runner.backtest_runner import BacktestRunner
 
         broker = BacktestBroker(
             executor=VirtualSpotExecutor(fee_rate=0.001),

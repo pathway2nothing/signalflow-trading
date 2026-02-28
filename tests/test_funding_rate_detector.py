@@ -3,13 +3,11 @@
 from datetime import datetime, timedelta
 
 import polars as pl
-import pytest
 
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.raw_data_view import RawDataView
 from signalflow.core.containers.signals import Signals
 from signalflow.detector.funding_rate import FundingRateDetector
-
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -170,7 +168,7 @@ class TestFundingRateDetectorSchema:
 
 class TestFundingRateDetectorRegistry:
     def test_component_registered(self):
-        from signalflow.core import default_registry, SfComponentType
+        from signalflow.core import SfComponentType, default_registry
 
         comp = default_registry.get(SfComponentType.DETECTOR, "funding/rate_transition")
         assert comp is not None

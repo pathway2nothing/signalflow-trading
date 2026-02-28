@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
-from signalflow.core import SfComponentType, sf_component
+import signalflow as sf
 from signalflow.strategy.component.sizing.base import SignalContext
 
 if TYPE_CHECKING:
@@ -25,8 +25,6 @@ class EntryFilter(ABC):
         - Should provide rejection reason for debugging
         - Can be composed via CompositeEntryFilter
     """
-
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_ENTRY_RULE
 
     @abstractmethod
     def allow_entry(
@@ -50,7 +48,7 @@ class EntryFilter(ABC):
 
 
 @dataclass
-@sf_component(name="composite_entry_filter")
+@sf.entry("composite_entry_filter")
 class CompositeEntryFilter(EntryFilter):
     """Combines multiple entry filters.
 
@@ -97,7 +95,7 @@ class CompositeEntryFilter(EntryFilter):
 
 
 @dataclass
-@sf_component(name="regime_filter")
+@sf.entry("regime_filter")
 class RegimeFilter(EntryFilter):
     """Filter entries based on market regime.
 
@@ -160,7 +158,7 @@ class RegimeFilter(EntryFilter):
 
 
 @dataclass
-@sf_component(name="volatility_filter")
+@sf.entry("volatility_filter")
 class VolatilityFilter(EntryFilter):
     """Skip entries in extreme volatility conditions.
 
@@ -200,7 +198,7 @@ class VolatilityFilter(EntryFilter):
 
 
 @dataclass
-@sf_component(name="drawdown_filter")
+@sf.entry("drawdown_filter")
 class DrawdownFilter(EntryFilter):
     """Pause trading after significant drawdown.
 
@@ -235,7 +233,7 @@ class DrawdownFilter(EntryFilter):
 
 
 @dataclass
-@sf_component(name="correlation_filter")
+@sf.entry("correlation_filter")
 class CorrelationFilter(EntryFilter):
     """Avoid concentrated positions in correlated assets.
 
@@ -279,7 +277,7 @@ class CorrelationFilter(EntryFilter):
 
 
 @dataclass
-@sf_component(name="time_of_day_filter")
+@sf.entry("time_of_day_filter")
 class TimeOfDayFilter(EntryFilter):
     """Restrict trading to specific hours.
 
@@ -314,7 +312,7 @@ class TimeOfDayFilter(EntryFilter):
 
 
 @dataclass
-@sf_component(name="price_distance_filter")
+@sf.entry("price_distance_filter")
 class PriceDistanceFilter(EntryFilter):
     """Filter entries based on price distance from existing positions.
 
@@ -353,46 +351,42 @@ class PriceDistanceFilter(EntryFilter):
         if not pair_positions:
             return True, ""  # No existing positions
 
-        # Get the most recent position's entry price
-        # (could also check all positions or closest price)
-        last_position = max(pair_positions, key=lambda p: p.entry_time or p.id)
-        last_entry_price = last_position.entry_price
-
-        if last_entry_price <= 0 or signal.price <= 0:
+        if signal.price <= 0:
             return True, ""
 
-        price_change_pct = (signal.price - last_entry_price) / last_entry_price
+        # Check distance against ALL open positions — reject if any is too close
+        for pos in pair_positions:
+            entry_price = pos.entry_price
+            if entry_price <= 0:
+                continue
 
-        if self.direction_aware:
-            # Determine direction for this signal_type
-            if self.signal_direction_map is not None:
-                direction = self.signal_direction_map.get(signal.signal_type)
+            pct = (signal.price - entry_price) / entry_price
+
+            if self.direction_aware:
+                if self.signal_direction_map is not None:
+                    direction = self.signal_direction_map.get(signal.signal_type)
+                else:
+                    direction = {"rise": "long", "fall": "short"}.get(signal.signal_type)
+
+                if direction == "long" and pct > -self.min_distance_pct:
+                    return False, (
+                        f"price too close to position @{entry_price:.2f}: {pct:.2%} > -{self.min_distance_pct:.2%}"
+                    )
+                elif direction == "short" and pct < self.min_distance_pct:
+                    return False, (
+                        f"price too close to position @{entry_price:.2f}: {pct:.2%} < {self.min_distance_pct:.2%}"
+                    )
             else:
-                # Legacy behavior
-                direction = {"rise": "long", "fall": "short"}.get(signal.signal_type)
-
-            if direction == "long":
-                # LONG: we want to buy lower (DCA)
-                if price_change_pct > -self.min_distance_pct:
+                if abs(pct) < self.min_distance_pct:
                     return False, (
-                        f"price too close to last entry: {price_change_pct:.2%} > -{self.min_distance_pct:.2%}"
+                        f"price too close to position @{entry_price:.2f}: |{pct:.2%}| < {self.min_distance_pct:.2%}"
                     )
-            elif direction == "short":
-                # SHORT: we want to sell higher
-                if price_change_pct < self.min_distance_pct:
-                    return False, (
-                        f"price too close to last entry: {price_change_pct:.2%} < {self.min_distance_pct:.2%}"
-                    )
-        else:
-            # Check absolute distance in either direction
-            if abs(price_change_pct) < self.min_distance_pct:
-                return False, (f"price too close to last entry: |{price_change_pct:.2%}| < {self.min_distance_pct:.2%}")
 
         return True, ""
 
 
 @dataclass
-@sf_component(name="signal_accuracy_filter")
+@sf.entry("signal_accuracy_filter")
 class SignalAccuracyFilter(EntryFilter):
     """Filter based on real-time signal accuracy metrics.
 

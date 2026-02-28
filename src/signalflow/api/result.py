@@ -7,16 +7,24 @@ signalflow.analytic.strategy for visualization and metrics computation.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol, Sequence, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 import polars as pl
 
-from signalflow.core import StrategyState, RawData, Signals, default_registry, SfComponentType
+from signalflow.core import RawData, SfComponentType, Signals, StrategyState, default_registry
 
 if TYPE_CHECKING:
     import plotly.graph_objects as go
+
+    from signalflow.analytic.stats.results import (
+        BootstrapResult,
+        MonteCarloResult,
+        StatisticalTestResult,
+        ValidationResult,
+    )
 
 
 # =============================================================================
@@ -109,9 +117,20 @@ class BacktestResult:
         return len(self.trades) if self.trades else 0
 
     @property
+    def trades_df(self) -> pl.DataFrame:
+        """Trades as a Polars DataFrame."""
+        from signalflow.core.containers.portfolio import Portfolio
+
+        if not self.trades:
+            return pl.DataFrame()
+        from signalflow.core.containers.trade import Trade
+
+        return Portfolio.trades_to_pl(cast(Iterable[Trade], self.trades))
+
+    @property
     def final_capital(self) -> float:
-        """Final capital after backtest."""
-        return float(getattr(self.state, "capital", 0.0))
+        """Final capital (cash) after backtest."""
+        return float(self.state.portfolio.cash)
 
     @property
     def initial_capital(self) -> float:
@@ -191,6 +210,26 @@ class BacktestResult:
             except Exception:
                 pass
 
+        # Override stateful metrics with accumulated values from metrics_df.
+        # Registry metrics are instantiated fresh and called once, so time-series
+        # metrics (drawdown, sharpe, sortino, calmar) return 0.  The runner's
+        # metrics_df tracks them bar-by-bar; the last row has the correct finals.
+        if self.metrics_df is not None and self.metrics_df.height > 0:
+            last = self.metrics_df.row(-1, named=True)
+            _ts_keys = (
+                "max_drawdown",
+                "current_drawdown",
+                "peak_equity",
+                "sharpe_ratio",
+                "sortino_ratio",
+                "calmar_ratio",
+                "annualized_return",
+                "max_drawdown_calmar",
+            )
+            for k in _ts_keys:
+                if k in last and last[k] is not None:
+                    results[k] = float(last[k])
+
         self._metrics_cache = results
         return results
 
@@ -208,10 +247,13 @@ class BacktestResult:
             return None
 
         results_dict = self._build_results_dict()
-        return self._main_result.plot(
-            results=results_dict,
-            state=self.state,
-            raw_data=self.raw,
+        return cast(
+            "list[go.Figure] | None",
+            self._main_result.plot(
+                results=results_dict,
+                state=self.state,
+                raw_data=self.raw,
+            ),
         )
 
     def plot_pair(self, pair: str) -> list[go.Figure] | None:
@@ -229,10 +271,13 @@ class BacktestResult:
             pair_result = pair_cls(pairs=[pair])
 
             results_dict = self._build_results_dict()
-            return pair_result.plot(
-                results=results_dict,
-                state=self.state,
-                raw_data=self.raw,
+            return cast(
+                "list[go.Figure] | None",
+                pair_result.plot(
+                    results=results_dict,
+                    state=self.state,
+                    raw_data=self.raw,
+                ),
             )
         except KeyError:
             return None
@@ -294,30 +339,41 @@ class BacktestResult:
         # Determine color for return
         return_color = "#22c55e" if self.total_return >= 0 else "#ef4444"
 
+        div_style = "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px;"
+        header_style = (
+            "background: linear-gradient(135deg, #1e293b 0%, #334155 100%);"
+            " color: white; padding: 20px; border-radius: 12px 12px 0 0;"
+        )
+        body_style = (
+            "background: #f8fafc; padding: 16px; border-radius: 0 0 12px 12px;"
+            " border: 1px solid #e2e8f0; border-top: none;"
+        )
+        td_style = "padding: 8px 0; text-align: right; font-weight: 600;"
+
         html = f"""
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px;">
-            <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: white; padding: 20px; border-radius: 12px 12px 0 0;">
+        <div style="{div_style}">
+            <div style="{header_style}">
                 <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 500; opacity: 0.8;">BACKTEST RESULT</h3>
                 <div style="font-size: 32px; font-weight: 700; color: {return_color};">
                     {self.total_return:+.2%}
                 </div>
                 <div style="font-size: 12px; opacity: 0.7; margin-top: 4px;">
-                    ${self.initial_capital:,.0f} → ${self.final_capital:,.0f}
+                    ${self.initial_capital:,.0f} &rarr; ${self.final_capital:,.0f}
                 </div>
             </div>
-            <div style="background: #f8fafc; padding: 16px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+            <div style="{body_style}">
                 <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                     <tr>
                         <td style="padding: 8px 0; color: #64748b;">Trades</td>
-                        <td style="padding: 8px 0; text-align: right; font-weight: 600;">{self.n_trades}</td>
+                        <td style="{td_style}">{self.n_trades}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; color: #64748b;">Win Rate</td>
-                        <td style="padding: 8px 0; text-align: right; font-weight: 600;">{self.win_rate:.1%}</td>
+                        <td style="{td_style}">{self.win_rate:.1%}</td>
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; color: #64748b;">Profit Factor</td>
-                        <td style="padding: 8px 0; text-align: right; font-weight: 600;">{self.profit_factor:.2f}</td>
+                        <td style="{td_style}">{self.profit_factor:.2f}</td>
                     </tr>
         """
 
@@ -325,7 +381,7 @@ class BacktestResult:
             html += f"""
                     <tr>
                         <td style="padding: 8px 0; color: #64748b;">Max Drawdown</td>
-                        <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #ef4444;">{max_dd:.1%}</td>
+                        <td style="{td_style} color: #ef4444;">{max_dd:.1%}</td>
                     </tr>
             """
 
@@ -385,7 +441,7 @@ class BacktestResult:
     def _trade_to_json_safe(self, trade: TradeType) -> dict[str, Any]:
         """Convert trade to JSON-safe dict (datetimes → ISO strings)."""
         d = self._trade_to_dict(trade)
-        return self._json_safe(d)
+        return cast(dict[str, Any], self._json_safe(d))
 
     @staticmethod
     def _json_safe(obj: Any) -> Any:
@@ -466,3 +522,202 @@ class BacktestResult:
         if hasattr(trade, "__dict__"):
             return {k: v for k, v in trade.__dict__.items() if not k.startswith("_")}
         return {"trade": str(trade)}
+
+    # =========================================================================
+    # Statistical Validation
+    # =========================================================================
+
+    def monte_carlo(
+        self,
+        n_simulations: int = 10_000,
+        ruin_threshold: float = 0.20,
+        random_seed: int | None = None,
+        confidence_levels: tuple[float, ...] = (0.05, 0.50, 0.95),
+    ) -> MonteCarloResult:
+        """Run Monte Carlo simulation on trade sequence.
+
+        Shuffles trade execution order to estimate distribution of outcomes
+        under different trade sequences. Useful for assessing strategy
+        robustness and estimating risk metrics.
+
+        Args:
+            n_simulations: Number of simulations to run (default: 10,000)
+            ruin_threshold: Max drawdown threshold for risk of ruin (default: 20%)
+            random_seed: Random seed for reproducibility (None for random)
+            confidence_levels: Percentile levels to compute (default: 5%, 50%, 95%)
+
+        Returns:
+            MonteCarloResult with simulation distributions and risk metrics
+
+        Example:
+            >>> result = backtest.run()
+            >>> mc = result.monte_carlo(n_simulations=10_000)
+            >>> print(f"Risk of Ruin: {mc.risk_of_ruin:.1%}")
+            >>> print(f"5th percentile equity: ${mc.equity_percentiles[0.05]:,.2f}")
+            >>> mc.plot()
+        """
+        from signalflow.analytic.stats import MonteCarloSimulator
+
+        simulator = MonteCarloSimulator(
+            n_simulations=n_simulations,
+            ruin_threshold=ruin_threshold,
+            random_seed=random_seed,
+            confidence_levels=confidence_levels,
+        )
+        return simulator.validate(self)
+
+    def bootstrap(
+        self,
+        n_bootstrap: int = 5_000,
+        method: str = "bca",
+        confidence_level: float = 0.95,
+        metrics: tuple[str, ...] | None = None,
+        block_size: int | None = None,
+        random_seed: int | None = None,
+    ) -> BootstrapResult:
+        """Compute bootstrap confidence intervals for key metrics.
+
+        Estimates confidence intervals for performance metrics using
+        bootstrap resampling. Supports BCa (bias-corrected accelerated),
+        percentile, and block bootstrap methods.
+
+        Args:
+            n_bootstrap: Number of bootstrap resamples (default: 5,000)
+            method: Bootstrap method - "bca", "percentile", or "block"
+            confidence_level: Confidence level (default: 0.95 for 95% CI)
+            metrics: Metrics to bootstrap (default: sharpe, sortino, calmar, profit_factor, win_rate)
+            block_size: Block size for block bootstrap (auto if None)
+            random_seed: Random seed for reproducibility
+
+        Returns:
+            BootstrapResult with confidence intervals for each metric
+
+        Example:
+            >>> result = backtest.run()
+            >>> bs = result.bootstrap(method="bca", confidence_level=0.95)
+            >>> sr_ci = bs.intervals["sharpe_ratio"]
+            >>> print(f"Sharpe: {sr_ci.point_estimate:.2f} ({sr_ci.lower:.2f}, {sr_ci.upper:.2f})")
+            >>> print(f"Significant vs 0: {bs.is_significant('sharpe_ratio', 0)}")
+        """
+        from signalflow.analytic.stats import BootstrapValidator
+
+        if metrics is None:
+            metrics = (
+                "sharpe_ratio",
+                "sortino_ratio",
+                "calmar_ratio",
+                "profit_factor",
+                "win_rate",
+            )
+
+        validator = BootstrapValidator(
+            n_bootstrap=n_bootstrap,
+            method=method,  # type: ignore[arg-type]
+            block_size=block_size,
+            confidence_level=confidence_level,
+            random_seed=random_seed,
+            metrics=metrics,
+        )
+        return validator.validate(self)
+
+    def statistical_tests(
+        self,
+        sr_benchmark: float = 0.0,
+        confidence_level: float = 0.95,
+    ) -> StatisticalTestResult:
+        """Run statistical significance tests on backtest results.
+
+        Computes:
+        - Probabilistic Sharpe Ratio (PSR): probability SR > benchmark
+        - Minimum Track Record Length (MinTRL): trades needed for significance
+
+        Based on Bailey & Lopez de Prado (2012).
+
+        Args:
+            sr_benchmark: Benchmark Sharpe ratio to compare against (default: 0)
+            confidence_level: Required confidence level (default: 0.95)
+
+        Returns:
+            StatisticalTestResult with PSR and MinTRL values
+
+        Example:
+            >>> result = backtest.run()
+            >>> tests = result.statistical_tests(sr_benchmark=0.5)
+            >>> print(f"PSR: {tests.psr:.1%}")
+            >>> print(f"Significant: {tests.psr_is_significant}")
+            >>> print(f"Min trades needed: {tests.min_track_record_length}")
+        """
+        from signalflow.analytic.stats import StatisticalTestsValidator
+
+        validator = StatisticalTestsValidator(
+            sr_benchmark=sr_benchmark,
+            confidence_level=confidence_level,
+        )
+        return validator.validate(self)
+
+    def validate(
+        self,
+        monte_carlo: bool = True,
+        bootstrap: bool = True,
+        statistical_tests: bool = True,
+        mc_simulations: int = 10_000,
+        bs_resamples: int = 5_000,
+        confidence_level: float = 0.95,
+        ruin_threshold: float = 0.20,
+    ) -> ValidationResult:
+        """Run comprehensive statistical validation.
+
+        Combines Monte Carlo simulation, bootstrap confidence intervals,
+        and statistical significance tests into a single analysis.
+
+        Args:
+            monte_carlo: Run Monte Carlo simulation (default: True)
+            bootstrap: Run bootstrap confidence intervals (default: True)
+            statistical_tests: Run statistical tests - PSR, MinTRL (default: True)
+            mc_simulations: Number of Monte Carlo simulations
+            bs_resamples: Number of bootstrap resamples
+            confidence_level: Confidence level for all tests
+            ruin_threshold: Max drawdown threshold for risk of ruin
+
+        Returns:
+            ValidationResult combining all analyses
+
+        Example:
+            >>> result = backtest.run()
+            >>> validation = result.validate()
+            >>> print(validation.summary())
+            >>> validation.plot()
+        """
+        from signalflow.analytic.stats import ValidationResult
+
+        mc_result = (
+            self.monte_carlo(
+                n_simulations=mc_simulations,
+                ruin_threshold=ruin_threshold,
+            )
+            if monte_carlo
+            else None
+        )
+
+        bs_result = (
+            self.bootstrap(
+                n_bootstrap=bs_resamples,
+                confidence_level=confidence_level,
+            )
+            if bootstrap
+            else None
+        )
+
+        st_result = (
+            self.statistical_tests(
+                confidence_level=confidence_level,
+            )
+            if statistical_tests
+            else None
+        )
+
+        return ValidationResult(
+            monte_carlo=mc_result,
+            bootstrap=bs_result,
+            statistical_tests=st_result,
+        )

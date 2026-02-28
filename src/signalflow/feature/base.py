@@ -1,7 +1,10 @@
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, ClassVar, Any
+from typing import TYPE_CHECKING, Any, ClassVar
+
 import polars as pl
-from signalflow.core import SfComponentType, sf_component
+
+from signalflow.core import SfComponentType
 from signalflow.utils import KwargsTolerantMixin
 
 if TYPE_CHECKING:
@@ -115,7 +118,7 @@ class GlobalFeature(Feature):
         self,
         raw: "RawData",
         data_type: str,
-    ):
+    ) -> Iterator[tuple[str, pl.DataFrame]]:
         """Iterate over source DataFrames from RawData.
 
         If `self.sources` is set, iterates only those sources.

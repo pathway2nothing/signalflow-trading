@@ -1,17 +1,15 @@
 """Tests for InMemoryRawStore and InMemoryStrategyStore."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
-import polars as pl
 import pytest
 
-from signalflow.data.raw_store.memory_store import InMemoryRawStore
-from signalflow.data.strategy_store.memory import InMemoryStrategyStore
-from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.position import Position
+from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
 from signalflow.core.enums import PositionType
-
+from signalflow.data.raw_store.memory_store import InMemoryRawStore
+from signalflow.data.strategy_store.memory import InMemoryStrategyStore
 
 TS = datetime(2024, 1, 1)
 
@@ -58,12 +56,11 @@ class TestInMemoryRawStoreInsert:
         assert df.height == 5  # no duplicates
 
     def test_timezone_stripped(self):
-        from datetime import timezone
 
         store = InMemoryRawStore()
         klines = [
             {
-                "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                "timestamp": datetime(2024, 1, 1, tzinfo=UTC),
                 "open": 100.0,
                 "high": 101.0,
                 "low": 99.0,

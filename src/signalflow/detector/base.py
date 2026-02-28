@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import RawDataView, Signals, SfComponentType, SignalType, SignalCategory, RawDataType
+from signalflow.core import RawDataType, RawDataView, SfComponentType, SignalCategory, Signals
 from signalflow.feature import Feature, FeaturePipeline
 from signalflow.utils import KwargsTolerantMixin
 

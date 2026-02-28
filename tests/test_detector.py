@@ -1,8 +1,7 @@
 """Tests for SignalDetector validation, SMA cross, PandasSignalDetector."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, ClassVar
+from datetime import UTC, datetime, timedelta
 
 import polars as pl
 import pytest
@@ -12,8 +11,9 @@ from signalflow.core.enums import SignalType
 from signalflow.detector.base import SignalDetector
 
 try:
-    from signalflow.detector.adapter.pandas_detector import PandasSignalDetector
     import pandas as pd
+
+    from signalflow.detector.adapter.pandas_detector import PandasSignalDetector
 
     _HAS_PANDAS_DETECTOR = True
 except (ImportError, ModuleNotFoundError):
@@ -70,7 +70,7 @@ class TestValidateFeatures:
 
     def test_not_dataframe_raises(self):
         d = DummyDetector()
-        with pytest.raises(TypeError, match="polars.DataFrame"):
+        with pytest.raises(TypeError, match=r"polars\.DataFrame"):
             d._validate_features("not a df")
 
     def test_missing_pair_col(self):
@@ -90,7 +90,7 @@ class TestValidateFeatures:
         df = pl.DataFrame(
             {
                 "pair": ["BTCUSDT"],
-                "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+                "timestamp": [datetime(2024, 1, 1, tzinfo=UTC)],
                 "close": [100.0],
             }
         )
@@ -149,7 +149,7 @@ class TestValidateSignals:
             pl.DataFrame(
                 {
                     "pair": ["BTCUSDT"],
-                    "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+                    "timestamp": [datetime(2024, 1, 1, tzinfo=UTC)],
                     "signal_type": [SignalType.RISE.value],
                     "signal": [1],
                 }
@@ -183,7 +183,7 @@ class TestNormalizeIndex:
         df = pl.DataFrame(
             {
                 "pair": ["BTCUSDT"],
-                "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+                "timestamp": [datetime(2024, 1, 1, tzinfo=UTC)],
             }
         )
         result = d._normalize_index(df)
@@ -221,6 +221,58 @@ class TestKeepOnlyLatest:
         assert result.value.height == 1
         assert result.value["timestamp"][0] == TS + timedelta(hours=2)
 
+    def test_keep_only_latest_in_run(self):
+        """Test that keep_only_latest_per_pair=True works in run()."""
+        from signalflow.core import RawData, RawDataView
+
+        @dataclass
+        class MultiSignalDetector(SignalDetector):
+            keep_only_latest_per_pair: bool = True
+
+            def detect(self, features, context=None):
+                # Return multiple signals per pair
+                return Signals(
+                    pl.DataFrame(
+                        {
+                            "pair": ["BTCUSDT", "BTCUSDT", "ETHUSDT", "ETHUSDT"],
+                            "timestamp": [
+                                TS,
+                                TS + timedelta(hours=1),
+                                TS,
+                                TS + timedelta(hours=1),
+                            ],
+                            "signal_type": [SignalType.RISE.value] * 4,
+                            "signal": [1] * 4,
+                        }
+                    )
+                )
+
+        raw = RawData(
+            datetime_start=TS,
+            datetime_end=TS + timedelta(hours=5),
+            pairs=["BTCUSDT", "ETHUSDT"],
+            data={
+                "spot": pl.DataFrame(
+                    {
+                        "pair": ["BTCUSDT", "BTCUSDT", "ETHUSDT", "ETHUSDT"],
+                        "timestamp": [TS, TS + timedelta(hours=1), TS, TS + timedelta(hours=1)],
+                        "open": [100.0] * 4,
+                        "high": [101.0] * 4,
+                        "low": [99.0] * 4,
+                        "close": [100.0] * 4,
+                        "volume": [1000.0] * 4,
+                    }
+                )
+            },
+        )
+        raw_view = RawDataView(raw)
+
+        d = MultiSignalDetector(keep_only_latest_per_pair=True)
+        signals = d.run(raw_view)
+
+        # Should only have 1 signal per pair (the latest)
+        assert signals.value.height == 2
+
     def test_multiple_pairs(self):
         d = DummyDetector()
         sigs = Signals(
@@ -235,6 +287,90 @@ class TestKeepOnlyLatest:
         )
         result = d._keep_only_latest(sigs)
         assert result.value.height == 2
+
+
+# ── Preprocess features handling ───────────────────────────────────────────
+
+
+class TestPreprocessFeatures:
+    """Test different features types in preprocess."""
+
+    def test_single_feature(self):
+        """Test preprocess with a single Feature instance."""
+        from signalflow.core import RawData, RawDataView
+        from signalflow.feature.examples import ExampleSmaFeature
+
+        @dataclass
+        class DetectorWithFeature(SignalDetector):
+            def __post_init__(self):
+                self.features = ExampleSmaFeature(period=3)
+
+            def detect(self, features, context=None):
+                return _valid_signals(1)
+
+        raw = RawData(
+            datetime_start=TS,
+            datetime_end=TS + timedelta(hours=10),
+            pairs=["BTCUSDT"],
+            data={
+                "spot": pl.DataFrame(
+                    {
+                        "pair": ["BTCUSDT"] * 10,
+                        "timestamp": [TS + timedelta(hours=i) for i in range(10)],
+                        "open": [100.0 + i for i in range(10)],
+                        "high": [101.0 + i for i in range(10)],
+                        "low": [99.0 + i for i in range(10)],
+                        "close": [100.0 + i for i in range(10)],
+                        "volume": [1000.0] * 10,
+                    }
+                )
+            },
+        )
+        raw_view = RawDataView(raw)
+
+        d = DetectorWithFeature()
+        feats = d.preprocess(raw_view)
+
+        assert "sma_3" in feats.columns
+
+    def test_feature_pipeline(self):
+        """Test preprocess with FeaturePipeline."""
+        from signalflow.core import RawData, RawDataView
+        from signalflow.feature.examples import ExampleSmaFeature
+        from signalflow.feature.feature_pipeline import FeaturePipeline
+
+        @dataclass
+        class DetectorWithPipeline(SignalDetector):
+            def __post_init__(self):
+                self.features = FeaturePipeline(features=[ExampleSmaFeature(period=3)])
+
+            def detect(self, features, context=None):
+                return _valid_signals(1)
+
+        raw = RawData(
+            datetime_start=TS,
+            datetime_end=TS + timedelta(hours=10),
+            pairs=["BTCUSDT"],
+            data={
+                "spot": pl.DataFrame(
+                    {
+                        "pair": ["BTCUSDT"] * 10,
+                        "timestamp": [TS + timedelta(hours=i) for i in range(10)],
+                        "open": [100.0 + i for i in range(10)],
+                        "high": [101.0 + i for i in range(10)],
+                        "low": [99.0 + i for i in range(10)],
+                        "close": [100.0 + i for i in range(10)],
+                        "volume": [1000.0] * 10,
+                    }
+                )
+            },
+        )
+        raw_view = RawDataView(raw)
+
+        d = DetectorWithPipeline()
+        feats = d.preprocess(raw_view)
+
+        assert "sma_3" in feats.columns
 
 
 # ── PandasSignalDetector adapter ────────────────────────────────────────────
@@ -277,7 +413,7 @@ class TestPandasSignalDetector:
                 return "not a dataframe"
 
         d = BadPD()
-        with pytest.raises(TypeError, match="pd.DataFrame"):
+        with pytest.raises(TypeError, match=r"pd\.DataFrame"):
             d.detect(_features_df(3))
 
 

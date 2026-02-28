@@ -1,21 +1,22 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Iterable, Optional
+from datetime import UTC, datetime, timedelta
+from typing import cast
 
 import pandas as pd
 import polars as pl
 
-from signalflow.core import sf_component, SfComponentType
-from signalflow.core.registry import default_registry
+from signalflow.core import SfComponentType, data_store
 from signalflow.core.containers.raw_data import RawData
-from signalflow.data.raw_store.base import RawDataStore
+from signalflow.core.registry import default_registry
 from signalflow.data.raw_store._schema import polars_schema, resolve_columns
+from signalflow.data.raw_store.base import RawDataStore
 
 
 @dataclass
-@sf_component(name="memory/spot")
+@data_store("memory/spot")
 class InMemoryRawStore(RawDataStore):
     """In-memory storage backend for raw market data.
 
@@ -64,11 +65,11 @@ class InMemoryRawStore(RawDataStore):
 
     # ── Queries ───────────────────────────────────────────────────────
 
-    def get_time_bounds(self, pair: str) -> tuple[Optional[datetime], Optional[datetime]]:
+    def get_time_bounds(self, pair: str) -> tuple[datetime | None, datetime | None]:
         subset = self._df.filter(pl.col("pair") == pair)
         if subset.is_empty():
             return (None, None)
-        return (subset["timestamp"].min(), subset["timestamp"].max())
+        return cast(tuple[datetime | None, datetime | None], (subset["timestamp"].min(), subset["timestamp"].max()))
 
     def find_gaps(self, pair: str, start: datetime, end: datetime, tf_minutes: int) -> list[tuple[datetime, datetime]]:
         subset = self._df.filter(
@@ -76,7 +77,7 @@ class InMemoryRawStore(RawDataStore):
         )
         existing_times = set(subset["timestamp"].to_list())
         gaps: list[tuple[datetime, datetime]] = []
-        gap_start: Optional[datetime] = None
+        gap_start: datetime | None = None
         current = start
         while current <= end:
             if current not in existing_times:
@@ -94,10 +95,10 @@ class InMemoryRawStore(RawDataStore):
     # ── Load ──────────────────────────────────────────────────────────
 
     def _apply_time_filter(
-        self, df: pl.DataFrame, hours: Optional[int], start: Optional[datetime], end: Optional[datetime]
+        self, df: pl.DataFrame, hours: int | None, start: datetime | None, end: datetime | None
     ) -> pl.DataFrame:
         if hours is not None:
-            cutoff = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+            cutoff = datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(hours=hours)
             df = df.filter(pl.col("timestamp") > cutoff)
         elif start and end:
             df = df.filter((pl.col("timestamp") >= start) & (pl.col("timestamp") <= end))
@@ -110,9 +111,9 @@ class InMemoryRawStore(RawDataStore):
     def load(
         self,
         pair: str,
-        hours: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        hours: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> pl.DataFrame:
         df = self._df.filter(pl.col("pair") == pair)
         df = self._apply_time_filter(df, hours, start, end)
@@ -121,9 +122,9 @@ class InMemoryRawStore(RawDataStore):
     def load_many(
         self,
         pairs: Iterable[str],
-        hours: Optional[int] = None,
-        start: Optional[datetime] = None,
-        end: Optional[datetime] = None,
+        hours: int | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> pl.DataFrame:
         pairs = list(pairs)
         if not pairs:
@@ -172,7 +173,7 @@ class InMemoryRawStore(RawDataStore):
         pairs: list[str],
         start: datetime,
         end: datetime,
-        data_key: Optional[str] = None,
+        data_key: str | None = None,
     ) -> RawData:
         """Convert store data to RawData container.
 

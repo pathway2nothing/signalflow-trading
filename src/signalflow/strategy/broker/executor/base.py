@@ -1,13 +1,14 @@
-from signalflow.core import Order, OrderFill, SfComponentType
 from datetime import datetime
-from typing import Protocol, ClassVar
+from typing import ClassVar, Protocol
+
+from signalflow.core import Order, OrderFill, SfComponentType
 
 
 class OrderExecutor(Protocol):
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_EXECUTOR
     """
     Protocol for order execution.
-    
+
     Implementations:
         - VirtualExecutor: Simulates fills at current prices
         - LiveExecutor: Submits orders to exchange

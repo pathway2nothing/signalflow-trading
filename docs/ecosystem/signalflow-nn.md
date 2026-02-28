@@ -18,7 +18,7 @@ component registry.
 pip install signalflow-nn
 ```
 
-Requires `signalflow-trading >= 1.1.0`, `torch >= 2.2`, `lightning >= 2.5`.
+Requires `signalflow-trading >= 0.5.0`, `torch >= 2.2`, `lightning >= 2.5`.
 
 For GPU support:
 ```bash
@@ -35,9 +35,9 @@ signalflow-nn uses an **Encoder + Head** composition pattern:
 
 ```
 Input [batch, seq_len, features]
-  → Encoder (LSTM, GRU)
+  → Encoder (LSTM, GRU, Transformer, TCN, PatchTST, ...)
     → [batch, embedding_size]
-  → Head (MLP, Attention, Residual, ...)
+  → Head (MLP, Attention, Residual, Ordinal, ...)
     → [batch, num_classes]
 ```
 
@@ -128,21 +128,33 @@ trainer.fit(model, data_module)
 
 ## Components
 
-### Encoders
+### Encoders (14)
 
 Sequence encoders that process windowed time series into fixed-size embeddings.
 
-| Class | Registry Name | Description |
+| Class | Registry Name | Architecture |
 |-------|--------------|-------------|
-| `LSTMEncoder` | `encoder/lstm` | Long Short-Term Memory, configurable depth and bidirectional |
-| `GRUEncoder` | `encoder/gru` | Gated Recurrent Unit, faster than LSTM with similar performance |
+| `LSTMEncoder` | `encoder/lstm` | Bidirectional LSTM |
+| `GRUEncoder` | `encoder/gru` | Gated Recurrent Unit |
+| `TransformerEncoder` | `encoder/transformer` | Self-attention + positional encoding |
+| `PatchTSTEncoder` | `encoder/patchtst` | Patch-based Transformer |
+| `TCNEncoder` | `encoder/tcn` | Temporal Convolutional Network |
+| `TSMixerEncoder` | `encoder/tsmixer` | All-MLP mixer (Google 2023) |
+| `InceptionTimeEncoder` | `encoder/inception_time` | Multi-scale convolutions |
+| `ResNet1dEncoder` | `encoder/resnet1d` | 1D ResNet |
+| `XceptionTimeEncoder` | `encoder/xception_time` | Depthwise separable conv |
+| `Conv1dEncoder` | `encoder/conv1d` | 1D CNN |
+| `XCMEncoder` | `encoder/xcm` | Cross-Channel Mixing |
+| `gMLPEncoder` | `encoder/gmlp` | Gating MLP |
+| `OmniScaleCNNEncoder` | `encoder/omniscale` | Multi-scale CNN |
+| `ConvTranEncoder` | `encoder/convtran` | Conv + Transformer hybrid |
 
-**Parameters:**
+**Common parameters:**
 
 - `input_size` - Number of input features per timestep
-- `hidden_size` - Hidden state dimensionality (default: 64)
-- `num_layers` - Number of stacked RNN layers (default: 2)
-- `bidirectional` - Process sequence in both directions (default: False)
+- `hidden_size` / `d_model` - Hidden dimensionality (default: 64)
+- `num_layers` - Number of stacked layers (default: 2)
+- Transformer-specific: `nhead`, `dim_feedforward`, `dropout`
 
 ### Classification Heads
 

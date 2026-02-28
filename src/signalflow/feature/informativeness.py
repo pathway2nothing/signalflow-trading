@@ -18,7 +18,8 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from datetime import datetime
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import polars as pl
@@ -29,15 +30,10 @@ from signalflow.feature.mutual_information import (
     entropy_discrete,
     mutual_information_continuous,
     mutual_information_continuous_discrete,
-    mutual_information_discrete,
     normalized_mutual_information,
 )
 from signalflow.target.multi_target_generator import (
-    DEFAULT_HORIZONS,
-    DEFAULT_TARGET_TYPES,
-    HorizonConfig,
     MultiTargetGenerator,
-    TargetType,
 )
 from signalflow.target.utils import mask_targets_by_signals
 
@@ -46,7 +42,7 @@ if TYPE_CHECKING:
     from signalflow.detector.base import SignalDetector
 
 
-def _default_event_detector() -> "SignalDetector":
+def _default_event_detector() -> SignalDetector:
     """Deferred import to avoid circular dependency."""
     from signalflow.detector.market import AgreementDetector
 
@@ -57,7 +53,7 @@ def _df_to_raw_data_view(
     df: pl.DataFrame,
     pair_col: str = "pair",
     ts_col: str = "timestamp",
-) -> "RawDataView":
+) -> RawDataView:
     """Convert a DataFrame to RawDataView for detector usage.
 
     Creates a minimal RawDataView from an OHLCV DataFrame.
@@ -78,8 +74,8 @@ def _df_to_raw_data_view(
     datetime_end = timestamps.max()
 
     raw_data = RawData(
-        datetime_start=datetime_start,
-        datetime_end=datetime_end,
+        datetime_start=cast(datetime, datetime_start),
+        datetime_end=cast(datetime, datetime_end),
         pairs=pairs,
         data={"spot": df},
     )
@@ -119,9 +115,9 @@ class InformativenessReport:
     """Container for informativeness analysis results.
 
     Attributes:
-        raw_mi: Full MI results (feature × horizon × target).
+        raw_mi: Full MI results (feature x horizon x target).
         composite_scores: Aggregated scores per feature, ranked.
-        score_matrix: Pivoted Feature × (Horizon, Target) matrix.
+        score_matrix: Pivoted Feature x (Horizon, Target) matrix.
         global_events: Global event detection results (if enabled).
         metadata: Analysis configuration and statistics.
     """
@@ -219,7 +215,7 @@ class FeatureInformativenessAnalyzer:
             df = mask_targets_by_signals(
                 df=df,
                 signals=signals,
-                mask_signal_types=self.event_detector.allowed_signal_types or set(),
+                mask_signal_types=self.event_detector.allowed_signal_types or set(),  # type: ignore[attr-defined]
                 horizon_bars=max_horizon,
                 cooldown_bars=60,
                 target_columns=target_columns,
@@ -228,7 +224,7 @@ class FeatureInformativenessAnalyzer:
             )
 
         # 3-4. Compute MI and rolling stability
-        logger.info(f"Computing MI for {len(feature_columns)} features × {len(target_meta)} targets...")
+        logger.info(f"Computing MI for {len(feature_columns)} features x {len(target_meta)} targets...")
         mi_rows = self._compute_all_mi(df, feature_columns, target_meta)
         raw_mi = pl.DataFrame(mi_rows)
 
@@ -278,7 +274,7 @@ class FeatureInformativenessAnalyzer:
                 target_kind = tmeta["kind"]
 
                 feat_arr, target_arr = self._extract_arrays(df, feat_col, target_col)
-                if feat_arr is None:
+                if feat_arr is None or target_arr is None:
                     rows.append(self._nan_row(feat_col, tmeta))
                     continue
 
@@ -360,10 +356,7 @@ class FeatureInformativenessAnalyzer:
             t_win = target[start:end]
 
             # Check fill rate
-            if np.issubdtype(f_win.dtype, np.floating):
-                valid = np.isfinite(f_win).sum()
-            else:
-                valid = len(f_win)
+            valid = np.isfinite(f_win).sum() if np.issubdtype(f_win.dtype, np.floating) else len(f_win)
 
             if valid < min_fill:
                 continue
@@ -382,7 +375,7 @@ class FeatureInformativenessAnalyzer:
             return 0.0
 
         cv = std_mi / mean_mi
-        return 1.0 / (1.0 + cv)
+        return float(1.0 / (1.0 + cv))
 
     # ------------------------------------------------------------------
     # Composite scoring
@@ -436,7 +429,7 @@ class FeatureInformativenessAnalyzer:
         return result
 
     def _build_score_matrix(self, raw_mi: pl.DataFrame) -> pl.DataFrame:
-        """Build pivoted Feature × (Horizon, Target) matrix."""
+        """Build pivoted Feature x (Horizon, Target) matrix."""
         if raw_mi.height == 0:
             return pl.DataFrame()
 

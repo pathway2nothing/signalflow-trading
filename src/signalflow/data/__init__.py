@@ -39,8 +39,8 @@ Example:
     ```
 """
 
-import signalflow.data.source as source
 import signalflow.data.raw_store as raw_store
+import signalflow.data.source as source
 import signalflow.data.strategy_store as strategy_store
 from signalflow.data.raw_data_factory import RawDataFactory
 from signalflow.data.resample import (
@@ -54,17 +54,31 @@ from signalflow.data.resample import (
 )
 from signalflow.data.store_factory import StoreFactory
 
+# Auto-import extended exchanges from signalflow-data if available
+# This triggers @data_source decorators to register components
+try:
+    import signalflow.data.source.binance_stocks
+    import signalflow.data.source.bybit
+    import signalflow.data.source.deribit
+    import signalflow.data.source.hyperliquid
+    import signalflow.data.source.kraken
+    import signalflow.data.source.okx
+    import signalflow.data.source.whitebit  # noqa: F401
+except ImportError:
+    # signalflow-data not installed, extended exchanges unavailable
+    pass
+
 __all__ = [
-    "source",
-    "raw_store",
-    "strategy_store",
-    "RawDataFactory",
-    "StoreFactory",
-    "resample_ohlcv",
-    "align_to_timeframe",
-    "detect_timeframe",
-    "select_best_timeframe",
-    "can_resample",
     "EXCHANGE_TIMEFRAMES",
     "TIMEFRAME_MINUTES",
+    "RawDataFactory",
+    "StoreFactory",
+    "align_to_timeframe",
+    "can_resample",
+    "detect_timeframe",
+    "raw_store",
+    "resample_ohlcv",
+    "select_best_timeframe",
+    "source",
+    "strategy_store",
 ]

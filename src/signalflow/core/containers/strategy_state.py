@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from signalflow.core.containers import Portfolio
 
@@ -65,17 +65,17 @@ class StrategyState:
 
     strategy_id: str
 
-    last_ts: Optional[datetime] = None
-    last_event_id: Optional[str] = None
+    last_ts: datetime | None = None
+    last_event_id: str | None = None
 
     portfolio: Portfolio = field(default_factory=Portfolio)
 
-    runtime: Dict[str, Any] = field(default_factory=dict)
-    metrics: Dict[str, float] = field(default_factory=dict)
+    runtime: dict[str, Any] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
 
     metrics_phase_done: set[str] = field(default_factory=set)
 
-    def touch(self, ts: datetime, event_id: Optional[str] = None) -> None:
+    def touch(self, ts: datetime, event_id: str | None = None) -> None:
         """Update watermarks after successful tick commit.
 
         Updates last_ts and optionally last_event_id to track processing progress.

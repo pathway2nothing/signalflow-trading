@@ -2,13 +2,12 @@
 
 from datetime import datetime, timedelta
 
-import numpy as np
 import polars as pl
 import pytest
 
 from signalflow.core.enums import SignalType
-from signalflow.target.triple_barrier_labeler import TripleBarrierLabeler
 from signalflow.target.take_profit_labeler import TakeProfitLabeler
+from signalflow.target.triple_barrier_labeler import TripleBarrierLabeler
 
 
 def _price_df(n=200, pair="BTCUSDT", trend=0.5):
@@ -127,7 +126,7 @@ class TestTripleBarrierCompute:
                 "volume": pl.Float64,
             }
         )
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             labeler.compute(empty)
 
     def test_include_meta(self):
@@ -300,7 +299,7 @@ class TestTakeProfitCompute:
                 "volume": pl.Float64,
             }
         )
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             labeler.compute(empty)
 
     def test_signal_masking(self):

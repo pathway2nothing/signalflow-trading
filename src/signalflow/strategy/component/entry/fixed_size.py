@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from signalflow.core import Signals, Order, StrategyState, SignalType, sf_component
+from typing import Any, Literal, cast
+
+import polars as pl
+
+from signalflow.core import Order, Signals, SignalType, StrategyState, entry
 from signalflow.core.signal_registry import DIRECTIONAL_SIGNAL_MAP
 from signalflow.strategy.component.base import EntryRule
-import polars as pl
 
 
 @dataclass
-@sf_component(name="fixed_size_entry")
+@entry("fixed_size_entry")
 class FixedSizeEntryRule(EntryRule):
     """Simple entry rule with fixed position size.
 
@@ -38,10 +41,7 @@ class FixedSizeEntryRule(EntryRule):
         if open_count >= self.max_positions:
             return orders
 
-        if self.signal_type_map is not None:
-            actionable = list(self.signal_type_map.keys())
-        else:
-            actionable = self.signal_types
+        actionable = list(self.signal_type_map.keys()) if self.signal_type_map is not None else self.signal_types
 
         df = signals.value.filter(pl.col("signal_type").is_in(actionable))
 
@@ -64,7 +64,11 @@ class FixedSizeEntryRule(EntryRule):
                 side = "BUY" if signal_type == SignalType.RISE.value else "SELL"
 
             order = Order(
-                pair=pair, side=side, order_type="MARKET", qty=self.position_size, meta={"signal_type": signal_type}
+                pair=pair,
+                side=cast(Literal["BUY", "SELL"], side),
+                order_type="MARKET",
+                qty=self.position_size,
+                meta={"signal_type": signal_type},
             )
             orders.append(order)
             open_count += 1
@@ -72,6 +76,6 @@ class FixedSizeEntryRule(EntryRule):
         return orders
 
     @classmethod
-    def from_directional_map(cls, **kwargs) -> FixedSizeEntryRule:
+    def from_directional_map(cls, **kwargs: Any) -> FixedSizeEntryRule:
         """Create entry rule using the global DIRECTIONAL_SIGNAL_MAP."""
         return cls(signal_type_map=dict(DIRECTIONAL_SIGNAL_MAP), **kwargs)

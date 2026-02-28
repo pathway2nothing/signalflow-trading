@@ -6,10 +6,9 @@ from datetime import datetime, timedelta
 import polars as pl
 import pytest
 
-from signalflow.utils.kwargs_mixin import KwargsTolerantMixin
 from signalflow.core.enums import SignalType
 from signalflow.target.adapter.pandas_labeler import PandasLabeler
-
+from signalflow.utils.kwargs_mixin import KwargsTolerantMixin
 
 # ── KwargsTolerantMixin ──────────────────────────────────────────────────
 
@@ -122,11 +121,11 @@ class TestPandasLabeler:
     def test_wrong_length_raises(self):
         labeler = _BadLengthLabeler(mask_to_signals=False)
         df = _price_df()
-        with pytest.raises(BaseException):
+        with pytest.raises(BaseException):  # noqa: B017
             labeler.compute(df)
 
     def test_wrong_type_raises(self):
         labeler = _BadTypeLabeler(mask_to_signals=False)
         df = _price_df()
-        with pytest.raises(BaseException):
+        with pytest.raises(BaseException):  # noqa: B017
             labeler.compute(df)

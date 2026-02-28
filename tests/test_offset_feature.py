@@ -6,9 +6,6 @@ import polars as pl
 import pytest
 
 from signalflow.feature.offset_feature import OffsetFeature
-from signalflow.core.registry import default_registry
-from signalflow.core import SfComponentType
-
 
 TS = datetime(2024, 1, 1)
 
@@ -36,7 +33,7 @@ class TestOffsetFeatureValidation:
             OffsetFeature(feature_name=None)
 
     def test_unknown_feature_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(KeyError):
             OffsetFeature(feature_name="nonexistent_feature_12345")
 
 

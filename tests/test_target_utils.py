@@ -2,9 +2,7 @@
 
 from datetime import datetime, timedelta
 
-import numpy as np
 import polars as pl
-import pytest
 
 from signalflow.core.containers.signals import Signals
 from signalflow.target.utils import mask_targets_by_signals, mask_targets_by_timestamps

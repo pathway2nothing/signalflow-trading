@@ -1,19 +1,19 @@
-from typing import Dict, Any, Tuple
 from dataclasses import dataclass
+from typing import Any
 
-import polars as pl
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import polars as pl
 from loguru import logger
+from plotly.subplots import make_subplots
 
-from signalflow.core import sf_component, RawData, Signals
 from signalflow.analytic.base import SignalMetric
+from signalflow.core import RawData, Signals, signal_metric
 
 
 @dataclass
-@sf_component(name="profile")
+@signal_metric("profile")
 class SignalProfileMetric(SignalMetric):
     """Analyze post-signal price behavior profiles with statistical aggregations.
 
@@ -22,7 +22,7 @@ class SignalProfileMetric(SignalMetric):
     """
 
     look_ahead: int = 1440
-    quantiles: Tuple[float, float] = (0.25, 0.75)
+    quantiles: tuple[float, float] = (0.25, 0.75)
 
     chart_height: int = 900
     chart_width: int = 1400
@@ -32,7 +32,7 @@ class SignalProfileMetric(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
         """Calculate performance metrics for signals across all pairs."""
 
         if "spot" in raw_data:
@@ -156,8 +156,8 @@ class SignalProfileMetric(SignalMetric):
 
     def plot(
         self,
-        computed_metrics: Dict[str, Any],
-        plots_context: Dict[str, Any],
+        computed_metrics: dict[str, Any] | None,
+        plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
@@ -188,7 +188,7 @@ class SignalProfileMetric(SignalMetric):
         return fig
 
     @staticmethod
-    def _create_figure():
+    def _create_figure() -> go.Figure:
         """Create subplot structure."""
         return make_subplots(
             rows=2,
@@ -202,7 +202,7 @@ class SignalProfileMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_mean_profile(fig, metrics):
+    def _add_mean_profile(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add mean profile line."""
         mean = metrics["series"]["mean_profile"]
         fig.add_trace(
@@ -218,8 +218,8 @@ class SignalProfileMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_std_bands(fig, metrics):
-        """Add ±1 STD bands around mean."""
+    def _add_std_bands(fig: go.Figure, metrics: dict[str, Any]) -> None:
+        """Add +/-1 STD bands around mean."""
         mean = metrics["series"]["mean_profile"]
         std = metrics["series"]["std_profile"]
 
@@ -252,7 +252,7 @@ class SignalProfileMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_median_profile(fig, metrics):
+    def _add_median_profile(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add median profile line."""
         median = metrics["series"]["median_profile"]
         fig.add_trace(
@@ -268,7 +268,7 @@ class SignalProfileMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_percentile_bands(fig, metrics):
+    def _add_percentile_bands(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add 25th-75th percentile bands."""
         lower = metrics["series"]["lower_quant"]
         upper = metrics["series"]["upper_quant"]
@@ -300,7 +300,7 @@ class SignalProfileMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_key_timepoints(fig, metrics):
+    def _add_key_timepoints(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add vertical lines at key time intervals."""
         mean = metrics["series"]["mean_profile"]
 
@@ -327,7 +327,7 @@ class SignalProfileMetric(SignalMetric):
                 )
 
     @staticmethod
-    def _add_max_mean_marker(fig, metrics):
+    def _add_max_mean_marker(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Mark the point of maximum mean return."""
         max_val = metrics["quant"]["max_mean_val"]
         max_idx = metrics["quant"]["max_mean_idx"]
@@ -348,7 +348,7 @@ class SignalProfileMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_cummax_profiles(fig, metrics):
+    def _add_cummax_profiles(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add cumulative maximum mean and median."""
         cummax_mean = metrics["series"]["cummax_mean"]
         cummax_median = metrics["series"]["cummax_median"]
@@ -378,7 +378,7 @@ class SignalProfileMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_cummin_profiles(fig, metrics):
+    def _add_cummin_profiles(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add cumulative minimum mean and median."""
         cummin_mean = metrics["series"]["cummin_mean"]
         cummin_median = metrics["series"]["cummin_median"]
@@ -408,7 +408,7 @@ class SignalProfileMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_cummax_percentiles(fig, metrics):
+    def _add_cummax_percentiles(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add cumulative max/min percentile bands."""
         cummax_lower = metrics["series"]["cummax_lower"]
         cummax_upper = metrics["series"]["cummax_upper"]
@@ -468,7 +468,7 @@ class SignalProfileMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_summary_annotation(fig, metrics):
+    def _add_summary_annotation(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add text box with key statistics."""
         q = metrics["quant"]
 
@@ -500,7 +500,7 @@ class SignalProfileMetric(SignalMetric):
             col=1,
         )
 
-    def _add_profit_target_line(self, fig):
+    def _add_profit_target_line(self, fig: go.Figure) -> None:
         """Add 5% profit target reference line."""
         fig.add_hline(
             y=0.05,
@@ -520,7 +520,7 @@ class SignalProfileMetric(SignalMetric):
             col=1,
         )
 
-    def _update_layout(self, fig, metrics, plots_context):
+    def _update_layout(self, fig: go.Figure, metrics: dict[str, Any], plots_context: dict[str, Any]) -> None:
         """Update figure layout and axes."""
         mean = metrics["series"]["mean_profile"]
         std = metrics["series"]["std_profile"]

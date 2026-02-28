@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import polars as pl
 
-from signalflow.core import Order, Position, Signals, SignalType, StrategyState, sf_component
+from signalflow.core import Order, Position, Signals, SignalType, StrategyState, entry
 from signalflow.core.signal_registry import DIRECTIONAL_SIGNAL_MAP
 from signalflow.strategy.component.base import EntryRule
 from signalflow.strategy.component.sizing.base import PositionSizer, SignalContext
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-@sf_component(name="signal", override=True)
+@entry("signal")
 class SignalEntryRule(EntryRule):
     """Signal-based entry rule with injectable sizer and filters.
 
@@ -113,7 +113,7 @@ class SignalEntryRule(EntryRule):
             return orders
 
         # Build positions map
-        positions_by_pair: dict[str, list[Position]] = {}
+        positions_by_pair: dict[str, list[Position | None]] = {}
         for pos in state.portfolio.open_positions():
             positions_by_pair.setdefault(pos.pair, []).append(pos)
 
@@ -201,7 +201,7 @@ class SignalEntryRule(EntryRule):
 
             order = Order(
                 pair=pair,
-                side=side,
+                side=cast(Literal["BUY", "SELL"], side),
                 order_type="MARKET",
                 qty=qty,
                 signal_strength=probability,
@@ -246,7 +246,7 @@ class SignalEntryRule(EntryRule):
         return None
 
     @classmethod
-    def from_directional_map(cls, **kwargs) -> SignalEntryRule:
+    def from_directional_map(cls, **kwargs: Any) -> SignalEntryRule:
         """Create entry rule using the global DIRECTIONAL_SIGNAL_MAP.
 
         Example:

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar
-from signalflow.core import SfComponentType, StrategyState, Position, Order, Signals
+
+from signalflow.core import Order, Position, SfComponentType, Signals, StrategyState
 
 
 @dataclass

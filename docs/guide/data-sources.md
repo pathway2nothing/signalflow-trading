@@ -227,13 +227,13 @@ from datetime import datetime
 from typing import Optional
 import aiohttp
 
-from signalflow.core import sf_component
+import signalflow as sf
 from signalflow.data.source.base import RawDataSource
 from signalflow.data.source._helpers import dt_to_ms_utc, ms_to_dt_utc_naive
 
 
 @dataclass
-@sf_component(name="myexchange")
+@sf.data_source("myexchange")
 class MyExchangeClient(RawDataSource):
     """Async client for custom exchange REST API."""
 
@@ -307,13 +307,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from signalflow.core import sf_component
+import signalflow as sf
 from signalflow.data.source.base import RawDataLoader
 from signalflow.data.raw_store import DuckDbSpotStore
 
 
 @dataclass
-@sf_component(name="myexchange/spot")
+@sf.data_loader("myexchange/spot")
 class MyExchangeSpotLoader(RawDataLoader):
     """Loader for custom exchange spot data."""
 
@@ -373,7 +373,7 @@ class MyExchangeSpotLoader(RawDataLoader):
 from signalflow.core.registry import default_registry
 from signalflow.core.enums import SfComponentType
 
-# Components are auto-registered via @sf_component decorator
+# Components are auto-registered via semantic decorators (e.g., @sf.data_source)
 # Or register manually:
 default_registry.register(
     SfComponentType.RAW_DATA_SOURCE,

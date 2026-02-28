@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import math
 import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -11,7 +10,7 @@ from typing import Any
 
 from loguru import logger
 
-from signalflow.core.decorators import sf_component
+from signalflow.core import data_source
 from signalflow.data.source.base import RawDataLoader
 
 _TIMEFRAME_MINUTES: dict[str, int] = {
@@ -144,10 +143,7 @@ def generate_crossover_data(
         ts = start + delta * i
 
         # Downtrend then uptrend to create crossover
-        if i < crossover_at:
-            drift = -0.001
-        else:
-            drift = 0.003  # sharp reversal
+        drift = -0.001 if i < crossover_at else 0.003  # sharp reversal
 
         noise = 0.005 * rng.gauss(0, 1)
         ret = drift + noise
@@ -182,7 +178,7 @@ def generate_crossover_data(
 
 
 @dataclass
-@sf_component(name="virtual/spot")
+@data_source("virtual/spot")
 class VirtualDataProvider(RawDataLoader):
     """Generates and streams synthetic OHLCV data into a store.
 
@@ -226,7 +222,7 @@ class VirtualDataProvider(RawDataLoader):
                 before now.
         """
         pairs = pairs or []
-        tf_minutes = _TIMEFRAME_MINUTES.get(self.timeframe, 1)
+        _TIMEFRAME_MINUTES.get(self.timeframe, 1)
 
         if start is None:
             start = datetime(2024, 1, 1)
@@ -254,7 +250,7 @@ class VirtualDataProvider(RawDataLoader):
 
             logger.info(f"VirtualDataProvider: generated {n_bars} bars for {pair}")
 
-    async def sync(
+    async def sync(  # type: ignore[override]
         self,
         pairs: list[str],
         update_interval_sec: int = 60,
@@ -281,10 +277,7 @@ class VirtualDataProvider(RawDataLoader):
 
                 # Get last timestamp from store
                 _, max_ts = self.store.get_time_bounds(pair)
-                if max_ts is None:
-                    ts = datetime(2024, 1, 1)
-                else:
-                    ts = max_ts + delta
+                ts = datetime(2024, 1, 1) if max_ts is None else max_ts + delta
 
                 # Generate one new bar
                 ret = self.trend + self.volatility * rng.gauss(0, 1)

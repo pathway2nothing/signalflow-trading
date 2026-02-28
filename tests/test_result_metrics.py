@@ -4,12 +4,11 @@ from datetime import datetime, timedelta
 
 import polars as pl
 
-from signalflow.core import RawData
-from signalflow.core.containers.strategy_state import StrategyState
-from signalflow.core.containers.position import Position
-from signalflow.core.enums import PositionType
 from signalflow.analytic.strategy.result_metrics import StrategyMainResult, StrategyPairResult
-
+from signalflow.core import RawData
+from signalflow.core.containers.position import Position
+from signalflow.core.containers.strategy_state import StrategyState
+from signalflow.core.enums import PositionType
 
 TS = datetime(2024, 1, 1)
 
@@ -347,7 +346,7 @@ class TestStrategyPairResultHelpers:
             }
         )
 
-        ts_dt, ts_s, price = metric._normalize_timeseries(df=df)
+        ts_dt, ts_s, _price = metric._normalize_timeseries(df=df)
 
         assert len(ts_dt) == 10
         assert ts_s[0] == base_epoch

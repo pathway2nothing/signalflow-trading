@@ -25,9 +25,10 @@ Example:
     ```
 """
 
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import cast
 
 import polars as pl
 
@@ -39,7 +40,7 @@ from signalflow.data.raw_store.base import RawDataStore
 def _get_data_type(store: RawDataStore) -> str:
     """Extract data_type from store."""
     if hasattr(store, "data_type"):
-        return store.data_type
+        return cast(str, store.data_type)
     return "unknown"
 
 
@@ -238,7 +239,7 @@ class RawDataFactory:
             datetime_start=start,
             datetime_end=end,
             pairs=pairs,
-            data=nested_data,
+            data=cast(dict[str, pl.DataFrame | dict[str, pl.DataFrame]], nested_data),
             default_source=default_source,
         )
 
@@ -259,9 +260,11 @@ class RawDataFactory:
 
         for store in stores:
             raw = store.to_raw_data(pairs=pairs, start=start, end=end)
-            for key, df in raw.data.items():
+            for key, val in raw.data.items():
                 if key in merged_data:
                     raise ValueError(f"Duplicate data key '{key}' from multiple stores")
+                assert isinstance(val, pl.DataFrame)
+                df: pl.DataFrame = val
                 # Resample to target timeframe if requested
                 if target_timeframe is not None and df.height > 1:
                     from signalflow.data.resample import align_to_timeframe
@@ -273,7 +276,7 @@ class RawDataFactory:
             datetime_start=start,
             datetime_end=end,
             pairs=pairs,
-            data=merged_data,
+            data=cast(dict[str, pl.DataFrame | dict[str, pl.DataFrame]], merged_data),
             default_source=default_source,
         )
 
@@ -448,7 +451,7 @@ class RawDataFactory:
                 datetime_start=start,
                 datetime_end=end,
                 pairs=pairs,
-                data=data,
+                data=cast(dict[str, pl.DataFrame | dict[str, pl.DataFrame]], data),
             )
         finally:
             store.close()

@@ -2,22 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, ClassVar
 import uuid
+from dataclasses import dataclass, field
+from typing import Any
 
 import polars as pl
 from loguru import logger
 
-from signalflow.core.enums import SfComponentType
-from signalflow.core.decorators import sf_component
+from signalflow.core import executor
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.signals import Signals
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.strategy.component.base import EntryRule
 from signalflow.strategy.runner.base import StrategyRunner
-
 
 # ==================== Result Class ====================
 
@@ -83,7 +80,7 @@ class UnlimitedResults:
 
 
 @dataclass
-@sf_component(name="runner/unlimited", override=True)
+@executor("runner/unlimited")
 class UnlimitedBalanceRunner(StrategyRunner):
     """Unlimited balance runner with vectorized exit detection.
 
@@ -116,8 +113,6 @@ class UnlimitedBalanceRunner(StrategyRunner):
         show_progress: Show progress bar
     """
 
-    component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_RUNNER
-
     strategy_id: str = "unlimited"
     broker: Any = None  # Not used
     entry_rules: list[EntryRule] = field(default_factory=list)
@@ -138,7 +133,7 @@ class UnlimitedBalanceRunner(StrategyRunner):
     fee_rate: float = 0.001
     show_progress: bool = True
 
-    def run(self, raw_data: RawData, signals: Signals, state: StrategyState | None = None) -> UnlimitedResults:
+    def run(self, raw_data: RawData, signals: Signals, state: StrategyState | None = None) -> UnlimitedResults:  # type: ignore[override]
         """Run vectorized backtest.
 
         Args:
@@ -350,7 +345,11 @@ class UnlimitedBalanceRunner(StrategyRunner):
         wins = trades_df.filter(pl.col("pnl") > 0)
         win_rate = wins.height / trades_df.height if trades_df.height > 0 else 0.0
 
-        avg_return = trades_df["return_pct_after_fees"].mean()
+        avg_return_raw = trades_df["return_pct_after_fees"].mean()
+        try:
+            avg_return: float = float(avg_return_raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            avg_return = 0.0
 
         tp_hits = trades_df.filter(pl.col("exit_reason") == "take_profit")
         hit_rate = tp_hits.height / trades_df.height if trades_df.height > 0 else 0.0

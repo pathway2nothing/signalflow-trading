@@ -1,10 +1,11 @@
-import optuna
 from typing import Any
+
+import optuna
 
 
 def build_optuna_params(trial: optuna.Trial, tune_space: dict[str, tuple]) -> dict[str, Any]:
     """Build hyperparameters from optuna trial."""
-    params = {}
+    params: dict[str, Any] = {}
     for name, spec in tune_space.items():
         param_type = spec[0]
         if param_type == "int":

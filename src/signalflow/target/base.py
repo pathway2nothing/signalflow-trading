@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import RawDataType, SfComponentType, SignalType, SignalCategory, Signals
+from signalflow.core import RawDataType, SfComponentType, SignalCategory, Signals, SignalType
 
 
 @dataclass
@@ -207,7 +207,7 @@ class Labeler(ABC):
 
         label_cols = sorted(set(out.columns) - input_cols) if self.output_columns is None else list(self.output_columns)
 
-        keep_cols = [self.pair_col, self.ts_col] + label_cols
+        keep_cols = [self.pair_col, self.ts_col, *label_cols]
         missing = [c for c in keep_cols if c not in out.columns]
         if missing:
             raise ValueError(f"Projection error, missing columns: {missing}")

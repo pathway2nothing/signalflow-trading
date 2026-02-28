@@ -1,13 +1,11 @@
 """Tests for BacktestBuilder."""
 
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timedelta
 
-import polars as pl
-
-import signalflow as sf
 from signalflow.api.builder import Backtest, BacktestBuilder
-from signalflow.core import default_registry, SfComponentType, RawData, Signals
+from signalflow.core import RawData, SfComponentType, Signals, default_registry
 
 
 class TestBacktestFactory:
@@ -462,6 +460,7 @@ class TestBuilderMultiValidator:
     def test_duplicate_validator_name_raises(self):
         """Duplicate validator name raises DuplicateComponentNameError."""
         from unittest.mock import MagicMock
+
         from signalflow.api.exceptions import DuplicateComponentNameError
 
         with pytest.raises(DuplicateComponentNameError):

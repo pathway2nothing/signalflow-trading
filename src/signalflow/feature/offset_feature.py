@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar, cast
 
 import polars as pl
 
-from signalflow.core import default_registry, SfComponentType
+from signalflow.core import SfComponentType, default_registry
 from signalflow.feature.base import Feature, GlobalFeature
 
 
@@ -38,15 +38,15 @@ class OffsetFeature(Feature):
         ... )
     """
 
-    feature_name: str = None
+    feature_name: str | None = None
     feature_params: dict = field(default_factory=dict)
     window: int = 15
     prefix: str | None = None
 
-    requires = ["open", "high", "low", "close", "volume", "timestamp"]
-    outputs = ["offset"]
+    requires: ClassVar[list[str]] = ["open", "high", "low", "close", "volume", "timestamp"]
+    outputs: ClassVar[list[str]] = ["offset"]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.feature_name is None:
             raise ValueError("OffsetFeature requires 'feature_name'")
 
@@ -59,7 +59,7 @@ class OffsetFeature(Feature):
 
     def output_cols(self, prefix: str = "") -> list[str]:
         base_cols = self._base.output_cols(prefix=f"{prefix}{self.prefix}")
-        return base_cols + [f"{prefix}offset"]
+        return [*base_cols, f"{prefix}offset"]
 
     def required_cols(self) -> list[str]:
         return ["open", "high", "low", "close", "volume", self.ts_col]
@@ -86,9 +86,9 @@ class OffsetFeature(Feature):
     def _compute_base_feature(self, resampled: pl.DataFrame) -> pl.DataFrame:
         """Compute base feature - handles both Feature and GlobalFeature."""
         if self._is_global:
-            return self._base.compute(resampled)
+            return cast(pl.DataFrame, self._base.compute(resampled))
         else:
-            return self._base.compute_pair(resampled)
+            return cast(pl.DataFrame, self._base.compute_pair(resampled))
 
     def _compute_single_pair(self, df: pl.DataFrame) -> pl.DataFrame:
         """Compute features for single pair (non-global base)."""
@@ -120,7 +120,7 @@ class OffsetFeature(Feature):
         feature_cols = [f"{self.prefix}{col}" for col in self._base.output_cols()]
 
         result = df.join(
-            all_offsets.select(["_grp", "_offset"] + feature_cols),
+            all_offsets.select(["_grp", "_offset", *feature_cols]),
             left_on=["_grp", "offset"],
             right_on=["_grp", "_offset"],
             how="left",
@@ -182,7 +182,7 @@ class OffsetFeature(Feature):
         feature_cols = [f"{self.prefix}{col}" for col in self._base.output_cols()]
 
         result = df.join(
-            all_offsets.select([self.group_col, "_grp", "_offset"] + feature_cols),
+            all_offsets.select([self.group_col, "_grp", "_offset", *feature_cols]),
             left_on=[self.group_col, "_grp", "offset"],
             right_on=[self.group_col, "_grp", "_offset"],
             how="left",

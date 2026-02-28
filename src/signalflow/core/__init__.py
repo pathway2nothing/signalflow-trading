@@ -4,58 +4,110 @@ Provides fundamental building blocks for SignalFlow trading framework:
 - Containers: RawData, Signals, Position, Trade, Portfolio, Order, OrderFill
 - Enums: SignalType, SfComponentType, PositionType, etc.
 - Registry: Component registration and discovery
-- Decorators: @sf_component for automatic registration
+- Decorators: Semantic decorators for component registration
+  - @sf.detector, @sf.feature, @sf.validator, @sf.labeler
+  - @sf.entry, @sf.exit
+  - @sf.signal_metric, @sf.strategy_metric
+  - @sf.alert, @sf.data_source, @sf.data_store, @sf.executor, @sf.risk
 - Transforms: SignalsTransform protocol
 """
 
+from signalflow.core.base_mixin import SfTorchModuleMixin
 from signalflow.core.containers import (
-    RawData,
-    RawDataLazy,
-    Signals,
-    RawDataView,
-    Position,
-    Trade,
-    Portfolio,
-    StrategyState,
     Order,
     OrderFill,
+    Portfolio,
+    Position,
+    RawData,
+    RawDataLazy,
+    RawDataView,
+    Signals,
+    StrategyState,
+    Trade,
+)
+from signalflow.core.decorators import (
+    # Semantic decorators (new API)
+    alert,
+    data_source,
+    data_store,
+    detector,
+    entry,
+    executor,
+    exit,
+    feature,
+    labeler,
+    register,
+    risk,
+    # Legacy (deprecated)
+    sf_component,
+    signal_metric,
+    strategy_metric,
+    strategy_store,
+    validator,
 )
 from signalflow.core.enums import (
-    SignalType,
-    SignalCategory,
-    PositionType,
-    SfComponentType,
     DataFrameType,
-    RawDataType,
     ExitPriority,
+    PositionType,
+    RawDataType,
+    SfComponentType,
+    SignalCategory,
+    SignalType,
 )
-from signalflow.core.decorators import sf_component
-from signalflow.core.registry import default_registry, SignalFlowRegistry, get_component
+from signalflow.core.registry import (
+    ComponentInfo,
+    SignalFlowRegistry,
+    default_registry,
+    get_component,
+    get_component_info,
+)
 from signalflow.core.signal_transform import SignalsTransform
-from signalflow.core.base_mixin import SfTorchModuleMixin
 
 __all__ = [
-    "RawData",
-    "RawDataLazy",
-    "Signals",
-    "RawDataView",
-    "Position",
-    "Trade",
+    # Registry
+    "ComponentInfo",
+    # Enums
+    "DataFrameType",
+    "ExitPriority",
+    # Containers
     "Order",
     "OrderFill",
     "Portfolio",
-    "StrategyState",
-    "SignalType",
-    "SignalCategory",
+    "Position",
     "PositionType",
-    "SfComponentType",
-    "DataFrameType",
+    "RawData",
+    "RawDataLazy",
     "RawDataType",
-    "ExitPriority",
-    "sf_component",
-    "default_registry",
-    "SignalFlowRegistry",
-    "get_component",
-    "SignalsTransform",
+    "RawDataView",
+    "SfComponentType",
+    # Other
     "SfTorchModuleMixin",
+    "SignalCategory",
+    "SignalFlowRegistry",
+    "SignalType",
+    "Signals",
+    "SignalsTransform",
+    "StrategyState",
+    "Trade",
+    # Semantic decorators (new API)
+    "alert",
+    "data_source",
+    "data_store",
+    "default_registry",
+    "detector",
+    "entry",
+    "executor",
+    "exit",
+    "feature",
+    "get_component",
+    "get_component_info",
+    "labeler",
+    "register",
+    "risk",
+    # Legacy decorator (deprecated)
+    "sf_component",
+    "signal_metric",
+    "strategy_metric",
+    "strategy_store",
+    "validator",
 ]

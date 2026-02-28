@@ -10,7 +10,6 @@ import pytest
 
 from signalflow.data.resample import (
     EXCHANGE_TIMEFRAMES,
-    TIMEFRAME_MINUTES,
     align_to_timeframe,
     can_resample,
     detect_timeframe,
@@ -18,7 +17,6 @@ from signalflow.data.resample import (
     select_best_timeframe,
     timeframe_to_minutes,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
