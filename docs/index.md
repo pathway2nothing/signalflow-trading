@@ -2,23 +2,23 @@
 title: Home
 description: >
   SignalFlow is a high-performance Python framework for algorithmic trading,
-  quantitative finance, backtesting, and ML-powered signal validation.
+  signal detection, meta-labeling validation, and strategy execution.
 
 hide:
   - navigation
 ---
 
-# SignalFlow - High-Performance Algorithmic Trading Framework
+# Signalflow-trading - High-Performance Algorithmic Trading Framework
 
 > Current stable version: **{{ project_version }}**
 
-**SignalFlow** is a high-performance Python framework for
+**signalflow-trading** is a high-performance Python framework for
 **algorithmic trading**, **quantitative finance**, and
-**machine learning-based trading strategies**.
+**ML-powered signal validation**.
 
 ---
 
-## What's New in v0.5
+## What's New in v0.6
 
 <div class="grid cards" markdown>
 
@@ -26,7 +26,7 @@ hide:
 
     ---
 
-    Clean, chainable API for quick backtesting with IDE autocomplete support
+    Clean, chainable API for backtesting with IDE autocomplete
 
     ```python
     result = (
@@ -38,49 +38,45 @@ hide:
     )
     ```
 
+-   :material-graph:{ .lg .middle } **Flow Builder**
+
+    ---
+
+    Execute strategies as directed flows with metric nodes, LTTB downsampling, and artifact caching
+
+    ```python
+    flow = (
+        FlowBuilder("research")
+        .data(store="binance", pair="BTC/USDT")
+        .detector("sma_cross")
+        .metric("sharpe_ratio")
+        .build()
+    )
+    ```
+
+-   :material-tag-multiple:{ .lg .middle } **Semantic Decorators**
+
+    ---
+
+    Type-safe component registration: `@sf.detector()`, `@sf.feature()`, `@sf.entry()`, `@sf.exit()`, `@sf.executor()`
+
+-   :material-database:{ .lg .middle } **State Persistence**
+
+    ---
+
+    `StateManager` with Redis, DuckDB, and Memory backends for crash recovery and session continuity
+
+-   :material-chart-scatter-plot:{ .lg .middle } **Statistical Analysis**
+
+    ---
+
+    Numba-accelerated Monte Carlo, Bootstrap CI, and significance tests
+
 -   :material-console:{ .lg .middle } **CLI & YAML Config**
 
     ---
 
-    Run backtests from command line with YAML configuration files
-
-    ```bash
-    sf init
-    sf run backtest.yaml --plot
-    ```
-
--   :material-chart-scatter-plot:{ .lg .middle } **Pipeline Visualization**
-
-    ---
-
-    Interactive D3.js pipeline DAG, Mermaid export, local dev server
-
-    ```python
-    sf.viz.pipeline(builder)
-    sf.viz.serve(builder, port=4141)
-    ```
-
--   :material-swap-horizontal:{ .lg .middle } **OHLCV Resampling**
-
-    ---
-
-    Auto-detect timeframes, resample to any interval, exchange-aware selection
-
-    ```python
-    df_4h = align_to_timeframe(df_1m, "4h")
-    ```
-
--   :material-message-alert:{ .lg .middle } **Better Error Messages**
-
-    ---
-
-    Clear, actionable error messages with suggestions for fixing issues
-
--   :material-notebook:{ .lg .middle } **Jupyter Support**
-
-    ---
-
-    Rich HTML rendering of results in Jupyter notebooks
+    Run backtests from command line with YAML configuration and `search_space()` for tuning
 
 </div>
 
@@ -92,207 +88,128 @@ hide:
 
     ---
 
-    Powered by Polars for blazing-fast processing of large datasets (100+ trading pairs, 500k+ candles)
+    Polars-first processing for 100+ pairs, 500k+ candles. Numba JIT for statistics
 
 -   :material-puzzle:{ .lg .middle } **Modular Design**
 
     ---
 
-    Component registry system with pluggable detectors, validators, features, and strategies
+    Component registry with pluggable detectors, validators, features, and strategies
 
 -   :material-chart-line:{ .lg .middle } **Production Ready**
 
     ---
 
-    Seamless transition from research to production with unified backtesting and live trading interfaces
+    Same code for backtesting, paper trading, and live execution
 
 -   :material-brain:{ .lg .middle } **ML-Powered**
 
     ---
 
-    Built-in support for scikit-learn, XGBoost, LightGBM, and PyTorch-based signal validation
+    scikit-learn, XGBoost, LightGBM, PyTorch signal validation with meta-labeling
 
 </div>
 
 ---
 
-## The Signal Processing Pipeline
-
-SignalFlow organizes algorithmic trading into four distinct stages:
+## The Signal Pipeline
 
 ```mermaid
 flowchart LR
     A[Market Data] --> B[Signal Detection]
     B --> C[Signal Validation]
     C --> D[Strategy Execution]
-    
-    style A fill:#2563eb,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style B fill:#ea580c,stroke:#f97316,stroke-width:2px,color:#fff
-    style C fill:#16a34a,stroke:#22c55e,stroke-width:2px,color:#fff
-    style D fill:#dc2626,stroke:#ef4444,stroke-width:2px,color:#fff
+
+    style A fill:#14b8a6,stroke:#0d9488,stroke-width:2px,color:#fff
+    style B fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    style C fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:#fff
+    style D fill:#22c55e,stroke:#16a34a,stroke-width:2px,color:#fff
 ```
 
-SignalFlow implements a four-stage algorithmic trading pipeline:
-market data ingestion, signal detection, machine learning-based
-signal validation, and strategy execution with risk management.
-
 ### 1. Data & Features
-Load and process market data with efficient storage and feature engineering:
 
 - **7 Exchange Sources**: Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT
 - DuckDB, SQLite, PostgreSQL storage backends
-- Technical indicators via pandas-ta and custom Polars extractors
+- 189+ technical indicators via [signalflow-ta](ecosystem/signalflow-ta.md)
 
 ### 2. Signal Detection
-Identify potential trading opportunities from market patterns:
 
-- Classical algorithms (SMA crossover, MACD, RSI thresholds)
-- Pattern recognition (candlestick patterns, chart formations)
-- Neural network outputs (CNN, LSTM, Transformer predictions)
+- Classical algorithms (SMA crossover, MACD, RSI, structure detection)
+- Neural network predictions via [signalflow-nn](ecosystem/signalflow-nn.md)
+- Custom detectors via `@sf.detector("name")`
 
 ### 3. Signal Validation (Meta-Labeling)
-Filter signals using machine learning to predict success probability:
 
-- Implements Lopez de Prado's meta-labeling methodology
-- Support for scikit-learn, XGBoost, LightGBM classifiers
-- Deep learning validators via PyTorch Lightning (signalflow-nn)
+- Lopez de Prado's meta-labeling methodology
+- scikit-learn, XGBoost, LightGBM classifiers
+- Deep learning validators via PyTorch Lightning
 
 ### 4. Strategy Execution
-Convert validated signals into trades with risk management:
 
-- **Entry/exit rules**:
-  - Entry: Signal-based, model-driven, fixed-size
-  - Exit: Take-profit/stop-loss, trailing stops, volatility-based, composite
-- **Advanced position sizing**: Kelly Criterion, volatility targeting, risk parity, martingale/grid
-- **Entry filters**: Regime, volatility, drawdown, correlation, time-of-day, price distance, signal accuracy
-- **Signal aggregation**: Combine multiple detectors with voting modes (majority, weighted, unanimous, meta-labeling)
-- **Real-time execution**: Paper trading with `RealtimeRunner` and monitoring/alerts
-- **ML/RL integration**: External model support via `StrategyModel` protocol
-- Unified interface for backtesting, paper trading, and live trading
-
----
-
-## Real-Time Trading & Monitoring
-
-SignalFlow v0.3.7+ includes production-ready infrastructure for paper and live trading:
-
-### Paper Trading (Virtual Trading)
-- **RealtimeRunner**: Async event loop for real-time bar processing
-- **VirtualRealtimeBroker**: Simulated execution with order/fill logging
-- **Data Sync**: Automatic background data updates from exchanges
-- **State Persistence**: Crash recovery with checkpoint restoration
-
-### Monitoring & Alerts
-- **MaxDrawdownAlert**: Trigger on excessive drawdown
-- **NoSignalsAlert**: Detect signal generation failures
-- **StuckPositionAlert**: Alert on positions not exiting
-- **Custom Metrics**: Track equity, win rate, Sharpe ratio in real-time
-
-### External Model Integration
-- **StrategyModel Protocol**: Integrate ML/RL models for automated decisions
-- **ModelEntryRule / ModelExitRule**: Model-driven entry and exit logic
-- **BacktestExporter**: Export training data (Parquet) for model development
-- **Decision Caching**: Single model call per bar for consistent decisions
+- **Entry/exit rules**: signal-based, model-driven, composite
+- **Position sizing**: Kelly Criterion, volatility targeting, risk parity, martingale
+- **Entry filters**: regime, volatility, drawdown, correlation, time-of-day
+- **Signal aggregation**: majority, weighted, unanimous, meta-labeling
+- **Real-time**: Paper trading with `RealtimeRunner`, monitoring, alerts
+- **State persistence**: Redis/DuckDB/Memory with crash recovery
 
 ---
 
 ## Quick Example
 
 ```python
-from datetime import datetime
-from pathlib import Path
+import signalflow as sf
 
-from signalflow.data.source import VirtualDataProvider
-from signalflow.data.raw_store import DuckDbSpotStore
-from signalflow.data import RawDataFactory
-from signalflow.detector import ExampleSmaCrossDetector
-from signalflow.strategy.runner import BacktestRunner
-from signalflow.strategy.component.entry.signal import SignalEntryRule
-from signalflow.strategy.component.exit.tp_sl import TakeProfitStopLossExit
-from signalflow.strategy.broker import BacktestBroker
-from signalflow.strategy.broker.executor import VirtualSpotExecutor
-
-# Generate synthetic data (no API keys needed)
-store = DuckDbSpotStore(db_path=Path("data.duckdb"))
-VirtualDataProvider(store=store, seed=42).download(
-    pairs=["BTCUSDT"], n_bars=10_000
+result = (
+    sf.Backtest("momentum_strategy")
+    .data(raw=my_raw_data)
+    .detector("example/sma_cross", fast_period=20, slow_period=50)
+    .entry(size_pct=0.1, max_positions=5)
+    .exit(tp=0.03, sl=0.015, trailing=0.02)
+    .capital(50_000)
+    .fee(0.001)
+    .run()
 )
 
-# Load data
-raw_data = RawDataFactory.from_duckdb_spot_store(
-    spot_store_path=Path("data.duckdb"),
-    pairs=["BTCUSDT"],
-    start=datetime(2020, 1, 1),
-    end=datetime(2030, 1, 1),
-)
-
-# Detect SMA crossover signals
-detector = ExampleSmaCrossDetector(fast_period=20, slow_period=50)
-signals = detector.run(raw_data.view())
-
-# Backtest with entry/exit rules
-runner = BacktestRunner(
-    strategy_id="quickstart",
-    broker=BacktestBroker(executor=VirtualSpotExecutor(fee_rate=0.001)),
-    entry_rules=[SignalEntryRule(base_position_size=100.0, use_probability_sizing=False)],
-    exit_rules=[TakeProfitStopLossExit(take_profit_pct=0.02, stop_loss_pct=0.01)],
-    initial_capital=10_000.0,
-)
-state = runner.run(raw_data=raw_data, signals=signals)
-print(f"Trades: {len(runner.trades)}, Final capital: ${state.capital:.2f}")
+print(result.summary())
+result.plot()
 ```
+
+### Custom Components
+
+```python
+import signalflow as sf
+from signalflow.detector import SignalDetector
+
+@sf.detector("my/custom_detector")
+class CustomDetector(SignalDetector):
+    def detect(self, data):
+        return signals
+```
+
+Available decorators: `@sf.detector()`, `@sf.feature()`, `@sf.entry()`, `@sf.exit()`, `@sf.executor()`, `@sf.data_source()`, `@sf.data_store()`, `@sf.strategy_store()`, `@sf.register()`
 
 ---
 
 ## Key Features
 
 ### :octicons-zap-16: Polars-First Performance
-Core data processing uses Polars for extreme efficiency on large datasets, with seamless Pandas compatibility for prototyping.
-
-### :octicons-plug-16: Component Registry
-All components (detectors, validators, features) are registered via semantic decorators for easy customization:
-
-```python
-import signalflow as sf
-from signalflow.detector import SignalDetector
-
-@sf.detector("my_detector")
-class CustomDetector(SignalDetector):
-    def detect(self, data):
-        # Your logic here
-        return signals
-```
+Core data processing uses Polars for extreme efficiency on large datasets, with seamless Pandas compatibility.
 
 ### :octicons-beaker-16: Advanced Labeling
-Built-in support for sophisticated labeling strategies:
+Triple Barrier Method, Fixed Horizon, Trend Scanning, Volatility and Volume labelers. Numba-accelerated (45s to 0.3s).
 
-- **Triple Barrier Method**: Combines take-profit, stop-loss, and time barriers
-- **Fixed Horizon**: Label signals based on future returns
-- **Signal masking**: Label only signal timestamps for efficient ML training
-- Numba-accelerated for performance (45s → 0.3s on large datasets)
-
-### :octicons-graph-16: 199+ Technical Indicators
-The [signalflow-ta](ecosystem/signalflow-ta.md) extension provides production-grade technical analysis:
-
-- Momentum, Overlap, Volatility, Volume, Trend, Statistics
-- Physics-based indicators (energy, viscosity, impedance analogs)
-- Preset pipeline factories for rapid feature engineering
+### :octicons-graph-16: 189+ Technical Indicators
+The [signalflow-ta](ecosystem/signalflow-ta.md) extension: momentum, volatility, trend, statistics, and physics-based market analogs.
 
 ### :octicons-rocket-16: Paper Trading & Monitoring
-Production-ready infrastructure for risk-free validation:
+`RealtimeRunner` with async data sync, virtual broker, drawdown/stuck-position alerts, and crash recovery.
 
-- **RealtimeRunner**: Async loop with automatic data sync and signal processing
-- **VirtualRealtimeBroker**: Simulated execution with comprehensive logging
-- **Alert System**: Real-time monitoring of drawdown, positions, and signal quality
-- **Crash Recovery**: State persistence and automatic restoration
+### :octicons-cpu-16: Statistical Validation
+Monte Carlo simulation, Bootstrap confidence intervals, significance tests — all Numba JIT-compiled.
 
-### :octicons-cpu-16: ML/RL Model Integration
-Protocol-based external model support:
-
-- **StrategyModel Protocol**: Clean interface for ML/RL decision models
-- **Model Rules**: `ModelEntryRule` and `ModelExitRule` for automated trading
-- **Training Export**: Parquet export of backtest data for model development
-- **Decision Caching**: Consistent model decisions across entry/exit phases
+### :octicons-plug-16: Flow Builder
+Execute strategies as directed acyclic graphs with metric nodes, progress callbacks, and LTTB downsampling.
 
 ---
 
@@ -301,29 +218,28 @@ Protocol-based external model support:
 <div class="grid" markdown>
 
 === "Data Processing"
-    - **Polars** - High-performance DataFrames
-    - **Pandas** - Legacy compatibility & prototyping
-    - **DuckDB** - Embedded analytics database
-    - **NumPy** - Numerical computing
+    - **Polars** — High-performance DataFrames
+    - **DuckDB** — Embedded analytics database
+    - **Pandas** — Compatibility layer
+    - **NumPy** — Numerical computing
 
 === "Machine Learning"
-    - **scikit-learn** - Classical ML models
-    - **XGBoost** - Gradient boosting
-    - **LightGBM** - Fast gradient boosting
-    - **PyTorch** - Deep learning framework
-    - **Lightning** - PyTorch training framework
-    - **Optuna** - Hyperparameter optimization
+    - **scikit-learn** — Classical ML models
+    - **XGBoost / LightGBM** — Gradient boosting
+    - **PyTorch + Lightning** — Deep learning
+    - **Optuna** — Hyperparameter optimization
+    - **Numba** — JIT compilation
 
-=== "Trading Tools"
-    - **signalflow-ta** - 199+ technical indicators
-    - **pandas-ta** - Technical analysis foundation
-    - **Numba** - JIT compilation for speed
-    - **Plotly** - Interactive visualizations
+=== "Trading"
+    - **signalflow-ta** — 189+ indicators
+    - **pandas-ta** — TA foundation
+    - **Plotly** — Interactive charts
 
 === "Infrastructure"
-    - **DuckDB** - Local data storage
-    - **SQLite / PostgreSQL** - Alternative storage backends
-    - **Kedro** - Pipeline orchestration
+    - **Redis** — State persistence (production)
+    - **DuckDB / SQLite / PostgreSQL** — Storage
+    - **Kedro** — Pipeline orchestration
+    - **FastAPI** — Web backend (sf-ui)
 
 </div>
 
@@ -331,99 +247,97 @@ Protocol-based external model support:
 
 ## SignalFlow Ecosystem
 
-SignalFlow is a multi-repository ecosystem with specialized extensions:
-
-### signalflow-trading (Core) :material-package-variant-closed:
-The main library with foundational components:
-
-- Core data containers and abstractions (`RawData`, `Signals`, `RawDataView`)
-- **7 Exchange Sources**: Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT
-- DuckDB, SQLite, and PostgreSQL storage backends
-- Backtesting infrastructure with modular entry/exit rules
-- Component registry system (semantic decorators like `@sf.detector`, `@sf.feature`)
-
-### [signalflow-ta](ecosystem/signalflow-ta.md) (Technical Analysis) :material-chart-bell-curve-cumulative:
-199+ technical indicators across 8 modules:
-
-- Momentum, Overlap, Volatility, Volume, Trend, Statistics
-- Physics-based market analogs (energy, viscosity, impedance)
-- Preset pipeline factories for rapid feature engineering
-- AutoFeatureNormalizer for automatic scaling
-
-### [signalflow-nn](ecosystem/signalflow-nn.md) (Neural Networks) :material-brain:
-Deep learning validators built on PyTorch Lightning:
-
-- Encoder + Head composition (LSTM, GRU + MLP, Attention, Residual)
-- TemporalValidator for seamless signalflow integration
-- Per-asset preprocessing with TimeSeriesPreprocessor
-- Optuna hyperparameter tuning support
-
----
-
-## Philosophy
-
-**Minimize time from successful experiment to production deployment.**
-
-SignalFlow bridges the research-production gap by:
-
-1. **Unified API**: Same code works for backtesting and live trading
-2. **Performance**: Polars-optimized for production-scale data
-3. **Modularity**: Swap components without rewriting strategies
-4. **Testability**: Every stage independently analyzable
-
----
-
-## Getting Started
-
-Ready to build your first trading strategy?
-
 <div class="grid cards" markdown>
 
--   :material-download:{ .lg .middle } **[Installation Guide for SignalFlow](getting-started/installation.md)**
+-   :material-package-variant-closed:{ .lg .middle } **signalflow-trading** (Core)
 
     ---
 
-    Install SignalFlow and set up your development environment
+    Data containers, signal detection, backtesting, strategy execution, state persistence, statistical analysis
 
--   :material-rocket-launch:{ .lg .middle } **[Quick Start Algorithmic Trading Example](quickstart.md)**
+    ```bash
+    pip install signalflow-trading
+    ```
 
-    ---
-
-    Build your first signal detector and backtest a strategy
-
--   :material-strategy:{ .lg .middle } **[Advanced Strategy Components](guide/advanced-strategies.md)**
+-   :material-chart-bell-curve-cumulative:{ .lg .middle } **[signalflow-ta](ecosystem/signalflow-ta.md)**
 
     ---
 
-    Position sizing, entry filters, signal aggregation, and exit rules
+    189+ technical indicators, 24 signal detectors, physics-based market analogs, AutoFeatureNormalizer
 
--   :material-brain:{ .lg .middle } **[ML/RL Model Integration](guide/model-integration.md)**
+    ```bash
+    pip install signalflow-ta
+    ```
 
-    ---
-
-    Integrate external ML/RL models with StrategyModel protocol
-
--   :material-puzzle:{ .lg .middle } **[Ecosystem Extensions](ecosystem/index.md)**
+-   :material-brain:{ .lg .middle } **[signalflow-nn](ecosystem/signalflow-nn.md)**
 
     ---
 
-    signalflow-ta (199 indicators) and signalflow-nn (deep learning)
+    14 neural encoders (LSTM, Transformer, PatchTST, TCN), 7 heads, 4 loss functions
 
--   :material-code-braces:{ .lg .middle } **[SignalFlow API Reference](api/index.md)**
+    ```bash
+    pip install signalflow-nn
+    ```
+
+-   :material-pipe:{ .lg .middle } **[sf-kedro](ecosystem/sf-kedro.md)**
 
     ---
 
-    Detailed documentation for all classes and methods
+    Universal ML pipelines: backtest, analyze, train, tune, validate with Optuna and MLflow
+
 
 </div>
 
 ---
 
-## Support & Community
+## Getting Started
+
+<div class="grid cards" markdown>
+
+-   :material-download:{ .lg .middle } **[Installation](getting-started/installation.md)**
+
+    ---
+
+    Install SignalFlow and set up your environment
+
+-   :material-rocket-launch:{ .lg .middle } **[Quick Start](quickstart.md)**
+
+    ---
+
+    Build your first strategy in 5 minutes
+
+-   :material-tag-multiple:{ .lg .middle } **[Semantic Decorators](guide/semantic-decorators.md)**
+
+    ---
+
+    Register custom components with type-safe decorators
+
+-   :material-strategy:{ .lg .middle } **[Advanced Strategies](guide/advanced-strategies.md)**
+
+    ---
+
+    Position sizing, entry filters, signal aggregation
+
+-   :material-puzzle:{ .lg .middle } **[Ecosystem](ecosystem/index.md)**
+
+    ---
+
+    signalflow-ta, signalflow-nn, sf-kedro
+
+-   :material-code-braces:{ .lg .middle } **[API Reference](api/index.md)**
+
+    ---
+
+    Complete documentation for all classes and methods
+
+</div>
+
+---
+
+## Support
 
 - **GitHub**: [github.com/pathway2nothing/signalflow-trading](https://github.com/pathway2nothing/signalflow-trading)
 - **Issues**: [Report bugs or request features](https://github.com/pathway2nothing/signalflow-trading/issues)
-- **Email**: [pathway2nothing@gmail.com](mailto:pathway2nothing@gmail.com)
 
 ---
 
@@ -431,23 +345,5 @@ Ready to build your first trading strategy?
 
 SignalFlow is open source software released under the [MIT License](https://opensource.org/licenses/MIT).
 
----
-
 !!! warning "Disclaimer"
     SignalFlow is provided for research purposes. Trading financial instruments carries risk. Past performance does not guarantee future results. Use at your own risk.
-
----
-
-## FAQ
-
-### What is SignalFlow used for?
-SignalFlow is used to build, validate, and deploy algorithmic trading
-strategies using classical indicators and machine learning models.
-
-### Is SignalFlow suitable for production trading?
-Yes. SignalFlow is designed with production pipelines, reproducibility,
-and performance in mind, using Polars, DuckDB, and Kedro.
-
-### Does SignalFlow support machine learning?
-SignalFlow supports scikit-learn, XGBoost, LightGBM, and PyTorch-based
-models for signal validation and meta-labeling.

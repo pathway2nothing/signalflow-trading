@@ -17,7 +17,7 @@ integrates directly with `FeaturePipeline` and the component registry.
 pip install signalflow-ta
 ```
 
-Requires `signalflow-trading >= 0.3.5`.
+Requires `signalflow-trading >= 0.5.0`.
 
 ---
 

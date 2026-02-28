@@ -1,6 +1,6 @@
 # Configuration API
 
-The `signalflow.config` module provides unified configuration loading and DAG-based flow definitions for all SignalFlow frontends (sf-kedro, sf-ui, CLI).
+The `signalflow.config` module provides unified configuration loading and flow definitions for all SignalFlow frontends (sf-kedro, sf-ui, CLI).
 
 ---
 

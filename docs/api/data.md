@@ -20,85 +20,9 @@
     options:
       show_root_heading: true
 
-### Bybit
+### Other Exchanges
 
-::: signalflow.data.source.bybit.BybitClient
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.bybit.BybitSpotLoader
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.bybit.BybitFuturesLoader
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.bybit.BybitFuturesInverseLoader
-    options:
-      show_root_heading: true
-
-### OKX
-
-::: signalflow.data.source.okx.OkxClient
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.okx.OkxSpotLoader
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.okx.OkxFuturesLoader
-    options:
-      show_root_heading: true
-
-### Deribit
-
-::: signalflow.data.source.deribit.DeribitClient
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.deribit.DeribitFuturesLoader
-    options:
-      show_root_heading: true
-
-### Kraken
-
-::: signalflow.data.source.kraken.KrakenClient
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.kraken.KrakenSpotLoader
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.kraken.KrakenFuturesLoader
-    options:
-      show_root_heading: true
-
-### Hyperliquid
-
-::: signalflow.data.source.hyperliquid.HyperliquidClient
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.hyperliquid.HyperliquidFuturesLoader
-    options:
-      show_root_heading: true
-
-### WhiteBIT
-
-::: signalflow.data.source.whitebit.WhitebitClient
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.whitebit.WhitebitSpotLoader
-    options:
-      show_root_heading: true
-
-::: signalflow.data.source.whitebit.WhitebitFuturesLoader
-    options:
-      show_root_heading: true
+Additional exchange sources (Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT) are provided by the **signalflow-data** extension package. Install it separately to access these loaders.
 
 ### Virtual Data
 

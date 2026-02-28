@@ -13,26 +13,28 @@ Get SignalFlow up and running in minutes.
 
 ## Install
 
-### Standard Installation
+### Core Framework
 
 ```bash
 pip install signalflow-trading
 ```
 
-### With Technical Analysis Indicators
-
-199+ indicators (momentum, volatility, trend, statistics, and more):
+### With Technical Analysis (189+ indicators)
 
 ```bash
 pip install signalflow-ta
 ```
 
-### With Neural Networks
-
-Deep learning validators (LSTM, GRU, Attention heads) via PyTorch Lightning:
+### With Neural Networks (14 encoders, PyTorch Lightning)
 
 ```bash
 pip install signalflow-nn
+```
+
+### Full Research Stack
+
+```bash
+pip install signalflow-trading signalflow-ta signalflow-nn
 ```
 
 ### Virtual Environment (Recommended)
@@ -53,11 +55,15 @@ pip install signalflow-nn    # neural network validators
 ## Verify Installation
 
 ```python
-import signalflow
+import signalflow as sf
 from signalflow.core import RawData, Signals
-from signalflow.detector import ExampleSmaCrossDetector
 
-print(f"SignalFlow {signalflow.__version__} installed")
+print(f"SignalFlow {sf.__version__} installed")
+
+# Check registered components
+from signalflow.core import default_registry, SfComponentType
+detectors = default_registry.list(SfComponentType.DETECTOR)
+print(f"Detectors available: {len(detectors)}")
 ```
 
 ---
@@ -68,10 +74,20 @@ print(f"SignalFlow {signalflow.__version__} installed")
     Works out of the box.
 
 === "macOS"
-    Supports both Intel and Apple Silicon (M1/M2/M3).
+    Supports both Intel and Apple Silicon (M1/M2/M3/M4).
 
 === "Windows"
     Works in Command Prompt or PowerShell.
+
+---
+
+## GPU Support (signalflow-nn)
+
+```bash
+# Check CUDA version: nvidia-smi
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+pip install signalflow-nn
+```
 
 ---
 
@@ -80,13 +96,6 @@ print(f"SignalFlow {signalflow.__version__} installed")
 **Import errors?**
 ```bash
 pip install --force-reinstall signalflow-trading
-```
-
-**GPU not detected (for signalflow-nn)?**
-```bash
-# Check CUDA version first: nvidia-smi
-pip install torch --index-url https://download.pytorch.org/whl/cu121
-pip install signalflow-nn
 ```
 
 **Python version too old?**
@@ -104,16 +113,18 @@ python --version  # Must be 3.12+
 
     ---
 
-    Build your first strategy in 10 minutes
+    Build your first strategy in 5 minutes
+
+-   :material-tag-multiple:{ .lg .middle } **[Semantic Decorators](../guide/semantic-decorators.md)**
+
+    ---
+
+    Register custom components with type-safe decorators
 
 -   :material-puzzle:{ .lg .middle } **[Ecosystem](../ecosystem/index.md)**
 
     ---
 
-    signalflow-ta and signalflow-nn extensions
+    signalflow-ta, signalflow-nn, sf-kedro, sf-ui
 
 </div>
-
----
-
-**Need help?** [pathway2nothing@gmail.com](mailto:pathway2nothing@gmail.com)
