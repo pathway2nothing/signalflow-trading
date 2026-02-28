@@ -162,11 +162,13 @@ class AllReconciler(BaseReconciler):
                 return pl.DataFrame()
 
             # Select key columns with prefix
-            prefixed_df = source_df.select([
-                pl.col("timestamp"),
-                pl.col("pair"),
-                pl.col("direction").alias(f"direction_{source_id}"),
-            ])
+            prefixed_df = source_df.select(
+                [
+                    pl.col("timestamp"),
+                    pl.col("pair"),
+                    pl.col("direction").alias(f"direction_{source_id}"),
+                ]
+            )
             dfs.append(prefixed_df)
 
         # Join all sources on timestamp and pair
@@ -182,12 +184,14 @@ class AllReconciler(BaseReconciler):
             result = result.filter(pl.col(first_dir) == pl.col(col))
 
         # Clean up and return
-        return result.select([
-            pl.col("timestamp"),
-            pl.col("pair"),
-            pl.col(first_dir).alias("direction"),
-            pl.lit("all").alias("source_id"),
-        ]).sort("timestamp")
+        return result.select(
+            [
+                pl.col("timestamp"),
+                pl.col("pair"),
+                pl.col(first_dir).alias("direction"),
+                pl.lit("all").alias("source_id"),
+            ]
+        ).sort("timestamp")
 
 
 class WeightedReconciler(BaseReconciler):
@@ -247,9 +251,7 @@ class WeightedReconciler(BaseReconciler):
                     continue
 
                 # Find signal at this point
-                match = df.filter(
-                    (pl.col("timestamp") == timestamp) & (pl.col("pair") == pair)
-                )
+                match = df.filter((pl.col("timestamp") == timestamp) & (pl.col("pair") == pair))
 
                 if match.is_empty():
                     continue
@@ -262,21 +264,25 @@ class WeightedReconciler(BaseReconciler):
 
             # Determine final direction based on scores
             if long_score >= self.threshold and long_score > short_score:
-                results.append({
-                    "timestamp": timestamp,
-                    "pair": pair,
-                    "direction": "long",
-                    "score": long_score,
-                    "source_id": "weighted",
-                })
+                results.append(
+                    {
+                        "timestamp": timestamp,
+                        "pair": pair,
+                        "direction": "long",
+                        "score": long_score,
+                        "source_id": "weighted",
+                    }
+                )
             elif short_score >= self.threshold and short_score > long_score:
-                results.append({
-                    "timestamp": timestamp,
-                    "pair": pair,
-                    "direction": "short",
-                    "score": short_score,
-                    "source_id": "weighted",
-                })
+                results.append(
+                    {
+                        "timestamp": timestamp,
+                        "pair": pair,
+                        "direction": "short",
+                        "score": short_score,
+                        "source_id": "weighted",
+                    }
+                )
 
         if not results:
             return pl.DataFrame()
@@ -330,9 +336,7 @@ class VotingReconciler(BaseReconciler):
                 if df is None or df.is_empty():
                     continue
 
-                match = df.filter(
-                    (pl.col("timestamp") == timestamp) & (pl.col("pair") == pair)
-                )
+                match = df.filter((pl.col("timestamp") == timestamp) & (pl.col("pair") == pair))
 
                 if match.is_empty():
                     continue
@@ -355,14 +359,16 @@ class VotingReconciler(BaseReconciler):
             if winner == "close":
                 continue  # Skip close signals in reconciliation
 
-            results.append({
-                "timestamp": timestamp,
-                "pair": pair,
-                "direction": winner,
-                "votes": max_votes,
-                "vote_ratio": vote_ratio,
-                "source_id": "voting",
-            })
+            results.append(
+                {
+                    "timestamp": timestamp,
+                    "pair": pair,
+                    "direction": winner,
+                    "votes": max_votes,
+                    "vote_ratio": vote_ratio,
+                    "source_id": "voting",
+                }
+            )
 
         if not results:
             return pl.DataFrame()

@@ -216,9 +216,7 @@ def pair_trades_by_position(
     return result
 
 
-def compute_trade_pnl(
-    entries: list[dict[str, Any]], exit_trade: dict[str, Any]
-) -> float:
+def compute_trade_pnl(entries: list[dict[str, Any]], exit_trade: dict[str, Any]) -> float:
     """Compute PnL for a single closed position.
 
     Args:
@@ -1676,9 +1674,7 @@ class FlowBuilder:
             raise ConfigurationError("No feature pipelines configured")
         return self._compute_features(raw)
 
-    def resolve_signals(
-        self, raw: RawData | None = None
-    ) -> tuple[Signals, dict[str, pl.DataFrame]]:
+    def resolve_signals(self, raw: RawData | None = None) -> tuple[Signals, dict[str, pl.DataFrame]]:
         """Detect signals from all detectors, capturing preprocessed features.
 
         Args:
@@ -1806,22 +1802,18 @@ class FlowBuilder:
             if k.startswith("_"):
                 continue
             if isinstance(v, int) and v > 0:
-                params[k] = {"value": v, "type": "int", "source": "entry",
-                             "low": max(1, v // 2), "high": v * 2}
+                params[k] = {"value": v, "type": "int", "source": "entry", "low": max(1, v // 2), "high": v * 2}
             elif isinstance(v, float) and v > 0:
-                params[k] = {"value": v, "type": "float", "source": "entry",
-                             "low": v * 0.5, "high": v * 2.0}
+                params[k] = {"value": v, "type": "float", "source": "entry", "low": v * 0.5, "high": v * 2.0}
 
         # Exit params
         for k, v in self._exit_config.items():
             if k.startswith("_"):
                 continue
             if isinstance(v, int) and v > 0:
-                params[k] = {"value": v, "type": "int", "source": "exit",
-                             "low": max(1, v // 2), "high": v * 2}
+                params[k] = {"value": v, "type": "int", "source": "exit", "low": max(1, v // 2), "high": v * 2}
             elif isinstance(v, float) and v > 0:
-                params[k] = {"value": v, "type": "float", "source": "exit",
-                             "low": v * 0.5, "high": v * 2.0}
+                params[k] = {"value": v, "type": "float", "source": "exit", "low": v * 0.5, "high": v * 2.0}
 
         return params
 

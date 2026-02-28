@@ -152,8 +152,7 @@ def _validate_references(config: dict[str, Any], result: ValidationResult) -> No
         bound_to = validator.get("bound_to")
         if bound_to and bound_to not in detector_ids:
             result.add_error(
-                "V5",
-                f"Validator '{validator.get('id', 'unknown')}' references unknown detector: {bound_to}"
+                "V5", f"Validator '{validator.get('id', 'unknown')}' references unknown detector: {bound_to}"
             )
 
     # V6: Reconcile weights reference valid detectors
@@ -163,10 +162,7 @@ def _validate_references(config: dict[str, Any], result: ValidationResult) -> No
 
     for weight_key in weights:
         if weight_key not in detector_ids:
-            result.add_error(
-                "V6",
-                f"Reconcile weight references unknown detector: {weight_key}"
-            )
+            result.add_error("V6", f"Reconcile weight references unknown detector: {weight_key}")
 
 
 def _validate_cardinality(config: dict[str, Any], result: ValidationResult) -> None:
@@ -184,10 +180,7 @@ def _validate_cardinality(config: dict[str, Any], result: ValidationResult) -> N
 
     for detector_id, validators in detector_validators.items():
         if len(validators) > 1:
-            result.add_error(
-                "V7",
-                f"Detector '{detector_id}' has multiple validators: {', '.join(validators)}"
-            )
+            result.add_error("V7", f"Detector '{detector_id}' has multiple validators: {', '.join(validators)}")
 
 
 def _validate_structure(config: dict[str, Any], result: ValidationResult) -> None:
@@ -227,18 +220,12 @@ def _validate_mode_compatibility(config: dict[str, Any], result: ValidationResul
     if mode == "train":
         validators = config.get("validators", [])
         if not validators:
-            result.add_warning(
-                "V11",
-                "Train mode without validators - nothing to train"
-            )
+            result.add_warning("V11", "Train mode without validators - nothing to train")
 
         # Check for labeling config
         train_config = config.get("train", {})
         if not train_config.get("labeling"):
-            result.add_warning(
-                "V11",
-                "Train mode without labeling configuration"
-            )
+            result.add_warning("V11", "Train mode without labeling configuration")
 
     # V12: mode=live → hooks should be defined
     if mode == "live":
@@ -257,23 +244,14 @@ def _validate_mode_compatibility(config: dict[str, Any], result: ValidationResul
         optimize_config = config.get("optimize", {})
         objective = optimize_config.get("objective", {})
         if not objective.get("metric"):
-            result.add_warning(
-                "V13",
-                "Optimize mode without objective metric"
-            )
+            result.add_warning("V13", "Optimize mode without objective metric")
 
     # W1-W2: Model without fallbacks
     if model:
         if not model.get("fallback_entry"):
-            result.add_warning(
-                "W1",
-                "Strategy model without fallback_entry - model failures will block entries"
-            )
+            result.add_warning("W1", "Strategy model without fallback_entry - model failures will block entries")
         if not model.get("fallback_exit"):
-            result.add_warning(
-                "W2",
-                "Strategy model without fallback_exit - model failures will block exits"
-            )
+            result.add_warning("W2", "Strategy model without fallback_exit - model failures will block exits")
 
 
 def validate_detector(detector: dict[str, Any]) -> ValidationResult:

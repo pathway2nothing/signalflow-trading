@@ -217,9 +217,14 @@ class BacktestResult:
         if self.metrics_df is not None and self.metrics_df.height > 0:
             last = self.metrics_df.row(-1, named=True)
             _ts_keys = (
-                "max_drawdown", "current_drawdown", "peak_equity",
-                "sharpe_ratio", "sortino_ratio", "calmar_ratio",
-                "annualized_return", "max_drawdown_calmar",
+                "max_drawdown",
+                "current_drawdown",
+                "peak_equity",
+                "sharpe_ratio",
+                "sortino_ratio",
+                "calmar_ratio",
+                "annualized_return",
+                "max_drawdown_calmar",
             )
             for k in _ts_keys:
                 if k in last and last[k] is not None:
@@ -242,11 +247,14 @@ class BacktestResult:
             return None
 
         results_dict = self._build_results_dict()
-        return cast("list[go.Figure] | None", self._main_result.plot(
-            results=results_dict,
-            state=self.state,
-            raw_data=self.raw,
-        ))
+        return cast(
+            "list[go.Figure] | None",
+            self._main_result.plot(
+                results=results_dict,
+                state=self.state,
+                raw_data=self.raw,
+            ),
+        )
 
     def plot_pair(self, pair: str) -> list[go.Figure] | None:
         """
@@ -263,11 +271,14 @@ class BacktestResult:
             pair_result = pair_cls(pairs=[pair])
 
             results_dict = self._build_results_dict()
-            return cast("list[go.Figure] | None", pair_result.plot(
-                results=results_dict,
-                state=self.state,
-                raw_data=self.raw,
-            ))
+            return cast(
+                "list[go.Figure] | None",
+                pair_result.plot(
+                    results=results_dict,
+                    state=self.state,
+                    raw_data=self.raw,
+                ),
+            )
         except KeyError:
             return None
 

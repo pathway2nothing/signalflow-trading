@@ -622,6 +622,7 @@ class RealtimeRunner(StrategyRunner):
         fee_rate = fee if fee is not None else builder._fee
         store = InMemoryStrategyStore()
         from signalflow.strategy.broker.executor.base import OrderExecutor
+
         executor = cast(OrderExecutor, VirtualSpotExecutor(fee_rate=fee_rate, slippage_pct=0.0005))
         broker = VirtualRealtimeBroker(executor=executor, store=store)
 

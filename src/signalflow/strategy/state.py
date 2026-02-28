@@ -507,20 +507,26 @@ class RedisStateBackend(BaseStateBackend):
             raise RuntimeError("Not connected")
 
         key = self._key("risk", "daily")
-        await self._client.hset(key, mapping={
-            "daily_pnl": str(state.daily_pnl),
-            "daily_trades": str(state.daily_trades),
-            "consecutive_losses": str(state.consecutive_losses),
-            "current_drawdown": str(state.current_drawdown),
-            "peak_equity": str(state.peak_equity),
-        })
+        await self._client.hset(
+            key,
+            mapping={
+                "daily_pnl": str(state.daily_pnl),
+                "daily_trades": str(state.daily_trades),
+                "consecutive_losses": str(state.consecutive_losses),
+                "current_drawdown": str(state.current_drawdown),
+                "peak_equity": str(state.peak_equity),
+            },
+        )
 
         cb_key = self._key("risk", "circuit_breaker")
-        await self._client.hset(cb_key, mapping={
-            "active": "1" if state.circuit_breaker_active else "0",
-            "reason": state.circuit_breaker_reason or "",
-            "until": state.circuit_breaker_until.isoformat() if state.circuit_breaker_until else "",
-        })
+        await self._client.hset(
+            cb_key,
+            mapping={
+                "active": "1" if state.circuit_breaker_active else "0",
+                "reason": state.circuit_breaker_reason or "",
+                "until": state.circuit_breaker_until.isoformat() if state.circuit_breaker_until else "",
+            },
+        )
 
     async def get_risk_state(self) -> RiskState:
         """Get risk state from Redis."""
@@ -563,11 +569,14 @@ class RedisStateBackend(BaseStateBackend):
 
         # Save last processed
         key = self._key("signals", "last")
-        await self._client.hset(key, mapping={
-            "ts": state.last_processed_ts.isoformat() if state.last_processed_ts else "",
-            "pair": state.last_processed_pair or "",
-            "id": state.last_processed_id or "",
-        })
+        await self._client.hset(
+            key,
+            mapping={
+                "ts": state.last_processed_ts.isoformat() if state.last_processed_ts else "",
+                "pair": state.last_processed_pair or "",
+                "id": state.last_processed_id or "",
+            },
+        )
 
         # Save cooldowns
         cd_key = self._key("signals", "cooldowns")
@@ -738,10 +747,7 @@ class DuckDBStateBackend(BaseStateBackend):
 
         self._conn.execute("DELETE FROM positions")
         for pos in positions:
-            self._conn.execute(
-                "INSERT INTO positions (id, data) VALUES (?, ?)",
-                [pos.id, json.dumps(pos.to_dict())]
-            )
+            self._conn.execute("INSERT INTO positions (id, data) VALUES (?, ?)", [pos.id, json.dumps(pos.to_dict())])
 
     async def get_positions(self) -> list[Position]:
         """Get positions from DuckDB."""
@@ -759,8 +765,7 @@ class DuckDBStateBackend(BaseStateBackend):
         self._conn.execute("DELETE FROM pending_orders")
         for order in orders:
             self._conn.execute(
-                "INSERT INTO pending_orders (id, data) VALUES (?, ?)",
-                [order.id, json.dumps(order.to_dict())]
+                "INSERT INTO pending_orders (id, data) VALUES (?, ?)", [order.id, json.dumps(order.to_dict())]
             )
 
     async def get_pending_orders(self) -> list[PendingOrder]:
@@ -781,7 +786,7 @@ class DuckDBStateBackend(BaseStateBackend):
             INSERT OR REPLACE INTO risk_state (id, data, updated_at)
             VALUES ('current', ?, CURRENT_TIMESTAMP)
             """,
-            [json.dumps(state.to_dict())]
+            [json.dumps(state.to_dict())],
         )
 
     async def get_risk_state(self) -> RiskState:
@@ -789,9 +794,7 @@ class DuckDBStateBackend(BaseStateBackend):
         if not self._conn:
             raise RuntimeError("Not connected")
 
-        result = self._conn.execute(
-            "SELECT data FROM risk_state WHERE id = 'current'"
-        ).fetchone()
+        result = self._conn.execute("SELECT data FROM risk_state WHERE id = 'current'").fetchone()
 
         if result:
             return RiskState.from_dict(json.loads(result[0]))
@@ -807,7 +810,7 @@ class DuckDBStateBackend(BaseStateBackend):
             INSERT OR REPLACE INTO signal_state (id, data, updated_at)
             VALUES ('current', ?, CURRENT_TIMESTAMP)
             """,
-            [json.dumps(state.to_dict())]
+            [json.dumps(state.to_dict())],
         )
 
     async def get_signal_state(self) -> SignalState:
@@ -815,9 +818,7 @@ class DuckDBStateBackend(BaseStateBackend):
         if not self._conn:
             raise RuntimeError("Not connected")
 
-        result = self._conn.execute(
-            "SELECT data FROM signal_state WHERE id = 'current'"
-        ).fetchone()
+        result = self._conn.execute("SELECT data FROM signal_state WHERE id = 'current'").fetchone()
 
         if result:
             return SignalState.from_dict(json.loads(result[0]))
@@ -840,9 +841,7 @@ class DuckDBStateBackend(BaseStateBackend):
         if not self._conn:
             raise RuntimeError("Not connected")
 
-        result = self._conn.execute(
-            "SELECT ts FROM heartbeat WHERE id = 'current'"
-        ).fetchone()
+        result = self._conn.execute("SELECT ts FROM heartbeat WHERE id = 'current'").fetchone()
 
         if result:
             ts = result[0]
@@ -867,15 +866,16 @@ class StateConfig:
     backend: StateBackend = StateBackend.MEMORY
     redis: dict[str, Any] = field(default_factory=dict)
     duckdb: dict[str, Any] = field(default_factory=dict)
-    persist: list[str] = field(default_factory=lambda: [
-        "positions", "pending_orders", "daily_stats",
-        "circuit_breaker", "signal_cooldowns"
-    ])
-    recovery: dict[str, Any] = field(default_factory=lambda: {
-        "mode": "sync",
-        "orphan_positions": "close",
-        "max_state_age": "24h",
-    })
+    persist: list[str] = field(
+        default_factory=lambda: ["positions", "pending_orders", "daily_stats", "circuit_breaker", "signal_cooldowns"]
+    )
+    recovery: dict[str, Any] = field(
+        default_factory=lambda: {
+            "mode": "sync",
+            "orphan_positions": "close",
+            "max_state_age": "24h",
+        }
+    )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> StateConfig:
@@ -885,10 +885,9 @@ class StateConfig:
             backend=StateBackend(backend_str),
             redis=data.get("redis", {}),
             duckdb=data.get("duckdb", {}),
-            persist=data.get("persist", [
-                "positions", "pending_orders", "daily_stats",
-                "circuit_breaker", "signal_cooldowns"
-            ]),
+            persist=data.get(
+                "persist", ["positions", "pending_orders", "daily_stats", "circuit_breaker", "signal_cooldowns"]
+            ),
             recovery=data.get("recovery", {}),
         )
 

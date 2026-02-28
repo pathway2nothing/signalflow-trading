@@ -361,11 +361,7 @@ class HooksManager:
             if isinstance(event_config, dict):
                 event_config = [event_config]
 
-            handlers[event] = [
-                create_handler(HookConfig.from_dict(h))
-                for h in event_config
-                if h.get("enabled", True)
-            ]
+            handlers[event] = [create_handler(HookConfig.from_dict(h)) for h in event_config if h.get("enabled", True)]
 
         return cls(handlers=handlers, enabled=config.get("enabled", True))
 

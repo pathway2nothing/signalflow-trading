@@ -921,7 +921,7 @@ class BacktestBuilder:
         # when data is e.g. "perpetual" from futures stores).
         data_key = "spot"
         if raw and raw.data and "spot" not in raw.data:
-                data_key = next(iter(raw.data.keys()), "spot")
+            data_key = next(iter(raw.data.keys()), "spot")
 
         runner = self._build_runner(
             broker,
@@ -1039,11 +1039,14 @@ class BacktestBuilder:
         """Resolve a detector from instance or registry name."""
         if isinstance(detector, str):
             try:
-                return cast("SignalDetector", default_registry.create(
-                    SfComponentType.DETECTOR,
-                    detector,
-                    **kwargs,
-                ))
+                return cast(
+                    "SignalDetector",
+                    default_registry.create(
+                        SfComponentType.DETECTOR,
+                        detector,
+                        **kwargs,
+                    ),
+                )
             except KeyError:
                 available = default_registry.list(SfComponentType.DETECTOR)
                 raise DetectorNotFoundError(detector, available) from None
@@ -1276,9 +1279,14 @@ class BacktestBuilder:
         }
         # Pass through optional fields supported by SignalEntryRule
         _passthrough = (
-            "signal_type_map", "allow_shorts", "min_probability",
-            "use_probability_sizing", "position_sizer", "entry_filters",
-            "max_capital_usage", "min_order_notional",
+            "signal_type_map",
+            "allow_shorts",
+            "min_probability",
+            "use_probability_sizing",
+            "position_sizer",
+            "entry_filters",
+            "max_capital_usage",
+            "min_order_notional",
         )
         for key in _passthrough:
             val = config.get(key)
@@ -1423,14 +1431,16 @@ class BacktestBuilder:
                 SortinoRatioMetric,
             )
 
-            metrics.extend([
-                SortinoRatioMetric(),
-                CalmarRatioMetric(),
-                ProfitFactorMetric(),
-                ExpectancyMetric(),
-                RiskRewardMetric(),
-                MaxConsecutiveMetric(),
-            ])
+            metrics.extend(
+                [
+                    SortinoRatioMetric(),
+                    CalmarRatioMetric(),
+                    ProfitFactorMetric(),
+                    ExpectancyMetric(),
+                    RiskRewardMetric(),
+                    MaxConsecutiveMetric(),
+                ]
+            )
         except ImportError:
             pass
 
