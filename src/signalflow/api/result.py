@@ -208,6 +208,21 @@ class BacktestResult:
             except Exception:
                 pass
 
+        # Override stateful metrics with accumulated values from metrics_df.
+        # Registry metrics are instantiated fresh and called once, so time-series
+        # metrics (drawdown, sharpe, sortino, calmar) return 0.  The runner's
+        # metrics_df tracks them bar-by-bar; the last row has the correct finals.
+        if self.metrics_df is not None and self.metrics_df.height > 0:
+            last = self.metrics_df.row(-1, named=True)
+            _ts_keys = (
+                "max_drawdown", "current_drawdown", "peak_equity",
+                "sharpe_ratio", "sortino_ratio", "calmar_ratio",
+                "annualized_return", "max_drawdown_calmar",
+            )
+            for k in _ts_keys:
+                if k in last and last[k] is not None:
+                    results[k] = float(last[k])
+
         self._metrics_cache = results
         return results
 

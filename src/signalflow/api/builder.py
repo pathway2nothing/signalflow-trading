@@ -1271,12 +1271,19 @@ class BacktestBuilder:
 
         rule_kwargs: dict[str, Any] = {
             "base_position_size": size,
-            "max_positions_per_pair": config.get("max_per_pair", 1),
-            "max_total_positions": config.get("max_positions", 10),
+            "max_positions_per_pair": config.get("max_per_pair", config.get("max_positions_per_pair", 1)),
+            "max_total_positions": config.get("max_positions", config.get("max_total_positions", 10)),
         }
-        # Pass entry filters if provided (from graph converter)
-        if config.get("entry_filters"):
-            rule_kwargs["entry_filters"] = config["entry_filters"]
+        # Pass through optional fields supported by SignalEntryRule
+        _passthrough = (
+            "signal_type_map", "allow_shorts", "min_probability",
+            "use_probability_sizing", "position_sizer", "entry_filters",
+            "max_capital_usage", "min_order_notional",
+        )
+        for key in _passthrough:
+            val = config.get(key)
+            if val is not None:
+                rule_kwargs[key] = val
 
         rule = rule_cls(**rule_kwargs)
 

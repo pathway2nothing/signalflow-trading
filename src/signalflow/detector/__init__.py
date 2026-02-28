@@ -1,10 +1,13 @@
 # Preset detectors (backward compat)
 from signalflow.detector.anomaly_detector import AnomalyDetector
 from signalflow.detector.base import SignalDetector
+from signalflow.detector.bollinger_touch import ExampleBollingerTouchDetector
+from signalflow.detector.ema_cross import ExampleEmaCrossDetector
 
 # Funding rate detector
 from signalflow.detector.funding_rate import FundingRateDetector
 from signalflow.detector.local_extrema import LocalExtremaDetector
+from signalflow.detector.macd_cross import ExampleMacdCrossDetector
 
 # Market-wide detectors
 from signalflow.detector.market import (
@@ -17,6 +20,7 @@ from signalflow.detector.market import (
     ZScoreEventDetector,
 )
 from signalflow.detector.percentile_regime import PercentileRegimeDetector
+from signalflow.detector.rsi_cross import ExampleRsiCrossDetector
 from signalflow.detector.sma_cross import ExampleSmaCrossDetector
 from signalflow.detector.structure_detector import StructureDetector
 from signalflow.detector.volatility_detector import VolatilityDetector
@@ -30,6 +34,10 @@ __all__ = [
     # Preset detectors (backward compat)
     "AnomalyDetector",
     "CusumEventDetector",
+    "ExampleBollingerTouchDetector",
+    "ExampleEmaCrossDetector",
+    "ExampleMacdCrossDetector",
+    "ExampleRsiCrossDetector",
     "ExampleSmaCrossDetector",
     # Funding rate
     "FundingRateDetector",
