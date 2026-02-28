@@ -984,7 +984,7 @@ class BacktestBuilder:
 
         # Check registry availability
         try:
-            default_registry.get(SfComponentType.STRATEGY_RUNNER, "backtest")
+            default_registry.get(SfComponentType.STRATEGY_EXECUTOR, "backtest")
         except KeyError:
             issues.append("ERROR: BacktestRunner not found in registry")
 
@@ -1399,7 +1399,7 @@ class BacktestBuilder:
     ) -> Any:
         """Build runner from registry."""
         try:
-            runner_cls = default_registry.get(SfComponentType.STRATEGY_RUNNER, "backtest")
+            runner_cls = default_registry.get(SfComponentType.STRATEGY_EXECUTOR, "backtest")
         except KeyError:
             from signalflow.strategy.runner import BacktestRunner
 

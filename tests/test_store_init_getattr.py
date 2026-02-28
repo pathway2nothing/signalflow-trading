@@ -7,17 +7,22 @@ class TestRawStoreGetattr:
     def test_pg_raw_store_lazy_import(self):
         from signalflow.data import raw_store
 
-        # Should return PgRawStore class via __getattr__
-        getattr(raw_store, "PgRawStore", None)
-        # May be None if psycopg not installed, that's OK
-        # Just testing the __getattr__ path works
+        # __getattr__ returns the class if sf-data is installed,
+        # raises ImportError if not
+        try:
+            cls = raw_store.PgRawStore
+            assert cls is not None
+        except ImportError:
+            pass  # sf-data not installed, expected
 
     def test_pg_spot_store_lazy_import(self):
         from signalflow.data import raw_store
 
-        # Should return PgRawStore class via __getattr__
-        getattr(raw_store, "PgSpotStore", None)
-        # May be None if psycopg not installed
+        try:
+            cls = raw_store.PgSpotStore
+            assert cls is not None
+        except ImportError:
+            pass  # sf-data not installed, expected
 
     def test_unknown_attr_raises(self):
         from signalflow.data import raw_store
@@ -30,9 +35,11 @@ class TestStrategyStoreGetattr:
     def test_pg_strategy_store_lazy_import(self):
         from signalflow.data import strategy_store
 
-        # Should return PgStrategyStore class via __getattr__
-        getattr(strategy_store, "PgStrategyStore", None)
-        # May be None if psycopg not installed
+        try:
+            cls = strategy_store.PgStrategyStore
+            assert cls is not None
+        except ImportError:
+            pass  # sf-data not installed, expected
 
     def test_unknown_attr_raises(self):
         from signalflow.data import strategy_store

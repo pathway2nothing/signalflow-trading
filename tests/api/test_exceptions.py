@@ -132,7 +132,7 @@ class TestComponentNotFoundError:
         """Message includes registration hint."""
         err = ComponentNotFoundError(SfComponentType.DETECTOR, "my_detector")
         msg = str(err)
-        assert "@sf_component" in msg
+        assert "@sf.detector" in msg
 
 
 # ===========================================================================
