@@ -218,7 +218,8 @@ def _trend_scan(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Dispatch to numba or numpy implementation."""
     if _HAS_NUMBA:
-        return _trend_scan_numba(prices, min_lf, max_lf, step)
+        result: tuple[np.ndarray, np.ndarray] = _trend_scan_numba(prices, min_lf, max_lf, step)
+        return result
     return _trend_scan_numpy(prices, min_lf, max_lf, step)
 
 
@@ -321,7 +322,7 @@ class TrendScanningLabeler(Labeler):
 
         # Assign labels based on t-statistic vs critical value
         n = len(prices)
-        labels = [None] * n
+        labels: list[str | None] = [None] * n
         for t in range(n):
             if np.isnan(t_stats[t]):
                 continue

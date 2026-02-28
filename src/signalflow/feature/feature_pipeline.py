@@ -35,15 +35,15 @@ class FeaturePipeline(Feature):
 
     requires: ClassVar[list[str]] = []
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.features:
             raise ValueError("FeaturePipeline requires at least one feature")
         self._validate()
 
     @property
-    def outputs(self) -> list[str]:
+    def outputs(self) -> list[str]:  # type: ignore[override]
         """Aggregated outputs from all features."""
-        result = []
+        result: list[str] = []
         for f in self.features:
             result.extend(f.output_cols())
         return result
@@ -51,7 +51,7 @@ class FeaturePipeline(Feature):
     def output_cols(self, prefix: str = "") -> list[str]:
         return [f"{prefix}{col}" for col in self.outputs]
 
-    def _validate(self):
+    def _validate(self) -> None:
         """Validate all dependencies are satisfied."""
         available = default_registry.get_raw_data_columns(self.raw_data_type)
 
@@ -67,7 +67,7 @@ class FeaturePipeline(Feature):
     def _group_into_batches(self) -> list[list[Feature]]:
         """Group features: consecutive per-pair → batch, global → separate."""
         batches = []
-        current_batch = []
+        current_batch: list[Feature] = []
 
         for f in self.features:
             is_global = isinstance(f, (GlobalFeature, FeaturePipeline)) or getattr(f, "_is_global", False)
@@ -100,7 +100,7 @@ class FeaturePipeline(Feature):
         for batch in batches:
             if self._is_per_pair_batch(batch):
 
-                def apply_batch(pair_df: pl.DataFrame, features=batch) -> pl.DataFrame:
+                def apply_batch(pair_df: pl.DataFrame, features: list[Feature] = batch) -> pl.DataFrame:
                     for f in features:
                         pair_df = f.compute_pair(pair_df)
                     return pair_df

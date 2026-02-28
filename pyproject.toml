@@ -132,6 +132,22 @@ module = [
     "aiohttp.*",
     "sklearn.*",
     "scipy.*",
+    "yaml.*",
+    "pandas.*",
+    "redis.*",
+    "lightgbm.*",
+    "xgboost.*",
+    "joblib.*",
+    "tqdm.*",
+    "signalflow.backtest.*",
+    "signalflow.data.source.binance_stocks.*",
+    "signalflow.data.source.bybit.*",
+    "signalflow.data.source.deribit.*",
+    "signalflow.data.source.hyperliquid.*",
+    "signalflow.data.source.kraken.*",
+    "signalflow.data.source.okx.*",
+    "signalflow.data.source.whitebit.*",
+    "signalflow.detector.base_detector.*",
 ]
 ignore_missing_imports = true
 

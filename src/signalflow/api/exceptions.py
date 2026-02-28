@@ -135,7 +135,7 @@ class DetectorNotFoundError(ComponentNotFoundError):
 class MissingDataError(ConfigurationError):
     """Raised when data is not configured for backtest."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         msg = "\n".join(
             [
                 "No data configured for backtest.",
@@ -160,7 +160,7 @@ class MissingDataError(ConfigurationError):
 class MissingDetectorError(ConfigurationError):
     """Raised when detector is not configured for backtest."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         msg = "\n".join(
             [
                 "No detector or signals configured for backtest.",

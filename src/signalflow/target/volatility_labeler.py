@@ -190,7 +190,7 @@ class VolatilityRegimeLabeler(Labeler):
         df = s.struct.unnest()
         vals = df["val"].to_numpy()
         n = len(vals)
-        result = [None] * n
+        result: list[float | None] = [None] * n
 
         import numpy as np
 

@@ -119,8 +119,8 @@ class VolatilityDetector(SignalDetector):
             vol_arr = group["_realized_vol"].to_numpy().astype(np.float64)
             n = len(vol_arr)
 
-            signal_types = [None] * n
-            probabilities = [None] * n
+            signal_types: list[str | None] = [None] * n
+            probabilities: list[float | None] = [None] * n
 
             for t in range(n):
                 if np.isnan(vol_arr[t]):

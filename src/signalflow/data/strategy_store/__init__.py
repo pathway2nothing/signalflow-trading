@@ -48,7 +48,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):  # type: ignore[misc]
+def __getattr__(name: str) -> object:
     """Lazy import extended stores from signalflow-data if available."""
     _EXTENDED_STORES = {
         "PgStrategyStore": "signalflow.data.strategy_store.pg",

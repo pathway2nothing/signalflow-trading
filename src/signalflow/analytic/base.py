@@ -20,7 +20,7 @@ class SignalMetric:
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
+    ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
         """Compute metrics from signals.
 
         Returns:
@@ -31,7 +31,7 @@ class SignalMetric:
 
     def plot(
         self,
-        computed_metrics: dict[str, Any],
+        computed_metrics: dict[str, Any] | None,
         plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
@@ -50,7 +50,7 @@ class SignalMetric:
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ):
+    ) -> tuple[dict[str, Any] | None, list[go.Figure] | go.Figure | None]:
         computed_metrics, plots_context = self.compute(
             raw_data=raw_data,
             signals=signals,
@@ -73,13 +73,17 @@ class StrategyMetric(ABC):  # noqa: B024
 
     component_type: ClassVar[SfComponentType] = SfComponentType.STRATEGY_METRIC
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         """Compute metric values."""
         logger.warning("Computing is not implemented for this component")
         return {}
 
     def plot(
-        self, results: dict, state: StrategyState | None = None, raw_data: RawData | None = None, **kwargs
+        self,
+        results: dict[str, Any],
+        state: StrategyState | None = None,
+        raw_data: RawData | None = None,
+        **kwargs: Any,
     ) -> list[go.Figure] | go.Figure | None:
         """Plot metric values."""
         logger.warning("Plotting is not implemented for this component")

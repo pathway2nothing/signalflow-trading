@@ -14,14 +14,14 @@ from signalflow.core import RawData, Signals, signal_metric
 class SignalPairPrice(SignalMetric):
     """Visualize signals overlaid on price chart for specified pairs."""
 
-    pairs: list[str] = None
+    pairs: list[str] | None = None
     buy_marker_color: str = "#00CC96"
     sell_marker_color: str = "#EF553B"
     price_line_color: str = "#2E86C1"
     marker_size: int = 13
     chart_height: int = 600
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Convert single pair string to list if needed."""
         if isinstance(self.pairs, str):
             self.pairs = [self.pairs]
@@ -31,7 +31,7 @@ class SignalPairPrice(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Compute basic signal statistics per pair.
 
         Returns:
@@ -63,7 +63,7 @@ class SignalPairPrice(SignalMetric):
 
     def plot(
         self,
-        computed_metrics: dict[str, Any],
+        computed_metrics: dict[str, Any] | None,
         plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
@@ -74,7 +74,10 @@ class SignalPairPrice(SignalMetric):
         Returns:
             List of figures, one per pair
         """
-        figures = []
+        figures: list[go.Figure] = []
+
+        if computed_metrics is None:
+            return figures
 
         if "spot" in raw_data:
             price_df = raw_data["spot"]

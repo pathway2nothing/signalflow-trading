@@ -9,4 +9,4 @@ def import_model_class(class_path: str) -> type:
     import importlib
 
     module = importlib.import_module(module_name)
-    return getattr(module, class_name)
+    return getattr(module, class_name)  # type: ignore[no-any-return]

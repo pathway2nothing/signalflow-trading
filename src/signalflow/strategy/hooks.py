@@ -317,15 +317,13 @@ def create_handler(config: HookConfig) -> BaseHookHandler:
     Returns:
         Configured handler instance
     """
-    handlers = {
-        "log": LogHookHandler,
-        "telegram": TelegramHookHandler,
-        "slack": SlackHookHandler,
-        "webhook": WebhookHookHandler,
-    }
-
-    handler_class = handlers.get(config.type, LogHookHandler)
-    return handler_class(config)
+    if config.type == "telegram":
+        return TelegramHookHandler(config)
+    elif config.type == "slack":
+        return SlackHookHandler(config)
+    elif config.type == "webhook":
+        return WebhookHookHandler(config)
+    return LogHookHandler(config)
 
 
 @dataclass

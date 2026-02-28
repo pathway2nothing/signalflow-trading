@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from signalflow.analytic.base import StrategyMetric
 from signalflow.core import StrategyState, strategy_metric
@@ -21,7 +22,7 @@ class PortfolioExposureMetric(StrategyMetric):
         - max_pair_pct: largest single-pair share of gross exposure
     """
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         portfolio = state.portfolio
         gross = portfolio.gross_exposure(prices=prices)
         net = portfolio.net_exposure(prices=prices)
@@ -49,7 +50,7 @@ class PortfolioPnLBreakdownMetric(StrategyMetric):
         - pair_count_open: number of pairs with open positions
     """
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         pair_pnl: dict[str, float] = {}
         for p in state.portfolio.positions.values():
             pnl = p.total_pnl

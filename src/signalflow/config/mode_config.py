@@ -312,7 +312,7 @@ def resolve_params(
 
         return PARAM_PATTERN.sub(replace_param, s)
 
-    return resolve_value(config)
+    return resolve_value(config)  # type: ignore[no-any-return]
 
 
 def load_params_from_file(params_path: Path | str) -> dict[str, Any]:
@@ -355,7 +355,7 @@ def extract_mode_config(config: dict[str, Any], mode: FlowMode) -> dict[str, Any
     Returns:
         Mode-specific configuration
     """
-    return config.get(mode.value, {})
+    return config.get(mode.value, {})  # type: ignore[no-any-return]
 
 
 def resolve_extends_chain(

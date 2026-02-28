@@ -47,7 +47,7 @@ class BacktestProgress:
             )
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
         elapsed = time.time() - self._start_time
         if self.verbose and exc_type is None:
             self._print_summary(elapsed)

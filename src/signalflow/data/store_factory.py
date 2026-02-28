@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any
+from typing import Any, cast
 
 from signalflow.core import SfComponentType
 from signalflow.core.registry import default_registry
@@ -57,7 +57,7 @@ class StoreFactory:
         # Only pass data_type if the store class accepts it.
         if dataclasses.is_dataclass(cls) and "data_type" in {f.name for f in dataclasses.fields(cls)}:
             kwargs["data_type"] = data_type
-        return cls(**kwargs)
+        return cast(RawDataStore, cls(**kwargs))
 
     @staticmethod
     def create_strategy_store(backend: str = "duckdb", **kwargs: Any) -> StrategyStore:
@@ -76,4 +76,4 @@ class StoreFactory:
             available = ", ".join(sorted(_STRATEGY_STORE_BACKENDS))
             raise KeyError(f"Unknown strategy store backend: {key!r}. Available: {available}")
         registry_name = _STRATEGY_STORE_BACKENDS[key]
-        return default_registry.create(SfComponentType.STRATEGY_STORE, registry_name, **kwargs)
+        return cast(StrategyStore, default_registry.create(SfComponentType.STRATEGY_STORE, registry_name, **kwargs))

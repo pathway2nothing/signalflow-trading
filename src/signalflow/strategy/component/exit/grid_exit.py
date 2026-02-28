@@ -1,6 +1,7 @@
 """Grid-level exit rule for collective grid management."""
 
 from dataclasses import dataclass
+from typing import Literal, cast
 
 import signalflow as sf
 from signalflow.core import Order, Position, PositionType, StrategyState
@@ -74,7 +75,7 @@ class GridExit(ExitRule):
             price = prices.get(pos.pair)
             if price is None or price <= 0:
                 continue
-            side = "SELL" if pos.position_type == PositionType.LONG else "BUY"
+            side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
             orders.append(
                 Order(
                     pair=pos.pair,
@@ -103,8 +104,8 @@ class GridExit(ExitRule):
             if price is None or price <= 0:
                 continue
             distance_pct = abs(price - pos.entry_price) / pos.entry_price
-            if distance_pct > self.max_distance_pct:
-                side = "SELL" if pos.position_type == PositionType.LONG else "BUY"
+            if self.max_distance_pct is not None and distance_pct > self.max_distance_pct:
+                side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
                 orders.append(
                     Order(
                         pair=pos.pair,

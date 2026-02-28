@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from functools import reduce
 from threading import Event
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import polars as pl
 
@@ -1039,11 +1039,11 @@ class BacktestBuilder:
         """Resolve a detector from instance or registry name."""
         if isinstance(detector, str):
             try:
-                return default_registry.create(
+                return cast("SignalDetector", default_registry.create(
                     SfComponentType.DETECTOR,
                     detector,
                     **kwargs,
-                )
+                ))
             except KeyError:
                 available = default_registry.list(SfComponentType.DETECTOR)
                 raise DetectorNotFoundError(detector, available) from None
@@ -1372,9 +1372,10 @@ class BacktestBuilder:
             # Fallback to direct imports
             from signalflow.strategy.broker import BacktestBroker
             from signalflow.strategy.broker.executor import VirtualSpotExecutor
+            from signalflow.strategy.broker.executor.base import OrderExecutor
 
             return BacktestBroker(
-                executor=VirtualSpotExecutor(fee_rate=self._fee),
+                executor=cast(OrderExecutor, VirtualSpotExecutor(fee_rate=self._fee)),
                 store=InMemoryStrategyStore(),
             )
 

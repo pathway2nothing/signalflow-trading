@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
@@ -75,6 +75,8 @@ def load(
     if start_dt is None:
         raise ValueError("start date is required")
 
+    assert end_dt is not None, "end date must be a valid datetime"
+
     # Determine source type
     source_path = Path(source) if isinstance(source, str) else source
 
@@ -131,7 +133,7 @@ def backtest(
     tp: float = 0.02,
     sl: float = 0.01,
     capital: float = 10_000.0,
-    **kwargs,
+    **kwargs: Any,
 ) -> BacktestResult:
     """
     Quick backtest with minimal configuration.

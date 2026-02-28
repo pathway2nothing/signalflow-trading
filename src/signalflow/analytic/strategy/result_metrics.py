@@ -3,7 +3,7 @@ from __future__ import annotations
 import bisect
 import datetime as dt
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -26,17 +26,17 @@ class StrategyMainResult(StrategyMetric):
         self,
         state: StrategyState,
         prices: dict[str, float],
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, float]:
         """Compute metric values."""
         return {}
 
     def plot(
         self,
-        results: dict,
+        results: dict[str, Any],
         state: StrategyState | None = None,
         raw_data: RawData | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> list[go.Figure] | go.Figure | None:
         metrics_df: pl.DataFrame | None = results.get("metrics_df")
         if metrics_df is None or metrics_df.height == 0:
@@ -265,16 +265,16 @@ class StrategyDistributionResult(StrategyMetric):
         self,
         state: StrategyState,
         prices: dict[str, float],
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, float]:
         return {}
 
     def plot(
         self,
-        results: dict,
+        results: dict[str, Any],
         state: StrategyState | None = None,
         raw_data: RawData | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> list[go.Figure] | go.Figure | None:
         metrics_df: pl.DataFrame | None = results.get("metrics_df")
         if metrics_df is None or metrics_df.height == 0:
@@ -478,16 +478,16 @@ class StrategyEquityResult(StrategyMetric):
         self,
         state: StrategyState,
         prices: dict[str, float],
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, float]:
         return {}
 
     def plot(
         self,
-        results: dict,
+        results: dict[str, Any],
         state: StrategyState | None = None,
         raw_data: RawData | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> go.Figure | None:
         metrics_df: pl.DataFrame | None = results.get("metrics_df")
         if metrics_df is None or metrics_df.height == 0:
@@ -596,15 +596,15 @@ class StrategyPairResult(StrategyMetric):
     template: str = "plotly_white"
     hovermode: str = "x unified"
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         return {}
 
     def plot(
         self,
-        results: dict,
+        results: dict[str, Any],
         state: StrategyState | None = None,
         raw_data: RawData | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> list[go.Figure] | go.Figure | None:
         if not self.pairs:
             logger.warning("StrategyPairResult.plot: pairs is empty")
@@ -808,7 +808,7 @@ class StrategyPairResult(StrategyMetric):
 
         if ts.dtype in (pl.Int64, pl.Int32, pl.UInt64, pl.UInt32):
             max_v = ts.max()
-            ms = bool(max_v is not None and int(max_v) > 10_000_000_000)
+            ms = bool(max_v is not None and int(cast(int, max_v)) > 10_000_000_000)
             ts_s = (ts.cast(pl.Int64) // (1000 if ms else 1)).alias("ts_s")
         elif ts.dtype == pl.Datetime:
             ts_s = ts.dt.epoch(time_unit="s").alias("ts_s")

@@ -37,7 +37,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 import polars as pl
 
@@ -73,8 +73,8 @@ class LazyDataTypeAccessor:
 
     def __getattr__(self, source: str) -> pl.DataFrame:
         """Access source by attribute: raw.perpetual.binance."""
-        lazy_raw = object.__getattribute__(self, "_lazy_raw")
-        data_type = object.__getattribute__(self, "_data_type")
+        lazy_raw: RawDataLazy = object.__getattribute__(self, "_lazy_raw")
+        data_type: str = object.__getattribute__(self, "_data_type")
 
         if source not in lazy_raw._stores.get(data_type, {}):
             available = list(lazy_raw._stores.get(data_type, {}).keys())
@@ -91,8 +91,8 @@ class LazyDataTypeAccessor:
 
     def to_polars(self) -> pl.DataFrame:
         """Return default source DataFrame with warning."""
-        lazy_raw = object.__getattribute__(self, "_lazy_raw")
-        data_type = object.__getattribute__(self, "_data_type")
+        lazy_raw: RawDataLazy = object.__getattribute__(self, "_lazy_raw")
+        data_type: str = object.__getattribute__(self, "_data_type")
 
         sources = self.sources
         if not sources:
@@ -109,10 +109,10 @@ class LazyDataTypeAccessor:
         )
         return lazy_raw._load(data_type, source)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple[str, pl.DataFrame]]:
         """Iterate over (source, DataFrame) pairs. Loads all sources."""
-        lazy_raw = object.__getattribute__(self, "_lazy_raw")
-        data_type = object.__getattribute__(self, "_data_type")
+        lazy_raw: RawDataLazy = object.__getattribute__(self, "_lazy_raw")
+        data_type: str = object.__getattribute__(self, "_data_type")
 
         for source in self.sources:
             yield source, lazy_raw._load(data_type, source)
@@ -176,7 +176,7 @@ class RawDataLazy:
     # Internal: memory cache[data_type][source] -> DataFrame
     _memory_cache: dict[str, dict[str, pl.DataFrame]] = field(default_factory=dict, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize cache directory for disk mode."""
         if self.cache_mode == "disk" and self.cache_dir is None:
             import tempfile
@@ -451,7 +451,7 @@ class RawDataLazy:
             datetime_start=self.datetime_start,
             datetime_end=self.datetime_end,
             pairs=self.pairs,
-            data=nested_data,
+            data=cast(dict[str, pl.DataFrame | dict[str, pl.DataFrame]], nested_data),
             default_source=self.default_source,
         )
 

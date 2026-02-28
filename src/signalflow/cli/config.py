@@ -482,7 +482,7 @@ class BacktestConfig:
 
         return issues
 
-    def to_builder(self):
+    def to_builder(self) -> Any:
         """
         Convert config to BacktestBuilder.
 
@@ -532,32 +532,32 @@ class BacktestConfig:
 
         # === Detectors ===
         if self.detectors:
-            for name, cfg in self.detectors.items():
+            for name, det_cfg in self.detectors.items():
                 builder.detector(
-                    cfg.name,
+                    det_cfg.name,
                     name=name,
-                    data_source=cfg.data_source,
-                    **cfg.params,
+                    data_source=det_cfg.data_source,
+                    **det_cfg.params,
                 )
         elif self.detector:
             builder.detector(self.detector.name, **self.detector.params)
 
         # === Validators ===
         if self.validators:
-            for name, cfg in self.validators.items():
-                builder.validator(cfg.name, name=name, **cfg.params)
+            for name, val_cfg in self.validators.items():
+                builder.validator(val_cfg.name, name=name, **val_cfg.params)
 
         # === Entry ===
         if self.entries:
-            for name, cfg in self.entries.items():
+            for name, entry_cfg in self.entries.items():
                 builder.entry(
                     name=name,
-                    rule=cfg.rule,
-                    size=cfg.size,
-                    size_pct=cfg.size_pct,
-                    max_positions=cfg.max_positions,
-                    max_per_pair=cfg.max_per_pair,
-                    source_detector=cfg.source_detector,
+                    rule=entry_cfg.rule,
+                    size=entry_cfg.size,
+                    size_pct=entry_cfg.size_pct,
+                    max_positions=entry_cfg.max_positions,
+                    max_per_pair=entry_cfg.max_per_pair,
+                    source_detector=entry_cfg.source_detector,
                 )
         else:
             builder.entry(
@@ -571,14 +571,14 @@ class BacktestConfig:
 
         # === Exit ===
         if self.exits:
-            for name, cfg in self.exits.items():
+            for name, exit_cfg in self.exits.items():
                 builder.exit(
                     name=name,
-                    rule=cfg.rule,
-                    tp=cfg.tp,
-                    sl=cfg.sl,
-                    trailing=cfg.trailing,
-                    time_limit=cfg.time_limit,
+                    rule=exit_cfg.rule,
+                    tp=exit_cfg.tp,
+                    sl=exit_cfg.sl,
+                    trailing=exit_cfg.trailing,
+                    time_limit=exit_cfg.time_limit,
                 )
         else:
             builder.exit(

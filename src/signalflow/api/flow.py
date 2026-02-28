@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from threading import Event
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import numpy as np
 import polars as pl
@@ -43,7 +43,7 @@ from signalflow.core import (
 if TYPE_CHECKING:
     from signalflow.detector.base import SignalDetector
     from signalflow.feature import FeaturePipeline
-    from signalflow.target.base import SignalLabeler
+    from signalflow.target.base import Labeler
     from signalflow.validator.base import SignalValidator
 
 
@@ -233,8 +233,8 @@ def compute_trade_pnl(
     exit_notional = exit_trade["price"] * exit_trade["qty"]
     exit_fee = exit_trade.get("fee", 0)
     if entries[0].get("side") == "BUY":
-        return exit_notional - entry_notional - entry_fees - exit_fee
-    return entry_notional - exit_notional - entry_fees - exit_fee
+        return float(exit_notional - entry_notional - entry_fees - exit_fee)
+    return float(entry_notional - exit_notional - entry_fees - exit_fee)
 
 
 def enrich_trades_with_pnl(trades: list[dict[str, Any]]) -> None:
@@ -597,7 +597,7 @@ class FlowBuilder:
     _aggregation_config: dict[str, Any] | None = field(default=None, repr=False)
 
     # Labeling
-    _named_labelers: dict[str, SignalLabeler] = field(default_factory=dict, repr=False)
+    _named_labelers: dict[str, Labeler] = field(default_factory=dict, repr=False)
 
     # Validation
     _named_validators: dict[str, SignalValidator] = field(default_factory=dict, repr=False)
@@ -789,7 +789,7 @@ class FlowBuilder:
 
     def labeler(
         self,
-        labeler: SignalLabeler | str,
+        labeler: Labeler | str,
         *,
         name: str | None = None,
         **kwargs: Any,
@@ -798,7 +798,7 @@ class FlowBuilder:
         Add a target labeler to the flow.
 
         Args:
-            labeler: SignalLabeler instance or registry name
+            labeler: Labeler instance or registry name
             name: Unique name for cross-referencing
             **kwargs: Parameters for registry-based creation
 
@@ -1279,6 +1279,7 @@ class FlowBuilder:
         """
         import asyncio
 
+        from signalflow.strategy.broker.executor.base import OrderExecutor
         from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
         from signalflow.strategy.broker.virtual_broker import VirtualRealtimeBroker
         from signalflow.strategy.runner.realtime_runner import RealtimeRunner
@@ -1313,7 +1314,7 @@ class FlowBuilder:
         # --- build broker ----------------------------------------------------
         store = self._resolve_strategy_store()
         executor = VirtualSpotExecutor(fee_rate=self._fee, slippage_pct=0.0005 if paper else 0.0)
-        broker = VirtualRealtimeBroker(executor=executor, store=store)
+        broker = VirtualRealtimeBroker(executor=cast(OrderExecutor, executor), store=store)
 
         # --- optional risk manager -------------------------------------------
         # Users can attach one via broker.risk_manager = ... before calling run
@@ -1354,7 +1355,10 @@ class FlowBuilder:
         result = FlowResult()
         result.execution_time = time.time() - start
 
-        trades_df = runner.trades_df
+        from signalflow.core.containers.portfolio import Portfolio
+
+        trades_list = runner.trades
+        trades_df = Portfolio.trades_to_pl(trades_list) if trades_list else pl.DataFrame()
         result.trades = trades_df
 
         metrics_df = runner.metrics_df
@@ -1909,10 +1913,10 @@ class FlowBuilder:
             results.append(labeled)
 
         if len(results) == 1:
-            return results[0]
+            return cast(pl.DataFrame, results[0])
 
         # Merge labels
-        return pl.concat(results).unique(["pair", "timestamp"])
+        return cast(pl.DataFrame, pl.concat(results).unique(["pair", "timestamp"]))
 
     def _apply_validation(
         self,

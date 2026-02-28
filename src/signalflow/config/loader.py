@@ -91,7 +91,7 @@ def _resolve_env_vars(config: dict[str, Any]) -> dict[str, Any]:
     Returns:
         Config with resolved environment variables
     """
-    result = {}
+    result: dict[str, Any] = {}
     for key, value in config.items():
         if isinstance(value, dict):
             result[key] = _resolve_env_vars(value)

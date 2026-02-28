@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 import numpy as np
 
@@ -20,12 +21,9 @@ class SortinoRatioMetric(StrategyMetric):
     window_size: int = 100
     risk_free_rate: float = 0.0
     target_return: float = 0.0
-    _returns_history: list[float] = None
+    _returns_history: list[float] = field(default_factory=list)
 
-    def __post_init__(self):
-        self._returns_history = []
-
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         equity = state.portfolio.equity(prices=prices)
         current_return = (equity - self.initial_capital) / self.initial_capital
 
@@ -64,7 +62,7 @@ class CalmarRatioMetric(StrategyMetric):
     _max_drawdown: float = 0.0
     _initial_equity: float = 0.0
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         equity = state.portfolio.equity(prices=prices)
 
         if self._initial_equity == 0.0:
@@ -92,7 +90,7 @@ class CalmarRatioMetric(StrategyMetric):
 class ProfitFactorMetric(StrategyMetric):
     """Computes profit factor (gross profit / gross loss)."""
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         closed_positions = [p for p in state.portfolio.positions.values() if p.is_closed]
 
         if not closed_positions:
@@ -120,7 +118,7 @@ class ProfitFactorMetric(StrategyMetric):
 class AverageTradeMetric(StrategyMetric):
     """Computes average profit, loss, and trade duration."""
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         closed_positions = [p for p in state.portfolio.positions.values() if p.is_closed]
 
         if not closed_positions:
@@ -140,9 +138,9 @@ class AverageTradeMetric(StrategyMetric):
         avg_loss = float(np.mean([p.realized_pnl for p in losers])) if losers else 0.0
         avg_trade = float(np.mean([p.realized_pnl for p in closed_positions]))
 
-        def get_duration_minutes(pos) -> float:
+        def get_duration_minutes(pos: Any) -> float:
             if pos.entry_time and pos.last_time:
-                return (pos.last_time - pos.entry_time).total_seconds() / 60
+                return float((pos.last_time - pos.entry_time).total_seconds() / 60)
             return 0.0
 
         all_durations = [get_duration_minutes(p) for p in closed_positions]
@@ -164,7 +162,7 @@ class AverageTradeMetric(StrategyMetric):
 class ExpectancyMetric(StrategyMetric):
     """Computes trade expectancy (win_rate * avg_win - loss_rate * avg_loss)."""
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         closed_positions = [p for p in state.portfolio.positions.values() if p.is_closed]
 
         if not closed_positions:
@@ -193,7 +191,7 @@ class ExpectancyMetric(StrategyMetric):
 class RiskRewardMetric(StrategyMetric):
     """Computes risk/reward ratio (avg_win / avg_loss)."""
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         closed_positions = [p for p in state.portfolio.positions.values() if p.is_closed]
 
         if not closed_positions:
@@ -225,7 +223,7 @@ class MaxConsecutiveMetric(StrategyMetric):
     _max_loss_streak: int = 0
     _last_result_win: bool | None = None
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         closed_positions = [p for p in state.portfolio.positions.values() if p.is_closed]
         current_count = len(closed_positions)
 

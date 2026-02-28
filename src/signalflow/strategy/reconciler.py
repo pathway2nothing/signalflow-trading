@@ -156,18 +156,18 @@ class AllReconciler(BaseReconciler):
         # Prepare DataFrames with source prefix
         dfs = []
         for source_id in sources:
-            df = signals.get(source_id)
-            if df is None or df.is_empty():
+            source_df = signals.get(source_id)
+            if source_df is None or source_df.is_empty():
                 logger.warning(f"Source {source_id} has no signals, ALL reconciliation will yield empty")
                 return pl.DataFrame()
 
             # Select key columns with prefix
-            df = df.select([
+            prefixed_df = source_df.select([
                 pl.col("timestamp"),
                 pl.col("pair"),
                 pl.col("direction").alias(f"direction_{source_id}"),
             ])
-            dfs.append(df)
+            dfs.append(prefixed_df)
 
         # Join all sources on timestamp and pair
         result = dfs[0]

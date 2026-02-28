@@ -74,19 +74,13 @@ class Broker(ABC):
 
         fills = self.executor.execute(orders, prices, ts)
 
-        # Persist fills
-        if fills:
-            strategy_id = self._get_strategy_id(orders)
-            if strategy_id:
-                self.store.save_fills(strategy_id, fills)
-
         return fills
 
     def _get_strategy_id(self, orders: list[Order]) -> str | None:
         """Extract strategy_id from orders metadata."""
         for order in orders:
             if "strategy_id" in order.meta:
-                return order.meta["strategy_id"]
+                return str(order.meta["strategy_id"])
         return None
 
     def sync_fills(self) -> list[OrderFill]:
@@ -117,13 +111,14 @@ class Broker(ABC):
         - Metrics
         """
         self.store.save_state(state)
-        self.store.save_positions(state.strategy_id, list(state.positions.values()))
-        if state.last_ts and state.all_metrics:
-            self.store.save_metrics(
-                state.strategy_id,
-                state.last_ts,
-                state.all_metrics,
-            )
+        if state.last_ts:
+            self.store.upsert_positions(state.strategy_id, state.last_ts, state.portfolio.positions.values())
+            if state.metrics:
+                self.store.append_metrics(
+                    state.strategy_id,
+                    state.last_ts,
+                    state.metrics,
+                )
 
     def restore_state(self, strategy_id: str) -> StrategyState:
         """
@@ -141,9 +136,6 @@ class Broker(ABC):
 
         if state is None:
             return StrategyState(strategy_id=strategy_id)
-
-        positions = self.store.load_positions(strategy_id, open_only=False)
-        state.portfolio.positions = {p.id: p for p in positions}
 
         return state
 

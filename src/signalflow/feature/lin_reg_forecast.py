@@ -51,7 +51,7 @@ class LinRegForecastFeature(Feature):
         {"source_col": "rsi_14", "n_lags": 5, "mean_window": 10},
     ]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.n_lags < 1:
             raise ValueError("n_lags must be >= 1")
 

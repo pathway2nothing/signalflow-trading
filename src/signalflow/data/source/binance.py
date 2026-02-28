@@ -33,6 +33,7 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import aiohttp
 from loguru import logger
@@ -80,7 +81,7 @@ class BinanceClient(RawDataSource):
         self._session = aiohttp.ClientSession(timeout=timeout)
         return self
 
-    async def __aexit__(self, *args) -> None:
+    async def __aexit__(self, *args: Any) -> None:
         """Exit async context - closes session."""
         if self._session:
             await self._session.close()
@@ -154,7 +155,7 @@ class BinanceClient(RawDataSource):
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         limit: int = 1000,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Fetch OHLCV klines from Binance.
 
         IMPORTANT: Returned "timestamp" is CANDLE CLOSE TIME (UTC-naive).
@@ -176,7 +177,7 @@ class BinanceClient(RawDataSource):
         if self._session is None:
             raise RuntimeError("BinanceClient must be used as an async context manager.")
 
-        params: dict[str, object] = {"symbol": pair, "interval": timeframe, "limit": int(limit)}
+        params: dict[str, str | int] = {"symbol": pair, "interval": timeframe, "limit": int(limit)}
         if start_time is not None:
             params["startTime"] = dt_to_ms_utc(start_time)
         if end_time is not None:
@@ -200,7 +201,7 @@ class BinanceClient(RawDataSource):
 
                     data = await resp.json()
 
-                out: list[dict] = []
+                out: list[dict[str, Any]] = []
                 for k in data:
                     close_ms = int(k[6])
                     out.append(
@@ -236,7 +237,7 @@ class BinanceClient(RawDataSource):
         end_time: datetime,
         *,
         limit: int = 1000,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Download all klines for period with automatic pagination.
 
         Semantics:
@@ -275,7 +276,7 @@ class BinanceClient(RawDataSource):
         tf_ms = TIMEFRAME_MS[timeframe]
         window = timedelta(milliseconds=tf_ms * limit)
 
-        all_klines: list[dict] = []
+        all_klines: list[dict[str, Any]] = []
         current_start = start_time
 
         max_loops = 2_000_000
@@ -318,7 +319,7 @@ class BinanceClient(RawDataSource):
 
             await asyncio.sleep(self.min_delay_sec)
 
-        uniq: dict[datetime, dict] = {}
+        uniq: dict[datetime, dict[str, Any]] = {}
         for k in all_klines:
             uniq[k["timestamp"]] = k
 
@@ -363,7 +364,7 @@ class BinanceSpotLoader(RawDataLoader):
         async with BinanceClient() as client:
             return await client.get_pairs(quote=quote)
 
-    async def download(
+    async def download(  # type: ignore[override]
         self,
         pairs: list[str],
         days: int | None = None,
@@ -420,6 +421,7 @@ class BinanceSpotLoader(RawDataLoader):
             if db_min is None:
                 ranges_to_download.append((start, end))
             else:
+                assert db_max is not None
                 if start < db_min:
                     pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
                     if start < pre_end:
@@ -458,7 +460,7 @@ class BinanceSpotLoader(RawDataLoader):
 
         self.store.close()
 
-    async def sync(
+    async def sync(  # type: ignore[override]
         self,
         pairs: list[str],
         update_interval_sec: int = 60,
@@ -537,7 +539,7 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
         ) as client:
             return await client.get_pairs(quote=quote)
 
-    async def download(
+    async def download(  # type: ignore[override]
         self,
         pairs: list[str],
         days: int | None = None,
@@ -582,6 +584,7 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
             if db_min is None:
                 ranges_to_download.append((start, end))
             else:
+                assert db_max is not None
                 if start < db_min:
                     pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
                     if start < pre_end:
@@ -620,7 +623,7 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
 
         self.store.close()
 
-    async def sync(
+    async def sync(  # type: ignore[override]
         self,
         pairs: list[str],
         update_interval_sec: int = 60,
@@ -651,7 +654,6 @@ class BinanceFuturesUsdtLoader(RawDataLoader):
                 await asyncio.sleep(update_interval_sec)
 
 
-@dataclass
 @dataclass
 @data_source("binance/inverse")
 class BinanceFuturesCoinLoader(RawDataLoader):
@@ -693,7 +695,7 @@ class BinanceFuturesCoinLoader(RawDataLoader):
         ) as client:
             return await client.get_pairs(quote=quote)
 
-    async def download(
+    async def download(  # type: ignore[override]
         self,
         pairs: list[str],
         days: int | None = None,
@@ -738,6 +740,7 @@ class BinanceFuturesCoinLoader(RawDataLoader):
             if db_min is None:
                 ranges_to_download.append((start, end))
             else:
+                assert db_max is not None
                 if start < db_min:
                     pre_end = min(end, db_min - timedelta(minutes=tf_minutes))
                     if start < pre_end:
@@ -776,7 +779,7 @@ class BinanceFuturesCoinLoader(RawDataLoader):
 
         self.store.close()
 
-    async def sync(
+    async def sync(  # type: ignore[override]
         self,
         pairs: list[str],
         update_interval_sec: int = 60,

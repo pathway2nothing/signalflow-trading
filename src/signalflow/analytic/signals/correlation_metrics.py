@@ -35,7 +35,7 @@ class SignalCorrelationMetric(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
+    ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
         """Compute signal-return correlations."""
         if "spot" in raw_data:
             price_df = raw_data["spot"]
@@ -182,7 +182,7 @@ class SignalCorrelationMetric(SignalMetric):
 
     def plot(
         self,
-        computed_metrics: dict[str, Any],
+        computed_metrics: dict[str, Any] | None,
         plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
@@ -214,7 +214,7 @@ class SignalCorrelationMetric(SignalMetric):
 
         return fig
 
-    def _add_correlation_bars(self, fig: go.Figure, metrics: dict[str, Any]):
+    def _add_correlation_bars(self, fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add correlation bar chart."""
         correlations = metrics["quant"]["correlations"]
 
@@ -250,7 +250,7 @@ class SignalCorrelationMetric(SignalMetric):
             col=1,
         )
 
-    def _add_scatter_plot(self, fig: go.Figure, metrics: dict[str, Any], ctx: dict[str, Any]):
+    def _add_scatter_plot(self, fig: go.Figure, metrics: dict[str, Any], ctx: dict[str, Any]) -> None:
         """Add scatter plot for first period."""
         scatter_data = metrics["series"]["scatter_data"]
         if not scatter_data:
@@ -279,7 +279,7 @@ class SignalCorrelationMetric(SignalMetric):
             col=2,
         )
 
-    def _add_quintile_returns(self, fig: go.Figure, metrics: dict[str, Any]):
+    def _add_quintile_returns(self, fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add quintile returns bar chart."""
         quintile_data = metrics["quant"]["quintile_analysis"]
         if not quintile_data:
@@ -301,7 +301,7 @@ class SignalCorrelationMetric(SignalMetric):
             col=1,
         )
 
-    def _add_quintile_winrate(self, fig: go.Figure, metrics: dict[str, Any]):
+    def _add_quintile_winrate(self, fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add quintile win rate chart."""
         quintile_data = metrics["quant"]["quintile_analysis"]
         if not quintile_data:
@@ -324,7 +324,7 @@ class SignalCorrelationMetric(SignalMetric):
 
         fig.add_hline(y=50, line_dash="dash", line_color="gray", row=2, col=2)
 
-    def _update_layout(self, fig: go.Figure):
+    def _update_layout(self, fig: go.Figure) -> None:
         """Update figure layout."""
         fig.update_layout(
             title=dict(
@@ -368,7 +368,7 @@ class SignalTimingMetric(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
+    ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
         """Compute optimal timing metrics."""
         if "spot" in raw_data:
             price_df = raw_data["spot"]
@@ -480,7 +480,7 @@ class SignalTimingMetric(SignalMetric):
 
     def plot(
         self,
-        computed_metrics: dict[str, Any],
+        computed_metrics: dict[str, Any] | None,
         plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,

@@ -250,7 +250,7 @@ class VirtualDataProvider(RawDataLoader):
 
             logger.info(f"VirtualDataProvider: generated {n_bars} bars for {pair}")
 
-    async def sync(
+    async def sync(  # type: ignore[override]
         self,
         pairs: list[str],
         update_interval_sec: int = 60,

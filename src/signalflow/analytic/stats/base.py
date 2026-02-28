@@ -114,7 +114,7 @@ def extract_returns(
         if len(total_returns) > 1:
             # Period return = (1 + r_t) / (1 + r_{t-1}) - 1
             cumulative = 1 + total_returns
-            period_returns = np.diff(cumulative) / cumulative[:-1]
+            period_returns: np.ndarray = np.diff(cumulative) / cumulative[:-1]
             return period_returns
 
     # Fallback: compute from trade PnLs
@@ -128,4 +128,4 @@ def extract_returns(
 
     # Simple returns based on trade PnL
     returns = pnls / initial
-    return returns
+    return np.asarray(returns)

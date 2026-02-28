@@ -157,7 +157,7 @@ class MultiTargetGenerator:
 
     def _create_labeler(self, h: HorizonConfig) -> Labeler:
         """Instantiate a labeler for the given horizon."""
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "price_col": self.price_col,
             "pair_col": self.pair_col,
             "ts_col": self.ts_col,

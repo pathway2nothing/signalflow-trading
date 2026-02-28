@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 import polars as pl
 
@@ -170,7 +170,8 @@ class ModelEntryRule(EntryRule):
         signal_type = signal_row.item(0, "signal_type")
 
         if self.signal_type_map is not None:
-            return self.signal_type_map.get(signal_type)
+            side = self.signal_type_map.get(signal_type)
+            return cast(OrderSide, side) if side is not None else None
 
         # Legacy behavior
         if signal_type == SignalType.RISE.value:

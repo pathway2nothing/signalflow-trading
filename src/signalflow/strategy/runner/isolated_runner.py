@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import polars as pl
 from joblib import Parallel, delayed
@@ -141,6 +141,7 @@ def _run_pair_backtest(
 ) -> PairResult:
     """Run backtest for single pair."""
     from signalflow.data.strategy_store.memory import InMemoryStrategyStore
+    from signalflow.strategy.broker.executor.base import OrderExecutor
     from signalflow.strategy.broker.executor.virtual_spot import VirtualSpotExecutor
     from signalflow.strategy.broker.isolated_broker import IsolatedBacktestBroker
 
@@ -151,7 +152,7 @@ def _run_pair_backtest(
     # Create broker for this pair
     broker = IsolatedBacktestBroker(
         pair=pair,
-        executor=VirtualSpotExecutor(fee_rate=config.get("fee_rate", 0.001)),
+        executor=cast(OrderExecutor, VirtualSpotExecutor(fee_rate=config.get("fee_rate", 0.001))),
         store=InMemoryStrategyStore(),
     )
 
@@ -289,7 +290,7 @@ class IsolatedBalanceRunner(StrategyRunner):
     _trades: list[Trade] = field(default_factory=list, init=False)
     _metrics_history: list[dict] = field(default_factory=list, init=False)
 
-    def run(self, raw_data: RawData, signals: Signals, state: StrategyState | None = None) -> IsolatedResults:
+    def run(self, raw_data: RawData, signals: Signals, state: StrategyState | None = None) -> IsolatedResults:  # type: ignore[override]
         """Run parallel backtest with isolated balance per pair.
 
         Args:

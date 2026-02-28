@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import polars as pl
 
@@ -38,7 +38,7 @@ class OffsetFeature(Feature):
         ... )
     """
 
-    feature_name: str = None
+    feature_name: str | None = None
     feature_params: dict = field(default_factory=dict)
     window: int = 15
     prefix: str | None = None
@@ -46,7 +46,7 @@ class OffsetFeature(Feature):
     requires: ClassVar[list[str]] = ["open", "high", "low", "close", "volume", "timestamp"]
     outputs: ClassVar[list[str]] = ["offset"]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.feature_name is None:
             raise ValueError("OffsetFeature requires 'feature_name'")
 
@@ -86,9 +86,9 @@ class OffsetFeature(Feature):
     def _compute_base_feature(self, resampled: pl.DataFrame) -> pl.DataFrame:
         """Compute base feature - handles both Feature and GlobalFeature."""
         if self._is_global:
-            return self._base.compute(resampled)
+            return cast(pl.DataFrame, self._base.compute(resampled))
         else:
-            return self._base.compute_pair(resampled)
+            return cast(pl.DataFrame, self._base.compute_pair(resampled))
 
     def _compute_single_pair(self, df: pl.DataFrame) -> pl.DataFrame:
         """Compute features for single pair (non-global base)."""

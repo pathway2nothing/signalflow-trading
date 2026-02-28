@@ -7,10 +7,10 @@ signalflow.analytic.strategy for visualization and metrics computation.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 import polars as pl
 
@@ -123,7 +123,9 @@ class BacktestResult:
 
         if not self.trades:
             return pl.DataFrame()
-        return Portfolio.trades_to_pl(self.trades)
+        from signalflow.core.containers.trade import Trade
+
+        return Portfolio.trades_to_pl(cast(Iterable[Trade], self.trades))
 
     @property
     def final_capital(self) -> float:
@@ -240,11 +242,11 @@ class BacktestResult:
             return None
 
         results_dict = self._build_results_dict()
-        return self._main_result.plot(
+        return cast("list[go.Figure] | None", self._main_result.plot(
             results=results_dict,
             state=self.state,
             raw_data=self.raw,
-        )
+        ))
 
     def plot_pair(self, pair: str) -> list[go.Figure] | None:
         """
@@ -261,11 +263,11 @@ class BacktestResult:
             pair_result = pair_cls(pairs=[pair])
 
             results_dict = self._build_results_dict()
-            return pair_result.plot(
+            return cast("list[go.Figure] | None", pair_result.plot(
                 results=results_dict,
                 state=self.state,
                 raw_data=self.raw,
-            )
+            ))
         except KeyError:
             return None
 
@@ -428,7 +430,7 @@ class BacktestResult:
     def _trade_to_json_safe(self, trade: TradeType) -> dict[str, Any]:
         """Convert trade to JSON-safe dict (datetimes → ISO strings)."""
         d = self._trade_to_dict(trade)
-        return self._json_safe(d)
+        return cast(dict[str, Any], self._json_safe(d))
 
     @staticmethod
     def _json_safe(obj: Any) -> Any:

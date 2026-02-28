@@ -7,7 +7,7 @@ import contextlib
 import signal
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import polars as pl
 from loguru import logger
@@ -343,7 +343,7 @@ class RealtimeRunner(StrategyRunner):
         if df.height == 0:
             return []
 
-        timestamps = df.select(self.ts_col).unique().sort(self.ts_col).get_column(self.ts_col).to_list()
+        timestamps: list[datetime] = df.select(self.ts_col).unique().sort(self.ts_col).get_column(self.ts_col).to_list()
 
         # Filter out already-processed bar
         if state.last_ts is not None:
@@ -621,7 +621,8 @@ class RealtimeRunner(StrategyRunner):
         # Broker
         fee_rate = fee if fee is not None else builder._fee
         store = InMemoryStrategyStore()
-        executor = VirtualSpotExecutor(fee_rate=fee_rate, slippage_pct=0.0005)
+        from signalflow.strategy.broker.executor.base import OrderExecutor
+        executor = cast(OrderExecutor, VirtualSpotExecutor(fee_rate=fee_rate, slippage_pct=0.0005))
         broker = VirtualRealtimeBroker(executor=executor, store=store)
 
         # Alert manager (set by UI graph_converter if alert nodes present)

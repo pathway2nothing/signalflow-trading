@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Literal, cast
 
 from signalflow.core import Order, Position, PositionType, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
@@ -121,17 +122,17 @@ class TrailingStopExit(ExitRule):
         if self.use_atr:
             atr = state.runtime.get("atr", {}).get(pos.pair)
             if atr is not None and atr > 0:
-                return atr * self.atr_multiplier
+                return float(atr) * self.atr_multiplier
             # Fallback to entry ATR if available
             entry_atr = pos.meta.get("entry_atr")
             if entry_atr is not None and entry_atr > 0:
-                return entry_atr * self.atr_multiplier
+                return float(entry_atr) * self.atr_multiplier
             # Final fallback to percentage
         return reference_price * self.trail_pct
 
     def _create_exit_order(self, pos: Position, price: float, peak_or_trough: float) -> Order:
         """Create exit order with metadata."""
-        side = "SELL" if pos.position_type == PositionType.LONG else "BUY"
+        side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
         meta_key = "peak_price" if pos.position_type == PositionType.LONG else "trough_price"
 
         return Order(

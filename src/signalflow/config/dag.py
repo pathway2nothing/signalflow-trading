@@ -509,9 +509,9 @@ class Flow:
 
         # Cache artifacts
         self._artifacts = {}
-        for node_id, node in self.nodes.items():
-            for output in node.get_outputs():
-                self._artifacts[f"{node_id}.{output}"] = Artifact.from_output(output, node_id)
+        for nid, nobj in self.nodes.items():
+            for output in nobj.get_outputs():
+                self._artifacts[f"{nid}.{output}"] = Artifact.from_output(output, nid)
 
         self._compiled = True
         return result
@@ -697,7 +697,7 @@ class Flow:
         raw = sf_load(
             source=config.get("source", config.get("store", {}).get("path")),
             pairs=config.get("pairs", ["BTCUSDT"]),
-            start=config.get("start"),
+            start=config.get("start"),  # type: ignore[arg-type]
             end=config.get("end"),
             timeframe=config.get("timeframe", "1h"),
         )
@@ -850,7 +850,7 @@ class Flow:
             return {"trades": pl.DataFrame(), "metrics": {}}
 
         # For backtest mode, use the traditional BacktestBuilder path
-        from signalflow import Backtest
+        from signalflow.api.builder import BacktestBuilder
 
         config = self._to_backtest_config()
 
@@ -859,7 +859,7 @@ class Flow:
         if signals is not None:
             config["_precomputed_signals"] = signals
 
-        result = Backtest.from_dict(config).run()
+        result = BacktestBuilder.from_dict(config).run()
         return {
             "trades": result.trades_df if hasattr(result, "trades_df") else pl.DataFrame(),
             "metrics": result.metrics if hasattr(result, "metrics") else {},

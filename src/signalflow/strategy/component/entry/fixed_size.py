@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, Literal, cast
 
 import polars as pl
 
@@ -63,7 +64,11 @@ class FixedSizeEntryRule(EntryRule):
                 side = "BUY" if signal_type == SignalType.RISE.value else "SELL"
 
             order = Order(
-                pair=pair, side=side, order_type="MARKET", qty=self.position_size, meta={"signal_type": signal_type}
+                pair=pair,
+                side=cast(Literal["BUY", "SELL"], side),
+                order_type="MARKET",
+                qty=self.position_size,
+                meta={"signal_type": signal_type},
             )
             orders.append(order)
             open_count += 1
@@ -71,6 +76,6 @@ class FixedSizeEntryRule(EntryRule):
         return orders
 
     @classmethod
-    def from_directional_map(cls, **kwargs) -> FixedSizeEntryRule:
+    def from_directional_map(cls, **kwargs: Any) -> FixedSizeEntryRule:
         """Create entry rule using the global DIRECTIONAL_SIGNAL_MAP."""
         return cls(signal_type_map=dict(DIRECTIONAL_SIGNAL_MAP), **kwargs)

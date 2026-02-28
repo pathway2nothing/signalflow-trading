@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -207,7 +208,7 @@ class RawDataLoader(ABC):
     pass
 
     @abstractmethod
-    def download(self, **kwargs):
+    def download(self, **kwargs: Any) -> Any:
         """Download historical data from source to storage.
 
         Initial data acquisition for a date range. Typically used for:
@@ -250,7 +251,7 @@ class RawDataLoader(ABC):
         pass
 
     @abstractmethod
-    def sync(self, **kwargs):
+    def sync(self, **kwargs: Any) -> Any:
         """Sync/update existing data with latest data.
 
         Incremental update for keeping data current. Typically used for:

@@ -82,7 +82,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> object:
     """Lazy import extended exchanges from signalflow-data if available."""
     _EXTENDED_EXCHANGES = {
         # Binance Stocks

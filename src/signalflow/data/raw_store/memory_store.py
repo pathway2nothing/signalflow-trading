@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 import pandas as pd
 import polars as pl
@@ -68,7 +69,7 @@ class InMemoryRawStore(RawDataStore):
         subset = self._df.filter(pl.col("pair") == pair)
         if subset.is_empty():
             return (None, None)
-        return (subset["timestamp"].min(), subset["timestamp"].max())
+        return cast(tuple[datetime | None, datetime | None], (subset["timestamp"].min(), subset["timestamp"].max()))
 
     def find_gaps(self, pair: str, start: datetime, end: datetime, tf_minutes: int) -> list[tuple[datetime, datetime]]:
         subset = self._df.filter(

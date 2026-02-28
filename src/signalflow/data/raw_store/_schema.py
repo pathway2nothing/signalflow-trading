@@ -33,7 +33,7 @@ def resolve_columns(data_type: str) -> list[str]:
 
 def polars_schema(columns: list[str]) -> dict[str, pl.DataType]:
     """Build a Polars schema dict for pair + timestamp + *columns*."""
-    schema: dict[str, pl.DataType] = {"pair": pl.Utf8, "timestamp": pl.Datetime}
+    schema: dict[str, pl.DataType] = {"pair": pl.Utf8(), "timestamp": pl.Datetime()}
     for c in columns:
-        schema[c] = pl.Int64 if c == "trades" else pl.Float64
+        schema[c] = pl.Int64() if c == "trades" else pl.Float64()
     return schema

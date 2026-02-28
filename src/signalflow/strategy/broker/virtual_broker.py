@@ -250,7 +250,7 @@ class VirtualRealtimeBroker(BacktestBroker):
                 "side": "long" if is_long else "short",
                 "entry_price": round(entry_price, 6),
                 "size": round(qty, 8),
-                "entry_time": pos.entry_time.isoformat() if getattr(pos, "entry_time", None) else None,
+                "entry_time": et.isoformat() if (et := getattr(pos, "entry_time", None)) else None,
                 "pnl": round(pnl, 4),
                 "pnl_pct": round(pnl_pct, 4),
             })

@@ -32,7 +32,7 @@ def entropy_discrete(x: np.ndarray) -> float:
     _, counts = np.unique(x, return_counts=True)
     probs = counts / counts.sum()
     probs = probs[probs > 0]
-    return -np.sum(probs * np.log2(probs))
+    return float(-np.sum(probs * np.log2(probs)))
 
 
 def entropy_continuous(x: np.ndarray, bins: int = 20) -> float:
@@ -52,7 +52,7 @@ def entropy_continuous(x: np.ndarray, bins: int = 20) -> float:
     counts, _ = np.histogram(x, bins=bins)
     probs = counts / counts.sum()
     probs = probs[probs > 0]
-    return -np.sum(probs * np.log2(probs))
+    return float(-np.sum(probs * np.log2(probs)))
 
 
 def mutual_information_discrete(x: np.ndarray, y: np.ndarray) -> float:
@@ -135,7 +135,7 @@ def mutual_information_continuous(
     outer = px[:, None] * py[None, :]
     valid = (pxy > 0) & (outer > 0)
     mi = np.sum(pxy[valid] * np.log2(pxy[valid] / outer[valid]))
-    return max(mi, 0.0)
+    return float(max(mi, 0.0))
 
 
 def normalized_mutual_information(mi: float, h_x: float, h_y: float) -> float:
@@ -154,7 +154,7 @@ def normalized_mutual_information(mi: float, h_x: float, h_y: float) -> float:
     denom = np.sqrt(h_x * h_y)
     if denom <= 0:
         return np.nan
-    return min(mi / denom, 1.0)
+    return float(min(mi / denom, 1.0))
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +165,8 @@ def normalized_mutual_information(mi: float, h_x: float, h_y: float) -> float:
 def _isnan_any(arr: np.ndarray) -> np.ndarray:
     """Return boolean mask for NaN-like values in any dtype."""
     if np.issubdtype(arr.dtype, np.floating):
-        return np.isnan(arr)
+        result: np.ndarray = np.isnan(arr)
+        return result
     if arr.dtype == object:
         return np.array([v is None or (isinstance(v, float) and np.isnan(v)) for v in arr])
     return np.zeros(len(arr), dtype=bool)
@@ -192,4 +193,4 @@ def _mi_from_contingency(x: np.ndarray, y: np.ndarray) -> float:
     outer = px[:, None] * py[None, :]
     valid = (pxy > 0) & (outer > 0)
     mi = np.sum(pxy[valid] * np.log2(pxy[valid] / outer[valid]))
-    return max(mi, 0.0)
+    return float(max(mi, 0.0))

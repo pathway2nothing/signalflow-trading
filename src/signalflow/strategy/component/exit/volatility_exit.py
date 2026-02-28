@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Literal, cast
 
 from signalflow.core import Order, Position, PositionType, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
@@ -69,7 +70,7 @@ class VolatilityExit(ExitRule):
                     exit_reason = "volatility_sl"
 
             if should_exit:
-                side = "SELL" if pos.position_type == PositionType.LONG else "BUY"
+                side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
                 order = Order(
                     pair=pos.pair,
                     side=side,
@@ -125,7 +126,8 @@ class VolatilityExit(ExitRule):
         # Try state.runtime first (current ATR)
         atr = state.runtime.get("atr", {}).get(pos.pair)
         if atr is not None:
-            return atr
+            return float(atr)
 
         # Fallback to entry ATR stored in position.meta
-        return pos.meta.get("entry_atr")
+        entry_atr = pos.meta.get("entry_atr")
+        return float(entry_atr) if entry_atr is not None else None

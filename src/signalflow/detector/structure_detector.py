@@ -108,8 +108,8 @@ class StructureDetector(SignalDetector):
             prices = group[self.price_col].to_numpy().astype(np.float64)
             n = len(prices)
 
-            signal_types = [None] * n
-            probabilities = [None] * n
+            signal_types: list[str | None] = [None] * n
+            probabilities: list[float | None] = [None] * n
 
             # Track last emitted extremum to avoid duplicates
             last_emitted_type = None

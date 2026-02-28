@@ -184,9 +184,10 @@ class SklearnValidatorBase(SignalValidator):
         X_np = self._extract_features(X_train, fit_mode=True)
         y_np = self._extract_labels(y_train)
 
-        n_trials = self.tune_params.get("n_trials", self.tune_n_trials)
-        cv_folds = self.tune_params.get("cv_folds", self.tune_cv_folds)
-        timeout = self.tune_params.get("timeout", self.tune_timeout)
+        _tp = self.tune_params or {}
+        n_trials = _tp.get("n_trials", self.tune_n_trials)
+        cv_folds = _tp.get("cv_folds", self.tune_cv_folds)
+        timeout = _tp.get("timeout", self.tune_timeout)
 
         def objective(trial: optuna.Trial) -> float:
             params = build_optuna_params(trial, self._tune_space)
@@ -200,7 +201,7 @@ class SklearnValidatorBase(SignalValidator):
                 scoring=self.tune_metric,
                 n_jobs=-1,
             )
-            return scores.mean()
+            return float(scores.mean())
 
         study = optuna.create_study(direction="maximize")
         study.optimize(
@@ -397,7 +398,7 @@ class LightGBMValidator(SklearnValidatorBase):
         super().__post_init__()
         # Merge instance params into model_params
         self.model_params = {
-            **self.model_params,
+            **(self.model_params or {}),
             "n_estimators": self.n_estimators,
             "max_depth": self.max_depth,
             "learning_rate": self.learning_rate,
@@ -468,7 +469,7 @@ class XGBoostValidator(SklearnValidatorBase):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.model_params = {
-            **self.model_params,
+            **(self.model_params or {}),
             "n_estimators": self.n_estimators,
             "max_depth": self.max_depth,
             "learning_rate": self.learning_rate,
@@ -529,7 +530,7 @@ class RandomForestValidator(SklearnValidatorBase):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.model_params = {
-            **self.model_params,
+            **(self.model_params or {}),
             "n_estimators": self.n_estimators,
             "max_depth": self.max_depth,
         }
@@ -574,7 +575,7 @@ class LogisticRegressionValidator(SklearnValidatorBase):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.model_params = {
-            **self.model_params,
+            **(self.model_params or {}),
             "C": self.C,
             "max_iter": self.max_iter,
         }
@@ -619,7 +620,7 @@ class SVMValidator(SklearnValidatorBase):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.model_params = {
-            **self.model_params,
+            **(self.model_params or {}),
             "C": self.C,
             "kernel": self.kernel,
         }
@@ -721,7 +722,7 @@ class AutoSelectValidator(SklearnValidatorBase):
             raise ValueError("Model not fitted. Call fit() first.")
         return self.selected_validator.predict_proba(signals, X)
 
-    def tune(self, *args, **kwargs) -> dict[str, Any]:
+    def tune(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         raise NotImplementedError("AutoSelectValidator does not support tune(). Use a specific validator.")
 
 

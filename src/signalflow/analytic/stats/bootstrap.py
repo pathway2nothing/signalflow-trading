@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
@@ -90,7 +90,7 @@ def _block_bootstrap_indices(
     for b in range(n_bootstrap):
         # Sample block starting points
         starts = rng.integers(0, max(1, n - block_size + 1), n_blocks)
-        idx = []
+        idx: list[Any] = []
         for start in starts:
             idx.extend(range(start, min(start + block_size, n)))
         indices[b, :] = idx[:n]
@@ -194,9 +194,10 @@ class BootstrapValidator(StatisticalValidator):
     ) -> np.ndarray:
         """Generate bootstrap distribution for metric."""
         if metric == "sharpe_ratio" and len(returns) > 0:
-            return bootstrap_sharpe_ratio(returns, self.n_bootstrap, seed)
+            result: np.ndarray = bootstrap_sharpe_ratio(returns, self.n_bootstrap, seed)
+            return result
         else:
-            return self._generic_bootstrap(metric, returns, pnls, seed)
+            return np.asarray(self._generic_bootstrap(metric, returns, pnls, seed))
 
     def _generic_bootstrap(
         self,
@@ -249,7 +250,7 @@ class BootstrapValidator(StatisticalValidator):
         alpha = 1 - self.confidence_level
 
         # Bias correction: proportion of bootstrap values below point estimate
-        p0 = np.mean(bootstrap_dist < point_estimate)
+        p0: float = float(np.mean(bootstrap_dist < point_estimate))
         if p0 == 0:
             p0 = 1 / (self.n_bootstrap + 1)
         elif p0 == 1:

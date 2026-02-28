@@ -18,7 +18,8 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from datetime import datetime
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import polars as pl
@@ -73,8 +74,8 @@ def _df_to_raw_data_view(
     datetime_end = timestamps.max()
 
     raw_data = RawData(
-        datetime_start=datetime_start,
-        datetime_end=datetime_end,
+        datetime_start=cast(datetime, datetime_start),
+        datetime_end=cast(datetime, datetime_end),
         pairs=pairs,
         data={"spot": df},
     )
@@ -214,7 +215,7 @@ class FeatureInformativenessAnalyzer:
             df = mask_targets_by_signals(
                 df=df,
                 signals=signals,
-                mask_signal_types=self.event_detector.allowed_signal_types or set(),
+                mask_signal_types=self.event_detector.allowed_signal_types or set(),  # type: ignore[attr-defined]
                 horizon_bars=max_horizon,
                 cooldown_bars=60,
                 target_columns=target_columns,
@@ -273,7 +274,7 @@ class FeatureInformativenessAnalyzer:
                 target_kind = tmeta["kind"]
 
                 feat_arr, target_arr = self._extract_arrays(df, feat_col, target_col)
-                if feat_arr is None:
+                if feat_arr is None or target_arr is None:
                     rows.append(self._nan_row(feat_col, tmeta))
                     continue
 
@@ -374,7 +375,7 @@ class FeatureInformativenessAnalyzer:
             return 0.0
 
         cv = std_mi / mean_mi
-        return 1.0 / (1.0 + cv)
+        return float(1.0 / (1.0 + cv))
 
     # ------------------------------------------------------------------
     # Composite scoring

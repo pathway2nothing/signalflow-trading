@@ -38,13 +38,13 @@ class BacktestRunner(StrategyRunner):
     _trades: list = field(default_factory=list, init=False)
     _metrics_history: list[dict] = field(default_factory=list, init=False)
 
-    def run(
+    def run(  # type: ignore[override]
         self,
-        raw_data,
+        raw_data: Any,
         signals: Signals,
         state: StrategyState | None = None,
         named_signals: dict[str, Signals] | None = None,
-    ):
+    ) -> StrategyState:
         from tqdm import tqdm
 
         from signalflow.core.containers.strategy_state import StrategyState
@@ -101,7 +101,7 @@ class BacktestRunner(StrategyRunner):
         return state
 
     def _build_price_lookup(self, df: pl.DataFrame) -> dict[datetime, dict[str, float]]:
-        lookup = {}
+        lookup: dict[datetime, dict[str, float]] = {}
         for row in df.select([self.ts_col, self.pair_col, self.price_col]).iter_rows():
             ts, pair, price = row
             if ts not in lookup:
@@ -110,7 +110,7 @@ class BacktestRunner(StrategyRunner):
         return lookup
 
     def _build_signal_lookup(self, signals_df: pl.DataFrame) -> dict[datetime, pl.DataFrame]:
-        lookup = {}
+        lookup: dict[datetime, pl.DataFrame] = {}
         if signals_df.height == 0:
             return lookup
 
@@ -177,7 +177,7 @@ class BacktestRunner(StrategyRunner):
         return state
 
     @property
-    def trades(self):
+    def trades(self) -> list[Any]:
         return self._trades
 
     @property

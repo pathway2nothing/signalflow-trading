@@ -150,7 +150,7 @@ def compute_acceleration(theta_i: np.ndarray) -> float:
     if denom == 0:
         return 0.0
 
-    return num / (6.0 * denom)
+    return float(num / (6.0 * denom))
 
 
 @njit(parallel=True, cache=True)
@@ -253,7 +253,7 @@ def compute_sortino_ratio(returns: np.ndarray) -> float:
     if downside_std < 1e-10:
         return 0.0 if mean_ret == 0 else np.inf
 
-    return mean_ret / downside_std
+    return float(mean_ret / downside_std)
 
 
 @njit(cache=True)

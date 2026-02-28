@@ -298,15 +298,15 @@ class FlowConfig:
 
         # Exit rules
         if self.strategy.exit_rules:
-            rule = self.strategy.exit_rules[0]  # Use first rule
+            exit_rule = self.strategy.exit_rules[0]  # Use first rule
             exit_config: dict[str, Any] = {}
 
             # Map common exit params
-            if rule.type == "tp_sl":
-                exit_config["tp"] = rule.params.get("take_profit_pct", 0.03)
-                exit_config["sl"] = rule.params.get("stop_loss_pct", 0.015)
+            if exit_rule.type == "tp_sl":
+                exit_config["tp"] = exit_rule.params.get("take_profit_pct", 0.03)
+                exit_config["sl"] = exit_rule.params.get("stop_loss_pct", 0.015)
             else:
-                exit_config.update(rule.params)
+                exit_config.update(exit_rule.params)
 
             config["exit"] = exit_config
 

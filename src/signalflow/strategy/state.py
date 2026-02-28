@@ -103,9 +103,13 @@ class Position:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Position:
         """Create from dict."""
-        entry_ts = data.get("entry_ts")
-        if isinstance(entry_ts, str):
-            entry_ts = datetime.fromisoformat(entry_ts)
+        entry_ts_raw = data.get("entry_ts")
+        if isinstance(entry_ts_raw, str):
+            entry_ts = datetime.fromisoformat(entry_ts_raw)
+        elif isinstance(entry_ts_raw, datetime):
+            entry_ts = entry_ts_raw
+        else:
+            entry_ts = datetime.now()
         return cls(
             id=data["id"],
             pair=data["pair"],
@@ -152,9 +156,13 @@ class PendingOrder:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PendingOrder:
         """Create from dict."""
-        created_at = data.get("created_at")
-        if isinstance(created_at, str):
-            created_at = datetime.fromisoformat(created_at)
+        created_at_raw = data.get("created_at")
+        if isinstance(created_at_raw, str):
+            created_at = datetime.fromisoformat(created_at_raw)
+        elif isinstance(created_at_raw, datetime):
+            created_at = created_at_raw
+        else:
+            created_at = datetime.now()
         return cls(
             id=data["id"],
             pair=data["pair"],
@@ -837,7 +845,10 @@ class DuckDBStateBackend(BaseStateBackend):
         ).fetchone()
 
         if result:
-            return result[0]
+            ts = result[0]
+            if isinstance(ts, datetime):
+                return ts
+            return datetime.fromisoformat(str(ts))
         return None
 
 
@@ -874,7 +885,10 @@ class StateConfig:
             backend=StateBackend(backend_str),
             redis=data.get("redis", {}),
             duckdb=data.get("duckdb", {}),
-            persist=data.get("persist", cls.__dataclass_fields__["persist"].default_factory()),
+            persist=data.get("persist", [
+                "positions", "pending_orders", "daily_stats",
+                "circuit_breaker", "signal_cooldowns"
+            ]),
             recovery=data.get("recovery", {}),
         )
 
@@ -923,6 +937,7 @@ class StateManager:
             config = StateConfig.from_dict(config)
 
         # Create backend
+        backend: BaseStateBackend
         if config.backend == StateBackend.REDIS:
             backend = RedisStateBackend(
                 flow_id=flow_id,

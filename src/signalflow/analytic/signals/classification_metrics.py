@@ -41,7 +41,7 @@ class SignalClassificationMetric(SignalMetric):
     chart_width: int = 1400
     roc_n_thresholds: int = 100
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Set default label mappings if not provided."""
         if not self.positive_labels:
             self.positive_labels = ["rise", "up", 1, "positive", "buy"]
@@ -75,7 +75,7 @@ class SignalClassificationMetric(SignalMetric):
         raw_data: RawData,
         signals: Signals,
         labels: pl.DataFrame | None = None,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
+    ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
         """Compute classification metrics."""
 
         if labels is None:
@@ -215,7 +215,7 @@ class SignalClassificationMetric(SignalMetric):
 
     def plot(
         self,
-        computed_metrics: dict[str, Any],
+        computed_metrics: dict[str, Any] | None,
         plots_context: dict[str, Any],
         raw_data: RawData,
         signals: Signals,
@@ -238,7 +238,7 @@ class SignalClassificationMetric(SignalMetric):
         return fig
 
     @staticmethod
-    def _create_figure():
+    def _create_figure() -> go.Figure:
         """Create subplot structure."""
         return make_subplots(
             rows=2,
@@ -258,7 +258,7 @@ class SignalClassificationMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_confusion_matrix(fig, metrics):
+    def _add_confusion_matrix(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add confusion matrix heatmap."""
         cm = metrics["quant"]["confusion_matrix"]
         cm_values = [[cm["tn"], cm["fp"]], [cm["fn"], cm["tp"]]]
@@ -298,7 +298,7 @@ class SignalClassificationMetric(SignalMetric):
                 )
 
     @staticmethod
-    def _add_roc_curve(fig, metrics):
+    def _add_roc_curve(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add ROC curve plot."""
         roc = metrics["series"]["roc_curve"]
         auc = metrics["quant"]["auc"]
@@ -346,7 +346,7 @@ class SignalClassificationMetric(SignalMetric):
         )
 
     @staticmethod
-    def _add_strength_distribution(fig, metrics):
+    def _add_strength_distribution(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add signal strength distribution plot."""
         if "strengths_raw" in metrics["series"]:
             strengths = np.array(metrics["series"]["strengths_raw"])
@@ -394,7 +394,7 @@ class SignalClassificationMetric(SignalMetric):
                 )
 
     @staticmethod
-    def _add_metrics_table(fig, metrics):
+    def _add_metrics_table(fig: go.Figure, metrics: dict[str, Any]) -> None:
         """Add metrics summary table."""
         quant = metrics["quant"]
 
@@ -438,7 +438,7 @@ class SignalClassificationMetric(SignalMetric):
             col=2,
         )
 
-    def _update_layout(self, fig):
+    def _update_layout(self, fig: go.Figure) -> None:
         """Update figure layout and axes."""
         fig.update_xaxes(
             title_text="False Positive Rate",

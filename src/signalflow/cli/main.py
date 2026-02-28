@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 @click.group()
 @click.version_option(package_name="signalflow-trading")
-def cli():
+def cli() -> None:
     """SignalFlow - Trading signal framework CLI."""
     pass
 
@@ -46,7 +46,15 @@ def cli():
 @click.option("--plot", "-p", is_flag=True, help="Show plots after backtest")
 @click.option("--set", "params", multiple=True, help="Override parameters (e.g., --set tp=0.03)")
 @click.option("--dry-run", is_flag=True, help="Validate without executing")
-def run(config_path: str, mode: str | None, output: str | None, quiet: bool, plot: bool, params: tuple, dry_run: bool):
+def run(
+    config_path: str,
+    mode: str | None,
+    output: str | None,
+    quiet: bool,
+    plot: bool,
+    params: tuple[str, ...],
+    dry_run: bool,
+) -> None:
     """
     Run flow from YAML configuration file.
 
@@ -64,7 +72,7 @@ def run(config_path: str, mode: str | None, output: str | None, quiet: bool, plo
     config_path_obj = Path(config_path)
 
     # Parse --set parameters
-    param_overrides = {}
+    param_overrides: dict[str, str | int | float] = {}
     for p in params:
         if "=" in p:
             key, value = p.split("=", 1)
@@ -360,7 +368,7 @@ def _save_result(result: BacktestResult, path: str) -> None:
     data = result.to_dict()
 
     # Convert datetime objects for JSON
-    def convert(obj):
+    def convert(obj: Any) -> str:
         if isinstance(obj, datetime):
             return obj.isoformat()
         raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
@@ -385,14 +393,14 @@ def _show_plots(result: BacktestResult) -> None:
 
 
 @cli.group()
-def list():
+def list() -> None:
     """List available components from registry."""
     pass
 
 
 @list.command("detectors")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed info")
-def list_detectors(verbose: bool):
+def list_detectors(verbose: bool) -> None:
     """List available signal detectors."""
     from signalflow.core import SfComponentType, default_registry
 
@@ -421,7 +429,7 @@ def list_detectors(verbose: bool):
 
 @list.command("metrics")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed info")
-def list_metrics(verbose: bool):
+def list_metrics(verbose: bool) -> None:
     """List available strategy metrics."""
     from signalflow.core import SfComponentType, default_registry
 
@@ -448,7 +456,7 @@ def list_metrics(verbose: bool):
 
 @list.command("features")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed info")
-def list_features(verbose: bool):
+def list_features(verbose: bool) -> None:
     """List available features."""
     from signalflow.core import SfComponentType, default_registry
 
@@ -466,7 +474,7 @@ def list_features(verbose: bool):
 
 
 @list.command("all")
-def list_all():
+def list_all() -> None:
     """List all registered components."""
     from signalflow.core import SfComponentType, default_registry
 
@@ -490,7 +498,7 @@ def list_all():
 
 @cli.command()
 @click.argument("config_path", type=click.Path(exists=True))
-def validate(config_path: str):
+def validate(config_path: str) -> None:
     """
     Validate configuration file without running.
 
@@ -539,7 +547,7 @@ def validate(config_path: str):
 @cli.command()
 @click.option("--output", "-o", default="backtest.yaml", help="Output filename")
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing file")
-def init(output: str, force: bool):
+def init(output: str, force: bool) -> None:
     """
     Create sample configuration file.
 
@@ -573,7 +581,7 @@ def init(output: str, force: bool):
 # =============================================================================
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     cli()
 

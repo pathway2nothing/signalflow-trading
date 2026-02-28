@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import dataclasses
 import importlib
 import pkgutil
@@ -199,7 +200,7 @@ class SignalFlowRegistry:
         if hasattr(eps, "select"):
             group = eps.select(group="signalflow.components")
         else:  # pragma: no cover
-            group = eps.get("signalflow.components", [])
+            group = getattr(eps, "get", lambda k, d: d)("signalflow.components", [])
 
         for ep in group:
             try:
@@ -427,7 +428,7 @@ class SignalFlowRegistry:
     def register_raw_data_type(
         self,
         name: str,
-        columns: list[str] | set[str],
+        columns: builtins.list[str] | set[str],
         *,
         override: bool = False,
     ) -> None:
@@ -497,7 +498,7 @@ class SignalFlowRegistry:
             available = ", ".join(sorted(self._raw_data_types))
             raise KeyError(f"Raw data type '{key}' not registered. Available: [{available}]") from None
 
-    def list_raw_data_types(self) -> list[str]:
+    def list_raw_data_types(self) -> builtins.list[str]:
         """List all registered raw data type names.
 
         Returns:
@@ -603,7 +604,7 @@ class SignalFlowRegistry:
             "outputs": list(outputs) if outputs else [],
         }
 
-    def export_schemas(self) -> dict[str, list[dict[str, Any]]]:
+    def export_schemas(self) -> dict[str, builtins.list[dict[str, Any]]]:
         """Export schemas for all registered components, grouped by type.
 
         Useful for bulk loading into UI component browsers without N+1 calls.
@@ -643,7 +644,7 @@ class SignalFlowRegistry:
 
     # ── Snapshot ────────────────────────────────────────────────────────
 
-    def snapshot(self) -> dict[str, list[str]]:
+    def snapshot(self) -> dict[str, builtins.list[str]]:
         """Snapshot of registry for debugging.
 
         Returns complete registry state organized by component type.

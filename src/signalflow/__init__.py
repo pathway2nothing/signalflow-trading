@@ -1,6 +1,7 @@
 # Allow sub-packages from other directories (sf-ta, sf-nn) to be found
 # under the signalflow namespace when they are on sys.path.
 import pkgutil
+from typing import Any
 
 __path__ = pkgutil.extend_path(__path__, __name__)
 
@@ -71,7 +72,7 @@ from signalflow.core.decorators import (  # noqa: F811
 # etc.) must stay eager for autodiscover() to work correctly.
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy load API module components."""
     if name == "Backtest":
         from signalflow.api.builder import Backtest

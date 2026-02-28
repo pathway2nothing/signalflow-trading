@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from signalflow.analytic.base import StrategyMetric
 from signalflow.core import PositionType, StrategyState, strategy_metric
@@ -27,7 +28,7 @@ class GridMetrics(StrategyMetric):
         - grid_avg_entry_price: qty-weighted average entry price of open positions
     """
 
-    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs) -> dict[str, float]:
+    def compute(self, state: StrategyState, prices: dict[str, float], **kwargs: Any) -> dict[str, float]:
         all_positions = list(state.portfolio.positions.values())
         open_positions = [p for p in all_positions if not p.is_closed]
         closed_positions = [p for p in all_positions if p.is_closed]

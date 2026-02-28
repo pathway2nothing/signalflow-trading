@@ -41,6 +41,7 @@ Migration from @sf_component:
 from __future__ import annotations
 
 import warnings
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from signalflow.core.enums import SfComponentType
@@ -57,7 +58,7 @@ T = TypeVar("T", bound=type)
 # =============================================================================
 
 
-def _make_component_decorator(component_type: SfComponentType):
+def _make_component_decorator(component_type: SfComponentType) -> Callable[..., Callable[[T], T]]:
     """Factory for creating component-specific decorators.
 
     Args:
@@ -67,7 +68,7 @@ def _make_component_decorator(component_type: SfComponentType):
         A decorator factory function.
     """
 
-    def decorator_factory(name: str, *, override: bool = True):
+    def decorator_factory(name: str, *, override: bool = True) -> Callable[[T], T]:
         """Register a class as a SignalFlow component.
 
         Args:
@@ -292,7 +293,7 @@ Example:
 # =============================================================================
 
 
-def sf_component(*, name: str, override: bool = True):
+def sf_component(*, name: str, override: bool = True) -> Callable[[type[Any]], type[Any]]:
     """Register class as SignalFlow component.
 
     .. deprecated:: 0.6.0
@@ -348,7 +349,7 @@ def sf_component(*, name: str, override: bool = True):
 # =============================================================================
 
 
-def register(name: str, *, override: bool = True):
+def register(name: str, *, override: bool = True) -> Callable[[T], T]:
     """Register component with auto-detected type.
 
     Infers component_type from the class's component_type attribute

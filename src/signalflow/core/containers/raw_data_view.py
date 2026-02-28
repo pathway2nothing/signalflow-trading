@@ -53,7 +53,7 @@ class RawDataView:
     cache_pandas: bool = False
     _pandas_cache: dict[str, pd.DataFrame] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize internal cache if needed."""
         if self._pandas_cache is None:
             self._pandas_cache = {}

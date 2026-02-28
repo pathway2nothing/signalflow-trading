@@ -159,7 +159,7 @@ OHLCV_SCHEMA = ArtifactSchema(
         ColumnSchema("close", "numeric", nullable=False),
         ColumnSchema("volume", "numeric", nullable=False),
     ),
-    optional_columns=(ColumnSchema("trades", pl.Int64),),
+    optional_columns=(ColumnSchema("trades", pl.Int64()),),
     allow_extra=True,
 )
 
