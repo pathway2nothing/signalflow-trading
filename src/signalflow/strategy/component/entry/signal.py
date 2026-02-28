@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import polars as pl
+from loguru import logger
 
 from signalflow.core import Order, Position, Signals, SignalType, StrategyState, entry
 from signalflow.core.signal_registry import DIRECTIONAL_SIGNAL_MAP
@@ -119,6 +120,7 @@ class SignalEntryRule(EntryRule):
 
         total_open = len(state.portfolio.open_positions())
         if total_open >= self.max_total_positions:
+            logger.debug("Entry skipped: max_total_positions reached ({}/{})", total_open, self.max_total_positions)
             return orders
 
         # Calculate capital limits
@@ -146,6 +148,10 @@ class SignalEntryRule(EntryRule):
             # Check position limits
             existing_positions = positions_by_pair.get(pair, [])
             if len(existing_positions) >= self.max_positions_per_pair:
+                logger.debug(
+                    "Entry skipped {}: per-pair limit ({}/{})",
+                    pair, len(existing_positions), self.max_positions_per_pair,
+                )
                 continue
 
             price = prices.get(pair)
@@ -171,6 +177,7 @@ class SignalEntryRule(EntryRule):
             if self._composite_filter is not None:
                 allowed, _reason = self._composite_filter.allow_entry(signal_ctx, state, prices)
                 if not allowed:
+                    logger.debug("Entry filtered {}: {}", pair, _reason)
                     continue
 
             # === Compute size ===
@@ -185,6 +192,10 @@ class SignalEntryRule(EntryRule):
             notional = min(notional, remaining_allocation)
 
             if notional < self.min_order_notional:
+                logger.debug(
+                    "Entry skipped {}: notional ${:.2f} < min ${:.2f}",
+                    pair, notional, self.min_order_notional,
+                )
                 continue
 
             qty = notional / price
@@ -208,6 +219,7 @@ class SignalEntryRule(EntryRule):
                 meta=order_meta,
             )
             orders.append(order)
+            logger.debug("Entry order: {} {} qty={:.4f} @ {:.2f} (${:.0f})", pair, side, qty, price, notional)
 
             # Update tracking
             total_open += 1

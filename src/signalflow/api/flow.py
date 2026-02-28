@@ -1823,7 +1823,10 @@ class FlowBuilder:
 
     def _resolve_data(self) -> RawData:
         """Resolve data sources."""
+        from loguru import logger as _logger
+
         if self._raw is not None:
+            _logger.debug("Using pre-loaded RawData")
             return self._raw
 
         if not self._named_data:
@@ -1838,6 +1841,10 @@ class FlowBuilder:
             return first_source
         elif isinstance(first_source, dict):
             params = {k: v for k, v in first_source.items() if v is not None}
+            _logger.debug(
+                "Loading data source '{}': {}",
+                _first_name, {k: v for k, v in params.items() if k != "pairs"},
+            )
             return load(**params)
 
         raise MissingDataError()
@@ -1854,6 +1861,8 @@ class FlowBuilder:
 
     def _resolve_signals(self, raw: RawData) -> tuple[Signals, dict[str, pl.DataFrame]]:
         """Detect signals from all detectors, capturing preprocessed features."""
+        from loguru import logger as _logger
+
         detector_features_map: dict[str, pl.DataFrame] = {}
 
         if self._signals is not None:
@@ -1880,6 +1889,10 @@ class FlowBuilder:
             if detector.keep_only_latest_per_pair:
                 signals = detector._keep_only_latest(signals)
 
+            _logger.debug(
+                "Detector '{}': {} features → {} signals",
+                name, feats.height, signals.value.height,
+            )
             signals_list.append(signals)
             detector_features_map[name] = feats
 

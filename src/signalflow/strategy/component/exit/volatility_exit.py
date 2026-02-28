@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal, cast
 
+from loguru import logger
+
 from signalflow.core import Order, Position, PositionType, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
 
@@ -70,6 +72,11 @@ class VolatilityExit(ExitRule):
                     exit_reason = "volatility_sl"
 
             if should_exit:
+                logger.debug(
+                    "{} {}: entry={:.2f}, price={:.2f}, tp={:.2f}, sl={:.2f}, atr={}",
+                    exit_reason, pos.pair, pos.entry_price, price,
+                    tp_price, sl_price, atr_used,
+                )
                 side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
                 order = Order(
                     pair=pos.pair,
@@ -103,6 +110,7 @@ class VolatilityExit(ExitRule):
         # Get ATR value
         atr = self._get_atr(pos, state)
         if atr is None or atr <= 0:
+            logger.debug("Volatility exit {}: ATR unavailable, skipping", pos.pair)
             return None, None, None
 
         # Calculate levels based on position type

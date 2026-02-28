@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from typing import Literal, cast
 
+from loguru import logger
+
 import signalflow as sf
 from signalflow.core import Order, Position, PositionType, StrategyState
 from signalflow.strategy.component.base import ExitRule
@@ -51,10 +53,18 @@ class GridExit(ExitRule):
 
         # Grid profit target — close all
         if self.grid_profit_target is not None and pnl_pct >= self.grid_profit_target:
+            logger.debug(
+                "Grid profit target hit: PnL={:+.2f}% >= {:.2f}%, closing {} positions",
+                pnl_pct * 100, self.grid_profit_target * 100, len(open_positions),
+            )
             return self._close_all(open_positions, prices, "grid_profit_target", pnl_pct)
 
         # Grid loss limit — close all
         if self.grid_loss_limit is not None and pnl_pct <= -self.grid_loss_limit:
+            logger.debug(
+                "Grid loss limit hit: PnL={:+.2f}% <= -{:.2f}%, closing {} positions",
+                pnl_pct * 100, self.grid_loss_limit * 100, len(open_positions),
+            )
             return self._close_all(open_positions, prices, "grid_loss_limit", pnl_pct)
 
         # Stale level — close individual positions too far from current price
@@ -105,6 +115,10 @@ class GridExit(ExitRule):
                 continue
             distance_pct = abs(price - pos.entry_price) / pos.entry_price
             if self.max_distance_pct is not None and distance_pct > self.max_distance_pct:
+                logger.debug(
+                    "Grid stale level {}: distance={:.2f}% > max={:.2f}%",
+                    pos.pair, distance_pct * 100, self.max_distance_pct * 100,
+                )
                 side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
                 orders.append(
                     Order(
