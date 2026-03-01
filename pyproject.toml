@@ -148,6 +148,9 @@ module = [
     "signalflow.data.source.okx.*",
     "signalflow.data.source.whitebit.*",
     "signalflow.detector.base_detector.*",
+    "signalflow.ta",
+    "signalflow.ta.*",
+    "signalflow.ta._numba_compat",
 ]
 ignore_missing_imports = true
 
