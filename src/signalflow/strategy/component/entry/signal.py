@@ -150,7 +150,9 @@ class SignalEntryRule(EntryRule):
             if len(existing_positions) >= self.max_positions_per_pair:
                 logger.debug(
                     "Entry skipped {}: per-pair limit ({}/{})",
-                    pair, len(existing_positions), self.max_positions_per_pair,
+                    pair,
+                    len(existing_positions),
+                    self.max_positions_per_pair,
                 )
                 continue
 
@@ -194,7 +196,9 @@ class SignalEntryRule(EntryRule):
             if notional < self.min_order_notional:
                 logger.debug(
                     "Entry skipped {}: notional ${:.2f} < min ${:.2f}",
-                    pair, notional, self.min_order_notional,
+                    pair,
+                    notional,
+                    self.min_order_notional,
                 )
                 continue
 

@@ -74,8 +74,13 @@ class VolatilityExit(ExitRule):
             if should_exit:
                 logger.debug(
                     "{} {}: entry={:.2f}, price={:.2f}, tp={:.2f}, sl={:.2f}, atr={}",
-                    exit_reason, pos.pair, pos.entry_price, price,
-                    tp_price, sl_price, atr_used,
+                    exit_reason,
+                    pos.pair,
+                    pos.entry_price,
+                    price,
+                    tp_price,
+                    sl_price,
+                    atr_used,
                 )
                 side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
                 order = Order(

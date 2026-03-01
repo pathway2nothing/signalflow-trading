@@ -66,7 +66,11 @@ class TakeProfitStopLossExit(ExitRule):
                     pnl_pct = -pnl_pct
                 logger.debug(
                     "{} exit {}: entry={:.2f} → {:.2f} ({:+.2f}%)",
-                    exit_reason, pos.pair, pos.entry_price, price, pnl_pct,
+                    exit_reason,
+                    pos.pair,
+                    pos.entry_price,
+                    price,
+                    pnl_pct,
                 )
                 side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
                 order = Order(

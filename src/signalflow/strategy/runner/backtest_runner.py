@@ -78,7 +78,9 @@ class BacktestRunner(StrategyRunner):
         n_pairs = df.select(self.pair_col).unique().height
         logger.info(
             "Backtest starting: {} bars, {} pairs, capital=${:,.0f}, {} signals",
-            len(timestamps), n_pairs, self.initial_capital,
+            len(timestamps),
+            n_pairs,
+            self.initial_capital,
             signals_df.height if signals_df.height > 0 else 0,
         )
 
@@ -106,12 +108,13 @@ class BacktestRunner(StrategyRunner):
         if self.progress_callback is not None and total > 0:
             self.progress_callback(total, total, self._metrics_history[-1] if self._metrics_history else {})
 
-        final_equity = state.portfolio.cash + sum(
-            p.entry_price * p.qty for p in state.portfolio.open_positions()
-        )
+        final_equity = state.portfolio.cash + sum(p.entry_price * p.qty for p in state.portfolio.open_positions())
         logger.info(
             "Backtest complete: {} bars, {} trades, equity=${:,.0f}, open_positions={}",
-            total, len(self._trades), final_equity, len(state.portfolio.open_positions()),
+            total,
+            len(self._trades),
+            final_equity,
+            len(state.portfolio.open_positions()),
         )
 
         return state

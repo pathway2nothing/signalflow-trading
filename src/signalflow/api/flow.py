@@ -1843,7 +1843,8 @@ class FlowBuilder:
             params = {k: v for k, v in first_source.items() if v is not None}
             _logger.debug(
                 "Loading data source '{}': {}",
-                _first_name, {k: v for k, v in params.items() if k != "pairs"},
+                _first_name,
+                {k: v for k, v in params.items() if k != "pairs"},
             )
             return load(**params)
 
@@ -1891,7 +1892,9 @@ class FlowBuilder:
 
             _logger.debug(
                 "Detector '{}': {} features → {} signals",
-                name, feats.height, signals.value.height,
+                name,
+                feats.height,
+                signals.value.height,
             )
             signals_list.append(signals)
             detector_features_map[name] = feats

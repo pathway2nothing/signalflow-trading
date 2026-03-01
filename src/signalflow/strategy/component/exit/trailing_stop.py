@@ -99,7 +99,10 @@ class TrailingStopExit(ExitRule):
         if price <= trail_price:
             logger.debug(
                 "Trailing stop exit {}: peak={:.2f}, trail={:.2f}, price={:.2f}",
-                pos.pair, current_peak, trail_price, price,
+                pos.pair,
+                current_peak,
+                trail_price,
+                price,
             )
             return self._create_exit_order(pos, price, current_peak)
 
@@ -121,7 +124,10 @@ class TrailingStopExit(ExitRule):
         if price >= trail_price:
             logger.debug(
                 "Trailing stop exit {}: trough={:.2f}, trail={:.2f}, price={:.2f}",
-                pos.pair, current_trough, trail_price, price,
+                pos.pair,
+                current_trough,
+                trail_price,
+                price,
             )
             return self._create_exit_order(pos, price, current_trough)
 
