@@ -43,7 +43,6 @@ from signalflow.core import (
     # Legacy (deprecated)
     sf_component,
 )
-import signalflow.analytic as analytic
 import signalflow.data as data
 import signalflow.detector as detectors
 import signalflow.feature as features
@@ -74,6 +73,11 @@ from signalflow.core.decorators import (  # noqa: F811
 
 def __getattr__(name: str) -> Any:
     """Lazy load API module components."""
+    if name == "analytic":
+        import signalflow.analytic as analytic
+
+        return analytic
+
     if name == "Backtest":
         from signalflow.api.builder import Backtest
 

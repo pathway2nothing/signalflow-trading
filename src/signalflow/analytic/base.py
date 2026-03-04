@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
-import plotly.graph_objects as go
 import polars as pl
 from loguru import logger
+
+if TYPE_CHECKING:
+    import plotly.graph_objects as go
 
 from signalflow.core import RawData, SfComponentType, Signals, StrategyState
 
