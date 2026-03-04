@@ -68,6 +68,7 @@ class AggregationMode(StrEnum):
 
 
 _MAX_PRICE_POINTS_PER_PAIR = 500
+_MAX_EQUITY_POINTS = 2000
 _MAX_FEATURE_POINTS_PER_PAIR = 2000
 _OHLCV_COLUMNS = {"open", "high", "low", "close", "volume", "trades"}
 
@@ -1103,10 +1104,16 @@ class FlowBuilder:
                     backtest_result.metrics.get("final_capital", 0) if backtest_result.metrics else 0,
                 )
 
-                # Extract equity curve from metrics_df
+                # Extract equity curve from metrics_df (downsampled for large backtests)
                 if hasattr(backtest_result, "metrics_df") and backtest_result.metrics_df is not None:
                     mdf = backtest_result.metrics_df
                     if mdf.height > 0:
+                        if mdf.height > _MAX_EQUITY_POINTS:
+                            step = max(1, mdf.height // _MAX_EQUITY_POINTS)
+                            indices = list(range(0, mdf.height, step))
+                            if indices[-1] != mdf.height - 1:
+                                indices.append(mdf.height - 1)
+                            mdf = mdf[indices]
                         result.equity_curve = _dataframe_to_json_safe(mdf)
 
                 # Extract downsampled close prices from raw data
