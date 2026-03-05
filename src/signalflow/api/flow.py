@@ -43,6 +43,7 @@ from signalflow.core import (
 if TYPE_CHECKING:
     from signalflow.detector.base import SignalDetector
     from signalflow.feature import FeaturePipeline
+    from signalflow.signal_feature.base import SignalFeature
     from signalflow.target.base import Labeler
     from signalflow.validator.base import SignalValidator
 
@@ -169,11 +170,12 @@ class FlowConfig:
     data_sources: list[str]
     feature_pipelines: list[str]
     detectors: list[str]
-    labelers: list[str]
-    validators: list[str]
-    metrics: list[str]
-    capital: float
-    fee: float
+    signal_features: list[str] = field(default_factory=list)
+    labelers: list[str] = field(default_factory=list)
+    validators: list[str] = field(default_factory=list)
+    metrics: list[str] = field(default_factory=list)
+    capital: float = 10_000.0
+    fee: float = 0.001
 
 
 def pair_trades_by_position(
@@ -365,6 +367,7 @@ class FlowResult:
 
     # Intermediate data (for debugging/analysis)
     features: pl.DataFrame | None = None
+    signal_feature_df: pl.DataFrame | None = None
     signals: Signals | None = None
     labels: pl.DataFrame | None = None
     predictions: pl.DataFrame | None = None
@@ -595,6 +598,9 @@ class FlowBuilder:
     _signals: Signals | None = field(default=None, repr=False)
     _aggregation_config: dict[str, Any] | None = field(default=None, repr=False)
 
+    # Signal features (meta-features from signal history)
+    _signal_features: list[SignalFeature] = field(default_factory=list, repr=False)
+
     # Labeling
     _named_labelers: dict[str, Labeler] = field(default_factory=dict, repr=False)
 
@@ -780,6 +786,46 @@ class FlowBuilder:
             "min_agreement": min_agreement,
             "weights": weights,
         }
+        return self
+
+    # =========================================================================
+    # Signal Feature Configuration
+    # =========================================================================
+
+    def signal_features(
+        self,
+        features: SignalFeature | list[SignalFeature],
+    ) -> Self:
+        """Add signal-level features (meta-features from signal history).
+
+        Signal features compute statistics about the signal stream itself
+        (frequency, entropy, rolling accuracy, etc.) and produce a
+        separate feature DataFrame that is joined with raw features
+        before validation.
+
+        Args:
+            features: A single SignalFeature or list of SignalFeatures.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> flow = (
+            ...     sf.flow()
+            ...     .data(raw)
+            ...     .detector("rsi_cross")
+            ...     .signal_features([
+            ...         SignalFrequency(window=50),
+            ...         RollingAccuracy(window=100),
+            ...     ])
+            ...     .validator("lightgbm")
+            ...     .run()
+            ... )
+        """
+        if isinstance(features, list):
+            self._signal_features.extend(features)
+        else:
+            self._signal_features.append(features)
         return self
 
     # =========================================================================
@@ -1007,6 +1053,7 @@ class FlowBuilder:
             data_sources=list(self._named_data.keys()),
             feature_pipelines=list(self._feature_pipelines.keys()),
             detectors=list(self._named_detectors.keys()),
+            signal_features=[type(sf).__name__ for sf in self._signal_features],
             labelers=list(self._named_labelers.keys()),
             validators=list(self._named_validators.keys()),
             metrics=[type(m).__name__ for m in self._metric_nodes],
@@ -1085,6 +1132,23 @@ class FlowBuilder:
         if self._named_labelers:
             labels_df = self._compute_labels(raw, signals)
             result.labels = labels_df
+
+        # 4b. Compute signal features (meta-features from signal history)
+        if self._signal_features and signals is not None:
+            sig_feat_df = self._compute_signal_features(signals, labels_df)
+            result.signal_feature_df = sig_feat_df
+            _logger.info(
+                "Signal features: {} feature(s), {} columns",
+                len(self._signal_features),
+                sig_feat_df.width - 2 if sig_feat_df is not None else 0,
+            )
+            # Merge signal features into the main feature matrix
+            if features_df is not None and sig_feat_df is not None:
+                features_df = features_df.join(sig_feat_df, on=["pair", "timestamp"], how="left")
+                result.features = features_df
+            elif sig_feat_df is not None:
+                features_df = sig_feat_df
+                result.features = features_df
 
         # 5. Apply validation (if configured)
         if self._named_validators and labels_df is not None and features_df is not None:
@@ -1932,6 +1996,43 @@ class FlowBuilder:
 
         # Merge labels
         return cast(pl.DataFrame, pl.concat(results).unique(["pair", "timestamp"]))
+
+    def _compute_signal_features(
+        self,
+        signals: Signals,
+        labels_df: pl.DataFrame | None,
+    ) -> pl.DataFrame | None:
+        """Compute signal-level meta-features.
+
+        Each :class:`SignalFeature` produces a DataFrame keyed on
+        ``(pair, timestamp)``.  Results are joined horizontally.
+        """
+        from loguru import logger as _logger
+
+        key = ["pair", "timestamp"]
+        result: pl.DataFrame | None = None
+
+        for sf_feat in self._signal_features:
+            # Supervised features need labels
+            if sf_feat.requires_labels and labels_df is None:
+                _logger.warning(
+                    "Skipping {} (requires labels but none available)",
+                    type(sf_feat).__name__,
+                )
+                continue
+
+            feat_df = sf_feat(
+                signals=signals.value,
+                labels=labels_df,
+            )
+
+            if result is None:
+                result = feat_df
+            else:
+                new_cols = [c for c in feat_df.columns if c not in key]
+                result = result.join(feat_df.select([*key, *new_cols]), on=key, how="left")
+
+        return result
 
     def _apply_validation(
         self,

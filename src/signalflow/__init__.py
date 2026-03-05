@@ -36,6 +36,7 @@ from signalflow.core import (
     labeler,
     register,
     risk,
+    signal_feature,
     signal_metric,
     strategy_metric,
     strategy_store,
@@ -51,6 +52,7 @@ import signalflow.target as target
 import signalflow.utils as utils
 import signalflow.validator as validators
 from signalflow.feature import Feature, FeaturePipeline, GlobalFeature, OffsetFeature
+from signalflow.signal_feature import SignalFeature
 
 # Re-assign semantic decorators after submodule imports.
 # `import signalflow.detector` binds the submodule to `signalflow.detector`,
@@ -60,6 +62,7 @@ from signalflow.core.decorators import (  # noqa: F811
     detector,
     exit,
     feature,
+    signal_feature,
     validator,
 )
 
@@ -236,8 +239,8 @@ __all__ = [
     "RiskLimit",
     "RiskManager",
     "SfComponentType",
-    # Other
     "SfTorchModuleMixin",
+    "SignalFeature",
     "SignalMetrics",
     "SignalType",
     "Signals",
@@ -274,6 +277,7 @@ __all__ = [
     "risk",
     # Legacy decorator (deprecated)
     "sf_component",
+    "signal_feature",
     "signal_metric",
     "strategy",
     "strategy_metric",
