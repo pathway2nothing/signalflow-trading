@@ -19,12 +19,14 @@ from signalflow.core import RawData, SfComponentType, Signals, StrategyState, de
 if TYPE_CHECKING:
     import plotly.graph_objects as go
 
+    from signalflow.analytic.compare import ComparisonResult
     from signalflow.analytic.stats.results import (
         BootstrapResult,
         MonteCarloResult,
         StatisticalTestResult,
         ValidationResult,
     )
+    from signalflow.api.report import Report
 
 
 # =============================================================================
@@ -721,3 +723,39 @@ class BacktestResult:
             bootstrap=bs_result,
             statistical_tests=st_result,
         )
+
+    def report(self) -> Report:
+        """Generate a structured report from this backtest result.
+
+        Returns:
+            Report with sections for summary, metrics, equity curve,
+            trade distribution, and configuration.
+
+        Example:
+            >>> report = result.report()
+            >>> report.to_html("report.html")
+            >>> print(report.text_summary())
+        """
+        from signalflow.api.report import build_report
+
+        return build_report(self)
+
+    def compare(self, *others: Any) -> ComparisonResult:
+        """Compare this result with one or more other results side-by-side.
+
+        Shortcut for :func:`signalflow.analytic.compare_results`.
+
+        Args:
+            *others: One or more result objects to compare against.
+
+        Returns:
+            ComparisonResult with metrics table, summary, and best/worst helpers.
+
+        Example:
+            >>> cmp = result_a.compare(result_b, result_c)
+            >>> print(cmp.summary())
+            >>> print(f"Best Sharpe: {cmp.best('sharpe_ratio')}")
+        """
+        from signalflow.analytic.compare import compare_results
+
+        return compare_results(self, *others)

@@ -577,6 +577,205 @@ def init(output: str, force: bool) -> None:
 
 
 # =============================================================================
+# Preset Commands
+# =============================================================================
+
+
+@cli.group()
+def preset() -> None:
+    """Browse and use strategy presets."""
+    pass
+
+
+@preset.command("list")
+@click.option(
+    "--difficulty", "-d",
+    type=click.Choice(["beginner", "intermediate", "advanced"]),
+    help="Filter by difficulty",
+)
+@click.option("--tag", "-t", type=str, help="Filter by tag")
+def preset_list(difficulty: str | None, tag: str | None) -> None:
+    """List available strategy presets.
+
+    \b
+    Example:
+        sf preset list
+        sf preset list --difficulty beginner
+        sf preset list --tag momentum
+    """
+    try:
+        from signalflow.ta.presets import list_presets
+    except ImportError:
+        click.secho("signalflow-ta not installed. Install it for presets:", fg="red")
+        click.secho("  pip install signalflow-ta", fg="cyan")
+        return
+
+    presets = list_presets(difficulty=difficulty, tag=tag)
+
+    if not presets:
+        click.echo("No presets found matching filters.")
+        return
+
+    click.echo(f"Available presets ({len(presets)}):")
+    click.echo("-" * 60)
+    for p in presets:
+        diff_color = {"beginner": "green", "intermediate": "yellow", "advanced": "red"}.get(p.difficulty, "white")
+        click.echo(f"  {p.name:<22} ", nl=False)
+        click.secho(f"[{p.difficulty}]", fg=diff_color, nl=False)
+        click.echo(f"  {p.description[:40]}")
+
+
+@preset.command("show")
+@click.argument("name")
+def preset_show(name: str) -> None:
+    """Show details of a strategy preset.
+
+    \b
+    Example:
+        sf preset show grid
+        sf preset show momentum
+    """
+    try:
+        from signalflow.ta.presets import get_preset
+    except ImportError:
+        click.secho("signalflow-ta not installed.", fg="red")
+        return
+
+    try:
+        p = get_preset(name)
+    except KeyError as e:
+        click.secho(str(e), fg="red")
+        return
+
+    click.echo(f"  {p.display_name}")
+    click.echo(f"  {'=' * len(p.display_name)}")
+    click.echo(f"  {p.description}")
+    click.echo()
+    click.echo(f"  Difficulty:  {p.difficulty}")
+    click.echo(f"  Tags:        {', '.join(p.tags)}")
+    click.echo(f"  Detector:    {p.detector}")
+    click.echo(f"  Capital:     ${p.capital:,.0f}")
+    click.echo(f"  Fee:         {p.fee:.4f}")
+    if p.notes:
+        click.echo(f"  Notes:       {p.notes}")
+
+
+@preset.command("init")
+@click.argument("name")
+@click.option("--output", "-o", default=None, help="Output YAML filename")
+def preset_init(name: str, output: str | None) -> None:
+    """Generate a YAML config from a preset.
+
+    \b
+    Example:
+        sf preset init grid
+        sf preset init momentum --output my_momentum.yaml
+    """
+    import yaml
+
+    try:
+        from signalflow.ta.presets import get_preset
+    except ImportError:
+        click.secho("signalflow-ta not installed.", fg="red")
+        return
+
+    try:
+        p = get_preset(name)
+    except KeyError as e:
+        click.secho(str(e), fg="red")
+        return
+
+    config = {
+        "strategy_id": f"preset/{p.name}",
+        "detector": p.detector,
+        "detector_params": dict(p.detector_params),
+        "entry": dict(p.entry_params),
+        "exit": dict(p.exit_params),
+        "capital": p.capital,
+        "fee": p.fee,
+    }
+    if p.features:
+        config["features"] = p.features
+
+    out_path = Path(output) if output else Path(f"{p.name}_preset.yaml")
+    out_path.write_text(yaml.dump(config, default_flow_style=False, sort_keys=False))
+    click.secho(f"Created: {out_path}", fg="green")
+
+
+# =============================================================================
+# Compare Command
+# =============================================================================
+
+
+@cli.command()
+@click.argument("files", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("--metric", "-m", default="sharpe_ratio", help="Metric to highlight best/worst")
+def compare(files: tuple[str, ...], metric: str) -> None:
+    """Compare multiple backtest result JSON files.
+
+    \b
+    Example:
+        sf compare run1.json run2.json
+        sf compare results/*.json --metric total_return
+    """
+    import json
+
+    if len(files) < 2:
+        click.secho("Need at least 2 result files to compare.", fg="red")
+        return
+
+    from signalflow.analytic.compare import compare_results
+
+    class _DictResult:
+        def __init__(self, name: str, metrics: dict[str, float]) -> None:
+            self.strategy_id = name
+            self.metrics = metrics
+
+    results = []
+    for f in files:
+        try:
+            with open(f) as fh:
+                data = json.load(fh)
+            metrics = data.get("metrics", {})
+            name = data.get("config", {}).get("strategy_id", Path(f).stem)
+            results.append(_DictResult(name, metrics))
+        except Exception as e:
+            click.secho(f"Error reading {f}: {e}", fg="red")
+            return
+
+    cmp = compare_results(*results)
+    click.echo(cmp.summary())
+
+    try:
+        click.echo()
+        click.echo(f"Best {metric}: ", nl=False)
+        click.secho(cmp.best(metric), fg="green", bold=True)
+    except KeyError:
+        pass
+
+
+# =============================================================================
+# Help Command
+# =============================================================================
+
+
+@cli.command("help")
+@click.argument("term", required=False, default="")
+def help_cmd(term: str) -> None:
+    """Look up component or metric documentation.
+
+    \b
+    Example:
+        sf help sharpe_ratio
+        sf help sma_cross
+        sf help detectors
+    """
+    from signalflow._help import help_system
+
+    help_system(term)
+
+
+# =============================================================================
 # Optional Extension Commands
 # =============================================================================
 

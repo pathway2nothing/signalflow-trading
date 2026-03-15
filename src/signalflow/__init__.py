@@ -81,6 +81,17 @@ def __getattr__(name: str) -> Any:
 
         return analytic
 
+    if name == "contrib":
+        import signalflow.contrib as _contrib
+
+        return _contrib
+
+    if name == "help":
+        from signalflow._help import help_system
+
+        globals()["help"] = help_system  # cache to avoid re-import
+        return help_system
+
     if name == "Backtest":
         from signalflow.api.builder import Backtest
 
@@ -255,6 +266,7 @@ __all__ = [
     "api",
     "backtest",
     "config",
+    "contrib",
     "core",
     "data",
     "data_source",
@@ -270,6 +282,7 @@ __all__ = [
     "features",
     "flow",
     "get_component",
+    "help",
     "labeler",
     "load",
     "load_artifact",

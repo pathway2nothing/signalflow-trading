@@ -1888,6 +1888,129 @@ class FlowBuilder:
 
         return params
 
+    def clone(
+        self,
+        *,
+        strategy_id: str | None = None,
+        detector: dict[str, Any] | None = None,
+        entry: dict[str, Any] | None = None,
+        exit: dict[str, Any] | None = None,
+        capital: float | None = None,
+        fee: float | None = None,
+    ) -> FlowBuilder:
+        """Create a deep copy with optional parameter overrides.
+
+        Unlike :meth:`update_config` which mutates in-place, ``clone()``
+        returns a new independent FlowBuilder.
+
+        Args:
+            strategy_id: Override strategy ID.
+            detector: Dict of {param_name: value} to override on detectors.
+            entry: Dict of {param_name: value} to merge into entry config.
+            exit: Dict of {param_name: value} to merge into exit config.
+            capital: Override capital amount.
+            fee: Override fee rate.
+
+        Returns:
+            New FlowBuilder with overridden parameters.
+        """
+        new = copy.deepcopy(self)
+        if strategy_id is not None:
+            new.strategy_id = strategy_id
+        if capital is not None:
+            new._capital = capital
+        if fee is not None:
+            new._fee = fee
+        if detector or entry or exit:
+            new.update_config(detector=detector, entry=entry, exit=exit)
+        return new
+
+    def sweep(
+        self,
+        param_grid: dict[str, list[Any]],
+        *,
+        parallel: bool = False,
+        max_workers: int = 4,
+        run_kwargs: dict[str, Any] | None = None,
+    ) -> Any:
+        """Run a parameter sweep over a grid of values.
+
+        Creates one FlowBuilder clone per combination of parameters
+        and runs them all via :func:`batch_run`.
+
+        Args:
+            param_grid: Dict mapping parameter paths to lists of values.
+                Paths use dot notation: ``"detector.fast_period"``,
+                ``"entry.size_pct"``, ``"exit.tp"``, ``"capital"``, ``"fee"``.
+            parallel: Run configs in parallel threads.
+            max_workers: Thread count for parallel mode.
+            run_kwargs: Extra kwargs for ``FlowBuilder.run()``.
+
+        Returns:
+            BatchResult with one result per parameter combination.
+
+        Example:
+            >>> results = base.sweep({
+            ...     "detector.fast_period": [10, 20, 30],
+            ...     "exit.tp": [0.02, 0.03],
+            ... })
+            >>> print(results.comparison.summary())
+        """
+        import itertools
+
+        from signalflow.api.batch import batch_run
+
+        # Parse param grid into (path, values) tuples
+        keys = list(param_grid.keys())
+        value_lists = [param_grid[k] for k in keys]
+
+        configs: list[FlowBuilder] = []
+        labels: list[str] = []
+
+        for combo in itertools.product(*value_lists):
+            overrides: dict[str, dict[str, Any]] = {
+                "detector": {},
+                "entry": {},
+                "exit": {},
+            }
+            sid_parts: list[str] = []
+            clone_kwargs: dict[str, Any] = {}
+
+            for key, val in zip(keys, combo, strict=True):
+                sid_parts.append(f"{key.split('.')[-1]}={val}")
+
+                if "." in key:
+                    category, param = key.split(".", 1)
+                    if category in overrides:
+                        overrides[category][param] = val
+                    elif category in ("capital", "fee"):
+                        clone_kwargs[category] = val
+                elif key in ("capital", "fee"):
+                    clone_kwargs[key] = val
+                else:
+                    # Default: treat as detector param
+                    overrides["detector"][key] = val
+
+            clone_kwargs["strategy_id"] = ",".join(sid_parts)
+            # Only pass non-empty dicts
+            if overrides["detector"]:
+                clone_kwargs["detector"] = overrides["detector"]
+            if overrides["entry"]:
+                clone_kwargs["entry"] = overrides["entry"]
+            if overrides["exit"]:
+                clone_kwargs["exit"] = overrides["exit"]
+
+            configs.append(self.clone(**clone_kwargs))
+            labels.append(",".join(sid_parts))
+
+        return batch_run(
+            configs,
+            labels=labels,
+            parallel=parallel,
+            max_workers=max_workers,
+            run_kwargs=run_kwargs,
+        )
+
     # =========================================================================
     # Private Helpers
     # =========================================================================
