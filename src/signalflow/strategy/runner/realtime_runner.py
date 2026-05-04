@@ -327,17 +327,15 @@ class RealtimeRunner(StrategyRunner):
         if state.last_ts is not None and latest <= state.last_ts:
             return []
 
-        # Load bars newer than last_ts (or all available when starting fresh)
+        # Load bars newer than last_ts (or recent window when starting fresh)
         if state.last_ts is not None:
             start = state.last_ts
         else:
-            # First run - find earliest timestamp across all pairs
-            earliest: datetime | None = None
-            for pair in self.pairs:
-                pair_min, _ = self.raw_store.get_time_bounds(pair)
-                if pair_min is not None and (earliest is None or pair_min < earliest):
-                    earliest = pair_min
-            start = earliest if earliest is not None else latest
+            # First run — only load a warmup window before the latest bar
+            # instead of replaying the entire store history.
+            tf_minutes = _TIMEFRAME_MINUTES.get(self.timeframe, 1)
+            lookback = timedelta(minutes=tf_minutes * (self.warmup_bars + 10))
+            start = latest - lookback
         df = self.raw_store.load_many(self.pairs, start=start, end=latest)
 
         if df.height == 0:

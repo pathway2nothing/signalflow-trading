@@ -7,7 +7,7 @@ Provides fundamental building blocks for SignalFlow trading framework:
 - Decorators: Semantic decorators for component registration
   - @sf.detector, @sf.feature, @sf.validator, @sf.labeler
   - @sf.entry, @sf.exit
-  - @sf.signal_metric, @sf.strategy_metric
+  - @sf.signal_feature, @sf.signal_metric, @sf.strategy_metric
   - @sf.alert, @sf.data_source, @sf.data_store, @sf.executor, @sf.risk
 - Transforms: SignalsTransform protocol
 """
@@ -40,6 +40,7 @@ from signalflow.core.decorators import (
     risk,
     # Legacy (deprecated)
     sf_component,
+    signal_feature,
     signal_metric,
     strategy_metric,
     strategy_store,
@@ -106,6 +107,7 @@ __all__ = [
     "risk",
     # Legacy decorator (deprecated)
     "sf_component",
+    "signal_feature",
     "signal_metric",
     "strategy_metric",
     "strategy_store",

@@ -43,6 +43,7 @@ from signalflow.core import (
 if TYPE_CHECKING:
     from signalflow.detector.base import SignalDetector
     from signalflow.feature import FeaturePipeline
+    from signalflow.signal_feature.base import SignalFeature
     from signalflow.target.base import Labeler
     from signalflow.validator.base import SignalValidator
 
@@ -68,6 +69,7 @@ class AggregationMode(StrEnum):
 
 
 _MAX_PRICE_POINTS_PER_PAIR = 500
+_MAX_EQUITY_POINTS = 2000
 _MAX_FEATURE_POINTS_PER_PAIR = 2000
 _OHLCV_COLUMNS = {"open", "high", "low", "close", "volume", "trades"}
 
@@ -168,11 +170,12 @@ class FlowConfig:
     data_sources: list[str]
     feature_pipelines: list[str]
     detectors: list[str]
-    labelers: list[str]
-    validators: list[str]
-    metrics: list[str]
-    capital: float
-    fee: float
+    signal_features: list[str] = field(default_factory=list)
+    labelers: list[str] = field(default_factory=list)
+    validators: list[str] = field(default_factory=list)
+    metrics: list[str] = field(default_factory=list)
+    capital: float = 10_000.0
+    fee: float = 0.001
 
 
 def pair_trades_by_position(
@@ -364,6 +367,7 @@ class FlowResult:
 
     # Intermediate data (for debugging/analysis)
     features: pl.DataFrame | None = None
+    signal_feature_df: pl.DataFrame | None = None
     signals: Signals | None = None
     labels: pl.DataFrame | None = None
     predictions: pl.DataFrame | None = None
@@ -594,6 +598,9 @@ class FlowBuilder:
     _signals: Signals | None = field(default=None, repr=False)
     _aggregation_config: dict[str, Any] | None = field(default=None, repr=False)
 
+    # Signal features (meta-features from signal history)
+    _signal_features: list[SignalFeature] = field(default_factory=list, repr=False)
+
     # Labeling
     _named_labelers: dict[str, Labeler] = field(default_factory=dict, repr=False)
 
@@ -779,6 +786,46 @@ class FlowBuilder:
             "min_agreement": min_agreement,
             "weights": weights,
         }
+        return self
+
+    # =========================================================================
+    # Signal Feature Configuration
+    # =========================================================================
+
+    def signal_features(
+        self,
+        features: SignalFeature | list[SignalFeature],
+    ) -> Self:
+        """Add signal-level features (meta-features from signal history).
+
+        Signal features compute statistics about the signal stream itself
+        (frequency, entropy, rolling accuracy, etc.) and produce a
+        separate feature DataFrame that is joined with raw features
+        before validation.
+
+        Args:
+            features: A single SignalFeature or list of SignalFeatures.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            >>> flow = (
+            ...     sf.flow()
+            ...     .data(raw)
+            ...     .detector("rsi_cross")
+            ...     .signal_features([
+            ...         SignalFrequency(window=50),
+            ...         RollingAccuracy(window=100),
+            ...     ])
+            ...     .validator("lightgbm")
+            ...     .run()
+            ... )
+        """
+        if isinstance(features, list):
+            self._signal_features.extend(features)
+        else:
+            self._signal_features.append(features)
         return self
 
     # =========================================================================
@@ -1006,6 +1053,7 @@ class FlowBuilder:
             data_sources=list(self._named_data.keys()),
             feature_pipelines=list(self._feature_pipelines.keys()),
             detectors=list(self._named_detectors.keys()),
+            signal_features=[type(sf).__name__ for sf in self._signal_features],
             labelers=list(self._named_labelers.keys()),
             validators=list(self._named_validators.keys()),
             metrics=[type(m).__name__ for m in self._metric_nodes],
@@ -1085,6 +1133,23 @@ class FlowBuilder:
             labels_df = self._compute_labels(raw, signals)
             result.labels = labels_df
 
+        # 4b. Compute signal features (meta-features from signal history)
+        if self._signal_features and signals is not None:
+            sig_feat_df = self._compute_signal_features(signals, labels_df)
+            result.signal_feature_df = sig_feat_df
+            _logger.info(
+                "Signal features: {} feature(s), {} columns",
+                len(self._signal_features),
+                sig_feat_df.width - 2 if sig_feat_df is not None else 0,
+            )
+            # Merge signal features into the main feature matrix
+            if features_df is not None and sig_feat_df is not None:
+                features_df = features_df.join(sig_feat_df, on=["pair", "timestamp"], how="left")
+                result.features = features_df
+            elif sig_feat_df is not None:
+                features_df = sig_feat_df
+                result.features = features_df
+
         # 5. Apply validation (if configured)
         if self._named_validators and labels_df is not None and features_df is not None:
             result.predictions = self._apply_validation(signals, features_df, labels_df)
@@ -1103,10 +1168,16 @@ class FlowBuilder:
                     backtest_result.metrics.get("final_capital", 0) if backtest_result.metrics else 0,
                 )
 
-                # Extract equity curve from metrics_df
+                # Extract equity curve from metrics_df (downsampled for large backtests)
                 if hasattr(backtest_result, "metrics_df") and backtest_result.metrics_df is not None:
                     mdf = backtest_result.metrics_df
                     if mdf.height > 0:
+                        if mdf.height > _MAX_EQUITY_POINTS:
+                            step = max(1, mdf.height // _MAX_EQUITY_POINTS)
+                            indices = list(range(0, mdf.height, step))
+                            if indices[-1] != mdf.height - 1:
+                                indices.append(mdf.height - 1)
+                            mdf = mdf[indices]
                         result.equity_curve = _dataframe_to_json_safe(mdf)
 
                 # Extract downsampled close prices from raw data
@@ -1817,13 +1888,139 @@ class FlowBuilder:
 
         return params
 
+    def clone(
+        self,
+        *,
+        strategy_id: str | None = None,
+        detector: dict[str, Any] | None = None,
+        entry: dict[str, Any] | None = None,
+        exit: dict[str, Any] | None = None,
+        capital: float | None = None,
+        fee: float | None = None,
+    ) -> FlowBuilder:
+        """Create a deep copy with optional parameter overrides.
+
+        Unlike :meth:`update_config` which mutates in-place, ``clone()``
+        returns a new independent FlowBuilder.
+
+        Args:
+            strategy_id: Override strategy ID.
+            detector: Dict of {param_name: value} to override on detectors.
+            entry: Dict of {param_name: value} to merge into entry config.
+            exit: Dict of {param_name: value} to merge into exit config.
+            capital: Override capital amount.
+            fee: Override fee rate.
+
+        Returns:
+            New FlowBuilder with overridden parameters.
+        """
+        new = copy.deepcopy(self)
+        if strategy_id is not None:
+            new.strategy_id = strategy_id
+        if capital is not None:
+            new._capital = capital
+        if fee is not None:
+            new._fee = fee
+        if detector or entry or exit:
+            new.update_config(detector=detector, entry=entry, exit=exit)
+        return new
+
+    def sweep(
+        self,
+        param_grid: dict[str, list[Any]],
+        *,
+        parallel: bool = False,
+        max_workers: int = 4,
+        run_kwargs: dict[str, Any] | None = None,
+    ) -> Any:
+        """Run a parameter sweep over a grid of values.
+
+        Creates one FlowBuilder clone per combination of parameters
+        and runs them all via :func:`batch_run`.
+
+        Args:
+            param_grid: Dict mapping parameter paths to lists of values.
+                Paths use dot notation: ``"detector.fast_period"``,
+                ``"entry.size_pct"``, ``"exit.tp"``, ``"capital"``, ``"fee"``.
+            parallel: Run configs in parallel threads.
+            max_workers: Thread count for parallel mode.
+            run_kwargs: Extra kwargs for ``FlowBuilder.run()``.
+
+        Returns:
+            BatchResult with one result per parameter combination.
+
+        Example:
+            >>> results = base.sweep({
+            ...     "detector.fast_period": [10, 20, 30],
+            ...     "exit.tp": [0.02, 0.03],
+            ... })
+            >>> print(results.comparison.summary())
+        """
+        import itertools
+
+        from signalflow.api.batch import batch_run
+
+        # Parse param grid into (path, values) tuples
+        keys = list(param_grid.keys())
+        value_lists = [param_grid[k] for k in keys]
+
+        configs: list[FlowBuilder] = []
+        labels: list[str] = []
+
+        for combo in itertools.product(*value_lists):
+            overrides: dict[str, dict[str, Any]] = {
+                "detector": {},
+                "entry": {},
+                "exit": {},
+            }
+            sid_parts: list[str] = []
+            clone_kwargs: dict[str, Any] = {}
+
+            for key, val in zip(keys, combo, strict=True):
+                sid_parts.append(f"{key.split('.')[-1]}={val}")
+
+                if "." in key:
+                    category, param = key.split(".", 1)
+                    if category in overrides:
+                        overrides[category][param] = val
+                    elif category in ("capital", "fee"):
+                        clone_kwargs[category] = val
+                elif key in ("capital", "fee"):
+                    clone_kwargs[key] = val
+                else:
+                    # Default: treat as detector param
+                    overrides["detector"][key] = val
+
+            clone_kwargs["strategy_id"] = ",".join(sid_parts)
+            # Only pass non-empty dicts
+            if overrides["detector"]:
+                clone_kwargs["detector"] = overrides["detector"]
+            if overrides["entry"]:
+                clone_kwargs["entry"] = overrides["entry"]
+            if overrides["exit"]:
+                clone_kwargs["exit"] = overrides["exit"]
+
+            configs.append(self.clone(**clone_kwargs))
+            labels.append(",".join(sid_parts))
+
+        return batch_run(
+            configs,
+            labels=labels,
+            parallel=parallel,
+            max_workers=max_workers,
+            run_kwargs=run_kwargs,
+        )
+
     # =========================================================================
     # Private Helpers
     # =========================================================================
 
     def _resolve_data(self) -> RawData:
         """Resolve data sources."""
+        from loguru import logger as _logger
+
         if self._raw is not None:
+            _logger.debug("Using pre-loaded RawData")
             return self._raw
 
         if not self._named_data:
@@ -1838,6 +2035,11 @@ class FlowBuilder:
             return first_source
         elif isinstance(first_source, dict):
             params = {k: v for k, v in first_source.items() if v is not None}
+            _logger.debug(
+                "Loading data source '{}': {}",
+                _first_name,
+                {k: v for k, v in params.items() if k != "pairs"},
+            )
             return load(**params)
 
         raise MissingDataError()
@@ -1854,6 +2056,8 @@ class FlowBuilder:
 
     def _resolve_signals(self, raw: RawData) -> tuple[Signals, dict[str, pl.DataFrame]]:
         """Detect signals from all detectors, capturing preprocessed features."""
+        from loguru import logger as _logger
+
         detector_features_map: dict[str, pl.DataFrame] = {}
 
         if self._signals is not None:
@@ -1880,6 +2084,12 @@ class FlowBuilder:
             if detector.keep_only_latest_per_pair:
                 signals = detector._keep_only_latest(signals)
 
+            _logger.debug(
+                "Detector '{}': {} features → {} signals",
+                name,
+                feats.height,
+                signals.value.height,
+            )
             signals_list.append(signals)
             detector_features_map[name] = feats
 
@@ -1909,6 +2119,43 @@ class FlowBuilder:
 
         # Merge labels
         return cast(pl.DataFrame, pl.concat(results).unique(["pair", "timestamp"]))
+
+    def _compute_signal_features(
+        self,
+        signals: Signals,
+        labels_df: pl.DataFrame | None,
+    ) -> pl.DataFrame | None:
+        """Compute signal-level meta-features.
+
+        Each :class:`SignalFeature` produces a DataFrame keyed on
+        ``(pair, timestamp)``.  Results are joined horizontally.
+        """
+        from loguru import logger as _logger
+
+        key = ["pair", "timestamp"]
+        result: pl.DataFrame | None = None
+
+        for sf_feat in self._signal_features:
+            # Supervised features need labels
+            if sf_feat.requires_labels and labels_df is None:
+                _logger.warning(
+                    "Skipping {} (requires labels but none available)",
+                    type(sf_feat).__name__,
+                )
+                continue
+
+            feat_df = sf_feat(
+                signals=signals.value,
+                labels=labels_df,
+            )
+
+            if result is None:
+                result = feat_df
+            else:
+                new_cols = [c for c in feat_df.columns if c not in key]
+                result = result.join(feat_df.select([*key, *new_cols]), on=key, how="left")
+
+        return result
 
     def _apply_validation(
         self,

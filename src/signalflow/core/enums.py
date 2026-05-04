@@ -180,6 +180,7 @@ class SfComponentType(StrEnum):
         RAW_DATA_LOADER: Raw data loaders combining source + store.
         FEATURE: Feature extraction classes (e.g., RSI, SMA).
         SIGNALS_TRANSFORM: Signal transformation functions.
+        SIGNAL_FEATURE: Signal-level feature extractors (meta-features from signal history).
         LABELER: Signal labeling strategies (e.g., triple barrier).
         DETECTOR: Signal detection algorithms (e.g., SMA cross).
         VALIDATOR: Signal validation models.
@@ -236,6 +237,7 @@ class SfComponentType(StrEnum):
     FEATURE = "feature"
     SIGNALS_TRANSFORM = "signals/transform"
     SIGNAL_METRIC = "signals/metric"
+    SIGNAL_FEATURE = "signals/feature"
     LABELER = "signals/labeler"
     DETECTOR = "signals/detector"
     VALIDATOR = "signals/validator"

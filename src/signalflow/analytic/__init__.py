@@ -1,4 +1,5 @@
 from signalflow.analytic.base import SignalMetric, StrategyMetric
+from signalflow.analytic.compare import ComparisonResult, compare_results
 from signalflow.analytic.stats import (
     BootstrapResult,
     BootstrapValidator,
@@ -19,6 +20,8 @@ from signalflow.analytic.stats import (
 __all__ = [
     "BootstrapResult",
     "BootstrapValidator",
+    # Comparison
+    "ComparisonResult",
     "ConfidenceInterval",
     # Stats - Results
     "MonteCarloResult",
@@ -31,6 +34,7 @@ __all__ = [
     "StrategyMetric",
     "ValidationResult",
     "bootstrap",
+    "compare_results",
     # Stats - Convenience functions
     "monte_carlo",
     "plot_bootstrap",

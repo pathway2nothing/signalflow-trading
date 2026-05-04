@@ -7,6 +7,7 @@ from threading import Event
 from typing import Any
 
 import polars as pl
+from loguru import logger
 
 import signalflow as sf
 from signalflow.analytic import StrategyMetric
@@ -74,6 +75,15 @@ class BacktestRunner(StrategyRunner):
                 if det_signals.value.height > 0:
                     named_signal_lookups[det_name] = self._build_signal_lookup(det_signals.value)
 
+        n_pairs = df.select(self.pair_col).unique().height
+        logger.info(
+            "Backtest starting: {} bars, {} pairs, capital=${:,.0f}, {} signals",
+            len(timestamps),
+            n_pairs,
+            self.initial_capital,
+            signals_df.height if signals_df.height > 0 else 0,
+        )
+
         iterator = tqdm(timestamps, desc="Backtesting") if self.show_progress else timestamps
         total = len(timestamps)
 
@@ -97,6 +107,15 @@ class BacktestRunner(StrategyRunner):
         # Final callback at 100%
         if self.progress_callback is not None and total > 0:
             self.progress_callback(total, total, self._metrics_history[-1] if self._metrics_history else {})
+
+        final_equity = state.portfolio.cash + sum(p.entry_price * p.qty for p in state.portfolio.open_positions())
+        logger.info(
+            "Backtest complete: {} bars, {} trades, equity=${:,.0f}, open_positions={}",
+            total,
+            len(self._trades),
+            final_equity,
+            len(state.portfolio.open_positions()),
+        )
 
         return state
 
@@ -163,6 +182,7 @@ class BacktestRunner(StrategyRunner):
             exit_fills = self.broker.submit_orders(exit_orders, prices, ts)
             exit_trades = self.broker.process_fills(exit_fills, exit_orders, state)
             self._trades.extend(exit_trades)
+            logger.debug("Bar {}: {} exit orders → {} trades", ts, len(exit_orders), len(exit_trades))
 
         entry_orders = []
         for entry_rule in self.entry_rules:
@@ -173,6 +193,7 @@ class BacktestRunner(StrategyRunner):
             entry_fills = self.broker.submit_orders(entry_orders, prices, ts)
             entry_trades = self.broker.process_fills(entry_fills, entry_orders, state)
             self._trades.extend(entry_trades)
+            logger.debug("Bar {}: {} entry orders → {} trades", ts, len(entry_orders), len(entry_trades))
 
         return state
 

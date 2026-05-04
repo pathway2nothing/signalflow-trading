@@ -188,6 +188,18 @@ Example:
 # Metrics
 # ─────────────────────────────────────────────────────────────────────────────
 
+signal_feature = _make_component_decorator(SfComponentType.SIGNAL_FEATURE)
+"""Register a signal-level feature (meta-feature from signal history).
+
+Example:
+    ```python
+    @sf.signal_feature("signal_stats/rolling_accuracy")
+    class RollingAccuracy(SignalFeature):
+        def compute(self, signals, labels=None, context=None):
+            ...
+    ```
+"""
+
 signal_metric = _make_component_decorator(SfComponentType.SIGNAL_METRIC)
 """Register a signal quality metric.
 
@@ -419,6 +431,7 @@ def _infer_component_type(cls: type) -> SfComponentType | None:
         "EntryRule": SfComponentType.STRATEGY_ENTRY_RULE,
         "SignalEntryRule": SfComponentType.STRATEGY_ENTRY_RULE,
         "ExitRule": SfComponentType.STRATEGY_EXIT_RULE,
+        "SignalFeature": SfComponentType.SIGNAL_FEATURE,
         "SignalMetric": SfComponentType.SIGNAL_METRIC,
         "StrategyMetric": SfComponentType.STRATEGY_METRIC,
         "Alert": SfComponentType.STRATEGY_ALERT,
@@ -456,6 +469,7 @@ __all__ = [
     "risk",
     # Legacy (deprecated)
     "sf_component",
+    "signal_feature",
     "signal_metric",
     "strategy_metric",
     "strategy_store",

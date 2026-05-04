@@ -1444,6 +1444,17 @@ class BacktestBuilder:
         except ImportError:
             pass
 
+        # Portfolio-level metrics (exposure, leverage, concentration)
+        try:
+            from signalflow.analytic.strategy.portfolio_metrics import (
+                PortfolioExposureMetric,
+                PortfolioPnLBreakdownMetric,
+            )
+
+            metrics.extend([PortfolioExposureMetric(), PortfolioPnLBreakdownMetric()])
+        except ImportError:
+            pass
+
         return runner_cls(
             strategy_id=self.strategy_id,
             broker=broker,

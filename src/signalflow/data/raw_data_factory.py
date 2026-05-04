@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import cast
 
 import polars as pl
+from loguru import logger
 
 from signalflow.core import RawData
 from signalflow.data.raw_store import DuckDbSpotStore
@@ -205,9 +206,11 @@ class RawDataFactory:
         # Nested structure: data_type -> source -> DataFrame
         nested_data: dict[str, dict[str, pl.DataFrame]] = {}
 
+        logger.info("Loading data from {} store(s) for {} pairs ({} → {})", len(stores), len(pairs), start, end)
         for source_name, store in stores.items():
             data_type = _get_data_type(store)
             df = store.load_many(pairs=pairs, start=start, end=end)
+            logger.debug("Store '{}' ({}): loaded {} rows", source_name, data_type, df.height)
 
             # Normalize timestamps
             if "timestamp" in df.columns:
@@ -410,10 +413,12 @@ class RawDataFactory:
             data_types = ["spot"]
 
         data: dict[str, pl.DataFrame] = {}
+        logger.info("Loading DuckDB spot data: {} pairs, {} → {}", len(pairs), start, end)
         store = DuckDbSpotStore(spot_store_path)
         try:
             if "spot" in data_types:
                 spot = store.load_many(pairs=pairs, start=start, end=end)
+                logger.debug("DuckDB loaded {} rows, columns: {}", spot.height, spot.columns)
 
                 required = {"pair", "timestamp"}
                 missing = required - set(spot.columns)
@@ -447,6 +452,8 @@ class RawDataFactory:
 
                 data["spot"] = spot
 
+            total_rows = sum(df.height for df in data.values())
+            logger.info("RawData ready: {} key(s), {} total rows, {} pairs", len(data), total_rows, len(pairs))
             return RawData(
                 datetime_start=start,
                 datetime_end=end,

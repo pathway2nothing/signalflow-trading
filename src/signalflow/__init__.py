@@ -36,6 +36,7 @@ from signalflow.core import (
     labeler,
     register,
     risk,
+    signal_feature,
     signal_metric,
     strategy_metric,
     strategy_store,
@@ -43,7 +44,6 @@ from signalflow.core import (
     # Legacy (deprecated)
     sf_component,
 )
-import signalflow.analytic as analytic
 import signalflow.data as data
 import signalflow.detector as detectors
 import signalflow.feature as features
@@ -52,6 +52,7 @@ import signalflow.target as target
 import signalflow.utils as utils
 import signalflow.validator as validators
 from signalflow.feature import Feature, FeaturePipeline, GlobalFeature, OffsetFeature
+from signalflow.signal_feature import SignalFeature
 
 # Re-assign semantic decorators after submodule imports.
 # `import signalflow.detector` binds the submodule to `signalflow.detector`,
@@ -61,6 +62,7 @@ from signalflow.core.decorators import (  # noqa: F811
     detector,
     exit,
     feature,
+    signal_feature,
     validator,
 )
 
@@ -74,6 +76,22 @@ from signalflow.core.decorators import (  # noqa: F811
 
 def __getattr__(name: str) -> Any:
     """Lazy load API module components."""
+    if name == "analytic":
+        import signalflow.analytic as analytic
+
+        return analytic
+
+    if name == "contrib":
+        import signalflow.contrib as _contrib
+
+        return _contrib
+
+    if name == "help":
+        from signalflow._help import help_system
+
+        globals()["help"] = help_system  # cache to avoid re-import
+        return help_system
+
     if name == "Backtest":
         from signalflow.api.builder import Backtest
 
@@ -232,8 +250,8 @@ __all__ = [
     "RiskLimit",
     "RiskManager",
     "SfComponentType",
-    # Other
     "SfTorchModuleMixin",
+    "SignalFeature",
     "SignalMetrics",
     "SignalType",
     "Signals",
@@ -248,6 +266,7 @@ __all__ = [
     "api",
     "backtest",
     "config",
+    "contrib",
     "core",
     "data",
     "data_source",
@@ -263,6 +282,7 @@ __all__ = [
     "features",
     "flow",
     "get_component",
+    "help",
     "labeler",
     "load",
     "load_artifact",
@@ -270,6 +290,7 @@ __all__ = [
     "risk",
     # Legacy decorator (deprecated)
     "sf_component",
+    "signal_feature",
     "signal_metric",
     "strategy",
     "strategy_metric",

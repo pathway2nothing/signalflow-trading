@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal, cast
 
+from loguru import logger
+
 from signalflow.core import Order, Position, PositionType, StrategyState, exit
 from signalflow.strategy.component.base import ExitRule
 
@@ -59,6 +61,17 @@ class TakeProfitStopLossExit(ExitRule):
                     exit_reason = "stop_loss"
 
             if should_exit:
+                pnl_pct = (price - pos.entry_price) / pos.entry_price * 100
+                if pos.position_type != PositionType.LONG:
+                    pnl_pct = -pnl_pct
+                logger.debug(
+                    "{} exit {}: entry={:.2f} → {:.2f} ({:+.2f}%)",
+                    exit_reason,
+                    pos.pair,
+                    pos.entry_price,
+                    price,
+                    pnl_pct,
+                )
                 side = cast(Literal["BUY", "SELL"], "SELL" if pos.position_type == PositionType.LONG else "BUY")
                 order = Order(
                     pair=pos.pair,
