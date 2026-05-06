@@ -316,3 +316,58 @@ class Portfolio:
                 for t in trades
             ]
         )
+
+    @staticmethod
+    def compute_position_pnls(trades: Iterable[Trade]) -> dict[str, float]:
+        """Compute realized PnL per closed position from a trade stream.
+
+        Groups trades by ``position_id`` and pairs entry-side trades with exit-side
+        trades using ``meta["type"] in {"entry", "exit"}``. Falls back to side-based
+        pairing for trades without ``meta.type``. Positions without both an entry
+        and an exit are excluded.
+
+        Long PnL  = exit_notional - entry_notional - all_fees
+        Short PnL = entry_notional - exit_notional - all_fees
+
+        Args:
+            trades: Iterable of Trade events.
+
+        Returns:
+            Dict mapping ``position_id`` to realized PnL (quote currency).
+            Only closed positions are present.
+        """
+        by_pos: dict[str, list[Trade]] = defaultdict(list)
+        for t in trades:
+            if t.position_id:
+                by_pos[t.position_id].append(t)
+
+        pnls: dict[str, float] = {}
+        for pid, ts in by_pos.items():
+            entries: list[Trade] = []
+            exits: list[Trade] = []
+            for t in ts:
+                kind = (t.meta or {}).get("type") if isinstance(t.meta, dict) else None
+                if kind == "entry":
+                    entries.append(t)
+                elif kind == "exit":
+                    exits.append(t)
+
+            if not entries and not exits:
+                # No meta.type — fall back to first-trade side as entry direction.
+                first = ts[0]
+                entries = [t for t in ts if t.side == first.side]
+                exits = [t for t in ts if t.side != first.side]
+
+            if not entries or not exits:
+                continue
+
+            entry_notional = sum(t.price * t.qty for t in entries)
+            exit_notional = sum(t.price * t.qty for t in exits)
+            total_fees = sum(t.fee for t in ts)
+
+            if entries[0].side == "BUY":
+                pnls[pid] = float(exit_notional - entry_notional - total_fees)
+            else:
+                pnls[pid] = float(entry_notional - exit_notional - total_fees)
+
+        return pnls

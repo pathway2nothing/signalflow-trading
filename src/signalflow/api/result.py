@@ -100,6 +100,7 @@ class BacktestResult:
     # Cached analytics (created via registry on first access)
     _main_result: Any | None = field(default=None, repr=False)
     _metrics_cache: dict[str, float] | None = field(default=None, repr=False)
+    _position_pnls_cache: dict[str, float] | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         """Initialize analytics from registry."""
@@ -152,21 +153,35 @@ class BacktestResult:
         return self.total_return * 100
 
     @property
+    def position_pnls(self) -> dict[str, float]:
+        """Realized PnL per closed position (keyed by position_id).
+
+        Computed once from the trade stream by pairing entry/exit trades
+        per ``position_id``. Open positions are not included.
+        """
+        if self._position_pnls_cache is not None:
+            return self._position_pnls_cache
+        self._position_pnls_cache = self._compute_position_pnls()
+        return self._position_pnls_cache
+
+    @property
     def win_rate(self) -> float:
-        """Win rate as decimal (e.g., 0.6 = 60%)."""
-        if not self.trades:
+        """Win rate over closed positions (decimal: 0.6 = 60%)."""
+        pnls = list(self.position_pnls.values())
+        if not pnls:
             return 0.0
-        wins = sum(1 for t in self.trades if self._get_trade_pnl(t) > 0)
-        return wins / len(self.trades)
+        wins = sum(1 for p in pnls if p > 0)
+        return wins / len(pnls)
 
     @property
     def profit_factor(self) -> float:
-        """Ratio of gross profits to gross losses."""
-        if not self.trades:
+        """Ratio of gross profits to gross losses over closed positions."""
+        pnls = list(self.position_pnls.values())
+        if not pnls:
             return 0.0
 
-        gross_profit = sum(self._get_trade_pnl(t) for t in self.trades if self._get_trade_pnl(t) > 0)
-        gross_loss = abs(sum(self._get_trade_pnl(t) for t in self.trades if self._get_trade_pnl(t) < 0))
+        gross_profit = sum(p for p in pnls if p > 0)
+        gross_loss = abs(sum(p for p in pnls if p < 0))
 
         if gross_loss == 0:
             return float("inf") if gross_profit > 0 else 0.0
@@ -507,20 +522,89 @@ class BacktestResult:
             pass
         return prices
 
+    def _compute_position_pnls(self) -> dict[str, float]:
+        """Compute PnL per closed position from the trade stream.
+
+        Uses ``Portfolio.compute_position_pnls`` for native ``Trade`` events.
+        For dict-based trades (external systems) falls back to per-trade
+        ``pnl``/``realized_pnl`` fields keyed by ``id``.
+        """
+        if not self.trades:
+            return {}
+
+        from signalflow.core.containers.portfolio import Portfolio
+        from signalflow.core.containers.trade import Trade
+
+        native = [t for t in self.trades if isinstance(t, Trade)]
+        if native:
+            return Portfolio.compute_position_pnls(native)
+
+        # Non-native trades (dicts or objects already carrying pnl).
+        out: dict[str, float] = {}
+        for i, t in enumerate(self.trades):
+            if isinstance(t, dict):
+                raw_pnl = t.get("pnl")
+                if raw_pnl is None:
+                    raw_pnl = t.get("realized_pnl")
+                key = t.get("position_id") or t.get("id") or str(i)
+            else:
+                raw_pnl = getattr(t, "pnl", None)
+                if raw_pnl is None:
+                    raw_pnl = getattr(t, "realized_pnl", None)
+                key = getattr(t, "position_id", None) or getattr(t, "id", None) or str(i)
+            if raw_pnl is None:
+                continue
+            out[str(key)] = float(raw_pnl)
+        return out
+
     def _get_trade_pnl(self, trade: TradeType) -> float:
-        """Extract PnL from trade object."""
+        """Get PnL attributed to a single trade event.
+
+        For native ``Trade`` events PnL is recorded on the **exit** trade only
+        (entries return 0). For dict-based trades, falls back to ``pnl`` /
+        ``realized_pnl`` fields.
+        """
+        if isinstance(trade, dict):
+            return float(trade.get("pnl") or trade.get("realized_pnl") or 0)
+
+        from signalflow.core.containers.trade import Trade
+
+        if isinstance(trade, Trade):
+            kind = (trade.meta or {}).get("type") if isinstance(trade.meta, dict) else None
+            if kind == "exit" and trade.position_id:
+                return float(self.position_pnls.get(trade.position_id, 0.0))
+            return 0.0
+
         if hasattr(trade, "pnl"):
             return float(trade.pnl or 0)
         if hasattr(trade, "realized_pnl"):
             return float(trade.realized_pnl or 0)  # type: ignore[union-attr]
-        if isinstance(trade, dict):
-            return float(trade.get("pnl", 0) or trade.get("realized_pnl", 0))
         return 0.0
 
     def _trade_to_dict(self, trade: TradeType) -> dict[str, Any]:
-        """Convert trade object to dictionary."""
+        """Convert trade object to dictionary, enriching exit trades with ``pnl``."""
         if isinstance(trade, dict):
             return trade
+
+        from signalflow.core.containers.trade import Trade
+
+        if isinstance(trade, Trade):
+            d = {
+                "id": trade.id,
+                "position_id": trade.position_id,
+                "pair": trade.pair,
+                "side": trade.side,
+                "ts": trade.ts,
+                "price": trade.price,
+                "qty": trade.qty,
+                "fee": trade.fee,
+                "meta": trade.meta,
+            }
+            kind = (trade.meta or {}).get("type") if isinstance(trade.meta, dict) else None
+            if kind == "exit" and trade.position_id:
+                d["pnl"] = float(self.position_pnls.get(trade.position_id, 0.0))
+            return d
+
         if hasattr(trade, "__dict__"):
             return {k: v for k, v in trade.__dict__.items() if not k.startswith("_")}
         return {"trade": str(trade)}
