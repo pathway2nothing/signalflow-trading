@@ -2,12 +2,13 @@
 
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import signed_tercile_soft
 from signalflow.target.base import Labeler
 
 
@@ -57,6 +58,12 @@ class AnomalyLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.ANOMALY
+
+    soft_classes: ClassVar[tuple[str, ...]] = (
+        "extreme_negative_anomaly",
+        "normal",
+        "extreme_positive_anomaly",
+    )
 
     price_col: str = "close"
     horizon: int = 60
@@ -179,4 +186,51 @@ class AnomalyLabeler(Labeler):
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft triple ``(p_extreme_negative_anomaly, p_normal, p_extreme_positive_anomaly)``.
+
+        Treats the *signed* horizon return scaled by per-bar volatility as the
+        decision metric: ``z = fwd_ret / (rolling_vol * sqrt(horizon))``. The
+        symmetric threshold from :attr:`threshold_return_std` defines the
+        anomaly cut for both tails, and :func:`signed_tercile_soft` produces
+        calibrated probabilities.
+        """
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+        if group_df.height == 0:
+            return group_df
+
+        price = pl.col(self.price_col)
+        df = group_df.with_columns((price / price.shift(1)).log().alias("_log_ret"))
+        df = df.with_columns(
+            pl.col("_log_ret")
+            .rolling_std(window_size=self.vol_window, min_samples=max(2, self.vol_window // 4))
+            .alias("_rolling_vol"),
+        )
+        df = df.with_columns((price.shift(-self.horizon) / price).log().alias("_forward_ret"))
+
+        scale = math.sqrt(self.horizon)
+        z = pl.when(pl.col("_rolling_vol") > 0).then(
+            pl.col("_forward_ret") / (pl.col("_rolling_vol") * scale)
+        ).otherwise(pl.lit(None))
+        df = df.with_columns(z.alias("_z"))
+
+        p_neg, p_norm, p_pos = signed_tercile_soft(
+            pl.col("_z"),
+            neg_threshold=self.threshold_return_std,
+            pos_threshold=self.threshold_return_std,
+            k=self.softness_k,
+        )
+        df = df.with_columns(
+            p_neg.alias(f"{self.soft_col_prefix}extreme_negative_anomaly"),
+            p_norm.alias(f"{self.soft_col_prefix}normal"),
+            p_pos.alias(f"{self.soft_col_prefix}extreme_positive_anomaly"),
+        )
+        df = df.drop([c for c in ("_log_ret", "_rolling_vol", "_forward_ret", "_z") if c in df.columns])
         return df

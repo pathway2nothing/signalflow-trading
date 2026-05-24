@@ -14,12 +14,13 @@ Implementation uses pure Polars expressions for performance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import signed_tercile_soft
 from signalflow.target.base import Labeler
 
 
@@ -59,6 +60,8 @@ class FlashMoveLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.ANOMALY
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("flash_dn", "normal", "flash_up")
 
     price_col: str = "close"
     flash_horizon: int = 10
@@ -126,4 +129,49 @@ class FlashMoveLabeler(Labeler):
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft triple ``(p_flash_dn, p_normal, p_flash_up)`` over short-horizon z.
+
+        Reduces the same ``fwd_logret`` vs ``±sigma_multiplier · past_vol · √h``
+        cut to a sigmoid in z-units (``fwd_logret / (past_vol · √h)``), so the
+        decision boundary becomes ``±sigma_multiplier``.
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+
+        import math
+
+        price = pl.col(self.price_col)
+        log_ret = (price / price.shift(1)).log()
+        df = group_df.with_columns(log_ret.alias("_log_ret"))
+        df = df.with_columns(
+            pl.col("_log_ret").rolling_std(self.vol_window, min_samples=2).alias("_past_vol"),
+            (price.shift(-self.flash_horizon) / price).log().alias("_fwd_logret"),
+        )
+        scale = math.sqrt(self.flash_horizon)
+        z = pl.when(pl.col("_past_vol") > 0).then(
+            pl.col("_fwd_logret") / (pl.col("_past_vol") * scale)
+        ).otherwise(pl.lit(None))
+        df = df.with_columns(z.alias("_z"))
+
+        p_dn, p_mid, p_up = signed_tercile_soft(
+            pl.col("_z"),
+            neg_threshold=self.sigma_multiplier,
+            pos_threshold=self.sigma_multiplier,
+            k=self.softness_k,
+        )
+        df = df.with_columns(
+            p_dn.alias(f"{self.soft_col_prefix}flash_dn"),
+            p_mid.alias(f"{self.soft_col_prefix}normal"),
+            p_up.alias(f"{self.soft_col_prefix}flash_up"),
+        )
+        df = df.drop(["_log_ret", "_past_vol", "_fwd_logret", "_z"])
         return df

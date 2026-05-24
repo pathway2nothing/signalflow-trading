@@ -19,13 +19,17 @@ expressible as a Polars rolling expression.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import (
+    gaussian_membership_soft,
+    sigmoid_expr,
+)
 from signalflow.target.base import Labeler
 
 try:
@@ -172,6 +176,9 @@ class HurstRegimeLabeler(Labeler):
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
 
+    soft_classes: ClassVar[tuple[str, ...]] = ("mean_reverting", "random_walk", "trending")
+    softness_k: float = 20.0
+
     price_col: str = "close"
     horizon: int = 480
     stride: int = 30
@@ -238,6 +245,47 @@ class HurstRegimeLabeler(Labeler):
 
         return df
 
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Gaussian-membership soft probabilities over the three Hurst centres.
+
+        Centres are placed at ``reverting_threshold``, ``0.5``, and
+        ``trending_threshold``. The membership width is controlled by
+        :attr:`softness_k` (interpreted in Hurst units, so the default
+        ``20`` gives ~0.05-wide bumps).
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+
+        prices = group_df.get_column(self.price_col).to_numpy().astype(np.float64)
+        n = len(prices)
+        log_ret = np.zeros(n, dtype=np.float64)
+        log_ret[1:] = np.log(prices[1:] / prices[:-1])
+
+        hurst = _hurst_forward(log_ret, self.horizon, self.stride)
+        last = np.nan
+        for i in range(n):
+            if np.isnan(hurst[i]):
+                hurst[i] = last
+            else:
+                last = hurst[i]
+
+        df = group_df.with_columns(pl.Series("_hurst", hurst, dtype=pl.Float64))
+        centres = (self.reverting_threshold, 0.5, self.trending_threshold)
+        p_rev, p_rand, p_trend = gaussian_membership_soft(pl.col("_hurst"), centres, k=self.softness_k)
+        df = df.with_columns(
+            p_rev.alias(f"{self.soft_col_prefix}mean_reverting"),
+            p_rand.alias(f"{self.soft_col_prefix}random_walk"),
+            p_trend.alias(f"{self.soft_col_prefix}trending"),
+        )
+        df = df.drop("_hurst")
+        return df
+
 
 # ────────────────────────────────────────────────────────────────────────
 # Mean-reversion event labeler
@@ -287,6 +335,8 @@ class MeanReversionEventLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("mean_reverted", "trend_continuation", "no_reversion")
 
     price_col: str = "close"
     horizon: int = 240
@@ -364,6 +414,61 @@ class MeanReversionEventLabeler(Labeler):
 
         return df
 
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft triple ``(p_mean_reverted, p_trend_continuation, p_no_reversion)``.
+
+        Replicates the conditional structure of the hard rule with sigmoids:
+            * ``p_stretched = sigmoid(k * (|z_now| - stretch))``
+            * ``p_reverted | stretched = sigmoid(k * (revert - |z_fwd|))``
+            * ``p_mean_reverted = p_stretched * p_reverted | stretched``
+            * ``p_trend_continuation = p_stretched * (1 - p_reverted | stretched)``
+            * ``p_no_reversion = 1 - p_stretched``
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+
+        price = pl.col(self.price_col)
+        df = group_df.with_columns(
+            price.rolling_mean(self.z_window, min_samples=2).alias("_mu"),
+            price.rolling_std(self.z_window, min_samples=2).alias("_sd"),
+        )
+        df = df.with_columns(
+            pl.when(pl.col("_sd") > 0)
+            .then((price - pl.col("_mu")) / pl.col("_sd"))
+            .otherwise(pl.lit(None))
+            .alias("_z_now"),
+            pl.when(pl.col("_sd") > 0)
+            .then((price.shift(-self.horizon) - pl.col("_mu")) / pl.col("_sd"))
+            .otherwise(pl.lit(None))
+            .alias("_z_fwd"),
+        )
+        null_mask = pl.col("_z_now").is_null() | pl.col("_z_fwd").is_null()
+        p_stretched = sigmoid_expr(pl.col("_z_now").abs() - pl.lit(self.stretch_threshold), self.softness_k)
+        p_revert_given = sigmoid_expr(pl.lit(self.revert_threshold) - pl.col("_z_fwd").abs(), self.softness_k)
+
+        df = df.with_columns(
+            pl.when(null_mask)
+            .then(pl.lit(None, dtype=pl.Float64))
+            .otherwise(p_stretched * p_revert_given)
+            .alias(f"{self.soft_col_prefix}mean_reverted"),
+            pl.when(null_mask)
+            .then(pl.lit(None, dtype=pl.Float64))
+            .otherwise(p_stretched * (pl.lit(1.0) - p_revert_given))
+            .alias(f"{self.soft_col_prefix}trend_continuation"),
+            pl.when(null_mask)
+            .then(pl.lit(None, dtype=pl.Float64))
+            .otherwise(pl.lit(1.0) - p_stretched)
+            .alias(f"{self.soft_col_prefix}no_reversion"),
+        )
+        df = df.drop(["_mu", "_sd", "_z_now", "_z_fwd"])
+        return df
+
 
 # ────────────────────────────────────────────────────────────────────────
 # Trend-break labeler (past slope sign vs forward slope sign)
@@ -437,6 +542,8 @@ class TrendBreakLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.TREND_MOMENTUM
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("no_break", "continue", "break")
 
     price_col: str = "close"
     window: int = 240

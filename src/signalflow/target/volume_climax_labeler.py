@@ -15,12 +15,13 @@ Implementation uses pure Polars expressions for performance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import signed_tercile_soft
 from signalflow.target.base import Labeler
 
 
@@ -62,6 +63,8 @@ class VolumeClimaxLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.VOLUME_LIQUIDITY
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("calm_vol", "normal_vol", "climax")
 
     volume_col: str = "volume"
     horizon: int = 240
@@ -133,4 +136,53 @@ class VolumeClimaxLabeler(Labeler):
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft triple ``(p_calm_vol, p_normal_vol, p_climax)`` from the forward max/SMA ratio.
+
+        The signed metric is ``ratio - centre`` where ``centre`` sits midway
+        between calm and climax. :func:`signed_tercile_soft` then handles
+        threshold-symmetric tails.
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.volume_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.volume_col}'")
+
+        vol = pl.col(self.volume_col)
+        df = group_df.with_columns(
+            vol.rolling_mean(window_size=self.vol_sma_window, min_samples=1).alias("_trailing_sma"),
+        )
+        df = df.with_columns(
+            vol.shift(-1)
+            .rolling_max(window_size=self.horizon, min_samples=1)
+            .shift(-(self.horizon - 1))
+            .alias("_forward_max"),
+        )
+        centre = 0.5 * (self.calm_threshold + self.climax_threshold)
+        df = df.with_columns(
+            pl.when(pl.col("_trailing_sma") > 0)
+            .then(pl.col("_forward_max") / pl.col("_trailing_sma") - centre)
+            .otherwise(pl.lit(None))
+            .alias("_centred_ratio"),
+        )
+
+        half_span = 0.5 * (self.climax_threshold - self.calm_threshold)
+        p_calm, p_norm, p_climax = signed_tercile_soft(
+            pl.col("_centred_ratio"),
+            neg_threshold=half_span,
+            pos_threshold=half_span,
+            k=self.softness_k,
+        )
+        df = df.with_columns(
+            p_calm.alias(f"{self.soft_col_prefix}calm_vol"),
+            p_norm.alias(f"{self.soft_col_prefix}normal_vol"),
+            p_climax.alias(f"{self.soft_col_prefix}climax"),
+        )
+        df = df.drop(["_trailing_sma", "_forward_max", "_centred_ratio"])
         return df

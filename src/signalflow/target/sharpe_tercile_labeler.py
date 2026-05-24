@@ -12,13 +12,14 @@ clean directional moves.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import percentile_tercile_soft
 from signalflow.target.base import Labeler
 
 
@@ -57,6 +58,9 @@ class SharpeTercileLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_DIRECTION
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("sharpe_neg", "sharpe_mid", "sharpe_pos")
+    softness_k: float = 20.0
 
     price_col: str = "close"
     horizon: int = 240
@@ -137,6 +141,58 @@ class SharpeTercileLabeler(Labeler):
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft tercile probabilities ``(p_sharpe_neg, p_sharpe_mid, p_sharpe_pos)``.
+
+        Uses the same rolling Sharpe percentile that drives the hard tercile
+        and maps it through :func:`percentile_tercile_soft` so the middle
+        bucket is represented explicitly.
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+
+        price = pl.col(self.price_col)
+        log_ret = (price / price.shift(1)).log()
+        df = group_df.with_columns(log_ret.alias("_log_ret"))
+        df = df.with_columns(
+            (price.shift(-self.horizon) / price).log().alias("_fwd_ret"),
+            pl.col("_log_ret")
+            .shift(-1)
+            .rolling_std(window_size=self.horizon, min_samples=2)
+            .shift(-(self.horizon - 1))
+            .alias("_fwd_vol"),
+        )
+        df = df.with_columns(
+            pl.when(pl.col("_fwd_vol") > 0)
+            .then(pl.col("_fwd_ret") / pl.col("_fwd_vol"))
+            .otherwise(pl.lit(None))
+            .alias("_sharpe"),
+        )
+
+        sharpe_arr = df.get_column("_sharpe").to_numpy()
+        pct = self._rolling_percentile(sharpe_arr, self.lookback_window)
+        df = df.with_columns(pl.Series("_pct", pct, dtype=pl.Float64))
+
+        p_neg, p_mid, p_pos = percentile_tercile_soft(
+            pl.col("_pct"),
+            lower_q=self.lower_quantile,
+            upper_q=self.upper_quantile,
+            k=self.softness_k,
+        )
+        df = df.with_columns(
+            p_neg.alias(f"{self.soft_col_prefix}sharpe_neg"),
+            p_mid.alias(f"{self.soft_col_prefix}sharpe_mid"),
+            p_pos.alias(f"{self.soft_col_prefix}sharpe_pos"),
+        )
+        df = df.drop(["_log_ret", "_fwd_ret", "_fwd_vol", "_sharpe", "_pct"])
         return df
 
     @staticmethod

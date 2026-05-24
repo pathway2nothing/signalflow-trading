@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl
 from numba import njit, prange
 
 from signalflow.core import SignalType, labeler
+from signalflow.target._soft_helpers import sigmoid_expr
 from signalflow.target.base import Labeler
 
 
@@ -54,6 +55,12 @@ class TripleBarrierLabeler(Labeler):
       - pt = close * exp(vol * profit_multiplier)
       - sl = close * exp(-vol * stop_loss_multiplier)
     """
+
+    soft_classes: ClassVar[tuple[str, ...]] = (
+        SignalType.FALL.value,
+        SignalType.NONE.value,
+        SignalType.RISE.value,
+    )
 
     price_col: str = "close"
 
@@ -119,6 +126,82 @@ class TripleBarrierLabeler(Labeler):
         drop_cols = ["_vol", "_pt", "_sl", "_up_off", "_dn_off"]
         df = df.drop([c for c in drop_cols if c in df.columns])
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft triple ``(p_fall, p_none, p_rise)`` based on barrier-hit timing.
+
+        Uses the same numba ``_find_first_hit`` to determine which barrier was
+        crossed first, then converts the timing gap into smooth probabilities:
+
+            * Let ``e_up = up_off if hit else horizon`` and likewise ``e_dn``.
+            * ``gap = (e_dn - e_up) / horizon`` ∈ ``[-1, 1]``;
+            * ``p_rise = sigmoid(k * gap)``, ``p_fall = sigmoid(-k * gap)``;
+            * ``p_none = max(1 - p_rise - p_fall, 0)`` (then renormalised) so
+              cases where neither barrier triggered carry probability mass on
+              ``none``.
+        """
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+        if group_df.height == 0:
+            return group_df
+
+        lf = int(self.horizon)
+        vw = int(self.vol_window)
+        df = group_df.with_columns(
+            (pl.col(self.price_col) / pl.col(self.price_col).shift(1))
+            .log()
+            .rolling_std(window_size=vw, ddof=1)
+            .alias("_vol")
+        ).with_columns(
+            (pl.col(self.price_col) * (pl.col("_vol") * self.profit_multiplier).exp()).alias("_pt"),
+            (pl.col(self.price_col) * (-pl.col("_vol") * self.stop_loss_multiplier).exp()).alias("_sl"),
+        )
+
+        prices = df.get_column(self.price_col).to_numpy().astype(np.float64)
+        pt = df.get_column("_pt").fill_null(np.nan).to_numpy().astype(np.float64)
+        sl = df.get_column("_sl").fill_null(np.nan).to_numpy().astype(np.float64)
+        up_off, dn_off = _find_first_hit(prices, pt, sl, lf)
+
+        n = len(prices)
+        finite = ~(np.isnan(pt) | np.isnan(sl))
+        e_up = np.where(up_off > 0, up_off, lf).astype(np.float64)
+        e_dn = np.where(dn_off > 0, dn_off, lf).astype(np.float64)
+        gap = (e_dn - e_up) / float(lf)
+        neither_hit = (up_off == 0) & (dn_off == 0)
+
+        df = df.with_columns(
+            pl.Series("_gap", gap, dtype=pl.Float64),
+            pl.Series("_finite", finite, dtype=pl.Boolean),
+            pl.Series("_neither", neither_hit, dtype=pl.Boolean),
+        )
+
+        p_rise_raw = sigmoid_expr(pl.col("_gap"), self.softness_k)
+        p_fall_raw = sigmoid_expr(-pl.col("_gap"), self.softness_k)
+        # When neither barrier triggered, force the "none" bucket to absorb mass.
+        p_rise_clamped = pl.when(pl.col("_neither")).then(pl.lit(0.0)).otherwise(p_rise_raw)
+        p_fall_clamped = pl.when(pl.col("_neither")).then(pl.lit(0.0)).otherwise(p_fall_raw)
+        p_none_raw = (pl.lit(1.0) - p_rise_clamped - p_fall_clamped).clip(lower_bound=0.0)
+        total = p_rise_clamped + p_fall_clamped + p_none_raw
+        safe = pl.when(total > 0).then(total).otherwise(pl.lit(1.0))
+        null_mask = ~pl.col("_finite")
+
+        df = df.with_columns(
+            pl.when(null_mask).then(pl.lit(None, dtype=pl.Float64)).otherwise(p_fall_clamped / safe).alias(
+                f"{self.soft_col_prefix}{SignalType.FALL.value}"
+            ),
+            pl.when(null_mask).then(pl.lit(None, dtype=pl.Float64)).otherwise(p_none_raw / safe).alias(
+                f"{self.soft_col_prefix}{SignalType.NONE.value}"
+            ),
+            pl.when(null_mask).then(pl.lit(None, dtype=pl.Float64)).otherwise(p_rise_clamped / safe).alias(
+                f"{self.soft_col_prefix}{SignalType.RISE.value}"
+            ),
+        )
+        df = df.drop(["_vol", "_pt", "_sl", "_gap", "_finite", "_neither"])
         return df
 
     def _apply_labels(self, df: pl.DataFrame) -> pl.DataFrame:

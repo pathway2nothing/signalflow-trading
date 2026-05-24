@@ -10,12 +10,13 @@ Implementation uses pure Polars expressions for performance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import signed_tercile_soft
 from signalflow.target.base import Labeler
 
 
@@ -64,6 +65,8 @@ class VolatilityShockLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("vol_shock_down", "vol_normal", "vol_shock_up")
 
     price_col: str = "close"
     horizon: int = 120
@@ -138,4 +141,55 @@ class VolatilityShockLabeler(Labeler):
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft triple ``(p_vol_shock_down, p_vol_normal, p_vol_shock_up)`` from the vol z-score.
+
+        The same forward-vol z-score that drives the hard ``±shock_threshold``
+        decision is passed through :func:`signed_tercile_soft` so the ``normal``
+        bucket gets explicit mass instead of falling through to ``otherwise``.
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+
+        log_ret = (pl.col(self.price_col) / pl.col(self.price_col).shift(1)).log()
+        df = group_df.with_columns(log_ret.alias("_log_ret"))
+        df = df.with_columns(
+            pl.col("_log_ret").rolling_std(self.past_vol_window, min_samples=2).alias("_past_vol"),
+            pl.col("_log_ret").rolling_std(self.vol_window_short, min_samples=2).alias("_inner_vol"),
+            pl.col("_log_ret")
+            .shift(-1)
+            .rolling_std(window_size=self.horizon, min_samples=2)
+            .shift(-(self.horizon - 1))
+            .alias("_fwd_vol"),
+        )
+        df = df.with_columns(
+            pl.col("_inner_vol").rolling_std(self.past_vol_window, min_samples=2).alias("_past_vol_std"),
+        )
+        df = df.with_columns(
+            pl.when(pl.col("_past_vol_std") > 0)
+            .then((pl.col("_fwd_vol") - pl.col("_past_vol")) / pl.col("_past_vol_std"))
+            .otherwise(pl.lit(None))
+            .alias("_vol_z")
+        )
+
+        p_dn, p_mid, p_up = signed_tercile_soft(
+            pl.col("_vol_z"),
+            neg_threshold=self.shock_threshold,
+            pos_threshold=self.shock_threshold,
+            k=self.softness_k,
+        )
+        df = df.with_columns(
+            p_dn.alias(f"{self.soft_col_prefix}vol_shock_down"),
+            p_mid.alias(f"{self.soft_col_prefix}vol_normal"),
+            p_up.alias(f"{self.soft_col_prefix}vol_shock_up"),
+        )
+        df = df.drop(["_log_ret", "_past_vol", "_inner_vol", "_fwd_vol", "_past_vol_std", "_vol_z"])
         return df

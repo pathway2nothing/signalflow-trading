@@ -18,7 +18,14 @@ import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import percentile_tercile_soft
 from signalflow.target.base import Labeler
+
+_MODE_TO_CLASSES: dict[str, tuple[str, str, str]] = {
+    "drawdown": ("dd_mild", "dd_normal", "dd_severe"),
+    "runup": ("ru_mild", "ru_normal", "ru_strong"),
+    "calmar": ("calmar_low", "calmar_mid", "calmar_high"),
+}
 
 try:
     from numba import njit, prange
@@ -116,6 +123,8 @@ class DrawdownLabeler(Labeler):
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
 
+    softness_k: float = 20.0
+
     price_col: str = "close"
     horizon: int = 480
     mode: str = "drawdown"
@@ -126,6 +135,11 @@ class DrawdownLabeler(Labeler):
     meta_columns: tuple[str, ...] = ("metric_value", "metric_percentile")
 
     _VALID_MODES = ("drawdown", "runup", "calmar")
+
+    @property
+    def soft_classes(self) -> tuple[str, ...]:
+        """Per-mode class triple matching :meth:`compute_group`'s string labels."""
+        return _MODE_TO_CLASSES[self.mode]
 
     def __post_init__(self) -> None:
         if self.horizon <= 0:
@@ -189,6 +203,49 @@ class DrawdownLabeler(Labeler):
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft tercile from the rolling-percentile metric (mode-aware classes).
+
+        Reuses the same forward-window metric and rolling-percentile as
+        :meth:`compute_group`, then maps the percentile through
+        :func:`percentile_tercile_soft`.
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+
+        prices = group_df.get_column(self.price_col).to_numpy().astype(np.float64)
+        max_dd, max_ru, log_ret = _forward_dd_ru_ret(prices, self.horizon)
+        if self.mode == "drawdown":
+            metric = max_dd
+        elif self.mode == "runup":
+            metric = max_ru
+        else:
+            metric = np.where(max_dd > 1e-12, log_ret / max_dd, np.nan)
+
+        pct = self._rolling_percentile(metric, self.lookback_window)
+        df = group_df.with_columns(pl.Series("_pct", pct, dtype=pl.Float64))
+
+        p_low, p_mid, p_high = percentile_tercile_soft(
+            pl.col("_pct"),
+            lower_q=self.lower_quantile,
+            upper_q=self.upper_quantile,
+            k=self.softness_k,
+        )
+        c_low, c_mid, c_high = self.soft_classes
+        df = df.with_columns(
+            p_low.alias(f"{self.soft_col_prefix}{c_low}"),
+            p_mid.alias(f"{self.soft_col_prefix}{c_mid}"),
+            p_high.alias(f"{self.soft_col_prefix}{c_high}"),
+        )
+        df = df.drop("_pct")
         return df
 
     @staticmethod
