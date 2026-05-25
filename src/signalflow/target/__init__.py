@@ -4,6 +4,9 @@ from signalflow.target.base import Labeler
 from signalflow.target.drawdown_labeler import DrawdownLabeler
 from signalflow.target.fixed_horizon_labeler import FixedHorizonLabeler
 from signalflow.target.flash_move_labeler import FlashMoveLabeler
+from signalflow.target.hmm_vol_regime_labeler import HMMVolRegime2StateLabeler
+from signalflow.target.market_wide_volatility_labeler import MarketWideVolatilityRegimeLabeler
+from signalflow.target.multi_horizon_mean_reversion_labeler import MultiHorizonMeanReversionLabeler
 from signalflow.target.multi_target_generator import (
     DEFAULT_HORIZONS,
     DEFAULT_TARGET_TYPES,
@@ -34,8 +37,11 @@ __all__ = [
     "DrawdownLabeler",
     "FixedHorizonLabeler",
     "FlashMoveLabeler",
+    "HMMVolRegime2StateLabeler",
     "HorizonConfig",
     "HurstRegimeLabeler",
+    "MarketWideVolatilityRegimeLabeler",
+    "MultiHorizonMeanReversionLabeler",
     "Labeler",
     "MeanReversionEventLabeler",
     "MultiTargetGenerator",
