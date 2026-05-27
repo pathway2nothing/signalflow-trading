@@ -61,15 +61,17 @@ def _generate_ohlcv(n_rows: int) -> pl.DataFrame:
     low = np.minimum(open_prices, close) * (1 - np.abs(rng.normal(0, 0.01, n_rows)))
     volume = np.abs(rng.normal(1000, 300, n_rows))
 
-    return pl.DataFrame({
-        "pair": ["BTCUSDT"] * n_rows,
-        "timestamp": timestamps,
-        "open": open_prices,
-        "high": high,
-        "low": low,
-        "close": close,
-        "volume": volume,
-    })
+    return pl.DataFrame(
+        {
+            "pair": ["BTCUSDT"] * n_rows,
+            "timestamp": timestamps,
+            "open": open_prices,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+        }
+    )
 
 
 def _load_class(class_path: str) -> type:

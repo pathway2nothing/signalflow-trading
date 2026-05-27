@@ -7,13 +7,14 @@ to detect statistically significant trends in price data.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import signed_tercile_soft
 from signalflow.target.base import Labeler
 
 try:
@@ -272,6 +273,8 @@ class TrendScanningLabeler(Labeler):
 
     signal_category: SignalCategory = SignalCategory.TREND_MOMENTUM
 
+    soft_classes: ClassVar[tuple[str, ...]] = ("fall", "neutral", "rise")
+
     price_col: str = "close"
     min_lookforward: int = 5
     max_lookforward: int = 60
@@ -348,4 +351,38 @@ class TrendScanningLabeler(Labeler):
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft triple ``(p_fall, p_neutral, p_rise)`` from the best-window t-statistic.
+
+        Maps the signed t-stat through :func:`signed_tercile_soft` with the
+        symmetric ``±critical_value`` threshold so probabilities reflect
+        statistical confidence in the trend rather than a hard 1.96 cut.
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+
+        prices = group_df[self.price_col].to_numpy().astype(np.float64)
+        t_stats, _ = _trend_scan(prices, self.min_lookforward, self.max_lookforward, self.step)
+        df = group_df.with_columns(pl.Series("_t_stat", t_stats, dtype=pl.Float64))
+
+        p_fall, p_neutral, p_rise = signed_tercile_soft(
+            pl.col("_t_stat"),
+            neg_threshold=self.critical_value,
+            pos_threshold=self.critical_value,
+            k=self.softness_k,
+        )
+        df = df.with_columns(
+            p_fall.alias(f"{self.soft_col_prefix}fall"),
+            p_neutral.alias(f"{self.soft_col_prefix}neutral"),
+            p_rise.alias(f"{self.soft_col_prefix}rise"),
+        )
+        df = df.drop("_t_stat")
         return df

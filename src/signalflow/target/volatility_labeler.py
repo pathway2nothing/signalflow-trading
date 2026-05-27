@@ -9,12 +9,13 @@ Implementation uses pure Polars expressions for performance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import percentile_tercile_soft
 from signalflow.target.base import Labeler
 
 
@@ -58,6 +59,9 @@ class VolatilityRegimeLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("low_volatility", "mid_volatility", "high_volatility")
+    softness_k: float = 20.0
 
     price_col: str = "close"
     horizon: int = 60
@@ -152,6 +156,50 @@ class VolatilityRegimeLabeler(Labeler):
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft tercile probabilities from the rolling vol percentile.
+
+        Uses the same forward-realised-vol percentile that drives the hard
+        ``low_volatility`` / ``high_volatility`` cut, then maps it through
+        :func:`percentile_tercile_soft` so the middle bucket (rows that the
+        hard pipeline emits as ``null``) is represented explicitly as
+        ``p_mid_volatility``.
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.price_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.price_col}'")
+
+        df = group_df.with_columns((pl.col(self.price_col) / pl.col(self.price_col).shift(1)).log().alias("_log_ret"))
+        df = df.with_columns(
+            pl.col("_log_ret")
+            .shift(-1)
+            .rolling_std(window_size=self.horizon, min_samples=2)
+            .shift(-(self.horizon - 1))
+            .alias("_realized_vol")
+        )
+        df = df.with_columns(
+            self._rolling_percentile_expr("_realized_vol", self.lookback_window).alias("_vol_percentile")
+        )
+
+        p_low, p_mid, p_high = percentile_tercile_soft(
+            pl.col("_vol_percentile"),
+            lower_q=self.lower_quantile,
+            upper_q=self.upper_quantile,
+            k=self.softness_k,
+        )
+        df = df.with_columns(
+            p_low.alias(f"{self.soft_col_prefix}low_volatility"),
+            p_mid.alias(f"{self.soft_col_prefix}mid_volatility"),
+            p_high.alias(f"{self.soft_col_prefix}high_volatility"),
+        )
+        df = df.drop(["_log_ret", "_realized_vol", "_vol_percentile"])
         return df
 
     def _rolling_percentile_expr(self, col_name: str, window: int) -> pl.Expr:

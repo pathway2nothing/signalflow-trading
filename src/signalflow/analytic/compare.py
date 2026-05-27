@@ -174,9 +174,7 @@ class ComparisonResult:
         """Export comparison as a JSON-serializable dict."""
         return {
             "names": self.names,
-            "metrics": {
-                name: metrics for name, metrics in zip(self.names, self.raw_metrics, strict=True)
-            },
+            "metrics": {name: metrics for name, metrics in zip(self.names, self.raw_metrics, strict=True)},
         }
 
 

@@ -9,12 +9,13 @@ Implementation uses pure Polars expressions for performance.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import polars as pl
 
 from signalflow.core import labeler
 from signalflow.core.enums import SignalCategory
+from signalflow.target._soft_helpers import signed_tercile_soft
 from signalflow.target.base import Labeler
 
 
@@ -60,6 +61,8 @@ class VolumeRegimeLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.VOLUME_LIQUIDITY
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("illiquidity", "normal_volume", "abnormal_volume")
 
     volume_col: str = "volume"
     horizon: int = 60
@@ -152,4 +155,52 @@ class VolumeRegimeLabeler(Labeler):
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
+        return df
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Soft triple ``(p_illiquidity, p_normal_volume, p_abnormal_volume)``.
+
+        Centres the volume ratio at 1.0 (no excess) and uses
+        :func:`signed_tercile_soft` with thresholds derived from
+        :attr:`spike_threshold` (``ratio - 1 > spike - 1``) and
+        :attr:`drought_threshold` (``1 - ratio > 1 - drought``).
+        """
+        if group_df.height == 0:
+            return group_df
+        if self.volume_col not in group_df.columns:
+            raise ValueError(f"Missing required column '{self.volume_col}'")
+
+        vol = pl.col(self.volume_col)
+        df = group_df.with_columns(
+            vol.rolling_mean(window_size=self.vol_sma_window, min_samples=1).alias("_trailing_sma")
+        )
+        df = df.with_columns(
+            vol.shift(-1)
+            .rolling_mean(window_size=self.horizon, min_samples=1)
+            .shift(-(self.horizon - 1))
+            .alias("_forward_avg")
+        )
+        df = df.with_columns(
+            pl.when(pl.col("_trailing_sma") > 0)
+            .then(pl.col("_forward_avg") / pl.col("_trailing_sma") - 1.0)
+            .otherwise(pl.lit(None))
+            .alias("_excess_ratio")
+        )
+
+        p_dry, p_norm, p_spike = signed_tercile_soft(
+            pl.col("_excess_ratio"),
+            neg_threshold=1.0 - self.drought_threshold,
+            pos_threshold=self.spike_threshold - 1.0,
+            k=self.softness_k,
+        )
+        df = df.with_columns(
+            p_dry.alias(f"{self.soft_col_prefix}illiquidity"),
+            p_norm.alias(f"{self.soft_col_prefix}normal_volume"),
+            p_spike.alias(f"{self.soft_col_prefix}abnormal_volume"),
+        )
+        df = df.drop(["_trailing_sma", "_forward_avg", "_excess_ratio"])
         return df

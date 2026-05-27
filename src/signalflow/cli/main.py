@@ -589,7 +589,8 @@ def preset() -> None:
 
 @preset.command("list")
 @click.option(
-    "--difficulty", "-d",
+    "--difficulty",
+    "-d",
     type=click.Choice(["beginner", "intermediate", "advanced"]),
     help="Filter by difficulty",
 )

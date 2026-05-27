@@ -94,6 +94,22 @@ class Labeler(ABC):
     signal_category: SignalCategory = SignalCategory.PRICE_DIRECTION
     """Signal category this labeler produces. Default: PRICE_DIRECTION."""
 
+    soft_classes: ClassVar[tuple[str, ...]] = ()
+    """Ordered class names emitted by :meth:`compute_soft` as ``p_<class>`` columns.
+
+    Empty by default — subclasses that support soft labeling must declare this
+    tuple. The order is significant: it fixes the column order in the soft output.
+    Class names should mirror the hard labels written to ``out_col`` so the
+    default ``compute_group_soft`` one-hot fallback can map them.
+    """
+
+    soft_col_prefix: ClassVar[str] = "p_"
+    """Prefix prepended to each soft class name to form the output column.
+
+    With ``soft_classes=("rise", "fall")`` and the default prefix, soft output
+    has columns ``p_rise`` and ``p_fall``.
+    """
+
     pair_col: str = "pair"
     ts_col: str = "timestamp"
 
@@ -105,6 +121,15 @@ class Labeler(ABC):
     out_col: str = "label"
     include_meta: bool = False
     meta_columns: tuple[str, ...] = ("t_hit", "ret")
+
+    softness_k: float = 3.0
+    """Sigmoid steepness for soft probability calibration.
+
+    Higher ``softness_k`` makes soft probabilities sharper (closer to 0/1) and
+    collapses toward the hard labeling at the limit. ``softness_k`` only
+    matters for subclasses that compute calibrated soft probabilities; the
+    default one-hot fallback ignores it.
+    """
 
     def compute(
         self,
@@ -163,6 +188,51 @@ class Labeler(ABC):
             raise TypeError(f"{self.__class__.__name__}.compute expects pl.DataFrame, got {type(df)}")
         return self._compute_pl(df=df, signals=signals, data_context=data_context)
 
+    def compute_soft(
+        self,
+        df: pl.DataFrame,
+        signals: Signals | None = None,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Compute soft labels — probability distribution over ``soft_classes``.
+
+        Same orchestration as :meth:`compute` but produces probability columns
+        ``{soft_col_prefix}{class}`` instead of a single categorical label.
+
+        Contract:
+            * For every valid row, probability columns sum to 1.0.
+            * For invalid rows (no forward data, warm-up, etc.), all
+              probability columns are null.
+            * Column order follows :attr:`soft_classes`.
+
+        Subclasses override :meth:`compute_group_soft` with calibrated logic
+        (sigmoid / percentile / Gaussian membership). If they don't, the
+        default falls back to a one-hot encoding of :meth:`compute_group`'s
+        hard labels.
+
+        Args:
+            df: Input data with OHLCV and required columns.
+            signals: Signals for filtering/masking (same semantics as compute).
+            data_context: Additional context (e.g. ``signal_keys``).
+
+        Returns:
+            ``pl.DataFrame`` with columns ``(pair, timestamp, p_<c0>, ..., p_<cN-1>)``.
+
+        Raises:
+            TypeError: If ``df`` is not a Polars DataFrame.
+            NotImplementedError: If ``soft_classes`` is empty (subclass did
+                not declare class names).
+            ValueError: If ``compute_group_soft`` returns a wrong-shaped frame
+                or omits required probability columns.
+        """
+        if not isinstance(df, pl.DataFrame):
+            raise TypeError(f"{self.__class__.__name__}.compute_soft expects pl.DataFrame, got {type(df)}")
+        if not self.soft_classes:
+            raise NotImplementedError(
+                f"{self.__class__.__name__}.soft_classes is empty — declare class names to enable soft labeling"
+            )
+        return self._compute_soft_pl(df=df, signals=signals, data_context=data_context)
+
     def _compute_pl(
         self,
         df: pl.DataFrame,
@@ -214,6 +284,48 @@ class Labeler(ABC):
 
         return out.select(keep_cols)
 
+    def _compute_soft_pl(
+        self,
+        df: pl.DataFrame,
+        signals: Signals | None,
+        data_context: dict[str, Any] | None,
+    ) -> pl.DataFrame:
+        """Internal Polars-based soft computation.
+
+        Mirrors :meth:`_compute_pl` orchestration but dispatches to
+        :meth:`compute_group_soft` and projects only the soft probability
+        columns (plus pair/timestamp).
+        """
+        self._validate_input_pl(df)
+        df0 = df.sort([self.pair_col, self.ts_col])
+
+        if signals is not None and self.filter_signal_type is not None:
+            s_pl = self._signals_to_pl(signals)
+            df0 = self._filter_by_signals_pl(df0, s_pl, self.filter_signal_type)
+
+        soft_cols = [f"{self.soft_col_prefix}{c}" for c in self.soft_classes]
+
+        def _wrapped(g: pl.DataFrame) -> pl.DataFrame:
+            out = self.compute_group_soft(g, data_context=data_context)
+            if not isinstance(out, pl.DataFrame):
+                raise TypeError(f"{self.__class__.__name__}.compute_group_soft must return pl.DataFrame")
+            if out.height != g.height:
+                raise ValueError(
+                    f"{self.__class__.__name__}: len(output_group)={out.height} != len(input_group)={g.height}"
+                )
+            missing = [c for c in soft_cols if c not in out.columns]
+            if missing:
+                raise ValueError(f"{self.__class__.__name__}.compute_group_soft missing required columns: {missing}")
+            return out
+
+        out = df0.group_by(self.pair_col, maintain_order=True).map_groups(_wrapped).sort([self.pair_col, self.ts_col])
+
+        if self.keep_input_columns:
+            return out
+
+        keep_cols = [self.pair_col, self.ts_col, *soft_cols]
+        return out.select(keep_cols)
+
     def _signals_to_pl(self, signals: Signals) -> pl.DataFrame:
         """Convert Signals to Polars DataFrame.
 
@@ -258,6 +370,51 @@ class Labeler(ABC):
             .unique(subset=[self.pair_col, self.ts_col])
         )
         return df.join(s_f, on=[self.pair_col, self.ts_col], how="inner")
+
+    def compute_group_soft(
+        self,
+        group_df: pl.DataFrame,
+        data_context: dict[str, Any] | None = None,
+    ) -> pl.DataFrame:
+        """Compute soft labels for a single pair group.
+
+        Default implementation: one-hot encoding of the hard labels produced
+        by :meth:`compute_group`. For each class ``c`` in :attr:`soft_classes`,
+        emits column ``{soft_col_prefix}{c}`` = 1.0 where the hard label
+        equals ``c``, 0.0 elsewhere, and null where the hard label is null.
+
+        This default is degenerate (probabilities are point masses) and only
+        useful as a fallback for labelers where calibrated probabilities are
+        not meaningful (e.g. event detectors). Labelers with smooth thresholds
+        — percentile, sigmoid, or distance-based — should override this with a
+        calibrated probability distribution.
+
+        Args:
+            group_df: Single pair's data, sorted by timestamp.
+            data_context: Additional context.
+
+        Returns:
+            DataFrame with same height as input, plus probability columns
+            ``{soft_col_prefix}{c}`` for every ``c`` in :attr:`soft_classes`.
+        """
+        hard = self.compute_group(group_df, data_context=data_context)
+        if self.out_col not in hard.columns:
+            raise ValueError(
+                f"{self.__class__.__name__}: default compute_group_soft expects "
+                f"out_col={self.out_col!r} in compute_group output"
+            )
+        label_col = pl.col(self.out_col).cast(pl.Utf8)
+        null_label = label_col.is_null()
+        soft_exprs = [
+            pl.when(null_label)
+            .then(pl.lit(None, dtype=pl.Float64))
+            .when(label_col == pl.lit(str(cls)))
+            .then(pl.lit(1.0))
+            .otherwise(pl.lit(0.0))
+            .alias(f"{self.soft_col_prefix}{cls}")
+            for cls in self.soft_classes
+        ]
+        return hard.with_columns(soft_exprs)
 
     @abstractmethod
     def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:

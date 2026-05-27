@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from signalflow.api.flow import FlowBuilder
 
@@ -93,10 +90,12 @@ class TestSweep:
         base._exit_config = {"tp": 0.02, "sl": 0.01}
 
         mock_batch.return_value = MagicMock()
-        base.sweep({
-            "exit.tp": [0.02, 0.03],
-            "exit.sl": [0.01, 0.02],
-        })
+        base.sweep(
+            {
+                "exit.tp": [0.02, 0.03],
+                "exit.sl": [0.01, 0.02],
+            }
+        )
 
         configs = mock_batch.call_args[0][0]
         assert len(configs) == 4  # 2 * 2

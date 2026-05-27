@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import ClassVar
 
 import polars as pl
 import pytest
 
 from signalflow.analytic.compare import ComparisonResult, compare_results
-
 
 # ── Helpers ────────────────────────────────────────────────────────────
 
@@ -70,13 +69,13 @@ class TestCompareResults:
         class _NoMetrics:
             strategy_id = "bad"
 
-        with pytest.raises(TypeError, match="no .metrics"):
+        with pytest.raises(TypeError, match=r"no \.metrics"):
             compare_results(_NoMetrics(), _NoMetrics())
 
     def test_non_dict_metrics_raises_type_error(self) -> None:
         class _BadMetrics:
             strategy_id = "bad"
-            metrics = [1, 2, 3]
+            metrics: ClassVar[list[int]] = [1, 2, 3]
 
         with pytest.raises(TypeError, match="expected dict"):
             compare_results(_BadMetrics(), _BadMetrics())
@@ -123,7 +122,7 @@ class TestCompareResults:
 
         class _FlowLike:
             strategy_id = "flow1"
-            backtest_metrics: dict[str, float] = {"sharpe_ratio": 1.8}
+            backtest_metrics: ClassVar[dict[str, float]] = {"sharpe_ratio": 1.8}
 
         cmp = compare_results(_FlowLike(), _MockResult("B", {"sharpe_ratio": 1.0}))
         assert cmp.best("sharpe_ratio") == "flow1"

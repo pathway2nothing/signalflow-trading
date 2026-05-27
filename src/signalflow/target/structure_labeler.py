@@ -13,7 +13,7 @@ Both support fixed-percentage and rolling z-score swing filters.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl
@@ -82,6 +82,8 @@ class StructureLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("local_max", "local_min")
 
     price_col: str = "close"
     lookforward: int = 60
@@ -309,6 +311,8 @@ class ZigzagStructureLabeler(Labeler):
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
+
+    soft_classes: ClassVar[tuple[str, ...]] = ("local_max", "local_min")
 
     price_col: str = "close"
     min_swing_pct: float = 0.02

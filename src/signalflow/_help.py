@@ -254,8 +254,8 @@ class _HelpSystem:
         lines.append('    sf.help("sma_cross")          # component docs + params')
         lines.append('    sf.help("detectors")          # list all detectors')
         lines.append('    sf.help.search("momentum")    # search everything')
-        lines.append('    sf.help.metrics()             # list all metrics')
-        lines.append('    sf.help.detectors()           # list all detectors')
+        lines.append("    sf.help.metrics()             # list all metrics")
+        lines.append("    sf.help.detectors()           # list all detectors")
         print("\n".join(lines))
 
     def search(self, query: str) -> None:

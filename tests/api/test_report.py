@@ -9,7 +9,6 @@ import pytest
 
 from signalflow.api.report import Report, ReportSection, build_report
 
-
 # ── Helpers ────────────────────────────────────────────────────────────
 
 
@@ -108,9 +107,13 @@ class TestBuildReport:
         assert "sharpe_ratio" in summary.data
 
     def test_trade_dist_values(self) -> None:
-        result = _MockResult(_trades=[
-            {"pnl": 100.0}, {"pnl": -50.0}, {"pnl": 200.0},
-        ])
+        result = _MockResult(
+            _trades=[
+                {"pnl": 100.0},
+                {"pnl": -50.0},
+                {"pnl": 200.0},
+            ]
+        )
         report = build_report(result)
         dist = next(s for s in report.sections if s.content_type == "trade_dist")
         assert dist.data["total_trades"] == 3
