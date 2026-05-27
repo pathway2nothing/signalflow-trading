@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.6.1"
+version = "0.6.2"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -103,6 +103,13 @@ select = [
     "B",    # flake8-bugbear
     "SIM",  # flake8-simplify
     "RUF",  # ruff-specific rules
+]
+ignore = [
+    # Mathematical docstrings legitimately use Greek letters (µ, σ, π) and
+    # en/em dashes; we don't want ruff fighting that style.
+    "RUF001",  # ambiguous-unicode-character-string
+    "RUF002",  # ambiguous-unicode-character-docstring
+    "RUF003",  # ambiguous-unicode-character-comment
 ]
 
 [tool.ruff.lint.per-file-ignores]
