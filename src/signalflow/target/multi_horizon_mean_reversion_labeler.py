@@ -9,9 +9,10 @@ This is the production version of iter-33's
 single-horizon variant (soft MI 0.179 vs 0.178 on the validated pool)
 and showed marginally better train→test stability across labels.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, ClassVar
 
 import numpy as np
@@ -102,11 +103,13 @@ class MultiHorizonMeanReversionLabeler(Labeler):
         for h in self.horizons:
             member = self._make_member(h)
             out = member.compute_group_soft(group_df)
-            ps = np.column_stack([
-                out.get_column("p_mean_reverted").to_numpy(),
-                out.get_column("p_trend_continuation").to_numpy(),
-                out.get_column("p_no_reversion").to_numpy(),
-            ])
+            ps = np.column_stack(
+                [
+                    out.get_column("p_mean_reverted").to_numpy(),
+                    out.get_column("p_trend_continuation").to_numpy(),
+                    out.get_column("p_no_reversion").to_numpy(),
+                ]
+            )
             row_valid = np.isfinite(ps).all(axis=1)
             accum[row_valid] += ps[row_valid]
             valid_count[row_valid] += 1

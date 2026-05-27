@@ -12,6 +12,7 @@ Use cases:
     * filtering signals during market-wide turbulence;
     * a baseline for cross-asset correlation breaks.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -77,8 +78,7 @@ class MarketWideVolatilityRegimeLabeler(Labeler):
             raise ValueError("horizon must be > 0")
         if not (0.0 < self.lower_quantile < self.upper_quantile < 1.0):
             raise ValueError(
-                "Require 0 < lower_quantile < upper_quantile < 1, "
-                f"got {self.lower_quantile}, {self.upper_quantile}"
+                f"Require 0 < lower_quantile < upper_quantile < 1, got {self.lower_quantile}, {self.upper_quantile}"
             )
         cols = [self.out_col]
         if self.include_meta:
@@ -90,9 +90,7 @@ class MarketWideVolatilityRegimeLabeler(Labeler):
         DataFrame computed once for the whole input."""
         # 1. per-pair log returns
         with_ret = df.sort([self.pair_col, self.ts_col]).with_columns(
-            (pl.col(self.price_col) / pl.col(self.price_col).shift(1).over(self.pair_col))
-            .log()
-            .alias("_log_ret")
+            (pl.col(self.price_col) / pl.col(self.price_col).shift(1).over(self.pair_col)).log().alias("_log_ret")
         )
         # 2. per-pair forward realised vol
         with_fwd = with_ret.with_columns(
@@ -104,11 +102,7 @@ class MarketWideVolatilityRegimeLabeler(Labeler):
             .alias("_fwd_vol")
         )
         # 3. cross-section mean per timestamp
-        mkt = (
-            with_fwd.group_by(self.ts_col)
-            .agg(pl.col("_fwd_vol").mean().alias("mkt_realized_vol"))
-            .sort(self.ts_col)
-        )
+        mkt = with_fwd.group_by(self.ts_col).agg(pl.col("_fwd_vol").mean().alias("mkt_realized_vol")).sort(self.ts_col)
         mkt_arr = mkt.get_column("mkt_realized_vol").to_numpy()
         pct = self._rolling_percentile(mkt_arr, self.lookback_window)
         mkt = mkt.with_columns(pl.Series("mkt_vol_percentile", pct, dtype=pl.Float64))
@@ -196,6 +190,4 @@ class MarketWideVolatilityRegimeLabeler(Labeler):
 
     def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None) -> pl.DataFrame:
         """Not used — :meth:`compute` is overridden for cross-sectional aggregation."""
-        raise NotImplementedError(
-            f"{self.__class__.__name__} is cross-sectional; use compute() directly."
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} is cross-sectional; use compute() directly.")

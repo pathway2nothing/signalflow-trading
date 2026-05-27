@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from signalflow._help import _HelpSystem, _search, help_system
+from signalflow._help import _search, help_system
 from signalflow.help_glossary import GLOSSARY
 
 
@@ -126,10 +126,18 @@ class TestGlossary:
 
     def test_key_terms_present(self) -> None:
         expected = [
-            "sharpe_ratio", "sortino_ratio", "calmar_ratio",
-            "max_drawdown", "win_rate", "profit_factor",
-            "rsi", "macd", "bollinger_bands",
-            "monte_carlo", "bootstrap", "psr",
+            "sharpe_ratio",
+            "sortino_ratio",
+            "calmar_ratio",
+            "max_drawdown",
+            "win_rate",
+            "profit_factor",
+            "rsi",
+            "macd",
+            "bollinger_bands",
+            "monte_carlo",
+            "bootstrap",
+            "psr",
         ]
         for term in expected:
             assert term in GLOSSARY, f"Missing glossary term: {term}"

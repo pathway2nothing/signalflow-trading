@@ -167,7 +167,6 @@ class TripleBarrierLabeler(Labeler):
         sl = df.get_column("_sl").fill_null(np.nan).to_numpy().astype(np.float64)
         up_off, dn_off = _find_first_hit(prices, pt, sl, lf)
 
-        n = len(prices)
         finite = ~(np.isnan(pt) | np.isnan(sl))
         e_up = np.where(up_off > 0, up_off, lf).astype(np.float64)
         e_dn = np.where(dn_off > 0, dn_off, lf).astype(np.float64)
@@ -191,15 +190,18 @@ class TripleBarrierLabeler(Labeler):
         null_mask = ~pl.col("_finite")
 
         df = df.with_columns(
-            pl.when(null_mask).then(pl.lit(None, dtype=pl.Float64)).otherwise(p_fall_clamped / safe).alias(
-                f"{self.soft_col_prefix}{SignalType.FALL.value}"
-            ),
-            pl.when(null_mask).then(pl.lit(None, dtype=pl.Float64)).otherwise(p_none_raw / safe).alias(
-                f"{self.soft_col_prefix}{SignalType.NONE.value}"
-            ),
-            pl.when(null_mask).then(pl.lit(None, dtype=pl.Float64)).otherwise(p_rise_clamped / safe).alias(
-                f"{self.soft_col_prefix}{SignalType.RISE.value}"
-            ),
+            pl.when(null_mask)
+            .then(pl.lit(None, dtype=pl.Float64))
+            .otherwise(p_fall_clamped / safe)
+            .alias(f"{self.soft_col_prefix}{SignalType.FALL.value}"),
+            pl.when(null_mask)
+            .then(pl.lit(None, dtype=pl.Float64))
+            .otherwise(p_none_raw / safe)
+            .alias(f"{self.soft_col_prefix}{SignalType.NONE.value}"),
+            pl.when(null_mask)
+            .then(pl.lit(None, dtype=pl.Float64))
+            .otherwise(p_rise_clamped / safe)
+            .alias(f"{self.soft_col_prefix}{SignalType.RISE.value}"),
         )
         df = df.drop(["_vol", "_pt", "_sl", "_gap", "_finite", "_neither"])
         return df

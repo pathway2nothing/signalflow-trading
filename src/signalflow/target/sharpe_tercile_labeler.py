@@ -75,8 +75,7 @@ class SharpeTercileLabeler(Labeler):
             raise ValueError("horizon must be > 0")
         if not (0.0 < self.lower_quantile < self.upper_quantile < 1.0):
             raise ValueError(
-                "Require 0 < lower_quantile < upper_quantile < 1, "
-                f"got {self.lower_quantile}, {self.upper_quantile}"
+                f"Require 0 < lower_quantile < upper_quantile < 1, got {self.lower_quantile}, {self.upper_quantile}"
             )
         if self.lookback_window < 100:
             raise ValueError("lookback_window must be >= 100 for stable terciles")

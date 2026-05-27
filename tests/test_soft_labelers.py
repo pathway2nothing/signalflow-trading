@@ -1,4 +1,5 @@
 """Tests for the soft-label API on every shipped Labeler subclass."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -53,7 +54,10 @@ def _ohlcv(n: int = 600, seed: int = 0, pair: str = "BTCUSDT") -> pl.DataFrame:
 ALL_LABELERS = [
     ("fixed_horizon", FixedHorizonLabeler(horizon=10, mask_to_signals=False)),
     ("volatility_regime", VolatilityRegimeLabeler(horizon=30, lookback_window=120, mask_to_signals=False)),
-    ("volatility_shock", VolatilityShockLabeler(horizon=60, past_vol_window=200, vol_window_short=30, mask_to_signals=False)),
+    (
+        "volatility_shock",
+        VolatilityShockLabeler(horizon=60, past_vol_window=200, vol_window_short=30, mask_to_signals=False),
+    ),
     ("anomaly", AnomalyLabeler(horizon=30, vol_window=200, mask_to_signals=False)),
     ("flash_move", FlashMoveLabeler(flash_horizon=5, vol_window=100, mask_to_signals=False)),
     ("sharpe_tercile", SharpeTercileLabeler(horizon=30, lookback_window=200, mask_to_signals=False)),
@@ -115,8 +119,18 @@ def test_soft_null_propagation(name: str, labeler) -> None:
         ("fixed_horizon", FixedHorizonLabeler(horizon=10, mask_to_signals=False, softness_k=500.0)),
         ("anomaly", AnomalyLabeler(horizon=30, vol_window=200, mask_to_signals=False, softness_k=500.0)),
         ("flash_move", FlashMoveLabeler(flash_horizon=5, vol_window=100, mask_to_signals=False, softness_k=500.0)),
-        ("vol_shock", VolatilityShockLabeler(horizon=60, past_vol_window=200, vol_window_short=30, mask_to_signals=False, softness_k=500.0)),
-        ("trend_scanning", TrendScanningLabeler(min_lookforward=5, max_lookforward=30, step=5, mask_to_signals=False, softness_k=500.0)),
+        (
+            "vol_shock",
+            VolatilityShockLabeler(
+                horizon=60, past_vol_window=200, vol_window_short=30, mask_to_signals=False, softness_k=500.0
+            ),
+        ),
+        (
+            "trend_scanning",
+            TrendScanningLabeler(
+                min_lookforward=5, max_lookforward=30, step=5, mask_to_signals=False, softness_k=500.0
+            ),
+        ),
     ],
 )
 def test_soft_collapses_to_hard_when_k_is_large(name: str, labeler) -> None:
@@ -166,9 +180,7 @@ def test_default_one_hot_fallback() -> None:
             labels = ["a", "b", None, "c", "b"][: group_df.height]
             return group_df.with_columns(pl.Series("label", labels, dtype=pl.Utf8))
 
-    df = pl.DataFrame(
-        {"pair": ["BTC"] * 5, "timestamp": list(range(5)), "close": [1.0, 2.0, 3.0, 4.0, 5.0]}
-    )
+    df = pl.DataFrame({"pair": ["BTC"] * 5, "timestamp": list(range(5)), "close": [1.0, 2.0, 3.0, 4.0, 5.0]})
     soft = _Simple().compute_soft(df).sort("timestamp")
     assert soft.get_column("p_a").to_list() == [1.0, 0.0, None, 0.0, 0.0]
     assert soft.get_column("p_b").to_list() == [0.0, 1.0, None, 0.0, 1.0]

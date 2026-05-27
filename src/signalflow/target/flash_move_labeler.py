@@ -157,9 +157,11 @@ class FlashMoveLabeler(Labeler):
             (price.shift(-self.flash_horizon) / price).log().alias("_fwd_logret"),
         )
         scale = math.sqrt(self.flash_horizon)
-        z = pl.when(pl.col("_past_vol") > 0).then(
-            pl.col("_fwd_logret") / (pl.col("_past_vol") * scale)
-        ).otherwise(pl.lit(None))
+        z = (
+            pl.when(pl.col("_past_vol") > 0)
+            .then(pl.col("_fwd_logret") / (pl.col("_past_vol") * scale))
+            .otherwise(pl.lit(None))
+        )
         df = df.with_columns(z.alias("_z"))
 
         p_dn, p_mid, p_up = signed_tercile_soft(

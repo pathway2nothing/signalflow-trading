@@ -176,9 +176,7 @@ class VolatilityRegimeLabeler(Labeler):
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
-        df = group_df.with_columns(
-            (pl.col(self.price_col) / pl.col(self.price_col).shift(1)).log().alias("_log_ret")
-        )
+        df = group_df.with_columns((pl.col(self.price_col) / pl.col(self.price_col).shift(1)).log().alias("_log_ret"))
         df = df.with_columns(
             pl.col("_log_ret")
             .shift(-1)

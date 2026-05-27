@@ -216,9 +216,11 @@ class AnomalyLabeler(Labeler):
         df = df.with_columns((price.shift(-self.horizon) / price).log().alias("_forward_ret"))
 
         scale = math.sqrt(self.horizon)
-        z = pl.when(pl.col("_rolling_vol") > 0).then(
-            pl.col("_forward_ret") / (pl.col("_rolling_vol") * scale)
-        ).otherwise(pl.lit(None))
+        z = (
+            pl.when(pl.col("_rolling_vol") > 0)
+            .then(pl.col("_forward_ret") / (pl.col("_rolling_vol") * scale))
+            .otherwise(pl.lit(None))
+        )
         df = df.with_columns(z.alias("_z"))
 
         p_neg, p_norm, p_pos = signed_tercile_soft(

@@ -7,9 +7,8 @@ from typing import Any, ClassVar
 
 import pytest
 
-from signalflow.contrib.scaffold import scaffold, check_component, validate_component
+from signalflow.contrib.scaffold import check_component, scaffold, validate_component
 from signalflow.core import SfComponentType
-
 
 # ── Helpers ────────────────────────────────────────────────────────────
 
@@ -46,8 +45,7 @@ class _ValidFeature:
 class TestScaffold:
     """Tests for scaffold() function."""
 
-    @pytest.mark.parametrize("ct", ["detector", "feature", "validator", "labeler",
-                                     "entry", "exit", "signal_feature"])
+    @pytest.mark.parametrize("ct", ["detector", "feature", "validator", "labeler", "entry", "exit", "signal_feature"])
     def test_generates_file(self, tmp_path: Path, ct: str) -> None:
         path = scaffold("my_test_comp", component_type=ct, output_dir=tmp_path)
         assert path.exists()

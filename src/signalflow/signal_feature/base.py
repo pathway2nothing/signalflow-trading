@@ -157,8 +157,7 @@ class SignalFeature(ABC):
         if self.requires_labels:
             if labels is None:
                 raise ValueError(
-                    f"{self.__class__.__name__} requires labels "
-                    f"(requires_labels=True) but labels=None was passed."
+                    f"{self.__class__.__name__} requires labels (requires_labels=True) but labels=None was passed."
                 )
             self._validate_labels(labels)
         return self.compute(signals=signals, labels=labels, context=context)
@@ -212,10 +211,7 @@ class SignalFeature(ABC):
         )
 
         # Determine _resolved_at
-        if (
-            self.label_resolve_col is not None
-            and self.label_resolve_col in merged.columns
-        ):
+        if self.label_resolve_col is not None and self.label_resolve_col in merged.columns:
             merged = merged.with_columns(
                 pl.col(self.label_resolve_col).alias("_resolved_at"),
             )
@@ -223,16 +219,12 @@ class SignalFeature(ABC):
             # Approximate: shift timestamp forward by label_delay rows
             # within each pair group
             merged = merged.sort(key).with_columns(
-                pl.col(self.ts_col)
-                .shift(-self.label_delay)
-                .over(self.group_col)
-                .alias("_resolved_at"),
+                pl.col(self.ts_col).shift(-self.label_delay).over(self.group_col).alias("_resolved_at"),
             )
         else:
             # Fallback: treat label as resolved at signal time
             logger.debug(
-                "{}: no label_resolve_col or label_delay set, "
-                "using signal timestamp as _resolved_at",
+                "{}: no label_resolve_col or label_delay set, using signal timestamp as _resolved_at",
                 self.__class__.__name__,
             )
             merged = merged.with_columns(
@@ -262,10 +254,7 @@ class SignalFeature(ABC):
             DataFrame with future-peeking labels nulled out.
         """
         if "_resolved_at" not in df.columns:
-            raise ValueError(
-                "DataFrame missing '_resolved_at' column. "
-                "Call prepare_labels() first."
-            )
+            raise ValueError("DataFrame missing '_resolved_at' column. Call prepare_labels() first.")
 
         # Label is valid only if it resolved at or before this row's timestamp
         is_resolved = pl.col("_resolved_at") <= pl.col(self.ts_col)
@@ -276,9 +265,7 @@ class SignalFeature(ABC):
             mask_cols.append(self.label_resolve_col)
 
         exprs = [
-            pl.when(is_resolved).then(pl.col(c)).otherwise(pl.lit(None)).alias(c)
-            for c in mask_cols
-            if c in df.columns
+            pl.when(is_resolved).then(pl.col(c)).otherwise(pl.lit(None)).alias(c) for c in mask_cols if c in df.columns
         ]
 
         return df.with_columns(exprs)
@@ -291,14 +278,10 @@ class SignalFeature(ABC):
         required = {self.group_col, self.ts_col, "signal_type"}
         missing = required - set(signals.columns)
         if missing:
-            raise ValueError(
-                f"{self.__class__.__name__}: signals missing columns {sorted(missing)}"
-            )
+            raise ValueError(f"{self.__class__.__name__}: signals missing columns {sorted(missing)}")
 
     def _validate_labels(self, labels: pl.DataFrame) -> None:
         required = {self.group_col, self.ts_col, "label"}
         missing = required - set(labels.columns)
         if missing:
-            raise ValueError(
-                f"{self.__class__.__name__}: labels missing columns {sorted(missing)}"
-            )
+            raise ValueError(f"{self.__class__.__name__}: labels missing columns {sorted(missing)}")

@@ -70,10 +70,7 @@ class Report:
         return {
             "strategy_id": self.strategy_id,
             "generated_at": self.generated_at,
-            "sections": [
-                {"title": s.title, "content_type": s.content_type, "data": s.data}
-                for s in self.sections
-            ],
+            "sections": [{"title": s.title, "content_type": s.content_type, "data": s.data} for s in self.sections],
         }
 
     def text_summary(self) -> str:
@@ -121,7 +118,7 @@ class Report:
             HTML string (always returned, even when written to file).
         """
         parts: list[str] = [_HTML_HEAD.replace("{{TITLE}}", html_mod.escape(self.strategy_id))]
-        parts.append(f'<h1>{html_mod.escape(self.strategy_id)}</h1>')
+        parts.append(f"<h1>{html_mod.escape(self.strategy_id)}</h1>")
         parts.append(f'<p class="meta">Generated: {html_mod.escape(self.generated_at)}</p>')
 
         for section in self.sections:
@@ -164,30 +161,22 @@ def build_report(result: Any) -> Report:
     # 3. Equity curve SVG
     equity = _get_equity_data(result)
     if equity:
-        sections.append(
-            ReportSection(title="Equity Curve", content_type="equity_svg", data=equity)
-        )
+        sections.append(ReportSection(title="Equity Curve", content_type="equity_svg", data=equity))
 
     # 4. Drawdown SVG
     drawdown = _get_drawdown_data(result)
     if drawdown:
-        sections.append(
-            ReportSection(title="Drawdown", content_type="drawdown_svg", data=drawdown)
-        )
+        sections.append(ReportSection(title="Drawdown", content_type="drawdown_svg", data=drawdown))
 
     # 5. Monthly returns
     monthly = _get_monthly_returns(result)
     if monthly:
-        sections.append(
-            ReportSection(title="Monthly Returns", content_type="monthly_table", data=monthly)
-        )
+        sections.append(ReportSection(title="Monthly Returns", content_type="monthly_table", data=monthly))
 
     # 6. Trade distribution
     trade_dist = _get_trade_distribution(result)
     if trade_dist:
-        sections.append(
-            ReportSection(title="Trade Distribution", content_type="trade_dist", data=trade_dist)
-        )
+        sections.append(ReportSection(title="Trade Distribution", content_type="trade_dist", data=trade_dist))
 
     # 7. Config snapshot
     config = _get_config(result)
@@ -382,8 +371,10 @@ def _html_summary(data: dict[str, Any]) -> str:
             css = ' class="positive"'
         elif sv.startswith("-"):
             css = ' class="negative"'
-        items.append(f'<div class="summary-item"><label>{html_mod.escape(label)}</label>'
-                     f'<div class="value"{css}>{html_mod.escape(sv)}</div></div>')
+        items.append(
+            f'<div class="summary-item"><label>{html_mod.escape(label)}</label>'
+            f'<div class="value"{css}>{html_mod.escape(sv)}</div></div>'
+        )
     return f'<div class="card"><div class="summary-grid">{"".join(items)}</div></div>'
 
 
@@ -393,8 +384,10 @@ def _html_metrics_table(data: dict[str, float]) -> str:
         name = html_mod.escape(k)
         formatted = f"{v:.4f}" if isinstance(v, float) else str(v)
         rows.append(f"<tr><td>{name}</td><td class='num'>{formatted}</td></tr>")
-    return f'<div class="card"><table><thead><tr><th>Metric</th><th>Value</th></tr></thead>' \
-           f'<tbody>{"".join(rows)}</tbody></table></div>'
+    return (
+        f'<div class="card"><table><thead><tr><th>Metric</th><th>Value</th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
 
 
 def _html_svg_line(data: list[dict[str, float]], key: str, color: str, label: str) -> str:
@@ -430,8 +423,10 @@ def _html_monthly(data: list[dict[str, Any]]) -> str:
         ret = row.get("return", 0.0)
         css = "positive" if ret >= 0 else "negative"
         rows.append(f"<tr><td>{m}</td><td class='num {css}'>{ret:+.2%}</td></tr>")
-    return f'<div class="card"><table><thead><tr><th>Month</th><th>Return</th></tr></thead>' \
-           f'<tbody>{"".join(rows)}</tbody></table></div>'
+    return (
+        f'<div class="card"><table><thead><tr><th>Month</th><th>Return</th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
 
 
 def _html_trade_dist(data: dict[str, Any]) -> str:
@@ -440,13 +435,17 @@ def _html_trade_dist(data: dict[str, Any]) -> str:
         label = html_mod.escape(k.replace("_", " ").title())
         formatted = f"{v:,.2f}" if isinstance(v, float) else str(v)
         rows.append(f"<tr><td>{label}</td><td class='num'>{formatted}</td></tr>")
-    return f'<div class="card"><table><thead><tr><th>Stat</th><th>Value</th></tr></thead>' \
-           f'<tbody>{"".join(rows)}</tbody></table></div>'
+    return (
+        f'<div class="card"><table><thead><tr><th>Stat</th><th>Value</th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
 
 
 def _html_config(data: dict[str, Any]) -> str:
     rows = []
     for k, v in data.items():
         rows.append(f"<tr><td>{html_mod.escape(str(k))}</td><td>{html_mod.escape(str(v))}</td></tr>")
-    return f'<div class="card"><table><thead><tr><th>Key</th><th>Value</th></tr></thead>' \
-           f'<tbody>{"".join(rows)}</tbody></table></div>'
+    return (
+        f'<div class="card"><table><thead><tr><th>Key</th><th>Value</th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )

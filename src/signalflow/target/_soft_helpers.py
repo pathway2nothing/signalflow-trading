@@ -12,6 +12,7 @@ Conventions:
     * Where any input expression is null the returned probabilities are null
       so callers can mask invalid bars uniformly.
 """
+
 from __future__ import annotations
 
 import polars as pl
@@ -118,7 +119,4 @@ def gaussian_membership_soft(
         total = total + r
     safe = pl.when(total > 0).then(total).otherwise(pl.lit(1.0))
     null_mask = metric.is_null()
-    return tuple(
-        pl.when(null_mask).then(pl.lit(None, dtype=pl.Float64)).otherwise(r / safe)
-        for r in raws
-    )
+    return tuple(pl.when(null_mask).then(pl.lit(None, dtype=pl.Float64)).otherwise(r / safe) for r in raws)

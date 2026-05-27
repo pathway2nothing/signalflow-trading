@@ -50,11 +50,7 @@ def _make_labels(
     rows: list[dict[str, Any]] = []
     for i, row in enumerate(signals.to_dicts()):
         correct = (i % 10) < int(accuracy * 10)
-        label = (
-            row["signal_type"]
-            if correct
-            else ("fall" if row["signal_type"] == "rise" else "rise")
-        )
+        label = row["signal_type"] if correct else ("fall" if row["signal_type"] == "rise" else "rise")
 
         entry: dict[str, Any] = {
             "pair": row["pair"],
@@ -125,10 +121,7 @@ class DummySupervised(SignalFeature):
 
         col_name = f"rolling_acc_{self.window}"
         merged = merged.with_columns(
-            pl.col("_hit")
-            .rolling_mean(window_size=self.window, min_samples=1)
-            .over(self.group_col)
-            .alias(col_name),
+            pl.col("_hit").rolling_mean(window_size=self.window, min_samples=1).over(self.group_col).alias(col_name),
         )
 
         return merged.select([self.group_col, self.ts_col, col_name])
@@ -281,9 +274,7 @@ class TestLookAheadPrevention:
             resolved = row["_resolved_at"]
             ts = row["timestamp"]
             if resolved is not None and ts is not None and resolved > ts:
-                assert row["label"] is None, (
-                    f"Label should be null at {ts} (resolves at {resolved})"
-                )
+                assert row["label"] is None, f"Label should be null at {ts} (resolves at {resolved})"
 
     def test_mask_unresolved_keeps_resolved_labels(self) -> None:
         """mask_unresolved should keep labels where _resolved_at <= timestamp."""
@@ -367,8 +358,7 @@ class TestLookAheadPrevention:
         acc = row_12["rolling_acc_5"]
         assert acc is not None
         assert acc > 0.9, (
-            f"At hour 12, rolling accuracy should be ~1.0 "
-            f"(only resolved correct labels visible), got {acc}"
+            f"At hour 12, rolling accuracy should be ~1.0 (only resolved correct labels visible), got {acc}"
         )
 
 
@@ -401,9 +391,7 @@ class TestDecoratorRegistration:
                 labels: pl.DataFrame | None = None,
                 context: dict[str, Any] | None = None,
             ) -> pl.DataFrame:
-                return signals.select(["pair", "timestamp"]).with_columns(
-                    pl.lit(1).alias("test_col")
-                )
+                return signals.select(["pair", "timestamp"]).with_columns(pl.lit(1).alias("test_col"))
 
         # Register via decorator
         import signalflow as sf
@@ -415,9 +403,7 @@ class TestDecoratorRegistration:
         assert "test/signal_feature_test" in info
 
         # Verify creation
-        instance = default_registry.create(
-            SfComponentType.SIGNAL_FEATURE, "test/signal_feature_test"
-        )
+        instance = default_registry.create(SfComponentType.SIGNAL_FEATURE, "test/signal_feature_test")
         assert isinstance(instance, SignalFeature)
 
     def test_infer_component_type(self) -> None:
@@ -435,9 +421,7 @@ class TestDecoratorRegistration:
                 labels: pl.DataFrame | None = None,
                 context: dict[str, Any] | None = None,
             ) -> pl.DataFrame:
-                return signals.select(["pair", "timestamp"]).with_columns(
-                    pl.lit(1).alias("inferred")
-                )
+                return signals.select(["pair", "timestamp"]).with_columns(pl.lit(1).alias("inferred"))
 
         from signalflow.core.registry import default_registry
 

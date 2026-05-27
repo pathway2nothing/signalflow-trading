@@ -9,6 +9,7 @@ observations within its training window, so the hard label is
 **forward-looking** and is only valid as a research / labeling target
 — not as a live-trading signal.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

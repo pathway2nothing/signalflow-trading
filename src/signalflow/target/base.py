@@ -229,8 +229,7 @@ class Labeler(ABC):
             raise TypeError(f"{self.__class__.__name__}.compute_soft expects pl.DataFrame, got {type(df)}")
         if not self.soft_classes:
             raise NotImplementedError(
-                f"{self.__class__.__name__}.soft_classes is empty — declare class names "
-                f"to enable soft labeling"
+                f"{self.__class__.__name__}.soft_classes is empty — declare class names to enable soft labeling"
             )
         return self._compute_soft_pl(df=df, signals=signals, data_context=data_context)
 
@@ -316,9 +315,7 @@ class Labeler(ABC):
                 )
             missing = [c for c in soft_cols if c not in out.columns]
             if missing:
-                raise ValueError(
-                    f"{self.__class__.__name__}.compute_group_soft missing required columns: {missing}"
-                )
+                raise ValueError(f"{self.__class__.__name__}.compute_group_soft missing required columns: {missing}")
             return out
 
         out = df0.group_by(self.pair_col, maintain_order=True).map_groups(_wrapped).sort([self.pair_col, self.ts_col])

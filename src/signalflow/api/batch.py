@@ -70,10 +70,12 @@ class BatchResult:
     def summary(self) -> str:
         """Return a text summary of the batch run."""
         lines: list[str] = []
-        lines.append(f"Batch Run: {len(self.results)} configs, "
-                     f"{len(self.successful)} succeeded, "
-                     f"{len(self.errors)} failed, "
-                     f"{self.elapsed:.1f}s")
+        lines.append(
+            f"Batch Run: {len(self.results)} configs, "
+            f"{len(self.successful)} succeeded, "
+            f"{len(self.errors)} failed, "
+            f"{self.elapsed:.1f}s"
+        )
         if len(self.successful) >= 2:
             lines.append("")
             lines.append(self.comparison.summary())

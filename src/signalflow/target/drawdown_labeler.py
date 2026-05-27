@@ -148,8 +148,7 @@ class DrawdownLabeler(Labeler):
             raise ValueError(f"mode must be one of {self._VALID_MODES}, got {self.mode!r}")
         if not (0.0 < self.lower_quantile < self.upper_quantile < 1.0):
             raise ValueError(
-                "Require 0 < lower_quantile < upper_quantile < 1, "
-                f"got {self.lower_quantile}, {self.upper_quantile}"
+                f"Require 0 < lower_quantile < upper_quantile < 1, got {self.lower_quantile}, {self.upper_quantile}"
             )
         if self.lookback_window < 100:
             raise ValueError("lookback_window must be >= 100 for stable terciles")
