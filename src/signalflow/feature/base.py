@@ -31,6 +31,16 @@ class Feature(KwargsTolerantMixin):
     outputs: ClassVar[list[str]] = []
     test_params: ClassVar[list[dict]] = []
 
+    # --- Warmup reproducibility contract (Stage 3) ---
+    # is_recursive: indicator is stateful / entry-point dependent (its value at
+    #   bar N depends on the start of the series unless correctly initialized).
+    # warmup_invariant: indicator guarantees entry-point invariance after warmup
+    #   (e.g. via deterministic SMA-seeded initialization). For recursive features
+    #   that do NOT re-seed deterministically this must be False — otherwise live
+    #   and backtest values diverge and break parity.
+    is_recursive: ClassVar[bool] = False
+    warmup_invariant: ClassVar[bool] = True
+
     group_col: str = "pair"
     ts_col: str = "timestamp"
     normalized: bool = False
@@ -60,6 +70,27 @@ class Feature(KwargsTolerantMixin):
         Default: 0 (no warmup required).
         """
         return 0
+
+    def assert_reproducible(self) -> None:
+        """Assert this feature honours the warmup reproducibility contract.
+
+        A recursive feature that does not guarantee entry-point invariance
+        (``is_recursive and not warmup_invariant``) will produce different
+        values in live vs. backtest depending on the warmup start point,
+        breaking parity. Such a feature raises here so the problem surfaces
+        before it reaches production.
+
+        Raises:
+            RuntimeError: if the feature is recursive and not warmup-invariant.
+        """
+        if self.is_recursive and not self.warmup_invariant:
+            raise RuntimeError(
+                f"{self.__class__.__name__} is recursive (entry-point dependent) and does NOT "
+                f"guarantee warmup invariance (warmup_invariant=False). Its value at a given bar "
+                f"depends on where the warmup window starts, so live values will diverge from "
+                f"backtest and break parity. Use a deterministically seeded (e.g. SMA-init) "
+                f"implementation, or extend warmup until convergence is provably within tolerance."
+            )
 
 
 @dataclass

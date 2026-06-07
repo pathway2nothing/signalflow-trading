@@ -24,10 +24,12 @@ raw_data = sf.load("binance", pairs=["BTC/USDT"], timeframe="1h")
 
 ---
 
-### Signals
-**What it is**: A DataFrame marking timestamps where trading opportunities were detected.
+### Signal
+**What it is**: A *discrete recommendation* emitted by a detector — "enter here / skip here". A `Signals` container is a DataFrame of these recommendations.
 
-**Think of it as**: A list of "buy here" or "sell here" recommendations from your detector.
+**Think of it as**: A list of "buy here" or "sell here" calls from your detector. The detector decides; the `Signal` is its discrete output.
+
+**Not the same as a Forecast**: a `Signal` is the detector's *decision*, while a [Forecast](#forecast) is a model's continuous *prediction* (e.g. `p_revert`) that a detector or validator may consume. Historically a `Signal(p_revert)` carried a probability; conceptually that probability is a Forecast, and `Signal` is now strictly the discrete recommendation.
 
 | Column | Description |
 |--------|-------------|
@@ -43,6 +45,64 @@ signals = detector.run(raw_data.view())
 ```
 
 ---
+
+### Forecast
+**What it is**: The continuous output of a *forecast model* — a prediction about the future (e.g. `p_revert`, an expected return), not a trade recommendation.
+
+**Think of it as**: A model's opinion that a detector or validator reads as one more input. A detector turns Forecasts into discrete [Signals](#signal); a Forecast on its own places no trade.
+
+**How it enters a flow**: register a pinned, versioned model artefact with `.forecast(...)`, then let a consumer read a *window* of its values via `forecasts=[...]` / `forecast_window=`:
+
+```python
+flow = (
+    sf.flow()
+    .data(store="binance", pair="BTC/USDT")
+    .forecast("revert", mlflow="models:/revert/3")           # register pinned artefact (lazy)
+    .detector("example/sma_cross", forecasts=["revert"], forecast_window=30)
+)
+```
+
+See [ModelRef / forecast artefact](#modelref-forecast-artefact) and the [Model Integration guide](guide/model-integration.md).
+
+---
+
+### ModelRef / forecast artefact
+**What it is**: A `ModelRef` is a declarative, *pinned* pointer to a forecast model that lives in an external registry (MLflow, HuggingFace). It carries no weights — only `name`, a mandatory `version`, and a `source`.
+
+**Why version is mandatory**: a floating `latest` silently breaks parity/reproducibility between training and live inference. `version="latest"` is rejected unless `SF_ALLOW_LATEST=1` (dev only).
+
+**Lazy by design**: building a `ModelRef` (and registering it via `.forecast()`) never touches the network. Weights load only when a `Resolver`/`ModelRegistry` resolves the ref.
+
+```python
+from signalflow.models import ModelRef
+
+ref = ModelRef.parse("models:/revert/3")   # or ModelRef.parse("revert@3")
+ref.uri                                     # "models:/revert/3"
+```
+
+See [`signalflow.models`](api/models.md).
+
+---
+
+### feature_hash
+**What it is**: A stable SHA-256 of a feature *recipe* (the ordered list of features + their params + `ta_version` + `raw_data_type`), produced by `FeatureSpec` / `ModelFeaturesPipeline`.
+
+**Think of it as**: A fingerprint of *how* features are built. It is the same for two logically-equal pipelines (key order and float jitter normalized, defaults resolved) but changes whenever a param value, the order of features, or `ta_version` changes.
+
+**Why it matters**: it is a configuration-drift detector. Store the hash with a model artefact at train time; recompute and compare at serve time (`verify_hash`) and refuse to continue on mismatch — that is what keeps train↔serve features identical.
+
+See [Feature API](api/feature.md).
+
+---
+
+### Warmup contract
+**What it is**: The reproducibility guarantee on a `Feature`. A feature declares `is_recursive` (its value depends on where the series starts) and `warmup_invariant` (it re-seeds deterministically so values converge regardless of entry point). `warmup` (property) is the minimum bars before output is stable.
+
+**Why it matters**: a recursive feature that is *not* warmup-invariant produces different values in live vs. backtest depending on the warmup start, breaking parity. `assert_reproducible()` raises on exactly that combination so the problem surfaces before production.
+
+**Warmup-silence (forecast window)**: a flow consumer that reads `forecasts=` must declare a fixed `forecast_window` *in bars*. Fixing the window (rather than "however much accumulated") makes backtest and live cold-start cut the identical slice, so parity holds.
+
+See [Feature API](api/feature.md) and the [Model Integration guide](guide/model-integration.md).
 
 ### Detector
 **What it is**: A component that analyzes market data and outputs trading signals.
@@ -113,15 +173,19 @@ result = (
 - Volatility over last 20 bars
 - Distance from 200-day moving average
 
+**Where features live (v2)**: `flow` no longer constructs features — the `.features()` builder method was removed. Features now live *inside* a forecast artefact (pinned with its weights) or as primitive parameters on a detector. The `FeaturePipeline` class itself remains the computation engine and can be used directly to compute feature columns from a DataFrame:
+
 ```python
-# Features provide context for ML validation
-result = (
-    sf.Backtest("ml_strategy")
-    .features("momentum")  # Adds RSI, MACD, etc. as features
-    .validator("lightgbm")
-    .run()
+from signalflow.feature import FeaturePipeline, ExampleRsiFeature, ExampleSmaFeature
+
+pipeline = FeaturePipeline(
+    features=[ExampleRsiFeature(period=14), ExampleSmaFeature(period=20)],
+    raw_data_type="spot",
 )
+features_df = pipeline.compute(df)
 ```
+
+For the train↔serve reproducibility wrapper (recipe + [feature_hash](#feature_hash)) see `ModelFeaturesPipeline` in the [Feature API](api/feature.md).
 
 ---
 
@@ -177,10 +241,13 @@ result = sf.Backtest("my_strategy").exit(tp=0.03, sl=0.015).run()
 
 ```
 ┌─────────┐    ┌──────────┐    ┌─────────┐    ┌───────────┐    ┌──────────┐
-│  Data   │───▶│ Features │───▶│ Detector│───▶│ Validator │───▶│ Strategy │
+│  Data   │───▶│ Forecast │───▶│ Detector│───▶│ Validator │───▶│ Strategy │
 └─────────┘    └──────────┘    └─────────┘    └───────────┘    └──────────┘
-   OHLCV         RSI, ATR       Signals      Filtered sigs     Entry/Exit
+   OHLCV       (optional)        Signals      Filtered sigs     Entry/Exit
+              pinned model
 ```
+
+Features are no longer a top-level stage: a forecast model (registered with `.forecast()`) carries its own feature recipe inside the artefact, and detectors compute any primitive features they need internally. A detector or validator reads a forecast via `forecasts=[...]` with a fixed `forecast_window`.
 
 ---
 

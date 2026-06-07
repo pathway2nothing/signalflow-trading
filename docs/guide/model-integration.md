@@ -1,12 +1,133 @@
 # External Model Integration
 
-This guide covers integrating external ML/RL models with SignalFlow for automated trading decisions.
+This guide covers two distinct ways of bringing models into SignalFlow:
+
+1. **Forecast models** — pinned, versioned prediction artefacts (e.g. a
+   reversion-probability model) that a flow registers with `.forecast(...)` and
+   that detectors/validators consume as one more input. *Covered first below.*
+2. **Decision models** — an ML/RL model that implements the `StrategyModel`
+   protocol and directly emits `StrategyDecision` objects (ENTER/CLOSE/...).
+   *Covered from [Decision Models](#decision-models-strategymodel) onward.*
 
 ---
 
-## Overview
+## Forecast Models
 
-SignalFlow supports external model integration via a Protocol-based interface:
+A **forecast** is the continuous output of a model (e.g. `p_revert`, an
+expected return) — *not* a trade recommendation. A detector turns forecasts
+into discrete [signals](../glossary.md#signal); a validator can read them when
+deciding whether to keep a signal. Forecast models are trained elsewhere and
+arrive as **versioned, reproducible artefacts**; the trading flow never trains
+them, it only references and consumes them.
+
+### Registering a pinned artefact: `.forecast(...)`
+
+`FlowBuilder.forecast()` records a pinned [`ModelRef`](../api/models.md) under a
+local name. **No weights are loaded here** — this is purely declarative; weights
+resolve later through the registry when the flow runs.
+
+```python
+def forecast(
+    self,
+    name: str,
+    *,
+    mlflow: str | None = None,
+    hf_path: str | None = None,
+    version: str | int | None = None,
+    source: str | None = None,
+) -> Self: ...
+```
+
+| Argument | Meaning |
+|----------|---------|
+| `name` | Local name consumers reference via `forecasts=[name]`. |
+| `mlflow` | MLflow model URI, e.g. `"models:/revert/3"` (version embedded in the URI). |
+| `hf_path` | HuggingFace Hub path (`source="hf"`); **requires** an explicit `version=`. |
+| `version` | Explicit version when not embedded in the URI. `"latest"` is rejected unless `SF_ALLOW_LATEST=1`. |
+| `source` | Override artefact source (`"mlflow"` \| `"hf"`); inferred otherwise. |
+
+Registering the same `name` twice, omitting both `mlflow=` and `hf_path=`, or a
+`version=` that conflicts with the version inside an `mlflow=` URI all raise
+`ConfigurationError`.
+
+### Consuming a forecast: `forecasts=` + `forecast_window=`
+
+`.detector()`, `.validator()` and `.exit()` each accept two keyword arguments:
+
+- `forecasts: list[str]` — names of registered forecasts this consumer reads.
+  The consumer sees a **window** of forecast values `[t-w, t]`, not just the
+  latest point.
+- `forecast_window: int` — window length **in bars**. It is **required**
+  whenever `forecasts` is given, and must be positive.
+
+This is the **warmup-silence contract**: by fixing the window in bars (rather
+than "however much accumulated"), backtest and live cold-start cut the identical
+slice, so parity holds. Passing `forecast_window` without `forecasts`, or
+`forecasts` without a positive `forecast_window`, raises `ConfigurationError`.
+
+### Why the version is mandatory (parity)
+
+A `ModelRef` requires an explicit `version`. A floating `version="latest"`
+silently breaks parity and reproducibility between training and live inference,
+so it is rejected unless `SF_ALLOW_LATEST=1` is set in the environment (dev
+opt-in only). Pinning the version is what guarantees that the exact same model
+artefact is used in research and in production.
+
+### Lazy loading: Resolver and ModelRegistry
+
+Registration is cheap and offline. When the flow runs, a
+[`ModelRegistry`](../api/models.md) (typically `CachingModelRegistry` wrapping
+an `MlflowResolver`) resolves each `ModelRef` to actual weights — and caches
+them so a ref is loaded at most once. Importing `signalflow.models` does **not**
+require `mlflow`; the dependency is imported only at resolve time.
+
+```python
+from signalflow.models import ModelRef, MlflowResolver, CachingModelRegistry
+
+registry = CachingModelRegistry(MlflowResolver())
+model = registry.get(ModelRef.parse("models:/revert/3"))   # weights load here, then cached
+```
+
+### Worked example
+
+```python
+import signalflow as sf
+
+flow = (
+    sf.flow()
+    .data(store="binance", pair="BTC/USDT")
+    # 1. Register a pinned forecast artefact (lazy — no weights loaded yet)
+    .forecast("revert", mlflow="models:/revert/3")
+    # 2. A detector reads a 30-bar window of that forecast
+    .detector("example/sma_cross", forecasts=["revert"], forecast_window=30)
+    # 3. A validator may read the same forecast over its own window
+    .validator("validator/lightgbm", forecasts=["revert"], forecast_window=60)
+)
+
+# Forecast references are validated against registered .forecast() artefacts at run time:
+result = flow.run()
+```
+
+A forecast may be referenced before it is registered (the existence check runs
+lazily at `.run()`), but every referenced name must ultimately be declared via
+`.forecast()`, otherwise `.run()` raises `ConfigurationError`.
+
+!!! note "Features live inside the artefact"
+    The former `.features()` builder method on `flow` was removed. A forecast
+    model carries its own feature recipe inside the artefact, and the
+    train↔serve feature hash (see [`ModelFeaturesPipeline`](../api/feature.md#modelfeaturespipeline))
+    guards against recipe drift. Detectors compute any primitive features they
+    need internally.
+
+---
+
+## Decision Models (`StrategyModel`)
+
+The rest of this guide covers a different integration: an ML/RL model that
+makes trade **decisions** directly via the `StrategyModel` protocol (in contrast
+to a forecast, which only *predicts* and lets a detector decide).
+
+SignalFlow supports this via a Protocol-based interface:
 
 ```
 Backtest Bar

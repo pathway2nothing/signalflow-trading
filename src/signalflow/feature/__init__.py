@@ -10,6 +10,7 @@ from signalflow.feature.informativeness import (
     RollingMIConfig,
 )
 from signalflow.feature.lin_reg_forecast import LinRegForecastFeature
+from signalflow.feature.model_features import ModelFeaturesPipeline
 from signalflow.feature.offset_feature import OffsetFeature
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "GlobalFeature",
     "InformativenessReport",
     "LinRegForecastFeature",
+    "ModelFeaturesPipeline",
     "OffsetFeature",
     "RollingMIConfig",
 ]

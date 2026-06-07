@@ -64,6 +64,32 @@ class FeaturePipeline(Feature):
 
             available.update(f.output_cols())
 
+    def assert_reproducible(self) -> None:
+        """Assert every nested feature honours the warmup reproducibility contract.
+
+        Delegates to :meth:`Feature.assert_reproducible` for each nested feature
+        and aggregates the names of all offending features into a single error,
+        so a pipeline with one or more non-invariant recursive features fails
+        loudly with the specific culprits named.
+
+        Raises:
+            RuntimeError: if any nested feature is recursive and not warmup-invariant.
+        """
+        offenders: list[str] = []
+        for f in self.features:
+            try:
+                f.assert_reproducible()
+            except RuntimeError:
+                offenders.append(f.__class__.__name__)
+
+        if offenders:
+            raise RuntimeError(
+                "FeaturePipeline contains recursive features that do not guarantee "
+                "warmup invariance (entry-point dependent, will break parity): "
+                f"{', '.join(offenders)}. Replace them with SMA-seeded implementations "
+                "or remove them from the pipeline."
+            )
+
     def _group_into_batches(self) -> list[list[Feature]]:
         """Group features: consecutive per-pair → batch, global → separate."""
         batches = []
