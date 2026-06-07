@@ -318,13 +318,11 @@ class TestFlowBuilderFluent:
         result = builder.data(raw=sample_raw_data)
         assert result is builder
 
-    def test_features_returns_self(self, sample_raw_data):
-        """features() returns self for chaining."""
+    def test_forecast_returns_self(self, sample_raw_data):
+        """forecast() returns self for chaining (v2 replaces .features())."""
         builder = flow().data(raw=sample_raw_data)
-        with patch.object(builder, "_feature_pipelines", {}):
-            mock_pipeline = MagicMock()
-            result = builder.features(mock_pipeline)
-            assert result is builder
+        result = builder.forecast("revert", mlflow="models:/revert/3")
+        assert result is builder
 
     def test_detector_returns_self(self, sample_raw_data):
         """detector() returns self for chaining."""
@@ -1019,18 +1017,11 @@ class TestFlowBuilderAdditional:
         resolved = builder._resolve_data()
         assert resolved is sample_raw_data
 
-    def test_features_with_pipeline_instance(self, sample_raw_data):
-        """features() accepts pipeline instance."""
-        mock_pipeline = MagicMock()
-        builder = flow().data(raw=sample_raw_data).features(mock_pipeline)
-        assert "default" in builder._feature_pipelines
-        assert builder._feature_pipelines["default"] is mock_pipeline
-
-    def test_features_with_name(self, sample_raw_data):
-        """features() accepts name parameter."""
-        mock_pipeline = MagicMock()
-        builder = flow().data(raw=sample_raw_data).features(mock_pipeline, name="momentum")
-        assert "momentum" in builder._feature_pipelines
+    def test_forecast_registered_by_name(self, sample_raw_data):
+        """forecast() registers a ModelRef under its name (v2 replaces .features())."""
+        builder = flow().data(raw=sample_raw_data).forecast("revert", mlflow="models:/revert/3")
+        assert "revert" in builder._named_forecasts
+        assert builder._named_forecasts["revert"].name == "revert"
 
     def test_compute_labels_single_labeler(self, sample_raw_data, sample_signals):
         """_compute_labels works with single labeler."""
@@ -1079,13 +1070,9 @@ class TestFlowBuilderAdditional:
         assert "timestamp" in feats_df.columns
         assert "pair" in feats_df.columns
 
-    def test_compute_features_single_pipeline(self, sample_raw_data):
-        """_compute_features transforms data through pipeline."""
-        builder = flow()
-        mock_pipeline = MagicMock()
-        mock_pipeline.compute.return_value = sample_raw_data.get("spot")
-        builder._feature_pipelines = {"default": mock_pipeline}
-
-        result = builder._compute_features(sample_raw_data)
-        mock_pipeline.compute.assert_called_once()
+    def test_compute_features_from_detector(self, sample_raw_data):
+        """compute_features() returns the detector-preprocessed feature matrix (v2)."""
+        builder = flow().data(raw=sample_raw_data).detector("example/sma_cross")
+        result = builder.compute_features(sample_raw_data)
         assert result is not None
+        assert "pair" in result.columns and "timestamp" in result.columns

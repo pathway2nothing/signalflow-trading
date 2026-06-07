@@ -39,10 +39,10 @@ from signalflow.core import (
     default_registry,
     strategy_metric,
 )
+from signalflow.models import ModelRef
 
 if TYPE_CHECKING:
     from signalflow.detector.base import SignalDetector
-    from signalflow.feature import FeaturePipeline
     from signalflow.signal_feature.base import SignalFeature
     from signalflow.target.base import Labeler
     from signalflow.validator.base import SignalValidator
@@ -168,8 +168,9 @@ class FlowConfig:
     strategy_id: str
     run_mode: RunMode
     data_sources: list[str]
-    feature_pipelines: list[str]
+    feature_pipelines: list[str]  # deprecated (v2): always empty — features live in artefacts
     detectors: list[str]
+    forecasts: list[str] = field(default_factory=list)
     signal_features: list[str] = field(default_factory=list)
     labelers: list[str] = field(default_factory=list)
     validators: list[str] = field(default_factory=list)
@@ -539,28 +540,21 @@ class FlowBuilder:
     """
     Fluent builder for unified SignalFlow pipelines.
 
-    FlowBuilder extends BacktestBuilder with:
-    - Feature pipelines (.features())
+    FlowBuilder composes:
+    - Pinned forecast artefacts (.forecast()) — features live inside the artefact
+    - Signal detection (.detector(), with optional forecasts=)
     - Target labeling (.labeler())
+    - Validation / meta-labeling (.validator())
     - Metric nodes (.metrics())
     - Multiple run modes (.run(mode=...))
     - Artifact saving
-
-    Example (feature analysis):
-        >>> result = (
-        ...     sf.flow()
-        ...     .data(store="binance", pair="BTC/USDT", timeframe="1h")
-        ...     .features(pipeline="momentum")
-        ...     .metrics(sf.FeatureMetrics())
-        ...     .run()
-        ... )
 
     Example (full backtest):
         >>> result = (
         ...     sf.flow()
         ...     .data(store="binance", pair="BTC/USDT")
-        ...     .features(pipeline="full")
-        ...     .detector("rsi_cross")
+        ...     .forecast("revert", mlflow="models:/revert/3")
+        ...     .detector("rsi_cross", forecasts=["revert"], forecast_window=30)
         ...     .labeler("triple_barrier", tp=0.02, sl=0.01)
         ...     .validator("lightgbm")
         ...     .entry("market")
@@ -590,8 +584,11 @@ class FlowBuilder:
     _raw: RawData | None = field(default=None, repr=False)
     _named_data: dict[str, RawData | dict[str, Any]] = field(default_factory=dict, repr=False)
 
-    # Features
-    _feature_pipelines: dict[str, FeaturePipeline] = field(default_factory=dict, repr=False)
+    # Forecasts (pinned ML artefacts — declared lazily via .forecast(); weights load at .run())
+    _named_forecasts: dict[str, ModelRef] = field(default_factory=dict, repr=False)
+    # Which named forecasts each consumer (detector/validator/sizing/exit) reads, and its window.
+    _forecast_consumers: dict[str, list[str]] = field(default_factory=dict, repr=False)
+    _forecast_windows: dict[str, int] = field(default_factory=dict, repr=False)
 
     # Detection
     _named_detectors: dict[str, SignalDetector] = field(default_factory=dict, repr=False)
@@ -676,43 +673,61 @@ class FlowBuilder:
         return self
 
     # =========================================================================
-    # Feature Configuration
+    # Forecast Configuration
     # =========================================================================
+    #
+    # NOTE (v2 refactor, VISION §4.2): the former ``.features()`` builder method and
+    # ``_feature_pipelines`` were removed. ``flow`` is a composer of artefacts, not a
+    # feature constructor. Features now live INSIDE a forecast artefact (pinned with its
+    # weights) or as primitive parameters on a detector. Declare models via ``.forecast()``.
 
-    def features(
+    def forecast(
         self,
-        pipeline: FeaturePipeline | str,
+        name: str,
         *,
-        name: str | None = None,
-        **kwargs: Any,
+        mlflow: str | None = None,
+        hf_path: str | None = None,
+        version: str | int | None = None,
+        source: str | None = None,
     ) -> Self:
-        """
-        Add a feature pipeline to the flow.
+        """Register a pinned forecast-model artefact (lazy — no weights loaded here).
+
+        The forecast is referenced by ``name`` from consumers via ``forecasts=[name]``
+        on ``.detector()``/``.validator()``/``.exit()``. Only a :class:`ModelRef` is
+        recorded; weights resolve through the registry at ``.run()`` (VISION §4.3).
 
         Args:
-            pipeline: FeaturePipeline instance or registry name
-            name: Unique name for cross-referencing
-            **kwargs: Parameters for registry-based creation
+            name: Local name to reference this forecast by.
+            mlflow: MLflow model URI, e.g. ``"models:/revert/3"`` (version inside the URI).
+            hf_path: HuggingFace Hub path (``source="hf"``); pair with ``version=``.
+            version: Explicit version when not embedded in the URI. ``latest`` is rejected
+                unless ``SF_ALLOW_LATEST=1`` — otherwise parity/reproducibility is lost.
+            source: Override artefact source (``"mlflow"`` | ``"hf"``); inferred otherwise.
 
         Returns:
-            Self for method chaining
+            Self for method chaining.
         """
-        if isinstance(pipeline, str):
-            try:
-                instance = default_registry.create(
-                    SfComponentType.FEATURE,
-                    pipeline,
-                    **kwargs,
+        if name in self._named_forecasts:
+            raise ConfigurationError(f"Forecast '{name}' already registered")
+
+        if mlflow is not None:
+            ref = ModelRef.parse(mlflow, source="mlflow")
+            if version is not None and str(version) != str(ref.version):
+                raise ConfigurationError(
+                    f"Conflicting version for forecast '{name}': URI says '{ref.version}', version= says '{version}'",
                 )
-            except KeyError:
-                raise ConfigurationError(f"Feature pipeline '{pipeline}' not found in registry") from None
+        elif hf_path is not None:
+            if version is None:
+                raise ConfigurationError(
+                    f"Forecast '{name}' from hf_path requires explicit version=",
+                )
+            ref = ModelRef(name=hf_path, version=version, source=source or "hf")
         else:
-            instance = pipeline
+            raise ConfigurationError(
+                f"Forecast '{name}' needs either mlflow= or hf_path=",
+            )
 
-        if name is None:
-            name = f"features_{len(self._feature_pipelines)}" if self._feature_pipelines else "default"
-
-        self._feature_pipelines[name] = instance
+        self._named_forecasts[name] = ref
         return self
 
     # =========================================================================
@@ -724,6 +739,8 @@ class FlowBuilder:
         detector: SignalDetector | str,
         *,
         name: str | None = None,
+        forecasts: list[str] | None = None,
+        forecast_window: int | None = None,
         **kwargs: Any,
     ) -> Self:
         """
@@ -732,6 +749,12 @@ class FlowBuilder:
         Args:
             detector: SignalDetector instance or registry name
             name: Unique name for cross-referencing
+            forecasts: Names of registered forecasts (see ``.forecast()``) this detector
+                reads. The detector sees a WINDOW of forecast values ``[t-w, t]``, not just
+                the latest point (VISION §6.2).
+            forecast_window: Window length in BARS (not "however much accumulated"). Required
+                when ``forecasts`` is given — fixes the warmup-silence contract so backtest and
+                live cold-start cut the identical slice and parity holds.
             **kwargs: Parameters for registry-based creation
 
         Returns:
@@ -756,7 +779,44 @@ class FlowBuilder:
             name = f"detector_{len(self._named_detectors)}" if self._named_detectors else "default"
 
         self._named_detectors[name] = instance
+        self._register_forecast_consumer(name, forecasts, forecast_window)
         return self
+
+    def _register_forecast_consumer(
+        self,
+        consumer: str,
+        forecasts: list[str] | None,
+        forecast_window: int | None,
+    ) -> None:
+        """Record which forecasts a consumer reads + its window (warmup-silence contract).
+
+        Enforces VISION §6.2: a consumer of ``forecasts=`` MUST declare a fixed bar-count
+        window. Existence of the referenced forecasts is checked lazily (forecasts may be
+        declared after their consumer) via :meth:`_validate_forecast_refs`.
+        """
+        if not forecasts:
+            if forecast_window is not None:
+                raise ConfigurationError(
+                    f"'{consumer}': forecast_window set without forecasts=",
+                )
+            return
+        if forecast_window is None or forecast_window <= 0:
+            raise ConfigurationError(
+                f"'{consumer}': forecasts= requires a positive forecast_window "
+                "(window must be fixed in bars, not 'whatever accumulated' — VISION §6.2)",
+            )
+        self._forecast_consumers[consumer] = list(forecasts)
+        self._forecast_windows[consumer] = forecast_window
+
+    def _validate_forecast_refs(self) -> None:
+        """Every forecast referenced by a consumer must be registered via .forecast()."""
+        for consumer, names in self._forecast_consumers.items():
+            missing = [n for n in names if n not in self._named_forecasts]
+            if missing:
+                raise ConfigurationError(
+                    f"'{consumer}' references unknown forecast(s) {missing}; "
+                    f"registered: {sorted(self._named_forecasts)}",
+                )
 
     def signals(self, signals: Signals) -> Self:
         """Use pre-computed signals (skip detection)."""
@@ -880,6 +940,8 @@ class FlowBuilder:
         validator: SignalValidator | str,
         *,
         name: str | None = None,
+        forecasts: list[str] | None = None,
+        forecast_window: int | None = None,
         **kwargs: Any,
     ) -> Self:
         """
@@ -888,6 +950,8 @@ class FlowBuilder:
         Args:
             validator: SignalValidator instance or registry name
             name: Unique name for cross-referencing
+            forecasts: Names of registered forecasts this validator reads (windowed, §6.2).
+            forecast_window: Window length in bars; required when ``forecasts`` is given.
             **kwargs: Parameters for registry-based creation
 
         Returns:
@@ -912,6 +976,7 @@ class FlowBuilder:
             name = f"validator_{len(self._named_validators)}" if self._named_validators else "default"
 
         self._named_validators[name] = instance
+        self._register_forecast_consumer(f"validator:{name}", forecasts, forecast_window)
         return self
 
     # =========================================================================
@@ -944,9 +1009,15 @@ class FlowBuilder:
         tp: float | None = None,
         sl: float | None = None,
         trailing: float | None = None,
+        forecasts: list[str] | None = None,
+        forecast_window: int | None = None,
         **kwargs: Any,
     ) -> Self:
-        """Configure exit rules."""
+        """Configure exit rules.
+
+        ``forecasts`` / ``forecast_window`` let the exit (ExitPolicy) read a windowed
+        forecast slice (§6.2); ``forecast_window`` is required when ``forecasts`` is set.
+        """
         self._exit_config = {
             "rule": rule,
             "tp": tp,
@@ -954,6 +1025,7 @@ class FlowBuilder:
             "trailing": trailing,
             **kwargs,
         }
+        self._register_forecast_consumer("exit", forecasts, forecast_window)
         return self
 
     def capital(self, amount: float) -> Self:
@@ -1046,13 +1118,17 @@ class FlowBuilder:
         start_time = time.time()
         run_mode = RunMode(mode) if isinstance(mode, str) else mode
 
+        # Forecast references must resolve to declared .forecast() artefacts.
+        self._validate_forecast_refs()
+
         # Build config snapshot
         config = FlowConfig(
             strategy_id=self.strategy_id,
             run_mode=run_mode,
             data_sources=list(self._named_data.keys()),
-            feature_pipelines=list(self._feature_pipelines.keys()),
+            feature_pipelines=[],  # deprecated (v2): features live in forecast artefacts
             detectors=list(self._named_detectors.keys()),
+            forecasts=list(self._named_forecasts.keys()),
             signal_features=[type(sf).__name__ for sf in self._signal_features],
             labelers=list(self._named_labelers.keys()),
             validators=list(self._named_validators.keys()),
@@ -1109,16 +1185,15 @@ class FlowBuilder:
             de = raw.datetime_end
             result.data_end = de.isoformat() if hasattr(de, "isoformat") else str(de)
 
-        # 2. Compute features
-        features_df = None
-        if self._feature_pipelines:
-            features_df = self._compute_features(raw)
-            result.features = features_df
-            _logger.info("Features computed: {} pipeline(s)", len(self._feature_pipelines))
-
-        # 3. Detect signals (capturing preprocessed features)
+        # 2. Detect signals (capturing detector-preprocessed features)
         signals, det_features = self._resolve_signals(raw)
         result.signals = signals
+
+        # v2 (VISION §6.1): the feature matrix for validation comes from detector
+        # preprocessing / forecast artefacts — not from a separate .features() pipeline.
+        features_df = self._merge_detector_features(det_features)
+        if features_df is not None:
+            result.features = features_df
         _logger.info(
             "Signal detection: {} signals from {} detector(s)",
             signals.value.height if signals else 0,
@@ -1618,25 +1693,22 @@ class FlowBuilder:
             # Filter data to test period
             test_raw = self._filter_raw_data(raw, test_start, test_end)
 
-            # Compute features on test data
-            test_features = None
-            if self._feature_pipelines:
-                test_features = self._compute_features(test_raw)
-                result.features = test_features
-
-            # Detect signals on test data
+            # Detect signals on test data (features come from detector preprocessing, v2)
             test_signals, det_features = self._resolve_signals(test_raw)
             result.signals = test_signals
             if det_features:
                 result.detector_features = det_features
+            test_features = self._merge_detector_features(det_features)
+            if test_features is not None:
+                result.features = test_features
 
             # Train validator on train data and validate test signals
             if train_start is not None and train_end is not None and self._named_validators and self._named_labelers:
                 train_raw = self._filter_raw_data(raw, train_start, train_end)
 
-                # Compute features and labels on train data
-                train_features = self._compute_features(train_raw) if self._feature_pipelines else None
-                train_signals, _ = self._resolve_signals(train_raw)
+                # Features and labels on train data (features from detector preprocessing)
+                train_signals, train_det_features = self._resolve_signals(train_raw)
+                train_features = self._merge_detector_features(train_det_features)
                 train_labels = self._compute_labels(train_raw, train_signals) if self._named_labelers else None
 
                 if train_features is not None and train_labels is not None and train_features.height > 0:
@@ -1727,23 +1799,27 @@ class FlowBuilder:
         return self._resolve_data()
 
     def compute_features(self, raw: RawData | None = None) -> pl.DataFrame:
-        """Compute features from all configured pipelines.
+        """Return the feature matrix produced by detector preprocessing (v2).
+
+        ``flow`` no longer owns feature pipelines (VISION §4.2); features come from the
+        detectors' own preprocessing / forecast artefacts. Requires at least one detector.
 
         Args:
             raw: Pre-loaded RawData. If None, resolves from config.
 
-        Returns:
-            DataFrame with computed features.
-
         Raises:
             MissingDataError: If no data and raw is None.
-            ConfigurationError: If no feature pipelines configured.
+            ConfigurationError: If no detector is configured.
         """
         if raw is None:
             raw = self._resolve_data()
-        if not self._feature_pipelines:
-            raise ConfigurationError("No feature pipelines configured")
-        return self._compute_features(raw)
+        if not self._named_detectors:
+            raise ConfigurationError("No detector configured to produce features")
+        _signals, det_features = self._resolve_signals(raw)
+        merged = self._merge_detector_features(det_features)
+        if merged is None:
+            raise ConfigurationError("Detectors produced no features")
+        return merged
 
     def resolve_signals(self, raw: RawData | None = None) -> tuple[Signals, dict[str, pl.DataFrame]]:
         """Detect signals from all detectors, capturing preprocessed features.
@@ -2044,15 +2120,29 @@ class FlowBuilder:
 
         raise MissingDataError()
 
-    def _compute_features(self, raw: RawData) -> pl.DataFrame:
-        """Compute features from all pipelines."""
-        first_key = next(iter(raw.data.keys()), "spot")
-        df = raw.get(first_key)
+    def _merge_detector_features(
+        self,
+        det_features: dict[str, pl.DataFrame],
+    ) -> pl.DataFrame | None:
+        """Build the feature matrix for validation from detector-preprocessed features.
 
-        for _name, pipeline in self._feature_pipelines.items():
-            df = pipeline.compute(df)
-
-        return df
+        v2 (VISION §6.1): features are produced by detector preprocessing (primitive params)
+        or forecast artefacts — there is no separate ``.features()`` pipeline. For a single
+        detector this is its feature frame; for several, outer-join on ``(pair, timestamp)``.
+        """
+        if not det_features:
+            return None
+        frames = list(det_features.values())
+        merged = frames[0]
+        for nxt in frames[1:]:
+            new_cols = [c for c in nxt.columns if c not in ("pair", "timestamp")]
+            merged = merged.join(
+                nxt.select(["pair", "timestamp", *new_cols]),
+                on=["pair", "timestamp"],
+                how="full",
+                coalesce=True,
+            )
+        return merged
 
     def _resolve_signals(self, raw: RawData) -> tuple[Signals, dict[str, pl.DataFrame]]:
         """Detect signals from all detectors, capturing preprocessed features."""
@@ -2211,9 +2301,9 @@ class FlowBuilder:
         if self._named_detectors:
             summary["detectors"] = list(self._named_detectors.keys())
 
-        # Features
-        if self._feature_pipelines:
-            summary["feature_pipelines"] = list(self._feature_pipelines.keys())
+        # Forecasts (pinned artefacts)
+        if self._named_forecasts:
+            summary["forecasts"] = list(self._named_forecasts.keys())
 
         # Entry config (safe keys only)
         if self._entry_config:
@@ -2315,8 +2405,8 @@ class FlowBuilder:
 
     def __repr__(self) -> str:
         parts = [f"strategy_id={self.strategy_id!r}"]
-        if self._feature_pipelines:
-            parts.append(f"features={list(self._feature_pipelines.keys())}")
+        if self._named_forecasts:
+            parts.append(f"forecasts={list(self._named_forecasts.keys())}")
         if self._named_detectors:
             parts.append(f"detectors={list(self._named_detectors.keys())}")
         if self._named_labelers:

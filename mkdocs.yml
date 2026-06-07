@@ -150,6 +150,7 @@ nav:
     - Data: api/data.md
     - Detector: api/detector.md
     - Feature: api/feature.md
+    - Models: api/models.md
     - Labeler: api/labeler.md
     - Validator: api/validator.md
     - Strategy: api/strategy.md

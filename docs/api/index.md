@@ -9,7 +9,8 @@ Complete API documentation for SignalFlow components.
 - [Core](core.md) — Data containers (`RawData`, `Signals`), registry, semantic decorators
 - [Data](data.md) — Exchange loaders, OHLCV resampling, storage backends
 - [Detector](detector.md) — Signal detection algorithms
-- [Feature](feature.md) — Feature extraction, `FeaturePipeline`, informativeness
+- [Feature](feature.md) — Feature extraction, `FeaturePipeline`, `FeatureSpec`, `ModelFeaturesPipeline`, informativeness
+- [Models](models.md) — Pinned forecast artefacts: `ModelRef`, `Resolver`/`MlflowResolver`, `ModelRegistry`/`CachingModelRegistry`
 - [Labeler](labeler.md) — Triple Barrier, Fixed Horizon, Trend Scanning, Volatility
 - [Validator](validator.md) — ML-based signal validation (sklearn, LightGBM, XGBoost)
 - [Strategy](strategy.md) — Runners, brokers, entry/exit rules, sizing, state, monitoring
