@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from signalflow.core import Position, StrategyState, Trade
+from signalflow.core import CashPolicy, StrategyState, Trade, apply_fill
 
 
 class TestStrategyStoreSaveLoad:
@@ -43,32 +43,87 @@ class TestStrategyStoreSaveLoad:
             assert loaded.strategy_id == sid
 
 
-class TestStrategyStorePositions:
-    def test_upsert_positions(self, strategy_store):
-        pos = Position(id="pos_1", pair="BTCUSDT", entry_price=45000.0, qty=0.5)
-        ts = datetime(2024, 1, 1, 12, 0)
-        strategy_store.upsert_positions("test_strat", ts, [pos])
-        # No error - positions persisted
+class TestStrategyStoreReadTrades:
+    def test_read_trades_empty(self, strategy_store):
+        assert strategy_store.read_trades("nonexistent") == []
 
-    def test_upsert_empty_positions(self, strategy_store):
-        ts = datetime(2024, 1, 1, 12, 0)
-        strategy_store.upsert_positions("test_strat", ts, [])
-        # No error - silently returns
+    def test_read_trades_round_trip(self, strategy_store):
+        t1 = Trade(
+            id="t1",
+            position_id="p1",
+            pair="BTCUSDT",
+            side="BUY",
+            ts=datetime(2024, 1, 1, 10),
+            price=100.0,
+            qty=1.0,
+            fee=0.1,
+            meta={"type": "entry", "signal_strength": 0.8},
+        )
+        t2 = Trade(
+            id="t2",
+            position_id="p1",
+            pair="BTCUSDT",
+            side="SELL",
+            ts=datetime(2024, 1, 1, 12),
+            price=110.0,
+            qty=1.0,
+            fee=0.11,
+            meta={"type": "exit"},
+        )
+        strategy_store.append_trade("s", t1)
+        strategy_store.append_trade("s", t2)
 
-    def test_position_requires_id(self, strategy_store):
-        # Position has id by default (uuid), so this should work
-        pos = Position(pair="BTCUSDT")
-        ts = datetime(2024, 1, 1)
-        strategy_store.upsert_positions("test_strat", ts, [pos])
+        trades = strategy_store.read_trades("s")
+        assert [t.id for t in trades] == ["t1", "t2"]  # chronological
+        assert trades[0].ts == datetime(2024, 1, 1, 10)
+        assert trades[0].meta["signal_strength"] == 0.8
+        assert trades[1].side == "SELL"
 
-    def test_upsert_overwrites_position(self, strategy_store):
-        ts = datetime(2024, 1, 1, 12, 0)
-        pos = Position(id="pos_1", pair="BTCUSDT", entry_price=45000.0, qty=0.5)
-        strategy_store.upsert_positions("test_strat", ts, [pos])
+    def test_verify_snapshot_matches_replay(self, strategy_store):
+        # Build a portfolio via the event log, append the trades, save the snapshot.
+        state = StrategyState(strategy_id="s")
+        state.portfolio.cash = 10_000.0
+        entry = Trade(
+            id="t1",
+            position_id="p1",
+            pair="BTCUSDT",
+            side="BUY",
+            ts=datetime(2024, 1, 1, 10),
+            price=100.0,
+            qty=1.0,
+            fee=0.1,
+            meta={"type": "entry"},
+        )
+        apply_fill(state.portfolio, entry, policy=CashPolicy())
+        strategy_store.append_trade("s", entry)
+        strategy_store.save_state(state)
 
-        pos_updated = Position(id="pos_1", pair="BTCUSDT", entry_price=46000.0, qty=1.0)
-        strategy_store.upsert_positions("test_strat", ts, [pos_updated])
-        # No error - upsert succeeded
+        assert strategy_store.verify_snapshot("s", initial_cash=10_000.0) is True
+
+    def test_verify_snapshot_detects_drift(self, strategy_store):
+        state = StrategyState(strategy_id="s")
+        state.portfolio.cash = 10_000.0
+        entry = Trade(
+            id="t1",
+            position_id="p1",
+            pair="BTCUSDT",
+            side="BUY",
+            ts=datetime(2024, 1, 1, 10),
+            price=100.0,
+            qty=1.0,
+            fee=0.1,
+            meta={"type": "entry"},
+        )
+        apply_fill(state.portfolio, entry, policy=CashPolicy())
+        # Tamper the snapshot cash so it no longer matches the log replay.
+        state.portfolio.cash += 999.0
+        strategy_store.append_trade("s", entry)
+        strategy_store.save_state(state)
+
+        assert strategy_store.verify_snapshot("s", initial_cash=10_000.0) is False
+
+    def test_verify_snapshot_no_state(self, strategy_store):
+        assert strategy_store.verify_snapshot("never_saved") is False
 
 
 class TestStrategyStoreTrades:

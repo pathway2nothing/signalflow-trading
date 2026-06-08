@@ -1,14 +1,14 @@
 # src/signalflow/data/strategy_store/duckdb.py
 from __future__ import annotations
 
-from collections.abc import Iterable
 from datetime import datetime
 
 import duckdb
 
-from signalflow.core import Position, StrategyState, Trade, strategy_store
+from signalflow.core import StrategyState, Trade, strategy_store
 from signalflow.data.strategy_store._serialization import state_from_json as _state_from_json
 from signalflow.data.strategy_store._serialization import to_json as _to_json
+from signalflow.data.strategy_store._serialization import trade_from_json as _trade_from_json
 from signalflow.data.strategy_store.base import StrategyStore
 from signalflow.data.strategy_store.schema import SCHEMA_SQL
 
@@ -190,63 +190,28 @@ class DuckDbStrategyStore(StrategyStore):
             [state.strategy_id, state.last_ts, state.last_event_id, payload],
         )
 
-    def upsert_positions(self, strategy_id: str, ts: datetime, positions: Iterable[Position]) -> None:
-        """Upsert position snapshots to database.
-
-        Records point-in-time position state. Updates if (strategy_id, ts, position_id)
-        exists, inserts otherwise.
+    def read_trades(self, strategy_id: str) -> list[Trade]:
+        """Read the trade (event) log in chronological order.
 
         Args:
             strategy_id (str): Strategy identifier.
-            ts (datetime): Snapshot timestamp.
-            positions (Iterable[Position]): Positions to persist.
 
-        Raises:
-            ValueError: If position missing id attribute.
+        Returns:
+            list[Trade]: Trades ordered by ``(ts, trade_id)``.
 
         Example:
             ```python
-            from datetime import datetime
+            from signalflow.core import fold
 
-            # After bar close
-            positions = state.portfolio.positions.values()
-            store.upsert_positions(
-                strategy_id="my_strategy",
-                ts=datetime.now(),
-                positions=positions
-            )
-
-            # Query positions
-            positions_df = store.con.execute(
-                "SELECT * FROM positions WHERE strategy_id = ?",
-                ["my_strategy"]
-            ).pl()
+            trades = store.read_trades("my_strategy")
+            portfolio = fold(trades, initial_cash=10_000.0)
             ```
-
-        Note:
-            Uses batch executemany for efficiency.
-            Silently returns if positions is empty.
-            Position id must be present.
         """
-        rows = []
-        for p in positions:
-            pid = getattr(p, "id", None)
-            if pid is None:
-                raise ValueError("Position must have id")
-            rows.append((strategy_id, ts, str(pid), _to_json(p)))
-
-        if not rows:
-            return
-
-        self.con.executemany(
-            """
-            INSERT INTO positions(strategy_id, ts, position_id, payload_json)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(strategy_id, ts, position_id) DO UPDATE SET
-              payload_json = excluded.payload_json
-            """,
-            rows,
-        )
+        rows = self.con.execute(
+            "SELECT payload_json FROM trades WHERE strategy_id = ? ORDER BY ts, trade_id",
+            [strategy_id],
+        ).fetchall()
+        return [_trade_from_json(row[0]) for row in rows]
 
     def append_trade(self, strategy_id: str, trade: Trade) -> None:
         """Append trade to log.

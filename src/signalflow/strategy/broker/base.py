@@ -13,12 +13,13 @@ Strategy generates intents (orders), Broker executes them.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+import uuid
+from abc import ABC
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import ClassVar
 
-from signalflow.core import Order, OrderFill, Position, StrategyState
+from signalflow.core import CashPolicy, Order, OrderFill, Position, StrategyState, Trade, apply_fill
 from signalflow.core.enums import SfComponentType
 from signalflow.data.strategy_store.base import StrategyStore
 from signalflow.strategy.broker.executor.base import OrderExecutor
@@ -49,6 +50,7 @@ class Broker(ABC):
     executor: OrderExecutor
     store: StrategyStore
     fee_rate: float = 0.001
+    cash_policy: CashPolicy = field(default_factory=CashPolicy)
 
     _pending_fills: list[OrderFill] = field(default_factory=list)
 
@@ -111,14 +113,12 @@ class Broker(ABC):
         - Metrics
         """
         self.store.save_state(state)
-        if state.last_ts:
-            self.store.upsert_positions(state.strategy_id, state.last_ts, state.portfolio.positions.values())
-            if state.metrics:
-                self.store.append_metrics(
-                    state.strategy_id,
-                    state.last_ts,
-                    state.metrics,
-                )
+        if state.last_ts and state.metrics:
+            self.store.append_metrics(
+                state.strategy_id,
+                state.last_ts,
+                state.metrics,
+            )
 
     def restore_state(self, strategy_id: str) -> StrategyState:
         """
@@ -139,37 +139,81 @@ class Broker(ABC):
 
         return state
 
-    @abstractmethod
-    def create_position(
-        self,
-        order: Order,
-        fill: OrderFill,
-    ) -> Position:
+    @staticmethod
+    def _fill_to_trade(fill: OrderFill, order: Order, *, is_exit: bool) -> Trade:
+        """Translate an execution fill into the canonical Trade event.
+
+        Entry trades carry the data needed to fully reconstruct the position on
+        replay (signal_strength, order/fill ids, order meta); exit trades only
+        reference the affected position. See ``core.eventlog`` for the fold.
         """
-        Create new position from order and fill.
+        if is_exit:
+            return Trade(
+                id=fill.id,
+                position_id=fill.position_id,
+                pair=fill.pair,
+                side=fill.side,
+                ts=fill.ts,
+                price=fill.price,
+                qty=fill.qty,
+                fee=fill.fee,
+                meta={"type": "exit", **fill.meta},
+            )
+        return Trade(
+            id=fill.id,
+            position_id=str(uuid.uuid4()),
+            pair=fill.pair,
+            side=fill.side,
+            ts=fill.ts,
+            price=fill.price,
+            qty=fill.qty,
+            fee=fill.fee,
+            meta={
+                "type": "entry",
+                "signal_strength": order.signal_strength,
+                "order_id": order.id,
+                "fill_id": fill.id,
+                **order.meta,
+                **fill.meta,
+            },
+        )
 
-        Args:
-            order: Original open order
-            fill: Execution fill
+    def process_fills(self, fills: list[OrderFill], orders: list[Order], state: StrategyState) -> list[Trade]:
+        """Fold execution fills into the portfolio and return the trade events.
 
-        Returns:
-            New Position instance
+        Position math and cash accounting live in ``core.eventlog.apply_fill``
+        (parameterised by ``self.cash_policy``), so every broker shares one
+        implementation — no duplicated fill->position logic.
         """
-        ...
+        trades: list[Trade] = []
+        order_map = {o.id: o for o in orders}
 
-    @abstractmethod
-    def apply_fill_to_position(
-        self,
-        position: Position,
-        fill: OrderFill,
-    ) -> None:
-        """
-        Apply fill to existing position.
+        for fill in fills:
+            order = order_map.get(fill.order_id)
+            if order is None:
+                continue
 
-        Mutates position in-place.
+            is_exit = bool(fill.position_id) and fill.position_id in state.portfolio.positions
+            trade = self._fill_to_trade(fill, order, is_exit=is_exit)
+            apply_fill(state.portfolio, trade, policy=self.cash_policy)
+            trades.append(trade)
 
-        Args:
-            position: Position to update
-            fill: Fill to apply
-        """
-        ...
+        return trades
+
+    def mark_positions(self, state: StrategyState, prices: dict[str, float], ts: datetime) -> None:
+        """Mark all open positions to current prices (mark-to-market)."""
+        for position in state.portfolio.open_positions():
+            price = prices.get(position.pair)
+            if price is not None and price > 0:
+                position.mark(ts=ts, price=price)
+
+    def get_open_position_for_pair(self, state: StrategyState, pair: str) -> Position | None:
+        """Get the open position for a specific pair, if any."""
+        for pos in state.portfolio.open_positions():
+            if pos.pair == pair:
+                return pos
+        return None
+
+    def get_open_positions_by_pair(self, state: StrategyState) -> dict[str, Position]:
+        """Get dict of pair -> open position."""
+        return {pos.pair: pos for pos in state.portfolio.open_positions()}

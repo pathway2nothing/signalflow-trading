@@ -14,6 +14,7 @@ from loguru import logger
 
 import signalflow as sf
 from signalflow.analytic import StrategyMetric
+from signalflow.core import required_warmup_bars
 from signalflow.core.containers.raw_data import RawData
 from signalflow.core.containers.raw_data_view import RawDataView
 from signalflow.core.containers.signals import Signals
@@ -262,6 +263,20 @@ class RealtimeRunner(StrategyRunner):
     #  Signal detection                                                   #
     # ------------------------------------------------------------------ #
 
+    def required_warmup_bars(self) -> int:
+        """Warmup window derived from the components (§4.2 contract).
+
+        Takes the max warmup declared by the detector and entry/exit rules,
+        floored at the configured ``warmup_bars``. Backtest must use the same
+        value (``assert_warmup_consistency``) to preserve parity.
+        """
+        return required_warmup_bars(
+            self.detector,
+            self.entry_rules,
+            self.exit_rules,
+            floor=self.warmup_bars,
+        )
+
     def _detect_signals(self, ts: datetime) -> tuple[pl.DataFrame, Signals]:
         """Load warmup window and run the detector for *ts*.
 
@@ -270,7 +285,7 @@ class RealtimeRunner(StrategyRunner):
             and signals are filtered to *ts*.
         """
         tf_minutes = _TIMEFRAME_MINUTES.get(self.timeframe, 1)
-        warmup_start = ts - timedelta(minutes=tf_minutes * self.warmup_bars)
+        warmup_start = ts - timedelta(minutes=tf_minutes * self.required_warmup_bars())
 
         window_df = self.raw_store.load_many(
             self.pairs,
@@ -334,7 +349,7 @@ class RealtimeRunner(StrategyRunner):
             # First run — only load a warmup window before the latest bar
             # instead of replaying the entire store history.
             tf_minutes = _TIMEFRAME_MINUTES.get(self.timeframe, 1)
-            lookback = timedelta(minutes=tf_minutes * (self.warmup_bars + 10))
+            lookback = timedelta(minutes=tf_minutes * (self.required_warmup_bars() + 10))
             start = latest - lookback
         df = self.raw_store.load_many(self.pairs, start=start, end=latest)
 
@@ -457,12 +472,6 @@ class RealtimeRunner(StrategyRunner):
                     ts,
                     state.metrics,
                 )
-                if hasattr(state.portfolio, "open_positions"):
-                    self.strategy_store.upsert_positions(
-                        self.strategy_id,
-                        ts,
-                        state.portfolio.open_positions(),
-                    )
         except Exception:
             logger.exception("Failed to persist state")
 

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from datetime import datetime
 
-from signalflow.core import Position, StrategyState, Trade, strategy_store
+from signalflow.core import StrategyState, Trade, strategy_store
 from signalflow.data.strategy_store._serialization import (
     state_from_json as _state_from_json,
 )
 from signalflow.data.strategy_store._serialization import (
     to_json as _to_json,
+)
+from signalflow.data.strategy_store._serialization import (
+    trade_from_json as _trade_from_json,
 )
 from signalflow.data.strategy_store.base import StrategyStore
 
@@ -23,7 +25,6 @@ class InMemoryStrategyStore(StrategyStore):
 
     def __init__(self, **kwargs: object) -> None:
         self._states: dict[str, str] = {}  # strategy_id -> payload_json
-        self._positions: dict[tuple[str, datetime, str], str] = {}  # (sid, ts, pid) -> json
         self._trades: dict[tuple[str, str], str] = {}  # (sid, tid) -> json
         self._metrics: dict[tuple[str, datetime, str], float] = {}  # (sid, ts, name) -> value
 
@@ -39,12 +40,10 @@ class InMemoryStrategyStore(StrategyStore):
     def save_state(self, state: StrategyState) -> None:
         self._states[state.strategy_id] = _to_json(state)
 
-    def upsert_positions(self, strategy_id: str, ts: datetime, positions: Iterable[Position]) -> None:
-        for p in positions:
-            pid = getattr(p, "id", None)
-            if pid is None:
-                raise ValueError("Position must have id")
-            self._positions[(strategy_id, ts, str(pid))] = _to_json(p)
+    def read_trades(self, strategy_id: str) -> list[Trade]:
+        trades = [_trade_from_json(payload) for (sid, _tid), payload in self._trades.items() if sid == strategy_id]
+        trades.sort(key=lambda t: (t.ts, t.id))
+        return trades
 
     def append_trade(self, strategy_id: str, trade: Trade) -> None:
         tid = getattr(trade, "id", None) or getattr(trade, "trade_id", None)
@@ -61,6 +60,5 @@ class InMemoryStrategyStore(StrategyStore):
 
     def close(self) -> None:
         self._states.clear()
-        self._positions.clear()
         self._trades.clear()
         self._metrics.clear()

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from signalflow.core import Position, StrategyState, Trade
+from signalflow.core import StrategyState, Trade
 
 PG_DSN = os.environ.get("SIGNALFLOW_PG_DSN", "")
 pg_available = pytest.mark.skipif(not PG_DSN, reason="SIGNALFLOW_PG_DSN not set")
@@ -115,6 +115,16 @@ class TestPgStrategyStore:
     def test_append_metrics(self, pg_store):
         pg_store.append_metrics("test", datetime(2024, 1, 1), {"sharpe": 1.5})
 
-    def test_upsert_positions(self, pg_store):
-        pos = Position(id="p1", pair="BTCUSDT", entry_price=45000.0, qty=0.5)
-        pg_store.upsert_positions("test", datetime(2024, 1, 1), [pos])
+    def test_read_trades_round_trip(self, pg_store):
+        trade = Trade(
+            id="t1",
+            position_id="p1",
+            pair="BTCUSDT",
+            side="BUY",
+            ts=datetime(2024, 1, 1),
+            price=45000.0,
+            qty=0.5,
+            fee=0.1,
+        )
+        pg_store.append_trade("test", trade)
+        assert [t.id for t in pg_store.read_trades("test")] == ["t1"]

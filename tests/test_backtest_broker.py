@@ -26,15 +26,22 @@ def _make_state(cash=10000.0):
 TS = datetime(2024, 1, 1)
 
 
-# ── create_position ─────────────────────────────────────────────────────────
+# ── position creation (entry path via process_fills + eventlog) ──────────────
+
+
+def _only_position(state):
+    assert len(state.portfolio.positions) == 1
+    return next(iter(state.portfolio.positions.values()))
 
 
 class TestCreatePosition:
     def test_buy_creates_long(self):
         broker = _make_broker()
+        state = _make_state()
         order = Order(id="o1", pair="BTCUSDT", side="BUY", qty=1.0, meta={"signal": "test"})
         fill = OrderFill(id="f1", order_id="o1", pair="BTCUSDT", side="BUY", ts=TS, price=100.0, qty=1.0, fee=0.1)
-        pos = broker.create_position(order, fill)
+        broker.process_fills([fill], [order], state)
+        pos = _only_position(state)
         assert pos.position_type == PositionType.LONG
         assert pos.pair == "BTCUSDT"
         assert pos.entry_price == 100.0
@@ -43,17 +50,21 @@ class TestCreatePosition:
 
     def test_sell_creates_short(self):
         broker = _make_broker()
+        state = _make_state()
         order = Order(id="o1", pair="ETHUSDT", side="SELL", qty=2.0)
         fill = OrderFill(id="f1", order_id="o1", pair="ETHUSDT", side="SELL", ts=TS, price=50.0, qty=2.0, fee=0.05)
-        pos = broker.create_position(order, fill)
+        broker.process_fills([fill], [order], state)
+        pos = _only_position(state)
         assert pos.position_type == PositionType.SHORT
         assert pos.qty == 2.0
 
     def test_meta_includes_order_meta(self):
         broker = _make_broker()
+        state = _make_state()
         order = Order(id="o1", pair="BTCUSDT", side="BUY", qty=1.0, meta={"custom": "value"})
         fill = OrderFill(id="f1", order_id="o1", pair="BTCUSDT", side="BUY", ts=TS, price=100.0, qty=1.0, fee=0.0)
-        pos = broker.create_position(order, fill)
+        broker.process_fills([fill], [order], state)
+        pos = _only_position(state)
         assert pos.meta["custom"] == "value"
         assert pos.meta["order_id"] == "o1"
         assert pos.meta["fill_id"] == "f1"

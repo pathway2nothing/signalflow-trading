@@ -55,6 +55,13 @@ from signalflow.core.enums import (
     SignalCategory,
     SignalType,
 )
+from signalflow.core.eventlog import (
+    CashPolicy,
+    apply_fill,
+    fold,
+    portfolios_match,
+    replay_state,
+)
 from signalflow.core.registry import (
     ComponentInfo,
     SignalFlowRegistry,
@@ -63,8 +70,15 @@ from signalflow.core.registry import (
     get_component_info,
 )
 from signalflow.core.signal_transform import SignalsTransform
+from signalflow.core.warmup import (
+    assert_warmup_consistency,
+    required_warmup_bars,
+    warmup_bars_of,
+)
 
 __all__ = [
+    # Event log (source of truth)
+    "CashPolicy",
     # Registry
     "ComponentInfo",
     # Enums
@@ -92,6 +106,9 @@ __all__ = [
     "Trade",
     # Semantic decorators (new API)
     "alert",
+    "apply_fill",
+    # Warmup contract
+    "assert_warmup_consistency",
     "data_source",
     "data_store",
     "default_registry",
@@ -100,10 +117,14 @@ __all__ = [
     "executor",
     "exit",
     "feature",
+    "fold",
     "get_component",
     "get_component_info",
     "labeler",
+    "portfolios_match",
     "register",
+    "replay_state",
+    "required_warmup_bars",
     "risk",
     # Legacy decorator (deprecated)
     "sf_component",
@@ -112,4 +133,5 @@ __all__ = [
     "strategy_metric",
     "strategy_store",
     "validator",
+    "warmup_bars_of",
 ]

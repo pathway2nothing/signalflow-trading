@@ -4,10 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from signalflow.core.containers.position import Position
 from signalflow.core.containers.strategy_state import StrategyState
 from signalflow.core.containers.trade import Trade
-from signalflow.core.enums import PositionType
 from signalflow.data.raw_store.memory_store import InMemoryRawStore
 from signalflow.data.strategy_store.memory import InMemoryStrategyStore
 
@@ -200,20 +198,14 @@ class TestInMemoryStrategyStore:
         store = InMemoryStrategyStore()
         assert store.load_state("nonexistent") is None
 
-    def test_upsert_positions(self):
+    def test_read_trades_round_trip(self):
         store = InMemoryStrategyStore()
-        pos = Position(id="p1", pair="BTCUSDT", position_type=PositionType.LONG, entry_price=100.0, qty=1.0)
-        store.upsert_positions("s1", TS, [pos])
-        assert ("s1", TS, "p1") in store._positions
-
-    def test_upsert_position_no_id_raises(self):
-        store = InMemoryStrategyStore()
-
-        class FakePos:
-            id = None
-
-        with pytest.raises(ValueError, match="Position must have id"):
-            store.upsert_positions("s1", TS, [FakePos()])
+        t1 = Trade(id="t1", position_id="p1", pair="BTCUSDT", side="BUY", ts=TS, price=100.0, qty=1.0, fee=0.1)
+        store.append_trade("s1", t1)
+        trades = store.read_trades("s1")
+        assert [t.id for t in trades] == ["t1"]
+        assert trades[0].ts == TS
+        assert store.read_trades("other") == []
 
     def test_append_trade(self):
         store = InMemoryStrategyStore()

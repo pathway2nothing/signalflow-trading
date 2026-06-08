@@ -299,20 +299,30 @@ Timeline:
 - Natural support for averaging (multiple small positions)
 - Atomic P&L attribution per trade
 
-## State Persistence
+## State Persistence — event log is the source of truth
 
-`StateManager` provides durable state across sessions with multiple backends:
+The portfolio changes ONLY through fills, so the system is event-sourced by
+definition: the append-only **trade log** is the source of truth and the saved
+state is a derived **snapshot cache**, verifiable by replay.
 
 ```python
-from signalflow.strategy.state import StateManager
+from signalflow.core import fold
+from signalflow.data.strategy_store import DuckDbStrategyStore
 
-state = StateManager(
-    backend="redis",          # "redis", "duckdb", "memory"
-    recovery_mode="snapshot", # "snapshot", "replay"
-)
+store = DuckDbStrategyStore("bot.duckdb")
+store.init()
+
+# Replay the event log into a portfolio (state = fold(events))
+portfolio = fold(store.read_trades("my_bot"), initial_cash=10_000.0)
+
+# Verify the snapshot cache equals the log replay
+assert store.verify_snapshot("my_bot", initial_cash=10_000.0)
 ```
 
-Backends: **Redis** (production, shared state), **DuckDB** (single-node persistence), **Memory** (backtesting)
+`StrategyStore` backends: **DuckDB** (single-node), **Memory** (backtesting),
+plus optional Postgres. Durable live-trading state recovery (`StateManager`,
+Redis backend) lives in the work-in-progress `signalflow.strategy.live` package
+until live trading is wired.
 
 ## Statistical Analysis
 

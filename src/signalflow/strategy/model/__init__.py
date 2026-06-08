@@ -39,6 +39,7 @@ Example:
 from signalflow.strategy.model.context import ModelContext
 from signalflow.strategy.model.decision import StrategyAction, StrategyDecision
 from signalflow.strategy.model.protocol import StrategyModel
+from signalflow.strategy.model.resolve import resolve_strategy_model
 from signalflow.strategy.model.rules import ModelEntryRule, ModelExitRule
 
 __all__ = [
@@ -48,4 +49,5 @@ __all__ = [
     "StrategyAction",
     "StrategyDecision",
     "StrategyModel",
+    "resolve_strategy_model",
 ]

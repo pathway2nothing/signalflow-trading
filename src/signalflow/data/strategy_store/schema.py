@@ -7,14 +7,6 @@ CREATE TABLE IF NOT EXISTS strategy_state (
   payload_json TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS positions (
-  strategy_id TEXT NOT NULL,
-  ts TIMESTAMP NOT NULL,
-  position_id TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  PRIMARY KEY (strategy_id, ts, position_id)
-);
-
 CREATE TABLE IF NOT EXISTS trades (
   strategy_id TEXT NOT NULL,
   ts TIMESTAMP NOT NULL,
@@ -32,7 +24,7 @@ CREATE TABLE IF NOT EXISTS metrics (
 );
 
 CREATE INDEX IF NOT EXISTS idx_metrics_strategy_ts ON metrics(strategy_id, ts);
-CREATE INDEX IF NOT EXISTS idx_positions_strategy_ts ON positions(strategy_id, ts);
+CREATE INDEX IF NOT EXISTS idx_trades_strategy_ts ON trades(strategy_id, ts);
 """
 
 PG_SCHEMA_SQL = """
@@ -41,14 +33,6 @@ CREATE TABLE IF NOT EXISTS strategy_state (
   last_ts TIMESTAMP,
   last_event_id TEXT,
   payload_json TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS positions (
-  strategy_id TEXT NOT NULL,
-  ts TIMESTAMP NOT NULL,
-  position_id TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  PRIMARY KEY (strategy_id, ts, position_id)
 );
 
 CREATE TABLE IF NOT EXISTS trades (
@@ -68,5 +52,5 @@ CREATE TABLE IF NOT EXISTS metrics (
 );
 
 CREATE INDEX IF NOT EXISTS idx_metrics_strategy_ts ON metrics(strategy_id, ts);
-CREATE INDEX IF NOT EXISTS idx_positions_strategy_ts ON positions(strategy_id, ts);
+CREATE INDEX IF NOT EXISTS idx_trades_strategy_ts ON trades(strategy_id, ts);
 """

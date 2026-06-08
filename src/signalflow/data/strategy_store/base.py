@@ -2,11 +2,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
 from datetime import datetime
 from typing import ClassVar
 
-from signalflow.core import Position, SfComponentType, StrategyState, Trade
+from signalflow.core import (
+    CashPolicy,
+    SfComponentType,
+    StrategyState,
+    Trade,
+    fold,
+    portfolios_match,
+)
 
 
 class StrategyStore(ABC):
@@ -19,9 +25,9 @@ class StrategyStore(ABC):
 
     Key responsibilities:
         - Initialize storage backend (tables, indexes, etc.)
-        - Load/save complete strategy state for recovery
+        - Load/save complete strategy state (snapshot cache) for recovery
         - Append event streams (trades, metrics)
-        - Upsert position snapshots
+        - Read back the trade log for deterministic replay / snapshot verification
 
     Common implementations:
         - DuckDB: Local file-based storage
@@ -29,9 +35,9 @@ class StrategyStore(ABC):
         - Parquet: Time-series optimized storage
 
     Persistence patterns:
-        - State: Full snapshot for recovery (load_state, save_state)
-        - Events: Append-only logs (append_trade, append_metrics)
-        - Snapshots: Point-in-time positions (upsert_positions)
+        - State: Full snapshot CACHE for recovery (load_state, save_state)
+        - Events: Append-only log — source of truth (append_trade, read_trades)
+        - Metrics: Append-only time series (append_metrics)
 
     Example:
         ```python
@@ -63,13 +69,6 @@ class StrategyStore(ABC):
                 fee=22.5
             )
             store.append_trade("my_strategy", trade)
-
-            # Persist position snapshot
-            store.upsert_positions(
-                "my_strategy",
-                datetime.now(),
-                state.portfolio.positions.values()
-            )
 
             # Persist metrics
             metrics = {"total_return": 0.05, "sharpe_ratio": 1.2}
@@ -178,35 +177,48 @@ class StrategyStore(ABC):
         ...
 
     @abstractmethod
-    def upsert_positions(self, strategy_id: str, ts: datetime, positions: Iterable[Position]) -> None:
-        """Upsert position snapshots.
+    def read_trades(self, strategy_id: str) -> list[Trade]:
+        """Read the full trade (event) log for a strategy, in chronological order.
 
-        Records point-in-time position state for analysis and visualization.
-        Updates existing positions or inserts new ones based on (strategy_id, ts, position_id).
+        The trade log is the source of truth for portfolio state; this read side
+        makes deterministic replay (``core.eventlog.fold``) possible.
 
         Args:
             strategy_id (str): Strategy identifier.
-            ts (datetime): Snapshot timestamp.
-            positions (Iterable[Position]): Positions to persist.
 
-        Example:
-            ```python
-            # After each bar
-            store.upsert_positions(
-                strategy_id="my_strategy",
-                ts=current_bar_time,
-                positions=state.portfolio.positions.values()
-            )
-
-            # Query positions later
-            # SELECT * FROM positions WHERE strategy_id = 'my_strategy'
-            ```
-
-        Note:
-            Upsert based on (strategy_id, ts, position_id).
-            Used for equity curve computation and position analysis.
+        Returns:
+            list[Trade]: Trades ordered by ``(ts, trade_id)``.
         """
         ...
+
+    def verify_snapshot(
+        self,
+        strategy_id: str,
+        *,
+        initial_cash: float = 0.0,
+        policy: CashPolicy | None = None,
+    ) -> bool:
+        """Verify the persisted snapshot equals an event-log replay.
+
+        Folds the trade log into a fresh portfolio and compares it (on the
+        trade-derived fields) against the saved snapshot's portfolio. Returns
+        True when they agree — i.e. the snapshot is a faithful cache of the log.
+        Returns False if no snapshot has been saved.
+
+        Args:
+            strategy_id: Strategy identifier.
+            initial_cash: Starting cash used when the strategy began.
+            policy: Cash-accounting policy used during execution.
+        """
+        state = self.load_state(strategy_id)
+        if state is None:
+            return False
+        replayed = fold(
+            self.read_trades(strategy_id),
+            initial_cash=initial_cash,
+            policy=policy or CashPolicy(),
+        )
+        return portfolios_match(replayed, state.portfolio)
 
     @abstractmethod
     def append_trade(self, strategy_id: str, trade: Trade) -> None:

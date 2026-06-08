@@ -64,7 +64,7 @@ hide:
 
     ---
 
-    `StateManager` with Redis, DuckDB, and Memory backends for crash recovery and session continuity
+    Event log as source of truth: `StrategyStore` with `read_trades` / `verify_snapshot`; state is `fold(events)`, the snapshot is a verifiable cache
 
 -   :material-chart-scatter-plot:{ .lg .middle } **Statistical Analysis**
 

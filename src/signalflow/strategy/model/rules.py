@@ -12,9 +12,12 @@ from signalflow.core import Order, PositionType, Signals, SignalType, entry, exi
 from signalflow.strategy.component.base import EntryRule, ExitRule
 from signalflow.strategy.model.context import ModelContext
 from signalflow.strategy.model.decision import StrategyAction, StrategyDecision
+from signalflow.strategy.model.resolve import resolve_strategy_model
 
 if TYPE_CHECKING:
     from signalflow.core import Position, StrategyState
+    from signalflow.models.model_ref import ModelRef
+    from signalflow.models.registry import ModelRegistry
     from signalflow.strategy.model.protocol import StrategyModel
 
 OrderSide = Literal["BUY", "SELL"]
@@ -90,11 +93,21 @@ class ModelEntryRule(EntryRule):
     signal_type_map: dict[str, str] | None = None  # signal_type -> "BUY"/"SELL"
 
     model: StrategyModel = None  # type: ignore[assignment]
+    # Pinned resolution (REFACTOR_PLAN.md §4.1): supply a ``model_ref`` + a
+    # ``registry`` instead of a pre-loaded ``model`` to load a version-locked
+    # artifact (floating ``latest`` is rejected by ModelRef).
+    model_ref: ModelRef | None = None
+    registry: ModelRegistry | None = None
     base_position_size: float = 0.01
     max_positions: int = 10
     min_confidence: float = 0.5
     allow_shorts: bool = False
     pair_col: str = "pair"
+
+    def _resolve_model(self) -> StrategyModel | None:
+        model = resolve_strategy_model(self.model, self.model_ref, self.registry)
+        self.model = model  # cache the resolved artifact
+        return model
 
     def check_entries(
         self,
@@ -108,14 +121,15 @@ class ModelEntryRule(EntryRule):
         if signals is None or signals.value.height == 0:
             return orders
 
-        if self.model is None:
+        model = self._resolve_model()
+        if model is None:
             return orders
 
         # Get or compute decisions
         decisions = _get_cached_decisions(state)
         if decisions is None:
             context = _build_model_context(signals, prices, state)
-            decisions = self.model.decide(context)
+            decisions = model.decide(context)
             _cache_decisions(state, decisions)
 
         # Filter to ENTER decisions
@@ -204,7 +218,15 @@ class ModelExitRule(ExitRule):
     """
 
     model: StrategyModel = None  # type: ignore[assignment]
+    # Pinned resolution (REFACTOR_PLAN.md §4.1) — see ModelEntryRule.
+    model_ref: ModelRef | None = None
+    registry: ModelRegistry | None = None
     min_confidence: float = 0.5
+
+    def _resolve_model(self) -> StrategyModel | None:
+        model = resolve_strategy_model(self.model, self.model_ref, self.registry)
+        self.model = model  # cache the resolved artifact
+        return model
 
     def check_exits(
         self,
@@ -218,7 +240,8 @@ class ModelExitRule(ExitRule):
         if not positions:
             return orders
 
-        if self.model is None:
+        model = self._resolve_model()
+        if model is None:
             return orders
 
         # Get cached decisions or compute them
@@ -228,7 +251,7 @@ class ModelExitRule(ExitRule):
             # Get signals from runtime (stored by runner)
             signals = state.runtime.get(BAR_SIGNALS_KEY, Signals(pl.DataFrame()))
             context = _build_model_context(signals, prices, state)
-            decisions = self.model.decide(context)
+            decisions = model.decide(context)
             _cache_decisions(state, decisions)
 
         # Build position lookup

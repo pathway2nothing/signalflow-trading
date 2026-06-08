@@ -442,24 +442,8 @@ class HooksManager:
         return self.trigger_sync(HookEvent.ON_ERROR, context)
 
 
-# Global hooks instance (can be configured once and used everywhere)
-_global_hooks: HooksManager | None = None
-
-
-def configure_hooks(config: dict[str, Any]) -> HooksManager:
-    """Configure global hooks manager.
-
-    Args:
-        config: Hooks configuration
-
-    Returns:
-        Configured HooksManager
-    """
-    global _global_hooks
-    _global_hooks = HooksManager.from_config(config)
-    return _global_hooks
-
-
-def get_hooks() -> HooksManager | None:
-    """Get global hooks manager."""
-    return _global_hooks
+# NOTE (REFACTOR_PLAN.md §5): the former module-global ``_global_hooks``
+# singleton (plus ``configure_hooks`` / ``get_hooks``) was removed. Global
+# mutable state is incompatible with parity/reproducibility — two runs over the
+# same data could diverge through shared state. Pass a ``HooksManager`` via
+# explicit dependency injection instead of reaching for a global.

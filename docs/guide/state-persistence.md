@@ -5,6 +5,28 @@ description: StateManager with Redis, DuckDB, and Memory backends for crash reco
 
 # State Persistence
 
+!!! warning "Source of truth: the event log"
+    The canonical state model is **event-sourced**: the portfolio changes only
+    through fills, so the append-only trade log (`StrategyStore.append_trade` /
+    `read_trades`) is the source of truth and the saved state is a derived
+    snapshot cache — verify it with `StrategyStore.verify_snapshot`, replay it
+    with `core.fold`.
+
+    ```python
+    from signalflow.core import fold
+    portfolio = fold(store.read_trades("my_bot"), initial_cash=10_000.0)
+    assert store.verify_snapshot("my_bot", initial_cash=10_000.0)
+    ```
+
+!!! note "StateManager is live-trading WIP"
+    `StateManager` and its Redis/DuckDB backends below are **not yet wired** and
+    have moved to `signalflow.strategy.live.state`
+    (`from signalflow.strategy.live.state import StateManager`). They still use a
+    legacy position model that will be migrated onto the canonical
+    `signalflow.core.Position` when live trading lands. The reconciliation port
+    that verifies internal vs exchange event logs lives in
+    `signalflow.strategy.live.reconciliation`.
+
 The `StateManager` provides async state persistence for live and paper trading.
 It tracks open positions, pending orders, risk state, and signal deduplication
 across three backends: **Redis**, **DuckDB**, and **Memory**.
@@ -14,7 +36,7 @@ across three backends: **Redis**, **DuckDB**, and **Memory**.
 ## Quick Start
 
 ```python
-from signalflow.strategy import StateManager
+from signalflow.strategy.live.state import StateManager  # live-trading WIP
 
 config = {
     "backend": "duckdb",
