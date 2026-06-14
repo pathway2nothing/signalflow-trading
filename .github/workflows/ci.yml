@@ -2,51 +2,35 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
   pull_request:
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12"]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-
-      - name: Set up Python
-        run: uv python install ${{ matrix.python-version }}
-
-      - name: Create venv and install (core + test + extras)
-        run: |
-          uv venv .venv --python ${{ matrix.python-version }}
-          uv pip install --python .venv -e ".[test,live,llm]"
-
+      - uses: astral-sh/setup-uv@v3
+      - run: uv venv
+      - name: Install (core + test + extras)
+        run: uv pip install -e ".[test,live,llm]"
       - name: Lint (ruff)
-        run: uv run --python .venv ruff check src tests
+        run: uvx ruff check src tests
         continue-on-error: true
-
       - name: Run tests
         env:
           PYTHONUTF8: "1"
-        run: uv run --python .venv pytest -q
+        run: .venv/bin/python -m pytest -q
 
-  # Fast gate: core only, asserts the package imports and core invariants hold
   core-invariants:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
-      - run: uv python install 3.12
-      - name: Install core only
-        run: |
-          uv venv .venv --python 3.12
-          uv pip install --python .venv -e ".[test]"
+      - run: uv venv
+      - name: Install (core only)
+        run: uv pip install -e ".[test]"
       - name: Core invariants (leakage, engine parity, OOS, untrained guard)
         env:
           PYTHONUTF8: "1"
-        run: uv run --python .venv pytest tests/test_flow.py tests/test_engine.py tests/test_model.py -q
+        run: .venv/bin/python -m pytest tests/test_flow.py tests/test_engine.py tests/test_model.py -q

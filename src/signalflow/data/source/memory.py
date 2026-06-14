@@ -57,7 +57,7 @@ class MemorySource(Source):
             lo: list[float] = []
             c: list[float] = []
             v: list[float] = []
-            price = self.start_price * (1.0 + (hash(pair) % 50) / 100.0)
+            price = self.start_price * (1.0 + (sum(ord(c) for c in pair) % 50) / 100.0)
             t = start_dt
             for _ in range(n):
                 ret = self.drift + self.vol * rng.normal()
