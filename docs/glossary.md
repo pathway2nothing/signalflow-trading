@@ -91,7 +91,7 @@ See [`signalflow.models`](api/models.md).
 
 **Why it matters**: it is a configuration-drift detector. Store the hash with a model artefact at train time; recompute and compare at serve time (`verify_hash`) and refuse to continue on mismatch - that is what keeps train↔serve features identical.
 
-See [Feature API](api/feature.md).
+See [Feature API](api/transform.md).
 
 ---
 
@@ -102,7 +102,7 @@ See [Feature API](api/feature.md).
 
 **Warmup-silence (forecast window)**: a flow consumer that reads `forecasts=` must declare a fixed `forecast_window` *in bars*. Fixing the window (rather than "however much accumulated") makes backtest and live cold-start cut the identical slice, so parity holds.
 
-See [Feature API](api/feature.md) and the [Model Integration guide](guide/model-integration.md).
+See [Feature API](api/transform.md) and the [Model Integration guide](guide/model-integration.md).
 
 ### Detector
 **What it is**: A component that analyzes market data and outputs trading signals.
@@ -185,7 +185,7 @@ pipeline = FeaturePipeline(
 features_df = pipeline.compute(df)
 ```
 
-For the train↔serve reproducibility wrapper (recipe + [feature_hash](#feature_hash)) see `ModelFeaturesPipeline` in the [Feature API](api/feature.md).
+For the train↔serve reproducibility wrapper (recipe + [feature_hash](#feature_hash)) see `ModelFeaturesPipeline` in the [Feature API](api/transform.md).
 
 ---
 

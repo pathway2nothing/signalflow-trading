@@ -1,14 +1,14 @@
 """
-Legacy ``Labeler`` base - ported to the V5 ``Target`` API.
+Legacy ``Labeler`` base - ported to the ``Target`` API.
 
-This is the restored pre-V5 labeler base class. Every method of the original
+This is the restored legacy labeler base class. Every method of the original
 (``compute`` / ``compute_group`` / ``compute_soft`` / ``compute_group_soft`` /
 signal-masking / soft-label one-hot fallback) is preserved verbatim in spirit;
 only the framework wiring changed:
 
-* ``class Labeler(Target, ABC)`` - labelers ARE V5 :class:`~signalflow.target.base.Target`
+* ``class Labeler(Target, ABC)`` - labelers ARE :class:`~signalflow.target.base.Target`
   specs, so they plug straight into ``ForecastModel(target=...)``.
-* Column defaults follow V5 conventions: ``ts_col="ts"``, ``pair_col="pair"``.
+* Column defaults follow the standard conventions: ``ts_col="ts"``, ``pair_col="pair"``.
 * The 7-type component registry / ``SfComponentType`` / ``Signals`` container are
   gone; ``Signals`` is now a loose ``Any`` (signal masking still works when a
   signal frame is passed, but target use needs none).
@@ -118,7 +118,7 @@ class Labeler(Target, ABC):
         return 1
 
     def labels(self, data: Dataset, at: pl.DataFrame | None = None) -> pl.DataFrame:
-        """V5 Target contract: return numeric ``[pair, ts, label]``."""
+        """Target contract: return numeric ``[pair, ts, label]``."""
         computed = self.compute(data.frame)
         if self.out_col not in computed.columns:
             raise ValueError(

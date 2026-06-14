@@ -135,7 +135,7 @@ flowchart LR
 ### 2. Signal Detection
 
 - Classical algorithms (SMA crossover, MACD, RSI, structure detection)
-- Neural network predictions via [signalflow-nn](ecosystem/signalflow-nn.md)
+- Neural network predictions via [signalflow-labs](ecosystem/signalflow-labs.md)
 - Custom detectors via `@sf.detector("name")`
 
 ### 3. Signal Validation (Meta-Labeling)
@@ -269,14 +269,14 @@ Execute strategies as directed acyclic graphs with metric nodes, progress callba
     pip install signalflow-ta
     ```
 
--   :material-brain:{ .lg .middle } **[signalflow-nn](ecosystem/signalflow-nn.md)**
+-   :material-brain:{ .lg .middle } **[signalflow-labs](ecosystem/signalflow-labs.md)**
 
     ---
 
     14 neural encoders (LSTM, Transformer, PatchTST, TCN), 7 heads, 4 loss functions
 
     ```bash
-    pip install signalflow-nn
+    pip install signalflow-labs
     ```
 
 -   :material-pipe:{ .lg .middle } **[sf-kedro](ecosystem/sf-kedro.md)**
@@ -322,7 +322,7 @@ Execute strategies as directed acyclic graphs with metric nodes, progress callba
 
     ---
 
-    signalflow-ta, signalflow-nn, sf-kedro
+    signalflow-ta, signalflow-labs, sf-kedro
 
 -   :material-code-braces:{ .lg .middle } **[API Reference](api/index.md)**
 

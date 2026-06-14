@@ -41,7 +41,7 @@ component registry, data containers, and pipeline patterns.
 
     [:material-github: GitHub](https://github.com/pathway2nothing/signalflow-ta){ .md-button }
 
--   :material-brain:{ .lg .middle } **[signalflow-nn](signalflow-nn.md)** `v0.6.0`
+-   :material-brain:{ .lg .middle } **[signalflow-labs](signalflow-labs.md)** `v0.6.0`
 
     ---
 
@@ -49,10 +49,10 @@ component registry, data containers, and pipeline patterns.
     7 classification heads, 4 loss functions. Built on PyTorch Lightning.
 
     ```bash
-    pip install signalflow-nn
+    pip install signalflow-labs
     ```
 
-    [:material-github: GitHub](https://github.com/pathway2nothing/signalflow-nn){ .md-button }
+    [:material-github: GitHub](https://github.com/pathway2nothing/signalflow-labs){ .md-button }
 
 -   :material-pipe:{ .lg .middle } **[sf-kedro](sf-kedro.md)** `v0.5.0`
 
@@ -80,7 +80,7 @@ from signalflow.core import default_registry, SfComponentType
 # signalflow-ta indicators
 rsi_cls = default_registry.get(SfComponentType.FEATURE, "momentum/rsi")
 
-# signalflow-nn validators
+# signalflow-labs validators
 validator_cls = default_registry.get(SfComponentType.VALIDATOR, "temporal_validator")
 
 # Custom components (via entry-point autodiscovery)
@@ -92,7 +92,7 @@ custom_cls = default_registry.get(SfComponentType.DETECTOR, "custom/my_detector"
 ```
 signalflow-trading              # Core (required)
 ├── signalflow-ta               # 189+ indicators
-├── signalflow-nn               # Neural network encoders
+├── signalflow-labs               # Neural network encoders
 ├── sf-kedro                    # ML pipelines
 └── sf-custom                   # User components (entry-point autodiscovery)
 ```

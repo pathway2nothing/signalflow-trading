@@ -1,4 +1,4 @@
-"""Tests for the restored legacy labelers, adapted to the V5 Target API."""
+"""Tests for the restored legacy labelers, adapted to the Target API."""
 
 
 import warnings

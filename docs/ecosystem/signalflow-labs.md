@@ -1,37 +1,36 @@
 ---
-title: signalflow-nn
-description: Neural network extension for deep learning signal validation in SignalFlow
+title: signalflow-labs
+description: Deep learning extension for neural signal models in SignalFlow
 ---
 
-# signalflow-nn - Neural Networks
+# signalflow-labs - Neural Networks
 
-**signalflow-nn** extends SignalFlow with deep learning signal validators
-built on PyTorch and Lightning. It provides a composable architecture
-where encoders and classification heads are mixed and matched via the
-component registry.
+**signalflow-labs** extends SignalFlow with deep learning models built on
+PyTorch and Lightning. It provides a composable architecture where encoders and
+classification heads are mixed and matched via the component registry.
 
 ---
 
 ## Installation
 
 ```bash
-pip install signalflow-nn
+pip install signalflow-labs
 ```
 
-Requires `signalflow-trading >= 0.5.0`, `torch >= 2.2`, `lightning >= 2.5`.
+Requires `signalflow-trading`, `torch >= 2.2`, and `lightning >= 2.5`.
 
 For GPU support:
 ```bash
 # Check CUDA version: nvidia-smi
 pip install torch --index-url https://download.pytorch.org/whl/cu121
-pip install signalflow-nn
+pip install signalflow-labs
 ```
 
 ---
 
 ## Architecture
 
-signalflow-nn uses an **Encoder + Head** composition pattern:
+signalflow-labs uses an **Encoder + Head** composition pattern:
 
 ```
 Input [batch, seq_len, features]
@@ -41,11 +40,11 @@ Input [batch, seq_len, features]
     → [batch, num_classes]
 ```
 
-Components are loaded from the signalflow registry, making architectures
-fully configurable:
+Components are loaded from the signalflow registry, making architectures fully
+configurable:
 
 ```python
-from signalflow.nn.model import TemporalClassificator
+from signalflow.labs.model import TemporalClassificator
 
 model = TemporalClassificator(
     encoder_type="encoder/lstm",
@@ -60,20 +59,20 @@ model = TemporalClassificator(
 
 ## Quick Start
 
-### Training a Neural Validator
+### Training a Neural Model
 
 ```python
 from pathlib import Path
-from signalflow.nn.validator import TemporalValidator
-from signalflow.nn.data import TimeSeriesPreprocessor, ScalerConfig
+from signalflow.labs.model import TemporalClassificator
+from signalflow.labs.data import TimeSeriesPreprocessor, ScalerConfig
 
 # Configure preprocessing
 preprocessor = TimeSeriesPreprocessor(
     default_config=ScalerConfig(method="robust", scope="group")
 )
 
-# Create validator
-validator = TemporalValidator(
+# Create model
+model = TemporalClassificator(
     encoder_type="encoder/lstm",
     encoder_params={"input_size": 10, "hidden_size": 64, "num_layers": 2},
     head_type="head/cls/mlp",
@@ -84,22 +83,19 @@ validator = TemporalValidator(
 )
 
 # Train on signalflow DataFrames
-validator.fit(X_train, y_train, log_dir=Path("./logs"))
-
-# Predict - returns Signals with probability columns
-validated_signals = validator.validate_signals(signals, features)
+model.fit(X_train, y_train, log_dir=Path("./logs"))
 
 # Save/load model
-validator.save("model.pkl")
-loaded = TemporalValidator.load("model.pkl")
+model.save("model.pkl")
+loaded = TemporalClassificator.load("model.pkl")
 ```
 
-### Using TemporalClassificator Directly
+### Using Lightning Directly
 
 ```python
 import lightning as L
-from signalflow.nn.model import TemporalClassificator
-from signalflow.nn.data import SignalDataModule
+from signalflow.labs.model import TemporalClassificator
+from signalflow.labs.data import SignalDataModule
 
 # Create model
 model = TemporalClassificator(
@@ -128,7 +124,7 @@ trainer.fit(model, data_module)
 
 ## Components
 
-### Encoders (14)
+### Encoders
 
 Sequence encoders that process windowed time series into fixed-size embeddings.
 
@@ -139,7 +135,7 @@ Sequence encoders that process windowed time series into fixed-size embeddings.
 | `TransformerEncoder` | `encoder/transformer` | Self-attention + positional encoding |
 | `PatchTSTEncoder` | `encoder/patchtst` | Patch-based Transformer |
 | `TCNEncoder` | `encoder/tcn` | Temporal Convolutional Network |
-| `TSMixerEncoder` | `encoder/tsmixer` | All-MLP mixer (Google 2023) |
+| `TSMixerEncoder` | `encoder/tsmixer` | All-MLP mixer |
 | `InceptionTimeEncoder` | `encoder/inception_time` | Multi-scale convolutions |
 | `ResNet1dEncoder` | `encoder/resnet1d` | 1D ResNet |
 | `XceptionTimeEncoder` | `encoder/xception_time` | Depthwise separable conv |
@@ -188,7 +184,7 @@ Output heads that convert encoder embeddings to class predictions.
 Per-asset feature scaling with configurable methods:
 
 ```python
-from signalflow.nn.data import TimeSeriesPreprocessor, ScalerConfig
+from signalflow.labs.data import TimeSeriesPreprocessor, ScalerConfig
 
 preprocessor = TimeSeriesPreprocessor(
     default_config=ScalerConfig(
@@ -210,7 +206,7 @@ test_scaled = preprocessor.transform(test_df)
 Creates 3D tensors `[window_size, features]` at signal timestamps only:
 
 ```python
-from signalflow.nn.data import SignalWindowDataset
+from signalflow.labs.data import SignalWindowDataset
 
 dataset = SignalWindowDataset(
     df=scaled_df,
@@ -227,7 +223,7 @@ dataset = SignalWindowDataset(
 Lightning DataModule with flexible splitting strategies:
 
 ```python
-from signalflow.nn.data import SignalDataModule
+from signalflow.labs.data import SignalDataModule
 
 dm = SignalDataModule(
     train_df=train_df,
@@ -261,45 +257,12 @@ study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=50, timeout=3600)
 ```
 
-Model size presets (`small`, `medium`, `large`) control search ranges
-for hidden dimensions, layer counts, and learning rates.
-
----
-
-## Integration with SignalFlow
-
-`TemporalValidator` inherits from `SignalValidator` and works identically
-to `SklearnSignalValidator`:
-
-```python
-# Both validators share the same interface
-from signalflow.validator import SklearnSignalValidator
-from signalflow.nn.validator import TemporalValidator
-
-# Sklearn-based
-sklearn_val = SklearnSignalValidator(model_type="lightgbm")
-sklearn_val.fit(X_train, y_train)
-result = sklearn_val.validate_signals(signals, features)
-
-# Neural network-based
-nn_val = TemporalValidator(
-    encoder_type="encoder/lstm",
-    encoder_params={"input_size": 10, "hidden_size": 64},
-    head_type="head/cls/mlp",
-    head_params={"hidden_sizes": [64]},
-    num_classes=3,
-    window_size=60,
-)
-nn_val.fit(X_train, y_train)
-result = nn_val.validate_signals(signals, features)
-```
-
-Both return `Signals` with `probability_none`, `probability_rise`,
-and `probability_fall` columns.
+Model size presets (`small`, `medium`, `large`) control search ranges for hidden
+dimensions, layer counts, and learning rates.
 
 ---
 
 ## Links
 
-- [:material-github: GitHub Repository](https://github.com/pathway2nothing/signalflow-nn)
-- [:material-package: PyPI Package](https://pypi.org/project/signalflow-nn/)
+- [:material-github: GitHub Repository](https://github.com/pathway2nothing/signalflow-labs)
+- [:material-package: PyPI Package](https://pypi.org/project/signalflow-labs/)

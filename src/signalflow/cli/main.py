@@ -1,5 +1,5 @@
 """
-``sf`` - the SignalFlow V5 command-line interface (click group).
+``sf`` - the SignalFlow command-line interface (click group).
 
 Four commands: ``list`` (enumerate the registry), ``run`` (load a flow.yaml,
 build a dataset, backtest, print the scorecard), ``promote`` (validate + show the
@@ -54,7 +54,7 @@ def _print_table(title: str, rows: list[tuple[str, str]], headers: tuple[str, st
 @click.group()
 @click.version_option(version=sf.__version__, prog_name="sf", message="%(prog)s %(version)s")
 def main() -> None:
-    """SignalFlow V5 - research, backtest, and promote trading flows."""
+    """SignalFlow - research, backtest, and promote trading flows."""
 
 
 @main.command(name="list")
