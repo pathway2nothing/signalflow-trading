@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.7.0"
+version = "0.8.0"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -9,24 +9,19 @@ authors = [
 ]
 license = { file = "LICENSE" }
 
+# V5 core - the six-noun framework runs on this set alone.
 dependencies = [
-    "pandas>=2.0.0",
     "polars>=0.20.0",
-    "duckdb>=1.0.0",
-    "loguru>=0.7.0",
-    "aiohttp>=3.9.0",
-    "scikit-learn>=1.3.0",
-    "optuna>=3.0.0",
-    "numba>=0.58.0",
-    "lightning>=2.1.0",
     "numpy>=1.24.0",
-    "pandas-ta>=0.3.14b",
-    "plotly>=5.0.0",
+    "scipy>=1.11.0",
+    "scikit-learn>=1.3.0",
+    "lightgbm>=4.0.0",
+    "pyyaml>=6.0",
+    "loguru>=0.7.0",
     "pyarrow>=14.0.0",
     "click>=8.0.0",
-    "pyyaml>=6.0",
-    "scipy>=1.11.0",
     "rich>=13.0.0",
+    "cloudpickle>=3.0.0",
 ]
 
 # CLI entry point
@@ -34,11 +29,26 @@ dependencies = [
 sf = "signalflow.cli.main:main"
 
 [project.optional-dependencies]
+# Technical-analysis indicator plugin.
+ta = ["signalflow-ta>=0.8.0"]
+# Neural encoders, RL strategy, and torch backends.
+labs = ["signalflow-labs[rl]>=0.8.0"]
+# Live deployment: experiment tracking + model artifact hub.
+live = [
+  "mlflow>=2.10",
+  "huggingface_hub>=0.20",
+]
+# LLM strategy via any open OpenAI-compatible server (Ollama, vLLM, LM Studio, TGI).
+llm = [
+  "httpx>=0.27",
+  "pydantic>=2.0",
+]
+# Everything: both plugins plus the live and llm extras.
+all = ["signalflow-trading[ta,labs,live,llm]"]
 dev = [
   "pytest>=8.0",
   "pytest-timeout>=2.2",
   "pytest-asyncio>=0.23",
-  "pre-commit>=3.7",
   "ruff>=0.15",
   "mypy>=1.19",
 ]
@@ -77,11 +87,11 @@ include = ["signalflow*"]
 # --- Semantic Release Configuration ---
 [tool.semantic_release]
 version_variables = [
-    "src/signalflow/__init__.py:__version__", 
+    "src/signalflow/_version.py:__version__",
     "pyproject.toml:version"
 ]
 branch = "main"
-upload_to_pypi = false 
+upload_to_pypi = false
 upload_to_release = true
 build_command = "pip install build && python -m build"
 commit_message = "chore(release): {version} [skip ci]"
@@ -113,7 +123,6 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"src/signalflow/viz/renderers/html.py" = ["E501"]  # HTML/CSS/JS template strings
 "src/signalflow/__init__.py" = ["I001"]  # Import order required for circular import avoidance
 
 [tool.ruff.lint.isort]
@@ -129,40 +138,25 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = [
     "loguru",
-    "pandas_ta.*",
-    "plotly.*",
-    "numba.*",
-    "optuna.*",
-    "lightning.*",
-    "duckdb.*",
-    "aiohttp.*",
     "sklearn.*",
     "scipy.*",
     "yaml.*",
-    "pandas.*",
-    "redis.*",
     "lightgbm.*",
-    "xgboost.*",
+    "cloudpickle.*",
     "joblib.*",
     "tqdm.*",
-    "signalflow.backtest.*",
-    "signalflow.data.source.binance_stocks.*",
-    "signalflow.data.source.bybit.*",
-    "signalflow.data.source.deribit.*",
-    "signalflow.data.source.hyperliquid.*",
-    "signalflow.data.source.kraken.*",
-    "signalflow.data.source.okx.*",
-    "signalflow.data.source.whitebit.*",
-    "signalflow.detector.base_detector.*",
-    "signalflow.ta",
-    "signalflow.ta.*",
-    "signalflow.ta._numba_compat",
+    "stable_baselines3.*",
+    "gymnasium.*",
+    "torch.*",
+    "mlflow.*",
+    "huggingface_hub.*",
 ]
 ignore_missing_imports = true
 
 # --- Pytest Configuration ---
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

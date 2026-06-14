@@ -25,7 +25,7 @@ raw_data = sf.load("binance", pairs=["BTC/USDT"], timeframe="1h")
 ---
 
 ### Signal
-**What it is**: A *discrete recommendation* emitted by a detector — "enter here / skip here". A `Signals` container is a DataFrame of these recommendations.
+**What it is**: A *discrete recommendation* emitted by a detector - "enter here / skip here". A `Signals` container is a DataFrame of these recommendations.
 
 **Think of it as**: A list of "buy here" or "sell here" calls from your detector. The detector decides; the `Signal` is its discrete output.
 
@@ -47,7 +47,7 @@ signals = detector.run(raw_data.view())
 ---
 
 ### Forecast
-**What it is**: The continuous output of a *forecast model* — a prediction about the future (e.g. `p_revert`, an expected return), not a trade recommendation.
+**What it is**: The continuous output of a *forecast model* - a prediction about the future (e.g. `p_revert`, an expected return), not a trade recommendation.
 
 **Think of it as**: A model's opinion that a detector or validator reads as one more input. A detector turns Forecasts into discrete [Signals](#signal); a Forecast on its own places no trade.
 
@@ -67,7 +67,7 @@ See [ModelRef / forecast artefact](#modelref-forecast-artefact) and the [Model I
 ---
 
 ### ModelRef / forecast artefact
-**What it is**: A `ModelRef` is a declarative, *pinned* pointer to a forecast model that lives in an external registry (MLflow, HuggingFace). It carries no weights — only `name`, a mandatory `version`, and a `source`.
+**What it is**: A `ModelRef` is a declarative, *pinned* pointer to a forecast model that lives in an external registry (MLflow, HuggingFace). It carries no weights - only `name`, a mandatory `version`, and a `source`.
 
 **Why version is mandatory**: a floating `latest` silently breaks parity/reproducibility between training and live inference. `version="latest"` is rejected unless `SF_ALLOW_LATEST=1` (dev only).
 
@@ -89,7 +89,7 @@ See [`signalflow.models`](api/models.md).
 
 **Think of it as**: A fingerprint of *how* features are built. It is the same for two logically-equal pipelines (key order and float jitter normalized, defaults resolved) but changes whenever a param value, the order of features, or `ta_version` changes.
 
-**Why it matters**: it is a configuration-drift detector. Store the hash with a model artefact at train time; recompute and compare at serve time (`verify_hash`) and refuse to continue on mismatch — that is what keeps train↔serve features identical.
+**Why it matters**: it is a configuration-drift detector. Store the hash with a model artefact at train time; recompute and compare at serve time (`verify_hash`) and refuse to continue on mismatch - that is what keeps train↔serve features identical.
 
 See [Feature API](api/feature.md).
 
@@ -110,9 +110,9 @@ See [Feature API](api/feature.md) and the [Model Integration guide](guide/model-
 **Think of it as**: A "signal finder" that scans price data for patterns.
 
 **Examples**:
-- `sma_cross` — Signal when fast SMA crosses slow SMA
-- `rsi_threshold` — Signal when RSI goes below 30 (oversold) or above 70 (overbought)
-- `macd_cross` — Signal when MACD line crosses signal line
+- `sma_cross` - Signal when fast SMA crosses slow SMA
+- `rsi_threshold` - Signal when RSI goes below 30 (oversold) or above 70 (overbought)
+- `macd_cross` - Signal when MACD line crosses signal line
 
 ```python
 # Detector finds trading opportunities
@@ -173,7 +173,7 @@ result = (
 - Volatility over last 20 bars
 - Distance from 200-day moving average
 
-**Where features live (v2)**: `flow` no longer constructs features — the `.features()` builder method was removed. Features now live *inside* a forecast artefact (pinned with its weights) or as primitive parameters on a detector. The `FeaturePipeline` class itself remains the computation engine and can be used directly to compute feature columns from a DataFrame:
+**Where features live (v2)**: `flow` no longer constructs features - the `.features()` builder method was removed. Features now live *inside* a forecast artefact (pinned with its weights) or as primitive parameters on a detector. The `FeaturePipeline` class itself remains the computation engine and can be used directly to compute feature columns from a DataFrame:
 
 ```python
 from signalflow.feature import FeaturePipeline, ExampleRsiFeature, ExampleSmaFeature
@@ -195,9 +195,9 @@ For the train↔serve reproducibility wrapper (recipe + [feature_hash](#feature_
 **Think of it as**: "How much to buy and at what price."
 
 **Common entry rules**:
-- `market` — Enter immediately at market price
-- `limit` — Enter only at a specific price
-- `signal` — Use signal's suggested size
+- `market` - Enter immediately at market price
+- `limit` - Enter only at a specific price
+- `signal` - Use signal's suggested size
 
 ---
 
@@ -359,6 +359,6 @@ Window 3:           [====TRAIN====][TEST]
 
 ## See Also
 
-- [Quick Start](quickstart.md) — Build your first strategy
-- [API Reference](api/index.md) — Detailed class documentation
-- [Advanced Strategies](guide/advanced-strategies.md) — Position sizing, filters, aggregation
+- [Quick Start](quickstart.md) - Build your first strategy
+- [API Reference](api/index.md) - Detailed class documentation
+- [Advanced Strategies](guide/advanced-strategies.md) - Position sizing, filters, aggregation

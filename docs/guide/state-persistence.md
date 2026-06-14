@@ -9,7 +9,7 @@ description: StateManager with Redis, DuckDB, and Memory backends for crash reco
     The canonical state model is **event-sourced**: the portfolio changes only
     through fills, so the append-only trade log (`StrategyStore.append_trade` /
     `read_trades`) is the source of truth and the saved state is a derived
-    snapshot cache — verify it with `StrategyStore.verify_snapshot`, replay it
+    snapshot cache - verify it with `StrategyStore.verify_snapshot`, replay it
     with `core.fold`.
 
     ```python
@@ -76,10 +76,10 @@ config = {
 
 Key schema: `sf:{flow_id}:{category}:{type}`
 
-- `sf:bot:positions:open` — Hash of open positions
-- `sf:bot:risk:daily` — Daily PnL and trade count
-- `sf:bot:signals:cooldowns` — Pair cooldown expiry times
-- `sf:bot:execution:heartbeat` — Liveness timestamp
+- `sf:bot:positions:open` - Hash of open positions
+- `sf:bot:risk:daily` - Daily PnL and trade count
+- `sf:bot:signals:cooldowns` - Pair cooldown expiry times
+- `sf:bot:execution:heartbeat` - Liveness timestamp
 
 ### DuckDB
 
@@ -99,7 +99,7 @@ The `{flow_id}` placeholder is replaced automatically.
 config = {"backend": "memory"}
 ```
 
-No persistence — state is lost on restart. Useful for testing.
+No persistence - state is lost on restart. Useful for testing.
 
 ---
 
@@ -191,7 +191,7 @@ await mgr.trigger_circuit_breaker(
 
 # Check before trading
 if await mgr.check_circuit_breaker():
-    print("Trading paused — circuit breaker active")
+    print("Trading paused - circuit breaker active")
     return
 ```
 
@@ -228,7 +228,7 @@ await mgr.heartbeat()
 
 # Check if state is stale (e.g. after crash)
 if await mgr.check_stale(max_age=timedelta(hours=24)):
-    print("State is stale — recovery needed")
+    print("State is stale - recovery needed")
 ```
 
 ---

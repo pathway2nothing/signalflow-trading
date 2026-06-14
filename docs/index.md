@@ -206,7 +206,7 @@ The [signalflow-ta](ecosystem/signalflow-ta.md) extension: momentum, volatility,
 `RealtimeRunner` with async data sync, virtual broker, drawdown/stuck-position alerts, and crash recovery.
 
 ### :octicons-cpu-16: Statistical Validation
-Monte Carlo simulation, Bootstrap confidence intervals, significance tests — all Numba JIT-compiled.
+Monte Carlo simulation, Bootstrap confidence intervals, significance tests - all Numba JIT-compiled.
 
 ### :octicons-plug-16: Flow Builder
 Execute strategies as directed acyclic graphs with metric nodes, progress callbacks, and LTTB downsampling.
@@ -218,28 +218,28 @@ Execute strategies as directed acyclic graphs with metric nodes, progress callba
 <div class="grid" markdown>
 
 === "Data Processing"
-    - **Polars** — High-performance DataFrames
-    - **DuckDB** — Embedded analytics database
-    - **Pandas** — Compatibility layer
-    - **NumPy** — Numerical computing
+    - **Polars** - High-performance DataFrames
+    - **DuckDB** - Embedded analytics database
+    - **Pandas** - Compatibility layer
+    - **NumPy** - Numerical computing
 
 === "Machine Learning"
-    - **scikit-learn** — Classical ML models
-    - **XGBoost / LightGBM** — Gradient boosting
-    - **PyTorch + Lightning** — Deep learning
-    - **Optuna** — Hyperparameter optimization
-    - **Numba** — JIT compilation
+    - **scikit-learn** - Classical ML models
+    - **XGBoost / LightGBM** - Gradient boosting
+    - **PyTorch + Lightning** - Deep learning
+    - **Optuna** - Hyperparameter optimization
+    - **Numba** - JIT compilation
 
 === "Trading"
-    - **signalflow-ta** — 189+ indicators
-    - **pandas-ta** — TA foundation
-    - **Plotly** — Interactive charts
+    - **signalflow-ta** - 189+ indicators
+    - **pandas-ta** - TA foundation
+    - **Plotly** - Interactive charts
 
 === "Infrastructure"
-    - **Redis** — State persistence (production)
-    - **DuckDB / SQLite / PostgreSQL** — Storage
-    - **Kedro** — Pipeline orchestration
-    - **FastAPI** — Web backend (sf-ui)
+    - **Redis** - State persistence (production)
+    - **DuckDB / SQLite / PostgreSQL** - Storage
+    - **Kedro** - Pipeline orchestration
+    - **FastAPI** - Web backend (sf-ui)
 
 </div>
 

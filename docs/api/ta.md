@@ -1,6 +1,6 @@
 # Technical Analysis Module (signalflow-ta)
 
-API reference for `signalflow.ta` — 199+ technical indicators.
+API reference for `signalflow.ta` - 199+ technical indicators.
 
 !!! info "Separate Package"
     Install with `pip install signalflow-ta`. See the [ecosystem page](../ecosystem/signalflow-ta.md) for usage guide, examples, and pipeline factories.
@@ -16,7 +16,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ## Momentum
 
-`signalflow.ta.momentum` — 18 indicators
+`signalflow.ta.momentum` - 18 indicators
 
 ### Core (`signalflow.ta.momentum.core`)
 
@@ -60,7 +60,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ## Overlap
 
-`signalflow.ta.overlap` — 26 indicators
+`signalflow.ta.overlap` - 26 indicators
 
 ### Smoothers (`signalflow.ta.overlap.smoothers`)
 
@@ -107,13 +107,13 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ## Volatility
 
-`signalflow.ta.volatility` — 18+ indicators
+`signalflow.ta.volatility` - 18+ indicators
 
 ### Range (`signalflow.ta.volatility.range`)
 
 | Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
-| `TrueRangeVol` | `volatility/true_range` | — | `true_range` |
+| `TrueRangeVol` | `volatility/true_range` | - | `true_range` |
 | `AtrVol` | `volatility/atr` | `period=14` | `atr_{period}` |
 | `NatrVol` | `volatility/natr` | `period=14` | `natr_{period}` |
 
@@ -135,7 +135,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 | `RviVol` | `volatility/rvi` | `period=14` | `rvi_{period}` |
 | `GapVol` | `volatility/gap` | `period=14` | `gap_vol_{period}` |
 
-### Energy — Physics-Based (`signalflow.ta.volatility.energy`)
+### Energy - Physics-Based (`signalflow.ta.volatility.energy`)
 
 | Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
@@ -152,7 +152,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ## Volume
 
-`signalflow.ta.volume` — 16 indicators
+`signalflow.ta.volume` - 16 indicators
 
 ### Cumulative (`signalflow.ta.volume.cumulative`)
 
@@ -174,7 +174,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 | `EomVolume` | `volume/eom` | `period=14` | `eom_{period}` |
 | `KvoVolume` | `volume/kvo` | `fast=34`, `slow=55`, `signal=13` | `kvo`, `kvo_signal` |
 
-### Dynamics — Physics-Based (`signalflow.ta.volume.dynamics`)
+### Dynamics - Physics-Based (`signalflow.ta.volume.dynamics`)
 
 | Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
@@ -189,7 +189,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ## Trend
 
-`signalflow.ta.trend` — 22 indicators
+`signalflow.ta.trend` - 22 indicators
 
 ### Strength (`signalflow.ta.trend.strength`)
 
@@ -232,7 +232,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ## Statistics
 
-`signalflow.ta.stat` — 73 indicators across 11 submodules
+`signalflow.ta.stat` - 73 indicators across 11 submodules
 
 ### Dispersion
 
@@ -366,7 +366,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ## Performance
 
-`signalflow.ta.performance` — 2 indicators
+`signalflow.ta.performance` - 2 indicators
 
 | Class | Registry Name | Parameters | Output |
 |-------|----------------|------------|--------|
@@ -377,7 +377,7 @@ rsi = ta.RsiMom(period=14, normalized=True)
 
 ## Divergence
 
-`signalflow.ta.divergence` — 2 detectors
+`signalflow.ta.divergence` - 2 detectors
 
 | Class | Registry Name | Description |
 |-------|----------------|-------------|

@@ -20,7 +20,7 @@ invariants (see `REFACTOR_PLAN.md`).
 - **ParityCheck** (`signalflow.strategy.ParityCheck` / `ParitySpec`): research↔
   production parity as a first-class, CI-checkable component. Diffs the event
   sequences of two runs, localises the first divergence, and classifies each
-  component as `exact` / `approximate` / `out_of_scope` — failing like a
+  component as `exact` / `approximate` / `out_of_scope` - failing like a
   `feature_hash` mismatch when a component leaves its declared class.
 - **Reconciliation port** (`signalflow.strategy.live.reconciliation`): a
   `Reconciler` protocol + `LogMergeReconciler` adapter that reconciles the
@@ -45,7 +45,7 @@ invariants (see `REFACTOR_PLAN.md`).
 
 - Write-only `StrategyStore.upsert_positions` and the point-in-time `positions`
   table (the trade log + replay supersede it).
-- Global mutable `_global_hooks` singleton (`configure_hooks` / `get_hooks`) —
+- Global mutable `_global_hooks` singleton (`configure_hooks` / `get_hooks`) -
   incompatible with parity; pass `HooksManager` via explicit DI instead.
 
 ### Moved

@@ -1,13 +1,13 @@
 ---
 title: sf-kedro
-description: Universal ML pipelines for SignalFlow — Kedro-based backtesting, optimization, and validation
+description: Universal ML pipelines for SignalFlow - Kedro-based backtesting, optimization, and validation
 ---
 
-# sf-kedro — Universal ML Pipelines
+# sf-kedro - Universal ML Pipelines
 
 **sf-kedro** implements a **Universal Pipelines Architecture** on top of
-[Kedro](https://kedro.org/). Pipelines are defined by purpose — not by strategy
-name — so the same `backtest`, `tune`, or `validate` pipeline works with any
+[Kedro](https://kedro.org/). Pipelines are defined by purpose - not by strategy
+name - so the same `backtest`, `tune`, or `validate` pipeline works with any
 flow configuration.
 
 ---

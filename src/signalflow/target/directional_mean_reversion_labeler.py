@@ -1,30 +1,21 @@
-"""Directional (long/short) mean-reversion labeler.
-
-:class:`MeanReversionEventLabeler` collapses both stretch directions into a
-single ``"mean_reverted"`` class — fine for "did it revert?" but it hides the
-trade direction the strategy should take. This labeler keeps the directions
-separate, emitting ``"revert_long"`` for oversold-to-rebound cases and
-``"revert_short"`` for overbought-to-pullback cases, with ``"no_revert"`` as
-the negative class. The intent is to let the same model power both long and
-short mean-revert books, addressing the iter-32 gap where the long-only
-``close < SMA240`` filter was the only direction validated forward.
-"""
+"""Directional (long/short) mean-reversion labeler."""
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
 from signalflow.target._soft_helpers import sigmoid_expr
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @dataclass
-@labeler("directional_mean_reversion")
+@register_target("directional_mean_reversion")
 class DirectionalMeanReversionLabeler(Labeler):
-    """Three-class long/short/none mean-reversion label.
+    """
+    Three-class long/short/none mean-reversion label.
 
     Algorithm:
         1. Rolling µ, σ over ``z_window``; ``z_now = (close - µ) / σ`` and
@@ -44,29 +35,6 @@ class DirectionalMeanReversionLabeler(Labeler):
         sleeves and ``revert_short`` to short sleeves. Pairs naturally with
         :class:`MeanReversionMagnitudeLabeler` (magnitude regressor) and
         :class:`MeanReversionEventLabeler` (direction-agnostic event flag).
-
-    Attributes:
-        price_col: Price column. Default ``"close"``.
-        horizon: Forward window. Default ``240``.
-        z_window: Rolling window for µ/σ baseline. Default ``240``.
-        stretch_threshold: |z_now| above which a bar is overstretched.
-            Default ``2.0``.
-        revert_threshold: ``|z_fwd|`` below which the move counts as
-            reverted, with the sign condition enforced. Default ``0.5``.
-        softness_k: sigmoid sharpness for soft probabilities.
-
-    Example:
-        ```python
-        from signalflow.target import DirectionalMeanReversionLabeler
-
-        labeler = DirectionalMeanReversionLabeler(
-            horizon=240,
-            stretch_threshold=2.0,
-            revert_threshold=0.5,
-            mask_to_signals=False,
-        )
-        labeled = labeler.compute(ohlcv_df)
-        ```
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
@@ -129,8 +97,8 @@ class DirectionalMeanReversionLabeler(Labeler):
 
         oversold = pl.col("_z_now") < pl.lit(-self.stretch_threshold)
         overbought = pl.col("_z_now") > pl.lit(self.stretch_threshold)
-        # Revert from oversold = forward z climbs at or above -revert_threshold
-        # (i.e. price came back up close to or above the mean).
+
+
         long_reverted = oversold & (pl.col("_z_fwd") >= pl.lit(-self.revert_threshold))
         short_reverted = overbought & (pl.col("_z_fwd") <= pl.lit(self.revert_threshold))
 
@@ -164,20 +132,7 @@ class DirectionalMeanReversionLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_revert_short, p_no_revert, p_revert_long)``.
-
-        Construction:
-            * ``p_oversold  = sigmoid(k * (-z_now - stretch))``
-            * ``p_overbought = sigmoid(k * (z_now - stretch))``
-            * ``p_long_given_oversold  = sigmoid(k * (z_fwd + revert))`` —
-              the forward z is *above* ``-revert`` (came back up).
-            * ``p_short_given_overbought = sigmoid(k * (revert - z_fwd))`` —
-              the forward z is *below* ``+revert`` (came back down).
-            * ``p_revert_long  = p_oversold  * p_long_given_oversold``
-            * ``p_revert_short = p_overbought * p_short_given_overbought``
-            * ``p_no_revert = max(1 - p_revert_long - p_revert_short, 0)``,
-              then renormalise.
-        """
+        """Soft triple ``(p_revert_short, p_no_revert, p_revert_long)``."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:

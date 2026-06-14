@@ -1,14 +1,14 @@
-"""Drawdown / runup labeler.
+"""
+Drawdown / runup labeler.
 
 Labels bars by the worst forward drawdown, the best forward runup, or the
-ratio of forward return to drawdown (Calmar) — captures path-risk that
+ratio of forward return to drawdown (Calmar) - captures path-risk that
 direction labels miss entirely.
 
 Uses rolling-quantile binning so that thresholds adapt to per-pair scale
 (no look-ahead).
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
@@ -16,10 +16,10 @@ from typing import Any
 import numpy as np
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
 from signalflow.target._soft_helpers import percentile_tercile_soft
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 _MODE_TO_CLASSES: dict[str, tuple[str, str, str]] = {
     "drawdown": ("dd_mild", "dd_normal", "dd_severe"),
@@ -27,31 +27,12 @@ _MODE_TO_CLASSES: dict[str, tuple[str, str, str]] = {
     "calmar": ("calmar_low", "calmar_mid", "calmar_high"),
 }
 
-try:
-    from numba import njit, prange
-
-    _HAS_NUMBA = True
-except ImportError:  # pragma: no cover
-    _HAS_NUMBA = False
-
-    def njit(*args, **kwargs):  # type: ignore[misc]
-        def decorator(fn):
-            return fn
-
-        return decorator if args and callable(args[0]) is False else args[0]
-
-    prange = range  # type: ignore[assignment]
+from signalflow.target._numba import njit, prange
 
 
 @njit(parallel=True, cache=True)
 def _forward_dd_ru_ret(prices: np.ndarray, horizon: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Compute (max_dd, max_ru, log_return) over forward horizon for each bar.
-
-    Returns:
-        max_dd[i] = -min over [t+1..t+H] of (price/cummax - 1)   (positive severity)
-        max_ru[i] =  max over [t+1..t+H] of (price/cummin - 1)
-        log_ret[i] = log(price[t+H] / price[t])
-    """
+    """Compute (max_dd, max_ru, log_return) over forward horizon for each bar."""
     n = len(prices)
     max_dd = np.full(n, np.nan, dtype=np.float64)
     max_ru = np.full(n, np.nan, dtype=np.float64)
@@ -82,9 +63,10 @@ def _forward_dd_ru_ret(prices: np.ndarray, horizon: int) -> tuple[np.ndarray, np
 
 
 @dataclass
-@labeler("drawdown")
+@register_target("drawdown")
 class DrawdownLabeler(Labeler):
-    """Label bars by forward path-risk metric, terciled within a rolling baseline.
+    """
+    Label bars by forward path-risk metric, terciled within a rolling baseline.
 
     Supports three modes:
         - ``"drawdown"``: max forward drawdown severity.
@@ -97,28 +79,6 @@ class DrawdownLabeler(Labeler):
     For each bar the chosen metric is computed over the forward window,
     then assigned a tercile based on its rank inside a trailing
     ``lookback_window`` of the same metric (per-pair rolling, no look-ahead).
-
-    Attributes:
-        price_col: Price column. Default: ``"close"``.
-        horizon: Forward window for the metric. Default: ``480``.
-        mode: Which metric to label. One of ``"drawdown"``, ``"runup"``,
-            ``"calmar"``. Default: ``"drawdown"``.
-        lookback_window: Trailing window for tercile fitting. Default: ``10080``
-            (1 week of 1-min bars).
-        upper_quantile: Default ``0.67``.
-        lower_quantile: Default ``0.33``.
-
-    Example:
-        ```python
-        from signalflow.target.drawdown_labeler import DrawdownLabeler
-
-        labeler = DrawdownLabeler(
-            horizon=480,
-            mode="drawdown",
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
@@ -173,11 +133,11 @@ class DrawdownLabeler(Labeler):
         elif self.mode == "runup":
             metric = max_ru
             names = ("ru_mild", "ru_normal", "ru_strong")
-        else:  # calmar
+        else:
             metric = np.where(max_dd > 1e-12, log_ret / max_dd, np.nan)
             names = ("calmar_low", "calmar_mid", "calmar_high")
 
-        # Rolling tercile percentile (trailing window, no look-ahead)
+
         pct = self._rolling_percentile(metric, self.lookback_window)
 
         labels: list[str | None] = [None] * len(metric)
@@ -209,12 +169,7 @@ class DrawdownLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft tercile from the rolling-percentile metric (mode-aware classes).
-
-        Reuses the same forward-window metric and rolling-percentile as
-        :meth:`compute_group`, then maps the percentile through
-        :func:`percentile_tercile_soft`.
-        """
+        """Soft tercile from the rolling-percentile metric (mode-aware classes)."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:

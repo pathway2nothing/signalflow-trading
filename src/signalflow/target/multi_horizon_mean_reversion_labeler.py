@@ -1,16 +1,16 @@
-"""Multi-horizon ensemble of mean-reversion events.
+"""
+Multi-horizon ensemble of mean-reversion events.
 
 Runs :class:`MeanReversionEventLabeler` over several forward horizons and
 averages the resulting per-class soft probabilities; the hard label is
 the argmax of the averaged triple.
 
 This is the production version of iter-33's
-``soft_D3_multi_horizon`` ensemble — slightly outperformed the
+``soft_D3_multi_horizon`` ensemble - slightly outperformed the
 single-horizon variant (soft MI 0.179 vs 0.178 on the validated pool)
 and showed marginally better train→test stability across labels.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
@@ -18,16 +18,17 @@ from typing import Any, ClassVar
 import numpy as np
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
-from signalflow.target.base import Labeler
+from signalflow.enums import SignalCategory
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 from signalflow.target.path_labeler import MeanReversionEventLabeler
 
 
 @dataclass
-@labeler("multi_horizon_mean_reversion")
+@register_target("multi_horizon_mean_reversion")
 class MultiHorizonMeanReversionLabeler(Labeler):
-    """Average ``MeanReversionEventLabeler`` posteriors across multiple horizons.
+    """
+    Average ``MeanReversionEventLabeler`` posteriors across multiple horizons.
 
     Algorithm:
         For each ``h`` in :attr:`horizons` instantiate a
@@ -41,18 +42,9 @@ class MultiHorizonMeanReversionLabeler(Labeler):
     Hard label is the argmax over the averaged triple.
 
     Research provenance:
-        iter-33 (sf-profit) ``soft_D3_multi_horizon`` — best soft MI
+        iter-33 (sf-profit) ``soft_D3_multi_horizon`` - best soft MI
         0.173 on ``signed_range_60`` in the validated pool, edging out
         ``soft_D3_revert`` (0.172).
-
-    Attributes:
-        horizons: Forward windows to ensemble over.
-            Default: ``(60, 120, 240, 480)``.
-        z_window: Rolling window for µ/σ baseline. Default: 240.
-        stretch_threshold: |z| above which a bar is "overstretched".
-            Default: 2.0.
-        revert_threshold: |z_fwd| below which the move is "reverted".
-            Default: 0.5.
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
@@ -116,7 +108,7 @@ class MultiHorizonMeanReversionLabeler(Labeler):
         avg = np.full((n, 3), np.nan)
         nonzero = valid_count > 0
         avg[nonzero] = accum[nonzero] / valid_count[nonzero, None]
-        # Renormalise rows (clipping can leave tiny drift)
+
         rsum = avg.sum(axis=1, keepdims=True)
         avg = np.where(rsum > 0, avg / np.where(rsum > 0, rsum, 1.0), np.nan)
         return avg

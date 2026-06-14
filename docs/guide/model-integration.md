@@ -2,10 +2,10 @@
 
 This guide covers two distinct ways of bringing models into SignalFlow:
 
-1. **Forecast models** — pinned, versioned prediction artefacts (e.g. a
+1. **Forecast models** - pinned, versioned prediction artefacts (e.g. a
    reversion-probability model) that a flow registers with `.forecast(...)` and
    that detectors/validators consume as one more input. *Covered first below.*
-2. **Decision models** — an ML/RL model that implements the `StrategyModel`
+2. **Decision models** - an ML/RL model that implements the `StrategyModel`
    protocol and directly emits `StrategyDecision` objects (ENTER/CLOSE/...).
    *Covered from [Decision Models](#decision-models-strategymodel) onward.*
 
@@ -14,7 +14,7 @@ This guide covers two distinct ways of bringing models into SignalFlow:
 ## Forecast Models
 
 A **forecast** is the continuous output of a model (e.g. `p_revert`, an
-expected return) — *not* a trade recommendation. A detector turns forecasts
+expected return) - *not* a trade recommendation. A detector turns forecasts
 into discrete [signals](../glossary.md#signal); a validator can read them when
 deciding whether to keep a signal. Forecast models are trained elsewhere and
 arrive as **versioned, reproducible artefacts**; the trading flow never trains
@@ -23,7 +23,7 @@ them, it only references and consumes them.
 ### Registering a pinned artefact: `.forecast(...)`
 
 `FlowBuilder.forecast()` records a pinned [`ModelRef`](../api/models.md) under a
-local name. **No weights are loaded here** — this is purely declarative; weights
+local name. **No weights are loaded here** - this is purely declarative; weights
 resolve later through the registry when the flow runs.
 
 ```python
@@ -54,10 +54,10 @@ Registering the same `name` twice, omitting both `mlflow=` and `hf_path=`, or a
 
 `.detector()`, `.validator()` and `.exit()` each accept two keyword arguments:
 
-- `forecasts: list[str]` — names of registered forecasts this consumer reads.
+- `forecasts: list[str]` - names of registered forecasts this consumer reads.
   The consumer sees a **window** of forecast values `[t-w, t]`, not just the
   latest point.
-- `forecast_window: int` — window length **in bars**. It is **required**
+- `forecast_window: int` - window length **in bars**. It is **required**
   whenever `forecasts` is given, and must be positive.
 
 This is the **warmup-silence contract**: by fixing the window in bars (rather
@@ -77,7 +77,7 @@ artefact is used in research and in production.
 
 Registration is cheap and offline. When the flow runs, a
 [`ModelRegistry`](../api/models.md) (typically `CachingModelRegistry` wrapping
-an `MlflowResolver`) resolves each `ModelRef` to actual weights — and caches
+an `MlflowResolver`) resolves each `ModelRef` to actual weights - and caches
 them so a ref is loaded at most once. Importing `signalflow.models` does **not**
 require `mlflow`; the dependency is imported only at resolve time.
 
@@ -96,7 +96,7 @@ import signalflow as sf
 flow = (
     sf.flow()
     .data(store="binance", pair="BTC/USDT")
-    # 1. Register a pinned forecast artefact (lazy — no weights loaded yet)
+    # 1. Register a pinned forecast artefact (lazy - no weights loaded yet)
     .forecast("revert", mlflow="models:/revert/3")
     # 2. A detector reads a 30-bar window of that forecast
     .detector("example/sma_cross", forecasts=["revert"], forecast_window=30)

@@ -7,7 +7,7 @@ description: Type-safe component registration with @sf.detector, @sf.feature, @s
 
 Semantic decorators provide type-safe component registration with clear intent.
 Instead of the generic `@sf_component`, each decorator maps directly to a
-component type — improving readability, IDE support, and discoverability.
+component type - improving readability, IDE support, and discoverability.
 
 ---
 
@@ -43,8 +43,8 @@ All decorators share the same signature:
 @sf.decorator_name(name: str, *, override: bool = True)
 ```
 
-- **`name`** — Registry key for the component (case-insensitive)
-- **`override`** — Allow overriding an existing registration (default: `True`)
+- **`name`** - Registry key for the component (case-insensitive)
+- **`override`** - Allow overriding an existing registration (default: `True`)
 
 ---
 

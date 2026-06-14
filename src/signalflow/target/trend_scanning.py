@@ -1,10 +1,5 @@
-"""Trend scanning labeler.
+"""Trend scanning labeler."""
 
-Implements De Prado's trend scanning method (ML for Asset Managers, Ch5)
-to detect statistically significant trends in price data.
-"""
-
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
@@ -12,17 +7,12 @@ from typing import Any, ClassVar
 import numpy as np
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
+from signalflow.target._numba import HAS_NUMBA as _HAS_NUMBA
+from signalflow.target._numba import njit
 from signalflow.target._soft_helpers import signed_tercile_soft
-from signalflow.target.base import Labeler
-
-try:
-    from numba import njit
-
-    _HAS_NUMBA = True
-except ImportError:
-    _HAS_NUMBA = False
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 def _trend_scan_numpy(
@@ -31,22 +21,7 @@ def _trend_scan_numpy(
     max_lf: int,
     step: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Pure numpy fallback for trend scanning.
-
-    For each bar t, fits OLS price[t+i] = alpha + beta*i for i=0..L-1
-    across multiple window sizes L, and selects the window with the
-    highest absolute t-statistic on beta.
-
-    Args:
-        prices: 1-D array of prices.
-        min_lf: Minimum look-forward window.
-        max_lf: Maximum look-forward window.
-        step: Step between window sizes.
-
-    Returns:
-        t_stats: Best t-statistic for each bar.
-        best_windows: Window size corresponding to best t-stat.
-    """
+    """Pure numpy fallback for trend scanning."""
     n = len(prices)
     t_stats = np.full(n, np.nan, dtype=np.float64)
     best_windows = np.full(n, np.nan, dtype=np.float64)
@@ -117,22 +92,7 @@ if _HAS_NUMBA:
         max_lf: int,
         step: int,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Numba-accelerated trend scanning.
-
-        For each bar t, fits OLS price[t+i] = alpha + beta*i for i=0..L-1
-        across multiple window sizes L, and selects the window with the
-        highest absolute t-statistic on beta.
-
-        Args:
-            prices: 1-D array of prices.
-            min_lf: Minimum look-forward window.
-            max_lf: Maximum look-forward window.
-            step: Step between window sizes.
-
-        Returns:
-            t_stats: Best t-statistic for each bar.
-            best_windows: Window size corresponding to best t-stat.
-        """
+        """Numba-accelerated trend scanning."""
         n = len(prices)
         t_stats = np.full(n, np.nan, dtype=np.float64)
         best_windows = np.full(n, np.nan, dtype=np.float64)
@@ -154,15 +114,14 @@ if _HAS_NUMBA:
                     L += step
                     continue
 
-                # OLS: y = alpha + beta * x, x = 0, 1, ..., L_len-1
-                # Using closed-form formulas
+
                 x_mean = (L_len - 1.0) / 2.0
                 y_sum = 0.0
                 for i in range(L_len):
                     y_sum += prices[t + i]
                 y_mean = y_sum / L_len
 
-                # ss_xx = sum((x - x_mean)^2) = L*(L^2-1)/12
+
                 ss_xx = L_len * (L_len * L_len - 1.0) / 12.0
                 if ss_xx == 0.0:
                     L += step
@@ -225,9 +184,10 @@ def _trend_scan(
 
 
 @dataclass
-@labeler("trend_scanning")
+@register_target("trend_scanning")
 class TrendScanningLabeler(Labeler):
-    """Label bars using De Prado's trend scanning method.
+    """
+    Label bars using De Prado's trend scanning method.
 
     For each bar, fits OLS regressions over multiple forward windows and
     selects the window with the strongest t-statistic. The sign and
@@ -240,35 +200,15 @@ class TrendScanningLabeler(Labeler):
         1. For each bar t, for each window L in
            range(min_lookforward, max_lookforward+1, step):
 
-           - Fit OLS: Price[t+i] = alpha + beta * i, for i=0..L-1
+    - Fit OLS: Price[t+i] = alpha + beta * i, for i=0..L-1
            - Compute t-statistic: t = beta / SE(beta)
 
-        2. Select L* = argmax_L |t_stat(t, L)|
+    2. Select L* = argmax_L |t_stat(t, L)|
         3. Label:
 
-           - ``"rise"`` if t_stat > critical_value
+    - ``"rise"`` if t_stat > critical_value
            - ``"fall"`` if t_stat < -critical_value
            - ``null`` otherwise
-
-    Attributes:
-        price_col: Price column. Default: ``"close"``.
-        min_lookforward: Minimum forward window. Default: ``5``.
-        max_lookforward: Maximum forward window. Default: ``60``.
-        step: Step between window sizes. Default: ``5``.
-        critical_value: T-stat threshold for significance. Default: ``1.96``.
-
-    Example:
-        ```python
-        from signalflow.target.trend_scanning import TrendScanningLabeler
-
-        labeler = TrendScanningLabeler(
-            min_lookforward=5,
-            max_lookforward=60,
-            critical_value=1.96,
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
     """
 
     signal_category: SignalCategory = SignalCategory.TREND_MOMENTUM
@@ -299,15 +239,7 @@ class TrendScanningLabeler(Labeler):
         self.output_columns = cols
 
     def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None = None) -> pl.DataFrame:
-        """Compute trend scanning labels for a single pair.
-
-        Args:
-            group_df: Single pair data sorted by timestamp.
-            data_context: Optional additional context.
-
-        Returns:
-            DataFrame with same row count, plus label and optional meta columns.
-        """
+        """Compute trend scanning labels for a single pair."""
         if group_df.height == 0:
             return group_df
 
@@ -323,7 +255,7 @@ class TrendScanningLabeler(Labeler):
             self.step,
         )
 
-        # Assign labels based on t-statistic vs critical value
+
         n = len(prices)
         labels: list[str | None] = [None] * n
         for t in range(n):
@@ -358,12 +290,7 @@ class TrendScanningLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_fall, p_neutral, p_rise)`` from the best-window t-statistic.
-
-        Maps the signed t-stat through :func:`signed_tercile_soft` with the
-        symmetric ``±critical_value`` threshold so probabilities reflect
-        statistical confidence in the trend rather than a hard 1.96 cut.
-        """
+        """Soft triple ``(p_fall, p_neutral, p_rise)`` from the best-window t-statistic."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:

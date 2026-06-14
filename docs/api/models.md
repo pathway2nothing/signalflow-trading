@@ -4,7 +4,7 @@
 
 Forecast models are trained elsewhere and arrive in the trading pipeline as
 versioned, reproducible artefacts. This package keeps the trading pipeline
-decoupled from training — a reference carries no weights, only enough metadata
+decoupled from training - a reference carries no weights, only enough metadata
 to resolve the artefact later.
 
 !!! note "Lazy by design"
@@ -39,9 +39,9 @@ from signalflow.models import (
 
 A `ModelRef` is a frozen dataclass: `ModelRef(name, version, source="mlflow")`.
 
-- `name` — registered model name (non-empty).
-- `version` — **mandatory**. Usually a numeric string/int (`"3"`).
-- `source` — backing registry, one of `{"mlflow", "hf"}` (default `"mlflow"`).
+- `name` - registered model name (non-empty).
+- `version` - **mandatory**. Usually a numeric string/int (`"3"`).
+- `source` - backing registry, one of `{"mlflow", "hf"}` (default `"mlflow"`).
 
 ### Why version is mandatory
 
@@ -125,8 +125,8 @@ model is registry.get(ref)  # True (served from cache)
 
 ## See Also
 
-- [Model Integration guide](../guide/model-integration.md) — registering forecast artefacts in a flow via `.forecast()` and consuming them with `forecasts=` / `forecast_window=`.
-- [Feature API](feature.md) — `FeatureSpec` / `ModelFeaturesPipeline` and the `feature_hash` drift detector that guards train↔serve reproducibility.
+- [Model Integration guide](../guide/model-integration.md) - registering forecast artefacts in a flow via `.forecast()` and consuming them with `forecasts=` / `forecast_window=`.
+- [Feature API](feature.md) - `FeatureSpec` / `ModelFeaturesPipeline` and the `feature_hash` drift detector that guards train↔serve reproducibility.
 
 ---
 

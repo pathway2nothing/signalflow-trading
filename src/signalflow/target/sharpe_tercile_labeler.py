@@ -1,4 +1,5 @@
-"""Sharpe-tercile labeler.
+"""
+Sharpe-tercile labeler.
 
 Labels bars by the tercile of a risk-adjusted forward return
 (``forward_log_return / forward_volatility``), measured against a trailing
@@ -9,7 +10,6 @@ those measure *raw* direction; this one penalises chop and rewards
 clean directional moves.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
@@ -17,45 +17,16 @@ from typing import Any, ClassVar
 import numpy as np
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
 from signalflow.target._soft_helpers import percentile_tercile_soft
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @dataclass
-@labeler("sharpe_tercile")
+@register_target("sharpe_tercile")
 class SharpeTercileLabeler(Labeler):
-    """Label bars by tercile of forward risk-adjusted log-return.
-
-    Algorithm:
-        1. fwd_log_ret = ln(close[t+horizon] / close[t])
-        2. fwd_vol     = std(log_returns[t+1 : t+horizon+1])
-        3. sharpe      = fwd_log_ret / fwd_vol
-        4. Within trailing ``lookback_window`` of past sharpe values,
-           assign tercile:
-              percentile > upper_quantile -> ``"sharpe_pos"``
-              percentile < lower_quantile -> ``"sharpe_neg"``
-              otherwise                    -> ``"sharpe_mid"``
-
-    Attributes:
-        price_col: Price column. Default: ``"close"``.
-        horizon: Forward window for return and vol. Default: ``240``.
-        lookback_window: Trailing window for tercile fitting. Default: ``10080``.
-        upper_quantile: Default ``0.67``.
-        lower_quantile: Default ``0.33``.
-
-    Example:
-        ```python
-        from signalflow.target.sharpe_tercile_labeler import SharpeTercileLabeler
-
-        labeler = SharpeTercileLabeler(
-            horizon=240,
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
-    """
+    """Label bars by tercile of forward risk-adjusted log-return."""
 
     signal_category: SignalCategory = SignalCategory.PRICE_DIRECTION
 
@@ -147,12 +118,7 @@ class SharpeTercileLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft tercile probabilities ``(p_sharpe_neg, p_sharpe_mid, p_sharpe_pos)``.
-
-        Uses the same rolling Sharpe percentile that drives the hard tercile
-        and maps it through :func:`percentile_tercile_soft` so the middle
-        bucket is represented explicitly.
-        """
+        """Soft tercile probabilities ``(p_sharpe_neg, p_sharpe_mid, p_sharpe_pos)``."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:

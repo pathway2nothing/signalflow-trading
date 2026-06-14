@@ -3,13 +3,14 @@ from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import SignalType, labeler
+from signalflow.enums import Signal as SignalType
 from signalflow.target._soft_helpers import signed_tercile_soft
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @dataclass
-@labeler("fixed_horizon")
+@register_target("fixed_horizon_labeler")
 class FixedHorizonLabeler(Labeler):
     """
     Fixed-Horizon Labeling:
@@ -105,14 +106,7 @@ class FixedHorizonLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft labels: sigmoid over the signed forward log-return.
-
-        Produces a calibrated probability triple ``(p_fall, p_none, p_rise)``
-        from the same forward return that drives the hard ``sign(fwd_ret)``
-        decision. The middle bucket gets meaningful mass only when
-        :attr:`soft_noise_floor` is set above zero; otherwise it collapses to
-        a near-binary rise/fall split.
-        """
+        """Soft labels: sigmoid over the signed forward log-return."""
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
         if group_df.height == 0:
