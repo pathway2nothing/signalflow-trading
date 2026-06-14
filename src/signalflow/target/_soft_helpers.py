@@ -1,4 +1,5 @@
-"""Soft-label helpers — sigmoid / percentile / Gaussian probability calibration.
+"""
+Soft-label helpers - sigmoid / percentile / Gaussian probability calibration.
 
 Used by :class:`signalflow.target.Labeler` subclasses to convert continuous
 metrics (forward returns, percentiles, z-scores, Hurst exponents) into
@@ -13,7 +14,6 @@ Conventions:
       so callers can mask invalid bars uniformly.
 """
 
-from __future__ import annotations
 
 import polars as pl
 
@@ -34,11 +34,7 @@ def binary_threshold_soft(
     threshold: float,
     k: float,
 ) -> tuple[pl.Expr, pl.Expr]:
-    """Soft binary classification: ``(p_below, p_above)``.
-
-    ``p_above = sigmoid(k * (metric - threshold))``;
-    ``p_below = 1 - p_above``. Both are null where ``metric`` is null.
-    """
+    """Soft binary classification: ``(p_below, p_above)``."""
     p_above = sigmoid_expr(metric - pl.lit(threshold), k)
     null_mask = metric.is_null()
     p_above = pl.when(null_mask).then(pl.lit(None, dtype=pl.Float64)).otherwise(p_above)
@@ -52,7 +48,8 @@ def signed_tercile_soft(
     pos_threshold: float,
     k: float,
 ) -> tuple[pl.Expr, pl.Expr, pl.Expr]:
-    """Soft three-class classification of a signed metric: ``(p_neg, p_mid, p_pos)``.
+    """
+    Soft three-class classification of a signed metric: ``(p_neg, p_mid, p_pos)``.
 
     ``p_pos = sigmoid(k * (metric - pos_threshold))``,
     ``p_neg = sigmoid(k * (-metric - |neg_threshold|))``,
@@ -81,15 +78,7 @@ def percentile_tercile_soft(
     upper_q: float,
     k: float,
 ) -> tuple[pl.Expr, pl.Expr, pl.Expr]:
-    """Soft tercile from a percentile column (0..1): ``(p_low, p_mid, p_high)``.
-
-    ``p_high = sigmoid(k * (pct - upper_q))``,
-    ``p_low  = sigmoid(k * (lower_q - pct))``,
-    ``p_mid  = max(1 - p_high - p_low, 0)``,
-    then the row is renormalised. ``k`` is interpreted in *percentile units*
-    — for default ``upper_q=0.67, lower_q=0.33`` a ``k`` of ~20 gives a sharp
-    cut at the boundary while still spreading mass into the middle bucket.
-    """
+    """Soft tercile from a percentile column (0..1): ``(p_low, p_mid, p_high)``."""
     p_high_raw = sigmoid_expr(percentile - pl.lit(upper_q), k)
     p_low_raw = sigmoid_expr(pl.lit(lower_q) - percentile, k)
     p_mid_raw = (pl.lit(1.0) - p_high_raw - p_low_raw).clip(lower_bound=0.0)
@@ -107,12 +96,7 @@ def gaussian_membership_soft(
     centers: tuple[float, ...],
     k: float,
 ) -> tuple[pl.Expr, ...]:
-    """Multi-class Gaussian membership: one probability per ``center``.
-
-    For each center ``c`` we compute ``exp(-0.5 * (k * (metric - c)) ** 2)``,
-    then renormalise so the per-row total is 1. The same null-mask propagation
-    as the other helpers applies.
-    """
+    """Multi-class Gaussian membership: one probability per ``center``."""
     raws = [gaussian_expr(metric, c, k) for c in centers]
     total = raws[0]
     for r in raws[1:]:

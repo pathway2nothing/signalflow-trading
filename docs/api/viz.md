@@ -3,7 +3,7 @@
 Interactive pipeline visualization for SignalFlow.
 
 !!! info "Module"
-    `signalflow.viz` — Available as `sf.viz.pipeline()`, `sf.viz.features()`, `sf.viz.serve()`.
+    `signalflow.viz` - Available as `sf.viz.pipeline()`, `sf.viz.features()`, `sf.viz.serve()`.
 
 ## Quick Example
 
@@ -36,9 +36,9 @@ Generate an interactive flow visualization of the pipeline.
 
 **Parameters:**
 
-- `builder` — A `Backtest` or `FlowBuilder` instance
-- `format` — Output format: `"html"` (D3.js interactive) or `"mermaid"` (text diagram)
-- `show` — Open in browser automatically (default: `True`)
+- `builder` - A `Backtest` or `FlowBuilder` instance
+- `format` - Output format: `"html"` (D3.js interactive) or `"mermaid"` (text diagram)
+- `show` - Open in browser automatically (default: `True`)
 
 **Returns:** HTML string or Mermaid code when `show=False`
 
@@ -48,8 +48,8 @@ Visualize feature distributions and correlations.
 
 **Parameters:**
 
-- `pipeline` — A `FeaturePipeline` instance
-- `df` — DataFrame with computed features
+- `pipeline` - A `FeaturePipeline` instance
+- `df` - DataFrame with computed features
 
 ### `sf.viz.data_flow(builder)`
 
@@ -57,7 +57,7 @@ Visualize data flow through the pipeline nodes.
 
 **Parameters:**
 
-- `builder` — A `Backtest` or `FlowBuilder` instance
+- `builder` - A `Backtest` or `FlowBuilder` instance
 
 ### `sf.viz.serve(builder, port=4141)`
 
@@ -65,5 +65,5 @@ Launch a local development server with live-reloading visualization.
 
 **Parameters:**
 
-- `builder` — A `Backtest` or `FlowBuilder` instance
-- `port` — Local server port (default: `4141`)
+- `builder` - A `Backtest` or `FlowBuilder` instance
+- `port` - Local server port (default: `4141`)

@@ -1,15 +1,15 @@
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl
-from numba import njit, prange
 
-from signalflow.core import SignalType, labeler
+from signalflow.enums import Signal as SignalType
+from signalflow.target._numba import njit, prange
 from signalflow.target._soft_helpers import sigmoid_expr
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @njit(parallel=True, cache=True)
@@ -46,15 +46,9 @@ def _find_first_hit(
 
 
 @dataclass
-@labeler("triple_barrier")
+@register_target("triple_barrier_labeler")
 class TripleBarrierLabeler(Labeler):
-    """
-    Triple-Barrier Labeling (De Prado), Numba-accelerated.
-
-    Volatility-based barriers:
-      - pt = close * exp(vol * profit_multiplier)
-      - sl = close * exp(-vol * stop_loss_multiplier)
-    """
+    """Triple-Barrier Labeling (De Prado), Numba-accelerated."""
 
     soft_classes: ClassVar[tuple[str, ...]] = (
         SignalType.FALL.value,
@@ -133,12 +127,13 @@ class TripleBarrierLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_fall, p_none, p_rise)`` based on barrier-hit timing.
+        """
+        Soft triple ``(p_fall, p_none, p_rise)`` based on barrier-hit timing.
 
         Uses the same numba ``_find_first_hit`` to determine which barrier was
         crossed first, then converts the timing gap into smooth probabilities:
 
-            * Let ``e_up = up_off if hit else horizon`` and likewise ``e_dn``.
+        * Let ``e_up = up_off if hit else horizon`` and likewise ``e_dn``.
             * ``gap = (e_dn - e_up) / horizon`` ∈ ``[-1, 1]``;
             * ``p_rise = sigmoid(k * gap)``, ``p_fall = sigmoid(-k * gap)``;
             * ``p_none = max(1 - p_rise - p_fall, 0)`` (then renormalised) so
@@ -181,7 +176,7 @@ class TripleBarrierLabeler(Labeler):
 
         p_rise_raw = sigmoid_expr(pl.col("_gap"), self.softness_k)
         p_fall_raw = sigmoid_expr(-pl.col("_gap"), self.softness_k)
-        # When neither barrier triggered, force the "none" bucket to absorb mass.
+
         p_rise_clamped = pl.when(pl.col("_neither")).then(pl.lit(0.0)).otherwise(p_rise_raw)
         p_fall_clamped = pl.when(pl.col("_neither")).then(pl.lit(0.0)).otherwise(p_fall_raw)
         p_none_raw = (pl.lit(1.0) - p_rise_clamped - p_fall_clamped).clip(lower_bound=0.0)

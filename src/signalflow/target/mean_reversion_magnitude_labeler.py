@@ -1,15 +1,4 @@
-"""Mean-reversion magnitude labeler — regression-style target.
-
-Where :class:`MeanReversionEventLabeler` answers "did the overstretched price
-revert at all?" (binary), this labeler answers "how *much* did it revert?".
-For every overstretched bar (``|z_now| > stretch_threshold``) we measure the
-*best* reduction of ``|z|`` reached within the forward horizon along the
-*signed* axis: the path must move toward the mean, not just oscillate around
-``z_now``. The continuous ratio drives both a soft three-class target and a
-regression meta column, addressing the iter-32 finding that a binary D3
-label saturates AUC near 1.0 while still leaving most of the PnL upside on
-the table.
-"""
+"""Mean-reversion magnitude labeler - regression-style target."""
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
@@ -17,25 +6,11 @@ from typing import Any, ClassVar
 import numpy as np
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
+from signalflow.target._numba import njit, prange
 from signalflow.target._soft_helpers import sigmoid_expr
-from signalflow.target.base import Labeler
-
-try:
-    from numba import njit, prange
-
-    _HAS_NUMBA = True
-except ImportError:  # pragma: no cover
-    _HAS_NUMBA = False
-
-    def njit(*args, **kwargs):  # type: ignore[misc]
-        def decorator(fn):
-            return fn
-
-        return decorator if args and callable(args[0]) is False else args[0]
-
-    prange = range  # type: ignore[assignment]
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @njit(parallel=True, cache=True)
@@ -46,15 +21,7 @@ def _forward_best_revert(
     sd: np.ndarray,
     horizon: int,
 ) -> np.ndarray:
-    """For each bar t with z_now[t] = z0, scan forward up to ``horizon`` bars
-    and record the deepest forward z (in the same baseline µ/σ as z0) that lies
-    on the path *toward* the mean. If z0 > 0 we track min forward z (clipped
-    at 0 from below — we count the move toward 0, not the overshoot through
-    the mean). If z0 < 0 we track max forward z (clipped at 0 from above).
-    Returns the signed depth ``z_now - z_best`` so larger means stronger
-    revert. Bars with no future data, with sd==0, or with |z_now| below
-    threshold are filled with NaN by the caller.
-    """
+    """Signed forward revert depth ``z_now - z_best`` toward the baseline mean."""
     n = price.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
     for i in prange(n):
@@ -76,7 +43,7 @@ def _forward_best_revert(
                     best = zf
                     if best <= 0.0:
                         break
-            out[i] = z0 - best  # positive => price moved down toward mean
+            out[i] = z0 - best
         elif z0 < 0:
             best = z0
             for j in range(i + 1, max_j + 1):
@@ -85,23 +52,24 @@ def _forward_best_revert(
                     best = zf
                     if best >= 0.0:
                         break
-            out[i] = best - z0  # positive => price moved up toward mean
+            out[i] = best - z0
         else:
             out[i] = 0.0
     return out
 
 
 @dataclass
-@labeler("mean_reversion_magnitude")
+@register_target("mean_reversion_magnitude")
 class MeanReversionMagnitudeLabeler(Labeler):
-    """Continuous revert-strength target plus three soft buckets.
+    """
+    Continuous revert-strength target plus three soft buckets.
 
     Algorithm:
         1. Rolling µ, σ over ``z_window``; ``z_now = (close - µ) / σ``.
         2. For overstretched bars (``|z_now| > stretch_threshold``):
             * scan forward up to ``horizon`` bars,
             * track the deepest forward z in the *toward-mean* direction
-              (clipped at 0 — we count progress toward, not through, µ),
+              (clipped at 0 - we count progress toward, not through, µ),
             * ``revert_strength = (|z_now| - clip(|z_best|, 0)) / |z_now|``
               ∈ ``[0, 1]``.
         3. Hard label by fixed cuts on ``revert_strength``:
@@ -109,7 +77,7 @@ class MeanReversionMagnitudeLabeler(Labeler):
             * ``[partial_threshold, full_threshold)`` -> ``"partial_revert"``
             * ``>= full_threshold``           -> ``"full_revert"``
         4. Non-overstretched bars get label ``None`` (excluded from training),
-           matching the meta-label semantics — we only learn the revert
+           matching the meta-label semantics - we only learn the revert
            magnitude conditional on the price being out of its band.
 
     Soft outputs (``p_no_revert, p_partial_revert, p_full_revert``) are
@@ -117,40 +85,11 @@ class MeanReversionMagnitudeLabeler(Labeler):
     full distribution rather than a hard cut.
 
     Why this exists (research provenance):
-        sf-profit ``experiments_report.md`` 2026-05 — the binary
+        sf-profit ``experiments_report.md`` 2026-05 - the binary
         ``D3_rev_mean_revert`` reached forward AUC 0.98–0.99 but the resulting
         strategy only captured a small share of available revert size
         (in-sample 50% → OOS 7%). A magnitude target lets downstream models
         size positions by *expected* revert depth instead of a yes/no flag.
-
-    Attributes:
-        price_col: Price column. Default ``"close"``.
-        horizon: Forward scan window. Default ``240``.
-        z_window: Rolling window for µ/σ baseline. Default ``240``.
-        stretch_threshold: |z_now| above which a bar is *eligible* and gets
-            a label. Default ``2.0``. Bars below are labelled null.
-        partial_threshold: revert ratio above which the label is at least
-            ``"partial_revert"``. Default ``0.25``.
-        full_threshold: revert ratio above which the label is
-            ``"full_revert"``. Default ``0.75``.
-        softness_k: sigmoid sharpness for the soft three-class output.
-
-    Example:
-        ```python
-        from signalflow.target import MeanReversionMagnitudeLabeler
-
-        labeler = MeanReversionMagnitudeLabeler(
-            horizon=240,
-            z_window=240,
-            stretch_threshold=2.0,
-            partial_threshold=0.25,
-            full_threshold=0.75,
-            include_meta=True,
-            mask_to_signals=False,
-        )
-        labeled = labeler.compute(ohlcv_df)
-        # labeled["revert_strength"] is the continuous regression target.
-        ```
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
@@ -211,9 +150,9 @@ class MeanReversionMagnitudeLabeler(Labeler):
         abs_z = np.abs(z_now)
         with np.errstate(divide="ignore", invalid="ignore"):
             revert_strength = np.where(abs_z > 0, signed_depth / abs_z, np.nan)
-        # Clip into [0, 1] — overshoot through the mean is not "more reverted".
+
         revert_strength = np.clip(revert_strength, 0.0, 1.0)
-        # Mask non-overstretched bars to NaN so they receive null labels.
+
         revert_strength = np.where(abs_z > self.stretch_threshold, revert_strength, np.nan)
         return df, z_now, revert_strength
 
@@ -259,14 +198,7 @@ class MeanReversionMagnitudeLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Sigmoid-tercile soft distribution over the revert ratio.
-
-        ``p_full = sigmoid(k * (rev - full_threshold))``;
-        ``p_no   = sigmoid(k * (partial_threshold - rev))``;
-        ``p_partial = max(1 - p_full - p_no, 0)``, then renormalised. Rows
-        where the bar is not overstretched or has no future data emit nulls
-        across all three columns.
-        """
+        """Sigmoid-tercile soft distribution over the revert ratio."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:

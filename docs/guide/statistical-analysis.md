@@ -18,16 +18,16 @@ from signalflow.analytic.stats import monte_carlo, bootstrap, statistical_tests
 
 result = sf.Backtest("test").data(raw=data).detector("sma_cross").run()
 
-# Monte Carlo — trade order shuffling
+# Monte Carlo - trade order shuffling
 mc = monte_carlo(result, n_simulations=10_000)
 print(f"Risk of Ruin: {mc.risk_of_ruin:.1%}")
 print(f"Expected Max Drawdown: {mc.expected_max_drawdown:.2%}")
 
-# Bootstrap — confidence intervals
+# Bootstrap - confidence intervals
 bs = bootstrap(result, method="bca", confidence_level=0.95)
 print(bs.intervals["sharpe_ratio"])
 
-# Statistical tests — PSR & MinTRL
+# Statistical tests - PSR & MinTRL
 tests = statistical_tests(result, sr_benchmark=0.5)
 print(f"PSR: {tests.psr:.2%}")
 print(f"Min trades needed: {tests.min_track_record_length}")
@@ -143,7 +143,7 @@ Two tests from Bailey & Lopez de Prado (2012):
 
 *"What is the probability that the true Sharpe ratio exceeds a benchmark?"*
 
-Accounts for skewness and kurtosis of returns — unlike the naive Sharpe ratio
+Accounts for skewness and kurtosis of returns - unlike the naive Sharpe ratio
 which assumes normality.
 
 ```python
@@ -208,9 +208,9 @@ All compute-intensive kernels use `@njit(cache=True)` with parallel support:
 
 | Kernel | Parallelization |
 |--------|----------------|
-| `simulate_equity_curves()` | `prange` — parallel simulations |
-| `bootstrap_sharpe_ratio()` | `prange` — parallel resamples |
-| `bootstrap_generic()` | `prange` — parallel resamples |
+| `simulate_equity_curves()` | `prange` - parallel simulations |
+| `bootstrap_sharpe_ratio()` | `prange` - parallel resamples |
+| `bootstrap_generic()` | `prange` - parallel resamples |
 | `compute_acceleration()` | Single-threaded (jackknife) |
 | Metric functions | Single-threaded |
 

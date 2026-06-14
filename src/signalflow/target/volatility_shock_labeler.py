@@ -1,29 +1,30 @@
-"""Volatility shock labeler.
+"""
+Volatility shock labeler.
 
 Labels bars based on the z-score change of forward realized volatility
-relative to a trailing volatility regime — captures regime *changes* rather
+relative to a trailing volatility regime - captures regime *changes* rather
 than absolute levels. Complements :class:`VolatilityRegimeLabeler`.
 
 Implementation uses pure Polars expressions for performance.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
 from signalflow.target._soft_helpers import signed_tercile_soft
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @dataclass
-@labeler("volatility_shock")
+@register_target("volatility_shock")
 class VolatilityShockLabeler(Labeler):
-    """Label bars by forward-vs-past volatility z-score shock.
+    """
+    Label bars by forward-vs-past volatility z-score shock.
 
     Detects abrupt regime transitions in realized volatility. While
     :class:`VolatilityRegimeLabeler` answers "what is the forward vol level
@@ -40,28 +41,6 @@ class VolatilityShockLabeler(Labeler):
         6. If z >  shock_threshold      -> ``"vol_shock_up"``
            If z < -shock_threshold      -> ``"vol_shock_down"``
            Otherwise                     -> ``"vol_normal"``
-
-    Attributes:
-        price_col: Price column name. Default: ``"close"``.
-        horizon: Forward window for realized vol. Default: ``120``.
-        past_vol_window: Trailing window for baseline vol & vol-of-vol.
-            Default: ``1440``.
-        vol_window_short: Short window for vol-of-vol inner std. Default: ``60``.
-        shock_threshold: |z| above which the bar is labelled a shock.
-            Default: ``1.0``.
-
-    Example:
-        ```python
-        from signalflow.target.volatility_shock_labeler import VolatilityShockLabeler
-
-        labeler = VolatilityShockLabeler(
-            horizon=120,
-            past_vol_window=1440,
-            shock_threshold=1.0,
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
@@ -148,12 +127,7 @@ class VolatilityShockLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_vol_shock_down, p_vol_normal, p_vol_shock_up)`` from the vol z-score.
-
-        The same forward-vol z-score that drives the hard ``±shock_threshold``
-        decision is passed through :func:`signed_tercile_soft` so the ``normal``
-        bucket gets explicit mass instead of falling through to ``otherwise``.
-        """
+        """Soft triple ``(p_vol_shock_down, p_vol_normal, p_vol_shock_up)`` from the vol z-score."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:

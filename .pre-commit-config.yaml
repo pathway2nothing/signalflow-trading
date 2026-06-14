@@ -11,7 +11,7 @@
 # commits only check what you changed. The ``--all-files`` run will surface
 # pre-existing format / lint drift across the repo; that's expected.
 #
-# Mypy is scoped tight to ``src/signalflow/core/`` — that subtree is fully
+# Mypy is scoped tight to ``src/signalflow/core/`` - that subtree is fully
 # annotated and clean today; wider modules accumulate untyped helpers (numba
 # fallbacks, pre-existing target/detector files) that would flood the hook.
 # Expand the ``files:`` regex as more subtrees reach a clean baseline.

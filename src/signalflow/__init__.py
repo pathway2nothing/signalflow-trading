@@ -1,302 +1,124 @@
-# Allow sub-packages from other directories (sf-ta, sf-nn) to be found
-# under the signalflow namespace when they are on sys.path.
-import pkgutil
-from typing import Any
+"""
+SignalFlow - real-time-first framework for trading signal research and execution.
 
-__path__ = pkgutil.extend_path(__path__, __name__)
+import signalflow as sf
 
-from signalflow.core import (
-    DataFrameType,
-    Order,
-    OrderFill,
-    Portfolio,
-    Position,
-    PositionType,
-    RawData,
-    RawDataType,
-    RawDataView,
-    SfComponentType,
-    SfTorchModuleMixin,
-    Signals,
-    SignalsTransform,
-    SignalType,
-    StrategyState,
-    Trade,
-    default_registry,
-    get_component,
-    # Semantic decorators (new API) - use as @sf.detector, @sf.entry, etc.
-    alert,
-    data_source,
-    data_store,
-    detector,
-    entry,
-    executor,
-    exit,
-    feature,
-    labeler,
-    register,
-    risk,
-    signal_feature,
-    signal_metric,
-    strategy_metric,
-    strategy_store,
-    validator,
-    # Legacy (deprecated)
-    sf_component,
+The public surface is the V5 six-noun model: Dataset, Transform, Models, Flow,
+Engine, Run - plus the WoE/IV feature policy, samplers, detectors, and strategy
+models.
+"""
+
+
+from signalflow._version import __version__
+
+
+from signalflow.enums import (
+    FALL,
+    NONE,
+    RISE,
+    ComponentType,
+    IntentKind,
+    OrderType,
+    PositionSide,
+    Provenance,
+    RunMode,
+    Side,
+    Signal,
 )
-import signalflow.data as data
-import signalflow.detector as detectors
-import signalflow.feature as features
-import signalflow.strategy as strategy
-import signalflow.target as target
-import signalflow.utils as utils
-import signalflow.validator as validators
-from signalflow.feature import Feature, FeaturePipeline, GlobalFeature, OffsetFeature
-from signalflow.signal_feature import SignalFeature
+from signalflow.errors import (
+    ArtifactError,
+    FingerprintMismatch,
+    KillSwitchTripped,
+    LeakageError,
+    PipeError,
+    RiskViolation,
+    SchemaVersionError,
+    SignalFlowError,
+    UnfittedTransformError,
+    UnknownComponentError,
+    UntrainedModelError,
+)
+from signalflow.registry import registry
 
-# Re-assign semantic decorators after submodule imports.
-# `import signalflow.detector` binds the submodule to `signalflow.detector`,
-# shadowing the `detector` decorator imported from signalflow.core above.
-# Same issue for `feature`, `exit`, `validator`.  Re-importing restores them.
-from signalflow.core.decorators import (  # noqa: F811
-    detector,
-    exit,
-    feature,
-    signal_feature,
-    validator,
+
+from signalflow.data import BinanceSource, Dataset, MemorySource, data
+
+
+from signalflow.transform import SMA, Feature, FeaturePipe, Transform
+from signalflow.transform.encode import Binning, IVSelector, WoE
+
+
+from signalflow import target
+from signalflow.target import FixedHorizon, Target, TripleBarrier
+from signalflow.sampler import (
+    CUSUMSampler,
+    MetaLabelingSampler,
+    SampleSet,
+    Sampler,
+    UniformSampler,
+    UniquenessSampler,
 )
 
-# =============================================================================
-# Lazy imports for high-level API
-# =============================================================================
-# These are loaded on first access to avoid import overhead.
-# IMPORTANT: Only api/ module is lazy-loaded. Other modules (detector, feature,
-# etc.) must stay eager for autodiscover() to work correctly.
+
+from signalflow.model import ForecastModel, MaxValidator, MeanValidator, VoteValidator
+from signalflow.detector import (
+    MarketDropDetector,
+    RevertDetector,
+    SignalDetector,
+    SmaCrossDetector,
+    ThresholdDetector,
+)
 
 
-def __getattr__(name: str) -> Any:
-    """Lazy load API module components."""
-    if name == "analytic":
-        import signalflow.analytic as analytic
+from signalflow.engine import Engine, ExchangeBroker, Fill, Intent, Order, SimBroker
+from signalflow.strategy import (
+    OBSERVATION_SCHEMA_VERSION,
+    Entry,
+    Exit,
+    Observation,
+    Risk,
+    RulesStrategy,
+    StrategyModel,
+)
+from signalflow.flow import Flow, Run
 
-        return analytic
 
-    if name == "contrib":
-        import signalflow.contrib as _contrib
+from signalflow.experiment import ArtifactCache, Experiment, Scorecard, bootstrap_ci, monte_carlo_bounds
 
-        return _contrib
 
-    if name == "help":
-        from signalflow._help import help_system
+_OPT = []
+try:
+    from signalflow.strategy import LLMClient, LLMStrategy, OpenAICompatClient
 
-        globals()["help"] = help_system  # cache to avoid re-import
-        return help_system
-
-    if name == "Backtest":
-        from signalflow.api.builder import Backtest
-
-        return Backtest
-
-    if name == "BacktestBuilder":
-        from signalflow.api.builder import BacktestBuilder
-
-        return BacktestBuilder
-
-    if name == "BacktestResult":
-        from signalflow.api.result import BacktestResult
-
-        return BacktestResult
-
-    if name == "backtest":
-        from signalflow.api.shortcuts import backtest
-
-        return backtest
-
-    if name == "load":
-        from signalflow.api.shortcuts import load
-
-        return load
-
-    if name == "load_artifact":
-        from signalflow.api.shortcuts import load_artifact
-
-        return load_artifact
-
-    if name == "api":
-        import signalflow.api as api
-
-        return api
-
-    # Config module
-    if name == "config":
-        import signalflow.config as config
-
-        return config
-
-    # Flow API (unified pipeline)
-    if name == "flow":
-        from signalflow.api.flow import flow
-
-        return flow
-
-    if name == "FlowBuilder":
-        from signalflow.api.flow import FlowBuilder
-
-        return FlowBuilder
-
-    if name == "FlowResult":
-        from signalflow.api.flow import FlowResult
-
-        return FlowResult
-
-    # Metric nodes
-    if name == "FeatureMetrics":
-        from signalflow.api.flow import FeatureMetrics
-
-        return FeatureMetrics
-
-    if name == "SignalMetrics":
-        from signalflow.api.flow import SignalMetrics
-
-        return SignalMetrics
-
-    if name == "LabelMetrics":
-        from signalflow.api.flow import LabelMetrics
-
-        return LabelMetrics
-
-    if name == "ValidationMetrics":
-        from signalflow.api.flow import ValidationMetrics
-
-        return ValidationMetrics
-
-    if name == "BacktestMetrics":
-        from signalflow.api.flow import BacktestMetrics
-
-        return BacktestMetrics
-
-    if name == "LiveMetrics":
-        from signalflow.api.flow import LiveMetrics
-
-        return LiveMetrics
-
-    # Risk management
-    if name == "RiskManager":
-        from signalflow.strategy.risk.manager import RiskManager
-
-        return RiskManager
-
-    if name == "RiskLimit":
-        from signalflow.strategy.risk.limits import RiskLimit
-
-        return RiskLimit
-
-    if name == "MaxLeverageLimit":
-        from signalflow.strategy.risk.limits import MaxLeverageLimit
-
-        return MaxLeverageLimit
-
-    if name == "MaxPositionsLimit":
-        from signalflow.strategy.risk.limits import MaxPositionsLimit
-
-        return MaxPositionsLimit
-
-    if name == "PairExposureLimit":
-        from signalflow.strategy.risk.limits import PairExposureLimit
-
-        return PairExposureLimit
-
-    if name == "DailyLossLimit":
-        from signalflow.strategy.risk.limits import DailyLossLimit
-
-        return DailyLossLimit
-
-    raise AttributeError(f"module 'signalflow' has no attribute {name!r}")
-
+    _OPT += ["LLMStrategy", "LLMClient", "OpenAICompatClient"]
+except Exception:
+    pass
 
 __all__ = [
-    # High-level API
-    "Backtest",
-    "BacktestBuilder",
-    "BacktestMetrics",
-    "BacktestResult",
-    # Risk
-    "DailyLossLimit",
-    # Enums
-    "DataFrameType",
-    # Features
-    "Feature",
-    # Metrics nodes
-    "FeatureMetrics",
-    "FeaturePipeline",
-    "FlowBuilder",
-    "FlowResult",
-    "GlobalFeature",
-    "LabelMetrics",
-    "LiveMetrics",
-    "MaxLeverageLimit",
-    "MaxPositionsLimit",
-    "OffsetFeature",
-    # Containers
-    "Order",
-    "OrderFill",
-    "PairExposureLimit",
-    "Portfolio",
-    "Position",
-    "PositionType",
-    "RawData",
-    "RawDataType",
-    "RawDataView",
-    "RiskLimit",
-    "RiskManager",
-    "SfComponentType",
-    "SfTorchModuleMixin",
-    "SignalFeature",
-    "SignalMetrics",
-    "SignalType",
-    "Signals",
-    "SignalsTransform",
-    "StrategyState",
-    "Trade",
-    "ValidationMetrics",
-    # Semantic decorators (new API) - @sf.detector, @sf.entry, etc.
-    "alert",
-    # Sub-packages
-    "analytic",
-    "api",
-    "backtest",
-    "config",
-    "contrib",
-    "core",
-    "data",
-    "data_source",
-    "data_store",
-    # Registry
-    "default_registry",
-    "detector",
-    "detectors",
-    "entry",
-    "executor",
-    "exit",
-    "feature",
-    "features",
-    "flow",
-    "get_component",
-    "help",
-    "labeler",
-    "load",
-    "load_artifact",
-    "register",
-    "risk",
-    # Legacy decorator (deprecated)
-    "sf_component",
-    "signal_feature",
-    "signal_metric",
-    "strategy",
-    "strategy_metric",
-    "strategy_store",
-    "target",
-    "utils",
-    "validator",
-    "validators",
-]
+    "__version__",
+
+    "RISE", "FALL", "NONE", "Signal",
+    "Side", "OrderType", "PositionSide", "IntentKind", "RunMode", "Provenance", "ComponentType",
+    "registry",
+
+    "SignalFlowError", "UntrainedModelError", "LeakageError", "PipeError", "RiskViolation",
+    "KillSwitchTripped", "ArtifactError", "FingerprintMismatch", "SchemaVersionError",
+    "UnknownComponentError", "UnfittedTransformError",
+
+    "data", "Dataset", "BinanceSource", "MemorySource",
+
+    "Transform", "Feature", "FeaturePipe", "SMA", "WoE", "Binning", "IVSelector",
+
+    "target", "Target", "FixedHorizon", "TripleBarrier",
+    "Sampler", "SampleSet", "UniformSampler", "MetaLabelingSampler", "CUSUMSampler", "UniquenessSampler",
+
+    "ForecastModel", "MeanValidator", "MaxValidator", "VoteValidator",
+    "SignalDetector", "SmaCrossDetector", "ThresholdDetector",
+    "RevertDetector", "MarketDropDetector",
+
+    "Engine", "SimBroker", "ExchangeBroker", "Fill", "Order", "Intent",
+    "RulesStrategy", "Entry", "Exit", "Risk", "Observation", "StrategyModel", "OBSERVATION_SCHEMA_VERSION",
+    "Flow", "Run",
+
+    "Experiment", "Scorecard", "ArtifactCache", "bootstrap_ci", "monte_carlo_bounds",
+] + _OPT

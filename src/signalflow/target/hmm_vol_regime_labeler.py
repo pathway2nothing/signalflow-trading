@@ -1,4 +1,5 @@
-"""2-state HMM vol-regime labeler (calm / turbulent).
+"""
+2-state HMM vol-regime labeler (calm / turbulent).
 
 Uses forward-backward smoothing on rolling log-vol; emits per-bar
 probability triple ``(calm, turbulent)`` plus a discrete hard label
@@ -7,10 +8,9 @@ probability triple ``(calm, turbulent)`` plus a discrete hard label
 NOTE: forward-backward smoothing reads both past *and* future
 observations within its training window, so the hard label is
 **forward-looking** and is only valid as a research / labeling target
-— not as a live-trading signal.
+- not as a live-trading signal.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
@@ -18,9 +18,9 @@ from typing import Any, ClassVar
 import numpy as np
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
-from signalflow.target.base import Labeler
+from signalflow.enums import SignalCategory
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 def _hmm_two_state_fb(
@@ -30,11 +30,7 @@ def _hmm_two_state_fb(
     trans: np.ndarray,
     pi: np.ndarray,
 ) -> np.ndarray:
-    """Forward-backward smoothing for a 2-state Gaussian HMM.
-
-    Returns ``gamma[t, k] = P(state_t = k | obs)`` of shape ``(len(obs), 2)``.
-    Numerically stable via per-row scaling. NaN observations are masked.
-    """
+    """Forward-backward smoothing for a 2-state Gaussian HMM."""
     n = len(obs)
     out = np.full((n, 2), np.nan)
     valid = np.isfinite(obs)
@@ -74,9 +70,10 @@ def _hmm_two_state_fb(
 
 
 @dataclass
-@labeler("hmm_vol_regime_2state")
+@register_target("hmm_vol_regime_2state")
 class HMMVolRegime2StateLabeler(Labeler):
-    """2-state Gaussian HMM (calm / turbulent) on rolling log-vol.
+    """
+    2-state Gaussian HMM (calm / turbulent) on rolling log-vol.
 
     Algorithm:
         1. Compute log-returns and rolling realised log-vol over
@@ -96,16 +93,11 @@ class HMMVolRegime2StateLabeler(Labeler):
         ``p_calm``, ``p_turbulent`` summing to 1.
 
     Research provenance:
-        iter-35 (sf-profit) — best soft label of all iterations.
+        iter-35 (sf-profit) - best soft label of all iterations.
         Soft MI = 0.391 with ``GMMVolRegime5State`` ``volreg5_q90`` and
         0.385 with ``volreg5_q10`` on the validated pool subset.
         Marginal entropy H = 0.999 bits (balanced, not degenerate
         unlike ``soft_H1_hurst``).
-
-    Attributes:
-        smoother: Rolling realised-vol smoothing window. Default: 60.
-        train_window: Slice of log-vol used to estimate HMM parameters
-            and re-fit periodically. Default: 4320 (3 days of 1-min bars).
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
@@ -130,7 +122,7 @@ class HMMVolRegime2StateLabeler(Labeler):
         self.output_columns = cols
 
     def _posterior(self, group_df: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
-        """Return (gamma, log_rv) — posterior and the underlying log-vol."""
+        """Return (gamma, log_rv) - posterior and the underlying log-vol."""
         close = group_df.get_column(self.price_col).to_numpy().astype(np.float64)
         n = len(close)
         c = np.maximum(close, 1e-12)

@@ -1,14 +1,15 @@
 """
-SignalFlow CLI - Command-line interface for backtest execution.
+SignalFlow command-line interface.
 
-Usage:
-    sf run config.yaml        Run backtest from YAML config
-    sf list detectors         List available detectors
-    sf list metrics           List available metrics
-    sf validate config.yaml   Validate config without running
-    sf init                   Create sample config file
+The ``sf`` console script (see ``[project.scripts]`` in ``pyproject.toml``)
+points at :data:`signalflow.cli.main.main`, the click group. Run it via the
+installed ``sf`` command or ``python -m signalflow.cli.main``.
+
+This package intentionally does NOT eagerly import :mod:`signalflow.cli.main`:
+doing so would place the module in ``sys.modules`` before ``runpy`` executes it,
+producing a spurious ``RuntimeWarning`` under ``python -m signalflow.cli.main``.
+Import the group explicitly with ``from signalflow.cli.main import main``.
 """
 
-from signalflow.cli.main import cli
 
-__all__ = ["cli"]
+__all__: list[str] = []

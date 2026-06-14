@@ -5,6 +5,56 @@ All notable changes to SignalFlow are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Architecture refactor toward the project's parity / single-source-of-truth
+invariants (see `REFACTOR_PLAN.md`).
+
+### Added
+
+- **Event log as source of truth** (`signalflow.core.eventlog`): `apply_fill`,
+  `fold`, `replay_state`, `portfolios_match`, and `CashPolicy`. The portfolio is
+  now formally `fold(events)`; `apply_fill` is the single home of fill→position
+  logic. `StrategyStore.read_trades` (read side) and `StrategyStore.verify_snapshot`
+  make the saved snapshot a replay-verifiable cache.
+- **ParityCheck** (`signalflow.strategy.ParityCheck` / `ParitySpec`): research↔
+  production parity as a first-class, CI-checkable component. Diffs the event
+  sequences of two runs, localises the first divergence, and classifies each
+  component as `exact` / `approximate` / `out_of_scope` - failing like a
+  `feature_hash` mismatch when a component leaves its declared class.
+- **Reconciliation port** (`signalflow.strategy.live.reconciliation`): a
+  `Reconciler` protocol + `LogMergeReconciler` adapter that reconciles the
+  internal trade log against the exchange trade log over the canonical model.
+- **Pinned strategy/RL models** (§4.1): `ModelEntryRule` / `ModelExitRule` accept
+  a `model_ref` + `registry` and resolve via `ModelRef` → `ModelRegistry`
+  (floating `latest` forbidden), matching forecast-model delivery.
+- **Warmup contract** (`signalflow.core.warmup`): `warmup_bars_of`,
+  `required_warmup_bars`, `assert_warmup_consistency`; the realtime runner now
+  derives its warmup window from component declarations instead of a constant.
+
+### Changed
+
+- Brokers no longer implement position math: `create_position` /
+  `apply_fill_to_position` removed from `Broker`; the three backtest brokers
+  collapse onto a shared `process_fills` parameterised by `CashPolicy`
+  (`unlimited` = `track_cash=False`).
+- `StrategyState` snapshot deserialization now reconstructs the canonical
+  `Portfolio` / `Position` (previously left as dicts).
+
+### Removed
+
+- Write-only `StrategyStore.upsert_positions` and the point-in-time `positions`
+  table (the trade log + replay supersede it).
+- Global mutable `_global_hooks` singleton (`configure_hooks` / `get_hooks`) -
+  incompatible with parity; pass `HooksManager` via explicit DI instead.
+
+### Moved
+
+- The orphaned `signalflow.strategy.state` (`StateManager` + Redis/DuckDB
+  backends, with its duplicate `Position`) moved to the work-in-progress
+  `signalflow.strategy.live.state`. `signalflow.strategy.Position` is now the
+  canonical `signalflow.core.Position`.
+
 ## [0.5.0] - 2026-02-14
 
 ### Added

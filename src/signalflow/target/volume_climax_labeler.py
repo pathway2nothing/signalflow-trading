@@ -1,7 +1,8 @@
-"""Volume climax labeler.
+"""
+Volume climax labeler.
 
 Labels bars based on the *maximum* forward volume within a horizon
-relative to a trailing volume SMA — captures climax/exhaustion events
+relative to a trailing volume SMA - captures climax/exhaustion events
 rather than the average forward volume.
 
 Complements :class:`VolumeRegimeLabeler` (which uses forward *mean*):
@@ -12,55 +13,22 @@ vs 0.97 for volume_regime).
 Implementation uses pure Polars expressions for performance.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
 from signalflow.target._soft_helpers import signed_tercile_soft
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @dataclass
-@labeler("volume_climax")
+@register_target("volume_climax")
 class VolumeClimaxLabeler(Labeler):
-    """Label bars by forward max-volume vs trailing SMA ratio.
-
-    Algorithm:
-        1. trailing_sma = rolling_mean(volume, vol_sma_window)
-        2. forward_max  = rolling_max(volume[t+1 : t+horizon+1])
-        3. ratio        = forward_max / trailing_sma
-        4. If ratio > climax_threshold -> ``"climax"``
-           If ratio < calm_threshold   -> ``"calm_vol"``
-           Otherwise                    -> ``"normal_vol"``
-
-    Attributes:
-        volume_col: Volume column. Default: ``"volume"``.
-        horizon: Number of forward bars. Default: ``240``.
-        vol_sma_window: Trailing SMA window. Default: ``1440``.
-        climax_threshold: Ratio above which the window is a climax.
-            Default: ``5.0``. (Tuned for 1m crypto bars; forward window
-            often contains a single spike-bar far above the SMA.)
-        calm_threshold: Ratio below which the window is calm.
-            Default: ``1.5``.
-
-    Example:
-        ```python
-        from signalflow.target.volume_climax_labeler import VolumeClimaxLabeler
-
-        labeler = VolumeClimaxLabeler(
-            horizon=240,
-            climax_threshold=3.0,
-            calm_threshold=1.2,
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
-    """
+    """Label bars by forward max-volume vs trailing SMA ratio."""
 
     signal_category: SignalCategory = SignalCategory.VOLUME_LIQUIDITY
 
@@ -143,12 +111,7 @@ class VolumeClimaxLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_calm_vol, p_normal_vol, p_climax)`` from the forward max/SMA ratio.
-
-        The signed metric is ``ratio - centre`` where ``centre`` sits midway
-        between calm and climax. :func:`signed_tercile_soft` then handles
-        threshold-symmetric tails.
-        """
+        """Soft triple ``(p_calm_vol, p_normal_vol, p_climax)`` from the forward max/SMA ratio."""
         if group_df.height == 0:
             return group_df
         if self.volume_col not in group_df.columns:

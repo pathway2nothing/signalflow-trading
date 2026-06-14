@@ -1,4 +1,5 @@
-"""Volume regime labeler.
+"""
+Volume regime labeler.
 
 Labels bars based on forward volume ratio relative to a rolling
 volume moving average.
@@ -6,23 +7,23 @@ volume moving average.
 Implementation uses pure Polars expressions for performance.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
 from signalflow.target._soft_helpers import signed_tercile_soft
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @dataclass
-@labeler("volume_regime")
+@register_target("volume_regime")
 class VolumeRegimeLabeler(Labeler):
-    """Label bars by forward volume regime.
+    """
+    Label bars by forward volume regime.
 
     Detects volume spikes and droughts by comparing forward average
     volume to a trailing volume SMA.
@@ -38,26 +39,6 @@ class VolumeRegimeLabeler(Labeler):
     Implementation:
         Uses pure Polars expressions instead of numpy loops for better
         performance and memory efficiency.
-
-    Attributes:
-        volume_col: Volume column. Default: ``"volume"``.
-        horizon: Number of forward bars. Default: ``60``.
-        vol_sma_window: Trailing SMA window. Default: ``1440``.
-        spike_threshold: Threshold for volume spike. Default: ``2.0``.
-        drought_threshold: Threshold for volume drought. Default: ``0.3``.
-
-    Example:
-        ```python
-        from signalflow.target.volume_labeler import VolumeRegimeLabeler
-
-        labeler = VolumeRegimeLabeler(
-            horizon=60,
-            spike_threshold=2.0,
-            drought_threshold=0.3,
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
     """
 
     signal_category: SignalCategory = SignalCategory.VOLUME_LIQUIDITY
@@ -88,15 +69,7 @@ class VolumeRegimeLabeler(Labeler):
         self.output_columns = cols
 
     def compute_group(self, group_df: pl.DataFrame, data_context: dict[str, Any] | None = None) -> pl.DataFrame:
-        """Compute volume regime labels for a single pair.
-
-        Args:
-            group_df: Single pair data sorted by timestamp.
-            data_context: Optional additional context.
-
-        Returns:
-            DataFrame with same row count, plus label and optional meta columns.
-        """
+        """Compute volume regime labels for a single pair."""
         if group_df.height == 0:
             return group_df
 
@@ -105,18 +78,12 @@ class VolumeRegimeLabeler(Labeler):
 
         vol = pl.col(self.volume_col)
 
-        # Step 1: Trailing volume SMA using Polars rolling_mean
-        # min_samples=1 allows SMA from the first bar (like original behavior)
+
         df = group_df.with_columns(
             vol.rolling_mean(window_size=self.vol_sma_window, min_samples=1).alias("_trailing_sma")
         )
 
-        # Step 2: Forward average volume
-        # To compute mean(volume[t+1 : t+horizon+1]), we:
-        # - Shift volume by -1 to start from next bar
-        # - Apply rolling_mean with window=horizon
-        # - The result at position t+horizon-1 contains mean of [t, t+horizon)
-        # - Shift back by -(horizon-1) to align with position t
+
         df = df.with_columns(
             vol.shift(-1)
             .rolling_mean(window_size=self.horizon, min_samples=1)
@@ -124,7 +91,7 @@ class VolumeRegimeLabeler(Labeler):
             .alias("_forward_avg")
         )
 
-        # Step 3: Volume ratio = forward_avg / trailing_sma
+
         df = df.with_columns(
             pl.when(pl.col("_trailing_sma") > 0)
             .then(pl.col("_forward_avg") / pl.col("_trailing_sma"))
@@ -132,7 +99,7 @@ class VolumeRegimeLabeler(Labeler):
             .alias("_volume_ratio")
         )
 
-        # Step 4-5: Assign labels based on thresholds
+
         label_expr = (
             pl.when(pl.col("_volume_ratio").is_null())
             .then(pl.lit(None, dtype=pl.Utf8))
@@ -149,7 +116,7 @@ class VolumeRegimeLabeler(Labeler):
         if self.include_meta:
             df = df.with_columns(pl.col("_volume_ratio").alias("volume_ratio"))
 
-        # Clean up temporary columns
+
         df = df.drop(["_trailing_sma", "_forward_avg", "_volume_ratio"])
 
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
@@ -162,13 +129,7 @@ class VolumeRegimeLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_illiquidity, p_normal_volume, p_abnormal_volume)``.
-
-        Centres the volume ratio at 1.0 (no excess) and uses
-        :func:`signed_tercile_soft` with thresholds derived from
-        :attr:`spike_threshold` (``ratio - 1 > spike - 1``) and
-        :attr:`drought_threshold` (``1 - ratio > 1 - drought``).
-        """
+        """Soft triple ``(p_illiquidity, p_normal_volume, p_abnormal_volume)``."""
         if group_df.height == 0:
             return group_df
         if self.volume_col not in group_df.columns:

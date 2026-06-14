@@ -1,22 +1,23 @@
-"""Survival-style triple-barrier labeler.
+"""
+Survival-style triple-barrier labeler.
 
 Where :class:`TripleBarrierLabeler` emits a categorical RISE/FALL/NONE label
 per bar, this labeler exposes the *timing* of the first barrier touch as a
 regression / survival target. For each bar we record:
 
-    * ``hit_time``        — normalised time to first barrier ∈ ``(0, 1]``,
+* ``hit_time``        - normalised time to first barrier ∈ ``(0, 1]``,
                             with ``1.0`` reserved for the vertical-barrier
                             (no horizontal touch within horizon).
-    * ``hit_event``       — categorical first-touch outcome (``"pt"``, ``"sl"``,
+    * ``hit_event``       - categorical first-touch outcome (``"pt"``, ``"sl"``,
                             ``"vertical"``).
-    * ``hit_ret``         — log return realised at the first-touch bar.
-    * ``censored``        — boolean: ``True`` when the vertical barrier was
+    * ``hit_ret``         - log return realised at the first-touch bar.
+    * ``censored``        - boolean: ``True`` when the vertical barrier was
                             hit first (right-censored observation).
 
 The continuous ``hit_time`` lets downstream models fit hazard / survival
 formulations (e.g. parametric ``log(1 - hit_time)`` or DeepSurv-style heads),
 addressing the iter-32 finding that fixed-horizon binary labels discard the
-*speed* of mean reversion — a signal worth more than the direction alone for
+*speed* of mean reversion - a signal worth more than the direction alone for
 sizing and stop placement.
 """
 
@@ -26,25 +27,11 @@ from typing import Any, ClassVar
 import numpy as np
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
+from signalflow.target._numba import njit, prange
 from signalflow.target._soft_helpers import sigmoid_expr
-from signalflow.target.base import Labeler
-
-try:
-    from numba import njit, prange
-
-    _HAS_NUMBA = True
-except ImportError:  # pragma: no cover
-    _HAS_NUMBA = False
-
-    def njit(*args, **kwargs):  # type: ignore[misc]
-        def decorator(fn):
-            return fn
-
-        return decorator if args and callable(args[0]) is False else args[0]
-
-    prange = range  # type: ignore[assignment]
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @njit(parallel=True, cache=True)
@@ -54,9 +41,7 @@ def _first_barrier_touch(
     sl: np.ndarray,
     lookforward: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Find the offset of the *first* barrier hit and which barrier (0=none,
-    1=pt, 2=sl). Ties resolve as profit-first (matches TripleBarrierLabeler).
-    """
+    """Offset of the first barrier hit and which barrier (0=none, 1=pt, 2=sl), profit-first on ties."""
     n = prices.shape[0]
     off = np.zeros(n, dtype=np.int32)
     which = np.zeros(n, dtype=np.int8)
@@ -82,9 +67,10 @@ def _first_barrier_touch(
 
 
 @dataclass
-@labeler("time_to_barrier")
+@register_target("time_to_barrier")
 class TimeToBarrierLabeler(Labeler):
-    """Time-to-first-touch triple barrier with survival-style outputs.
+    """
+    Time-to-first-touch triple barrier with survival-style outputs.
 
     Algorithm:
         1. Realised volatility ``vol = rolling_std(log_ret, vol_window)``.
@@ -94,12 +80,12 @@ class TimeToBarrierLabeler(Labeler):
         3. Scan ``[t+1 .. t+horizon]`` for the first crossing. Ties favour
            the profit barrier (matches :class:`TripleBarrierLabeler`).
         4. Emit four columns:
-            * ``hit_event`` — ``"pt" | "sl" | "vertical"`` (string label).
-            * ``hit_time`` — ``offset / horizon`` ∈ ``(0, 1]``, ``1.0`` if
+            * ``hit_event`` - ``"pt" | "sl" | "vertical"`` (string label).
+            * ``hit_time`` - ``offset / horizon`` ∈ ``(0, 1]``, ``1.0`` if
               vertical barrier (i.e., no horizontal touch).
-            * ``hit_ret`` — ``log(prices[t + offset] / prices[t])`` at the
+            * ``hit_ret`` - ``log(prices[t + offset] / prices[t])`` at the
               first-touch bar.
-            * ``censored`` — ``True`` for vertical barriers (right-censored
+            * ``censored`` - ``True`` for vertical barriers (right-censored
               observations for survival models).
 
     Soft outputs (``p_pt_fast, p_vertical, p_sl_fast``) are derived from the
@@ -108,32 +94,6 @@ class TimeToBarrierLabeler(Labeler):
     load on ``p_sl_fast``; trades that never touch either load on
     ``p_vertical``. This is useful for ranking trades by *expected speed* of
     resolution, not just direction.
-
-    Attributes:
-        price_col: Price column. Default ``"close"``.
-        vol_window: Rolling-vol window for barrier scaling. Default ``60``.
-        horizon: Vertical-barrier horizon in bars. Default ``1440``.
-        profit_multiplier: PT = price * exp(+vol * profit_multiplier).
-            Default ``1.0``.
-        stop_loss_multiplier: SL = price * exp(-vol * stop_loss_multiplier).
-            Default ``1.0``.
-        softness_k: sigmoid sharpness for the soft 3-class output.
-
-    Example:
-        ```python
-        from signalflow.target import TimeToBarrierLabeler
-
-        labeler = TimeToBarrierLabeler(
-            vol_window=60,
-            horizon=240,
-            profit_multiplier=1.5,
-            stop_loss_multiplier=1.0,
-            include_meta=True,
-            mask_to_signals=False,
-        )
-        labeled = labeler.compute(ohlcv_df)
-        # labeled["hit_time"] ∈ (0,1]; "censored" = (hit_event == "vertical").
-        ```
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_DIRECTION
@@ -189,15 +149,15 @@ class TimeToBarrierLabeler(Labeler):
         h = float(self.horizon)
 
         finite = ~(np.isnan(pt) | np.isnan(sl))
-        # Default = vertical barrier (offset = horizon).
+
         hit_off = np.where(which > 0, off, self.horizon).astype(np.float64)
-        hit_time = hit_off / h  # ∈ (0, 1]
+        hit_time = hit_off / h
 
         idx = np.arange(n)
         end_idx = np.clip(idx + hit_off.astype(np.int64), 0, n - 1)
         with np.errstate(divide="ignore", invalid="ignore"):
             hit_ret = np.where(prices > 0, np.log(prices[end_idx] / prices), np.nan)
-        # Censored = vertical barrier was first touch (no horizontal hit).
+
         censored = (which == 0) & finite
 
         labels: list[str | None] = [None] * n
@@ -233,15 +193,7 @@ class TimeToBarrierLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_sl_fast, p_vertical, p_pt_fast)`` from timing gap.
-
-        We compute the first-touch offsets to *each* barrier independently
-        (re-using the upstream :func:`_find_first_hit` shape), then combine
-        them into a normalised speed gap ``gap = (e_sl - e_pt) / horizon``
-        ∈ ``[-1, 1]``. Positive ``gap`` means PT hit earlier (or only PT
-        hit), negative means SL hit earlier. ``p_vertical`` collects the
-        residual mass when neither barrier was touched.
-        """
+        """Soft triple ``(p_sl_fast, p_vertical, p_pt_fast)`` from timing gap."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:
@@ -252,16 +204,13 @@ class TimeToBarrierLabeler(Labeler):
         pt = df.get_column("_pt").fill_null(np.nan).to_numpy().astype(np.float64)
         sl = df.get_column("_sl").fill_null(np.nan).to_numpy().astype(np.float64)
 
-        # Compute first-touch offsets *separately* for PT and SL so we can
-        # rank them on speed even when one would have been blocked by the
-        # other in the strict triple-barrier rule.
+
         n = prices.shape[0]
         h = int(self.horizon)
         pt_off = np.zeros(n, dtype=np.int32)
         sl_off = np.zeros(n, dtype=np.int32)
-        # Plain Python is fine here for clarity; the numba-path-first-touch
-        # in compute_group handles the hot loop and this branch is only used
-        # by soft-label callers (typically lower throughput).
+
+
         for i in range(n):
             if np.isnan(pt[i]) or np.isnan(sl[i]):
                 continue

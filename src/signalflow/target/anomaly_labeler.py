@@ -6,16 +6,17 @@ from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
 from signalflow.target._soft_helpers import signed_tercile_soft
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @dataclass
-@labeler("anomaly")
+@register_target("anomaly")
 class AnomalyLabeler(Labeler):
-    """Labels black swan and flash crash events in historical data.
+    """
+    Labels black swan and flash crash events in historical data.
 
     Forward-looking labeler that identifies anomalous price movements by
     comparing forward return magnitude against rolling volatility.
@@ -28,33 +29,6 @@ class AnomalyLabeler(Labeler):
         5. If additionally the return is negative AND happened in < flash_horizon
            bars -> "extreme_negative_anomaly"
         6. Otherwise -> null (no label)
-
-    Attributes:
-        price_col (str): Price column name. Default: "close".
-        horizon (int): Forward-looking horizon in bars. Default: 60.
-        vol_window (int): Rolling window for volatility estimation. Default: 1440.
-        threshold_return_std (float): Number of standard deviations for anomaly
-            threshold. Default: 4.0.
-        flash_horizon (int): Maximum bars for flash crash classification.
-            Default: 10.
-
-    Example:
-        ```python
-        from signalflow.target.anomaly_labeler import AnomalyLabeler
-
-        labeler = AnomalyLabeler(
-            horizon=60,
-            vol_window=1440,
-            threshold_return_std=4.0,
-            mask_to_signals=False,
-        )
-        labeled = labeler.compute(ohlcv_df)
-        ```
-
-    Note:
-        This is a forward-looking labeler -- it uses future data and is NOT
-        suitable for live trading. Use ``AnomalyDetector`` for real-time
-        anomaly detection.
     """
 
     signal_category: SignalCategory = SignalCategory.ANOMALY
@@ -91,16 +65,7 @@ class AnomalyLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Compute anomaly labels for a single pair group.
-
-        Args:
-            group_df (pl.DataFrame): Single pair's data sorted by timestamp.
-            data_context (dict[str, Any] | None): Additional context.
-
-        Returns:
-            pl.DataFrame: Same length as input with anomaly label column added.
-                Labels are "extreme_positive_anomaly", "extreme_negative_anomaly", or null.
-        """
+        """Compute anomaly labels for a single pair group."""
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
@@ -109,19 +74,19 @@ class AnomalyLabeler(Labeler):
 
         price = pl.col(self.price_col)
 
-        # Step 1: log returns
+
         df = group_df.with_columns(
             (price / price.shift(1)).log().alias("_log_ret"),
         )
 
-        # Step 2: rolling std of returns
+
         df = df.with_columns(
             pl.col("_log_ret")
             .rolling_std(window_size=self.vol_window, min_samples=max(2, self.vol_window // 4))
             .alias("_rolling_vol"),
         )
 
-        # Step 3: forward return (signed) and magnitude
+
         df = df.with_columns(
             (price.shift(-self.horizon) / price).log().alias("_forward_ret"),
         )
@@ -129,12 +94,10 @@ class AnomalyLabeler(Labeler):
             pl.col("_forward_ret").abs().alias("_forward_ret_abs"),
         )
 
-        # Step 4-5: compute threshold and classify
-        # Scale per-bar volatility to horizon-length volatility: vol * sqrt(horizon)
+
         horizon_threshold = pl.col("_rolling_vol") * self.threshold_return_std * math.sqrt(self.horizon)
 
-        # For flash crash detection, check if a large negative move happens
-        # within flash_horizon bars (shorter window).
+
         flash_threshold = pl.col("_rolling_vol") * self.threshold_return_std * math.sqrt(self.flash_horizon)
         df = df.with_columns(
             (price.shift(-self.flash_horizon) / price).log().alias("_flash_ret"),
@@ -164,7 +127,7 @@ class AnomalyLabeler(Labeler):
 
         df = df.with_columns(label_expr)
 
-        # Step 6: meta columns
+
         if self.include_meta:
             df = df.with_columns(
                 [
@@ -173,7 +136,7 @@ class AnomalyLabeler(Labeler):
                 ]
             )
 
-        # Clean up temporary columns
+
         df = df.drop(
             [
                 c
@@ -182,7 +145,7 @@ class AnomalyLabeler(Labeler):
             ]
         )
 
-        # Apply signal masking if configured
+
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)
 
@@ -193,14 +156,7 @@ class AnomalyLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_extreme_negative_anomaly, p_normal, p_extreme_positive_anomaly)``.
-
-        Treats the *signed* horizon return scaled by per-bar volatility as the
-        decision metric: ``z = fwd_ret / (rolling_vol * sqrt(horizon))``. The
-        symmetric threshold from :attr:`threshold_return_std` defines the
-        anomaly cut for both tails, and :func:`signed_tercile_soft` produces
-        calibrated probabilities.
-        """
+        """Soft triple ``(p_extreme_negative_anomaly, p_normal, p_extreme_positive_anomaly)``."""
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
         if group_df.height == 0:

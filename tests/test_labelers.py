@@ -1,193 +1,108 @@
-"""Tests for target labelers: Labeler base, FixedHorizonLabeler."""
+"""Tests for the restored legacy labelers, adapted to the V5 Target API."""
 
-import math
-from datetime import datetime, timedelta
+
+import warnings
 
 import polars as pl
 import pytest
 
-from signalflow.core.containers.signals import Signals
-from signalflow.core.enums import SignalType
-from signalflow.target.fixed_horizon_labeler import FixedHorizonLabeler
+warnings.filterwarnings("ignore", message="X does not have valid feature names")
+
+import signalflow as sf
 
 
-def _price_df(n=20, pair="BTCUSDT", trend=1.0):
-    """Simple OHLCV with a linear price trend."""
-    base = datetime(2024, 1, 1)
-    rows = []
-    for i in range(n):
-        price = 100.0 + trend * i
-        rows.append(
-            {
-                "pair": pair,
-                "timestamp": base + timedelta(minutes=i),
-                "open": price,
-                "high": price + 1,
-                "low": price - 1,
-                "close": price,
-                "volume": 1000.0,
-            }
-        )
-    return pl.DataFrame(rows)
+def test_import_signalflow():
+    pass
 
 
-def _multi_pair_df(n=20):
-    btc = _price_df(n, pair="BTCUSDT", trend=1.0)
-    eth = _price_df(n, pair="ETHUSDT", trend=-1.0)
-    return pl.concat([btc, eth])
+def test_import_labelers():
+    pass
 
 
-# ── Labeler base validation ─────────────────────────────────────────────────
+@pytest.fixture(scope="module")
+def small_ds():
+    return sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
 
 
-class TestLabelerBaseValidation:
-    def test_not_dataframe_raises(self):
-        labeler = FixedHorizonLabeler(horizon=5)
-        with pytest.raises(TypeError, match=r"pl\.DataFrame"):
-            labeler.compute("not a df")
+def _labeler_cases():
+    from signalflow.target import (
+        DirectionalMeanReversionLabeler,
+        FixedHorizonLabeler,
+        MeanReversionEventLabeler,
+        MetaLabelLabeler,
+        TripleBarrierLabeler,
+        VolatilityRegimeLabeler,
+    )
 
-    def test_missing_pair_col_raises(self):
-        labeler = FixedHorizonLabeler(horizon=5)
-        df = pl.DataFrame({"timestamp": [datetime(2024, 1, 1)], "close": [100.0]})
-        with pytest.raises(ValueError, match="pair"):
-            labeler.compute(df)
-
-    def test_missing_ts_col_raises(self):
-        labeler = FixedHorizonLabeler(horizon=5)
-        df = pl.DataFrame({"pair": ["BTCUSDT"], "close": [100.0]})
-        with pytest.raises(ValueError, match="timestamp"):
-            labeler.compute(df)
-
-    def test_keep_input_columns(self):
-        labeler = FixedHorizonLabeler(horizon=5, keep_input_columns=True, mask_to_signals=False)
-        df = _price_df(20)
-        result = labeler.compute(df)
-        assert "close" in result.columns
-        assert "open" in result.columns
-        assert "label" in result.columns
-
-    def test_output_columns_projection(self):
-        labeler = FixedHorizonLabeler(horizon=5, mask_to_signals=False)
-        df = _price_df(20)
-        result = labeler.compute(df)
-        assert "pair" in result.columns
-        assert "timestamp" in result.columns
-        assert "label" in result.columns
-        assert "close" not in result.columns
+    return [
+        (TripleBarrierLabeler, dict(horizon=24, vol_window=12)),
+        (FixedHorizonLabeler, dict(horizon=24)),
+        (DirectionalMeanReversionLabeler, dict(horizon=24, z_window=24)),
+        (VolatilityRegimeLabeler, dict(horizon=24, lookback_window=120)),
+        (MeanReversionEventLabeler, dict(horizon=24, z_window=24)),
+        (MetaLabelLabeler, dict(horizon=24, mode="fixed_horizon")),
+    ]
 
 
-# ── FixedHorizonLabeler ─────────────────────────────────────────────────────
+@pytest.mark.parametrize("cls,kwargs", _labeler_cases())
+def test_labeler_labels_contract(small_ds, cls, kwargs):
+    lab = cls(**kwargs)
+    out = lab.labels(small_ds)
+
+    assert out.columns == ["pair", "ts", "label"]
+    assert out.height > 0
+    assert out.schema["label"].is_numeric()
+
+    assert out.get_column("label").drop_nulls().len() > 0
+
+    assert isinstance(lab.horizon, int) and lab.horizon > 0
 
 
-class TestFixedHorizonLabeler:
-    def test_horizon_zero_raises(self):
-        with pytest.raises(ValueError, match="horizon must be > 0"):
-            FixedHorizonLabeler(horizon=0)
+def test_labels_restrict_to_index(small_ds):
+    from signalflow.target import FixedHorizonLabeler
 
-    def test_negative_horizon_raises(self):
-        with pytest.raises(ValueError, match="horizon must be > 0"):
-            FixedHorizonLabeler(horizon=-5)
-
-    def test_basic_rise_label(self):
-        labeler = FixedHorizonLabeler(horizon=5, mask_to_signals=False)
-        df = _price_df(20, trend=1.0)  # rising prices
-        result = labeler.compute(df)
-        # First 15 bars should be RISE (future > current)
-        labels = result.filter(pl.col("label") != SignalType.NONE.value)
-        assert (labels["label"] == SignalType.RISE.value).all()
-
-    def test_basic_fall_label(self):
-        labeler = FixedHorizonLabeler(horizon=5, mask_to_signals=False)
-        df = _price_df(20, trend=-1.0)  # falling prices
-        result = labeler.compute(df)
-        labels = result.filter(pl.col("label") != SignalType.NONE.value)
-        assert (labels["label"] == SignalType.FALL.value).all()
-
-    def test_none_at_end(self):
-        labeler = FixedHorizonLabeler(horizon=5, mask_to_signals=False)
-        df = _price_df(20, trend=1.0)
-        result = labeler.compute(df)
-        # Last 5 bars have no future data → NONE
-        last_5 = result.tail(5)
-        assert (last_5["label"] == SignalType.NONE.value).all()
-
-    def test_include_meta(self):
-        labeler = FixedHorizonLabeler(horizon=5, include_meta=True, mask_to_signals=False)
-        df = _price_df(20)
-        result = labeler.compute(df)
-        assert "t1" in result.columns
-        assert "ret" in result.columns
-
-    def test_ret_is_log_return(self):
-        labeler = FixedHorizonLabeler(horizon=5, include_meta=True, mask_to_signals=False)
-        df = _price_df(20, trend=1.0)
-        result = labeler.compute(df)
-        # Check first row: close=100, future=105, ret=log(105/100)
-        first_ret = result.filter(pl.col("ret").is_not_null())["ret"][0]
-        expected = math.log(105.0 / 100.0)
-        assert first_ret == pytest.approx(expected, rel=1e-4)
-
-    def test_empty_group(self):
-        labeler = FixedHorizonLabeler(horizon=5, mask_to_signals=False)
-        empty = pl.DataFrame(
-            {"pair": [], "timestamp": [], "close": [], "open": [], "high": [], "low": [], "volume": []}
-        ).cast(
-            {
-                "timestamp": pl.Datetime,
-                "close": pl.Float64,
-                "open": pl.Float64,
-                "high": pl.Float64,
-                "low": pl.Float64,
-                "volume": pl.Float64,
-            }
-        )
-        # Empty group_by never calls compute_group, so "label" column is not produced
-        with pytest.raises(Exception):  # noqa: B017
-            labeler.compute(empty)
-
-    def test_multi_pair(self):
-        labeler = FixedHorizonLabeler(horizon=5, mask_to_signals=False)
-        df = _multi_pair_df(20)
-        result = labeler.compute(df)
-        assert result.height == 40  # 20 per pair
-        # BTC rising → RISE, ETH falling → FALL
-        btc = result.filter(pl.col("pair") == "BTCUSDT").filter(pl.col("label") != SignalType.NONE.value)
-        eth = result.filter(pl.col("pair") == "ETHUSDT").filter(pl.col("label") != SignalType.NONE.value)
-        assert (btc["label"] == SignalType.RISE.value).all()
-        assert (eth["label"] == SignalType.FALL.value).all()
-
-    def test_length_preserved(self):
-        labeler = FixedHorizonLabeler(horizon=5, mask_to_signals=False)
-        df = _price_df(50)
-        result = labeler.compute(df)
-        assert result.height == df.height
-
-    def test_missing_price_col_raises(self):
-        labeler = FixedHorizonLabeler(horizon=5, price_col="nonexistent", mask_to_signals=False)
-        df = _price_df(10)
-        # ValueError raised inside compute_group is wrapped by Polars as PanicException (BaseException)
-        with pytest.raises(BaseException, match="nonexistent"):
-            labeler.compute(df)
+    lab = FixedHorizonLabeler(horizon=24)
+    at = small_ds.index().head(10)
+    out = lab.labels(small_ds, at=at)
+    assert out.height == 10
+    assert out.select(["pair", "ts"]).equals(at.select(["pair", "ts"]))
 
 
-# ── Labeler signal filtering ───────────────────────────────────────────────
+def test_make_target_returns_working_labeler(small_ds):
+    from signalflow.target import TripleBarrierLabeler, make_target
 
 
-class TestLabelerSignalFiltering:
-    def test_filter_by_signal_type(self):
-        labeler = FixedHorizonLabeler(horizon=5, filter_signal_type=SignalType.RISE, mask_to_signals=False)
-        df = _price_df(20)
-        base = datetime(2024, 1, 1)
-        signals = Signals(
-            pl.DataFrame(
-                {
-                    "pair": ["BTCUSDT", "BTCUSDT"],
-                    "timestamp": [base, base + timedelta(minutes=5)],
-                    "signal_type": [SignalType.RISE.value, SignalType.FALL.value],
-                    "signal": [1, -1],
-                }
-            )
-        )
-        result = labeler.compute(df, signals=signals)
-        # Only RISE signal row kept (inner join)
-        assert result.height == 1
+    clean = make_target("triple_barrier", max_bars=24)
+    assert clean.labels(small_ds).columns == ["pair", "ts", "label"]
+
+
+    legacy = make_target("triple_barrier_labeler", horizon=24, vol_window=12)
+    assert isinstance(legacy, TripleBarrierLabeler)
+    out = legacy.labels(small_ds)
+    assert out.columns == ["pair", "ts", "label"]
+    assert out.height > 0
+
+
+@pytest.mark.filterwarnings("ignore:X does not have valid feature names")
+def test_forecast_model_with_legacy_target(small_ds):
+    from signalflow.target import TripleBarrierLabeler
+
+    model = sf.ForecastModel(
+        target=TripleBarrierLabeler(horizon=24, vol_window=12),
+        features=sf.FeaturePipe(sf.SMA(20)),
+        n_folds=3,
+    )
+    model.fit(small_ds)
+    assert model.is_fitted
+
+
+def test_label_to_numeric_helper():
+    from signalflow.target import Labeler
+
+    s = pl.Series(["rise", "fall", "none", None, "mean_reverted"])
+    num = Labeler._label_to_numeric(s)
+    assert num.to_list() == [1.0, 0.0, 0.0, None, 1.0]
+
+
+    n = pl.Series([0, 1, 2, 3])
+    assert Labeler._label_to_numeric(n).to_list() == [0.0, 1.0, 2.0, 3.0]

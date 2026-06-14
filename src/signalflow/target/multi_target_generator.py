@@ -1,8 +1,4 @@
-"""Multi-horizon, multi-target label generation for informativeness analysis.
-
-Wraps existing Labeler subclasses to produce multiple label columns
-at different horizons and target types simultaneously.
-"""
+"""Multi-horizon, multi-target label generation for informativeness analysis."""
 
 from dataclasses import dataclass, field
 from typing import Any
@@ -10,20 +6,13 @@ from typing import Any
 import polars as pl
 from loguru import logger
 
-from signalflow.target.base import Labeler
+from signalflow.target.labeler import Labeler
 from signalflow.target.triple_barrier_labeler import TripleBarrierLabeler
 
 
 @dataclass
 class HorizonConfig:
-    """Configuration for a single prediction horizon.
-
-    Attributes:
-        name: Human-readable name (e.g., "short", "mid", "long").
-        horizon: Number of bars for the horizon.
-        labeler_cls: Labeler class to use for direction targets.
-        labeler_kwargs: Extra kwargs passed to the labeler constructor.
-    """
+    """Configuration for a single prediction horizon."""
 
     name: str
     horizon: int
@@ -33,15 +22,10 @@ class HorizonConfig:
 
 @dataclass
 class TargetType:
-    """Defines a target type derived from OHLCV data.
-
-    Attributes:
-        name: Target name (e.g., "direction", "return_magnitude", "volume_regime").
-        kind: "discrete" or "continuous" — determines MI computation method.
-    """
+    """Defines a target type derived from OHLCV data."""
 
     name: str
-    kind: str  # "discrete" | "continuous"
+    kind: str
 
 
 DEFAULT_HORIZONS: list[HorizonConfig] = [
@@ -60,7 +44,8 @@ DEFAULT_TARGET_TYPES: list[TargetType] = [
 
 @dataclass
 class MultiTargetGenerator:
-    """Generates multiple targets at multiple horizons from OHLCV data.
+    """
+    Generates multiple targets at multiple horizons from OHLCV data.
 
     For each (horizon, target_type) combination, adds a column to the
     DataFrame. Column naming convention: ``target_{target_name}_{horizon_name}``.
@@ -69,16 +54,6 @@ class MultiTargetGenerator:
     Return magnitude is ``|log(close[t+h] / close[t])|``.
     Volume regime discretizes ``volume / sma(volume)`` into HIGH/MED/LOW.
     Crash regime classifies forward return into crash/rally/normal.
-
-    Attributes:
-        horizons: List of HorizonConfig.
-        target_types: List of TargetType to generate.
-        volume_window: Rolling window for volume SMA baseline.
-        volume_quantiles: (low, high) thresholds for volume regime.
-        crash_quantiles: (crash, rally) quantile thresholds for crash regime.
-        pair_col: Trading pair column name.
-        ts_col: Timestamp column name.
-        price_col: Price column name.
     """
 
     horizons: list[HorizonConfig] = field(default_factory=lambda: list(DEFAULT_HORIZONS))
@@ -89,18 +64,11 @@ class MultiTargetGenerator:
     crash_quantiles: tuple[float, float] = (0.1, 0.9)
 
     pair_col: str = "pair"
-    ts_col: str = "timestamp"
+    ts_col: str = "ts"
     price_col: str = "close"
 
     def generate(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Generate all target columns.
-
-        Args:
-            df: OHLCV DataFrame with pair, timestamp, open, high, low, close, volume.
-
-        Returns:
-            Original DataFrame with added ``target_*`` columns.
-        """
+        """Generate all target columns."""
         self._validate(df)
 
         target_type_map = {t.name: t for t in self.target_types}
@@ -120,11 +88,7 @@ class MultiTargetGenerator:
         return df
 
     def target_columns(self) -> list[dict[str, str]]:
-        """Return metadata for all generated target columns.
-
-        Returns:
-            List of dicts with keys: column, horizon, target_type, kind.
-        """
+        """Return metadata for all generated target columns."""
         result = []
         for h in self.horizons:
             for t in self.target_types:
@@ -138,9 +102,6 @@ class MultiTargetGenerator:
                 )
         return result
 
-    # ------------------------------------------------------------------
-    # Direction targets via existing Labelers
-    # ------------------------------------------------------------------
 
     def _generate_direction(self, df: pl.DataFrame) -> pl.DataFrame:
         for h in self.horizons:
@@ -171,9 +132,6 @@ class MultiTargetGenerator:
         kwargs.update(h.labeler_kwargs)
         return h.labeler_cls(**kwargs)
 
-    # ------------------------------------------------------------------
-    # Return magnitude: |log(close[t+h] / close[t])|
-    # ------------------------------------------------------------------
 
     def _generate_return_magnitude(self, df: pl.DataFrame) -> pl.DataFrame:
         for h in self.horizons:
@@ -192,9 +150,6 @@ class MultiTargetGenerator:
 
         return df
 
-    # ------------------------------------------------------------------
-    # Volume regime: HIGH / MED / LOW
-    # ------------------------------------------------------------------
 
     def _generate_volume_regime(self, df: pl.DataFrame) -> pl.DataFrame:
         for h in self.horizons:
@@ -214,16 +169,12 @@ class MultiTargetGenerator:
         return df
 
     def _volume_regime_expr(self, horizon: int) -> pl.Expr:
-        """Polars expression for volume regime classification.
-
-        Computes forward-looking average volume ratio vs current rolling SMA,
-        then discretizes into HIGH/MED/LOW based on quantile thresholds.
-        """
+        """Polars expression for volume regime classification."""
         vol = pl.col("volume")
         vol_sma = vol.rolling_mean(window_size=self.volume_window)
         vol_ratio = vol / vol_sma
 
-        # Use forward-looking mean of volume_ratio over the horizon
+
         forward_vol_ratio = vol_ratio.shift(-horizon)
 
         low_q, high_q = self.volume_quantiles
@@ -237,9 +188,6 @@ class MultiTargetGenerator:
             .otherwise(pl.lit("MED"))
         )
 
-    # ------------------------------------------------------------------
-    # Crash regime: crash / normal / rally
-    # ------------------------------------------------------------------
 
     def _generate_crash_regime(self, df: pl.DataFrame) -> pl.DataFrame:
         for h in self.horizons:
@@ -259,11 +207,7 @@ class MultiTargetGenerator:
         return df
 
     def _crash_regime_expr(self, horizon: int) -> pl.Expr:
-        """Polars expression for crash/rally regime classification.
-
-        Computes forward log-return over ``horizon`` bars, then discretizes
-        into crash/rally/normal based on quantile thresholds.
-        """
+        """Polars expression for crash/rally regime classification."""
         price = pl.col(self.price_col)
         forward_return = (price.shift(-horizon) / price).log()
 
@@ -278,9 +222,6 @@ class MultiTargetGenerator:
             .otherwise(pl.lit("normal"))
         )
 
-    # ------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------
 
     def _validate(self, df: pl.DataFrame) -> None:
         required = {self.pair_col, self.ts_col, self.price_col}

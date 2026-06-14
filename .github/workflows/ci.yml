@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, dev]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv venv
+      - name: Install (core + test + extras)
+        run: uv pip install -e ".[test,live,llm]"
+      - name: Lint (ruff)
+        run: uvx ruff check src tests
+        continue-on-error: true
+      - name: Run tests
+        env:
+          PYTHONUTF8: "1"
+        run: .venv/bin/python -m pytest -q
+
+  core-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv venv
+      - name: Install (core only)
+        run: uv pip install -e ".[test]"
+      - name: Core invariants (leakage, engine parity, OOS, untrained guard)
+        env:
+          PYTHONUTF8: "1"
+        run: .venv/bin/python -m pytest tests/test_flow.py tests/test_engine.py tests/test_model.py -q

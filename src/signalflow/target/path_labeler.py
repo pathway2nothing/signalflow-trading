@@ -1,22 +1,22 @@
-"""Path-property labelers.
+"""
+Path-property labelers.
 
 Three labelers that describe the *shape* of the forward price path rather
 than its direction or magnitude. Per iter25 EDA, each occupies its own
-hierarchical cluster (K=5) — they carry information uncorrelated with
+hierarchical cluster (K=5) - they carry information uncorrelated with
 direction / volatility / volume labels.
 
-- :class:`HurstRegimeLabeler` — Hurst exponent (R/S) of forward returns:
+- :class:`HurstRegimeLabeler` - Hurst exponent (R/S) of forward returns:
   trending vs random vs mean-reverting.
-- :class:`MeanReversionEventLabeler` — does an overstretched price (|z|>2σ)
+- :class:`MeanReversionEventLabeler` - does an overstretched price (|z|>2σ)
   revert to its mean within the horizon?
-- :class:`TrendBreakLabeler` — does the sign of the OLS slope flip between
+- :class:`TrendBreakLabeler` - does the sign of the OLS slope flip between
   past and forward windows?
 
 All three use Numba-accelerated inner loops where the operation is not
 expressible as a Polars rolling expression.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
@@ -24,42 +24,19 @@ from typing import Any, ClassVar
 import numpy as np
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
+from signalflow.target._numba import njit, prange
 from signalflow.target._soft_helpers import (
     gaussian_membership_soft,
     sigmoid_expr,
 )
-from signalflow.target.base import Labeler
-
-try:
-    from numba import njit, prange
-
-    _HAS_NUMBA = True
-except ImportError:  # pragma: no cover
-    _HAS_NUMBA = False
-
-    def njit(*args, **kwargs):  # type: ignore[misc]
-        def decorator(fn):
-            return fn
-
-        return decorator if args and callable(args[0]) is False else args[0]
-
-    prange = range  # type: ignore[assignment]
-
-
-# ────────────────────────────────────────────────────────────────────────
-# Hurst exponent (R/S estimator)
-# ────────────────────────────────────────────────────────────────────────
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @njit(cache=True)
 def _hurst_rs_window(series: np.ndarray) -> float:
-    """Rescaled-range Hurst exponent for a single window.
-
-    Splits the window into chunks of varying sizes, computes R/S for
-    each chunk, and fits log(R/S) ~ slope * log(window_size).
-    """
+    """Rescaled-range Hurst exponent for a single window."""
     n = len(series)
     if n < 32:
         return np.nan
@@ -134,45 +111,9 @@ def _hurst_forward(log_ret: np.ndarray, horizon: int, step: int) -> np.ndarray:
 
 
 @dataclass
-@labeler("hurst_regime")
+@register_target("hurst_regime")
 class HurstRegimeLabeler(Labeler):
-    """Label bars by forward Hurst-exponent regime.
-
-    Algorithm:
-        1. log_returns = ln(close[t] / close[t-1])
-        2. For each bar (subsampled every ``stride`` bars), estimate the
-           Hurst exponent H of the next ``horizon`` log-returns using a
-           rescaled-range (R/S) estimator.
-        3. Carry-forward H to fill in skipped bars.
-        4. If H >= ``trending_threshold``   -> ``"trending"``
-           If H <= ``reverting_threshold``  -> ``"mean_reverting"``
-           Otherwise                         -> ``"random_walk"``
-
-    Attributes:
-        price_col: Price column. Default: ``"close"``.
-        horizon: Forward window size. Default: ``480`` bars.
-        stride: Subsample step in bars (Hurst is expensive). Default: ``30``.
-        trending_threshold: H >= this -> trending. Default: ``0.55``.
-        reverting_threshold: H <= this -> mean_reverting. Default: ``0.45``.
-
-    Example:
-        ```python
-        from signalflow.target.path_labeler import HurstRegimeLabeler
-
-        labeler = HurstRegimeLabeler(
-            horizon=480,
-            stride=30,
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
-
-    Note:
-        Hurst is a heavy computation; ``stride`` controls the trade-off
-        between fidelity and speed. Within each stride the value is held
-        constant — fine for regime detection but lossy for sub-stride
-        transitions.
-    """
+    """Label bars by forward Hurst-exponent regime."""
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
 
@@ -216,7 +157,7 @@ class HurstRegimeLabeler(Labeler):
         log_ret[1:] = np.log(prices[1:] / prices[:-1])
 
         hurst = _hurst_forward(log_ret, self.horizon, self.stride)
-        # Forward-fill nan between sampled points
+
         last = np.nan
         for i in range(n):
             if np.isnan(hurst[i]):
@@ -250,13 +191,7 @@ class HurstRegimeLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Gaussian-membership soft probabilities over the three Hurst centres.
-
-        Centres are placed at ``reverting_threshold``, ``0.5``, and
-        ``trending_threshold``. The membership width is controlled by
-        :attr:`softness_k` (interpreted in Hurst units, so the default
-        ``20`` gives ~0.05-wide bumps).
-        """
+        """Gaussian-membership soft probabilities over the three Hurst centres."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:
@@ -287,15 +222,11 @@ class HurstRegimeLabeler(Labeler):
         return df
 
 
-# ────────────────────────────────────────────────────────────────────────
-# Mean-reversion event labeler
-# ────────────────────────────────────────────────────────────────────────
-
-
 @dataclass
-@labeler("mean_reversion_event")
+@register_target("mean_reversion_event")
 class MeanReversionEventLabeler(Labeler):
-    """Label bars by whether an overstretched price reverts within horizon.
+    """
+    Label bars by whether an overstretched price reverts within horizon.
 
     Algorithm:
         1. Rolling mean µ and std σ of price over ``z_window``.
@@ -309,29 +240,8 @@ class MeanReversionEventLabeler(Labeler):
     Use:
         Complements :class:`StructureLabeler` and
         :class:`ZigzagStructureLabeler`, which detect extrema themselves;
-        this labeler asks the follow-on question — does the extreme persist
+        this labeler asks the follow-on question - does the extreme persist
         or revert?
-
-    Attributes:
-        price_col: Price column. Default: ``"close"``.
-        horizon: Forward window. Default: ``240``.
-        z_window: Rolling window for µ/σ baseline. Default: ``240``.
-        stretch_threshold: |z| above which a bar is "overstretched".
-            Default: ``2.0``.
-        revert_threshold: |z_fwd| below which the move is "reverted".
-            Default: ``0.5``.
-
-    Example:
-        ```python
-        from signalflow.target.path_labeler import MeanReversionEventLabeler
-
-        labeler = MeanReversionEventLabeler(
-            horizon=240,
-            stretch_threshold=2.0,
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
@@ -419,15 +329,7 @@ class MeanReversionEventLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_mean_reverted, p_trend_continuation, p_no_reversion)``.
-
-        Replicates the conditional structure of the hard rule with sigmoids:
-            * ``p_stretched = sigmoid(k * (|z_now| - stretch))``
-            * ``p_reverted | stretched = sigmoid(k * (revert - |z_fwd|))``
-            * ``p_mean_reverted = p_stretched * p_reverted | stretched``
-            * ``p_trend_continuation = p_stretched * (1 - p_reverted | stretched)``
-            * ``p_no_reversion = 1 - p_stretched``
-        """
+        """Soft triple ``(p_mean_reverted, p_trend_continuation, p_no_reversion)``."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:
@@ -470,11 +372,6 @@ class MeanReversionEventLabeler(Labeler):
         return df
 
 
-# ────────────────────────────────────────────────────────────────────────
-# Trend-break labeler (past slope sign vs forward slope sign)
-# ────────────────────────────────────────────────────────────────────────
-
-
 @njit(parallel=True, cache=True)
 def _slope_windows(log_close: np.ndarray, window: int) -> tuple[np.ndarray, np.ndarray]:
     """OLS slope of log_close over past and forward windows for each bar."""
@@ -508,9 +405,10 @@ def _slope_windows(log_close: np.ndarray, window: int) -> tuple[np.ndarray, np.n
 
 
 @dataclass
-@labeler("trend_break")
+@register_target("trend_break")
 class TrendBreakLabeler(Labeler):
-    """Label bars by whether forward OLS slope flips sign vs past slope.
+    """
+    Label bars by whether forward OLS slope flips sign vs past slope.
 
     Algorithm:
         1. Fit OLS slope of log(close) over past ``window`` bars -> b_past
@@ -522,23 +420,6 @@ class TrendBreakLabeler(Labeler):
     Use:
         Complements :class:`TrendScanningLabeler` (which detects the
         *presence* of a trend) by classifying its *continuation* vs *break*.
-
-    Attributes:
-        price_col: Price column. Default: ``"close"``.
-        window: Past and forward OLS window size. Default: ``240``.
-        slope_eps: Magnitude below which the slope is treated as noise.
-            Default: ``1e-7``.
-
-    Example:
-        ```python
-        from signalflow.target.path_labeler import TrendBreakLabeler
-
-        labeler = TrendBreakLabeler(
-            window=240,
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
     """
 
     signal_category: SignalCategory = SignalCategory.TREND_MOMENTUM

@@ -1,7 +1,8 @@
-"""Flash move labeler.
+"""
+Flash move labeler.
 
 Labels bars where the forward absolute return over a *short* horizon
-exceeds a multiple of trailing volatility — captures slippage/microstructure
+exceeds a multiple of trailing volatility - captures slippage/microstructure
 events (flash crashes, flash pumps) rather than slow regime changes.
 
 Complements :class:`AnomalyLabeler`, which uses longer horizons and looks
@@ -11,53 +12,22 @@ matter for execution risk.
 Implementation uses pure Polars expressions for performance.
 """
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
 import polars as pl
 
-from signalflow.core import labeler
-from signalflow.core.enums import SignalCategory
+from signalflow.enums import SignalCategory
 from signalflow.target._soft_helpers import signed_tercile_soft
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @dataclass
-@labeler("flash_move")
+@register_target("flash_move")
 class FlashMoveLabeler(Labeler):
-    """Label bars by extreme forward short-horizon returns.
-
-    Algorithm:
-        1. log_returns = ln(close[t] / close[t-1])
-        2. past_vol    = rolling_std(log_returns, vol_window)
-        3. fwd_logret  = ln(close[t+flash_horizon] / close[t])
-        4. threshold   = sigma_multiplier * past_vol * sqrt(flash_horizon)
-        5. If  fwd_logret >  threshold -> ``"flash_up"``
-           If  fwd_logret < -threshold -> ``"flash_dn"``
-           Otherwise                    -> ``"normal"``
-
-    Attributes:
-        price_col: Price column. Default: ``"close"``.
-        flash_horizon: Short forward window. Default: ``10`` bars.
-        vol_window: Trailing window for vol baseline. Default: ``1440``.
-        sigma_multiplier: Magnitude in standard deviations to qualify as
-            flash. Default: ``3.0``.
-
-    Example:
-        ```python
-        from signalflow.target.flash_move_labeler import FlashMoveLabeler
-
-        labeler = FlashMoveLabeler(
-            flash_horizon=10,
-            vol_window=1440,
-            sigma_multiplier=3.0,
-            mask_to_signals=False,
-        )
-        result = labeler.compute(ohlcv_df)
-        ```
-    """
+    """Label bars by extreme forward short-horizon returns."""
 
     signal_category: SignalCategory = SignalCategory.ANOMALY
 
@@ -136,12 +106,7 @@ class FlashMoveLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_flash_dn, p_normal, p_flash_up)`` over short-horizon z.
-
-        Reduces the same ``fwd_logret`` vs ``±sigma_multiplier · past_vol · √h``
-        cut to a sigmoid in z-units (``fwd_logret / (past_vol · √h)``), so the
-        decision boundary becomes ``±sigma_multiplier``.
-        """
+        """Soft triple ``(p_flash_dn, p_normal, p_flash_up)`` over short-horizon z."""
         if group_df.height == 0:
             return group_df
         if self.price_col not in group_df.columns:

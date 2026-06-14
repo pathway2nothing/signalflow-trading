@@ -3,7 +3,7 @@
 Feature extraction for technical indicators and derived metrics.
 
 !!! note "v2: where features live"
-    `flow` no longer constructs features — the `.features()` builder method was
+    `flow` no longer constructs features - the `.features()` builder method was
     removed. Features now live **inside a forecast artefact** (pinned with its
     weights) or as primitive parameters on a detector. The `FeaturePipeline`
     class itself is unchanged: it remains the single **computation engine** and
@@ -79,11 +79,11 @@ backtest after warmup. Two `ClassVar` flags on `Feature` express this:
 | `is_recursive` (`ClassVar[bool]`, default `False`) | The indicator is stateful / entry-point dependent: its value at bar *N* depends on where the series starts unless correctly initialized. |
 | `warmup_invariant` (`ClassVar[bool]`, default `True`) | The indicator guarantees entry-point invariance after warmup (e.g. deterministic SMA-seeded initialization). For a recursive feature that does **not** re-seed deterministically this must be `False`. |
 
-The existing `warmup` property remains — the minimum number of bars before the
+The existing `warmup` property remains - the minimum number of bars before the
 output is stable (default `0`).
 
 `Feature.assert_reproducible()` raises `RuntimeError` for exactly the dangerous
-combination `is_recursive and not warmup_invariant` — a feature whose value
+combination `is_recursive and not warmup_invariant` - a feature whose value
 depends on the warmup start point, which would diverge between live and
 backtest and break parity:
 
@@ -99,7 +99,7 @@ aggregates all offending feature names into a single error.
 ## FeatureSpec
 
 `FeatureSpec` is the serializable, hashable **recipe** for a `FeaturePipeline`
-— it captures *how* to rebuild a pipeline (ordered features + params +
+- it captures *how* to rebuild a pipeline (ordered features + params +
 `ta_version` + `raw_data_type`), not the computed values.
 
 ```python
@@ -119,7 +119,7 @@ assert spec2.feature_hash() == spec.feature_hash()   # round-trips
 rebuilt = spec.build()       # -> FeaturePipeline
 ```
 
-Attributes: `features` (ordered list of `{"name", "params", "scope"}` dicts —
+Attributes: `features` (ordered list of `{"name", "params", "scope"}` dicts -
 order is significant), `ta_version`, `raw_data_type` (default `"spot"`),
 `order_significant` (default `True`, provenance metadata; features are never
 reordered).
@@ -138,10 +138,10 @@ reordered).
 function (no I/O, no global state) backing `FeatureSpec.feature_hash()`. The
 hash is:
 
-- **identical** for two logically-equal recipes — dict key order is irrelevant,
+- **identical** for two logically-equal recipes - dict key order is irrelevant,
   float jitter is normalized (e.g. `0.1 == 0.1000000001`), and omitted defaults
   are resolved explicitly (`rsi()` == `rsi(period=14)`);
-- **different** whenever something meaningful changes — a param value, the
+- **different** whenever something meaningful changes - a param value, the
   **order** of features (never sorted), or the `ta_version` (the same feature
   name across TA library versions is not the same implementation).
 

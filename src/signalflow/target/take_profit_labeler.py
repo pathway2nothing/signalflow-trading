@@ -3,11 +3,12 @@ from typing import Any, ClassVar
 
 import numpy as np
 import polars as pl
-from numba import njit, prange
 
-from signalflow.core import SignalType, labeler
+from signalflow.enums import Signal as SignalType
+from signalflow.target._numba import njit, prange
 from signalflow.target._soft_helpers import sigmoid_expr
-from signalflow.target.base import Labeler
+from signalflow.target.base import register_target
+from signalflow.target.labeler import Labeler
 
 
 @njit(parallel=True, cache=True)
@@ -17,13 +18,7 @@ def _find_first_hit_static(
     sl: np.ndarray,
     lookforward: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Finds the first hit for static barriers.
-
-    Returns:
-        up_off: offset of the first PT hit (0 = no hit)
-        dn_off: offset of the first SL hit (0 = no hit)
-    """
+    """Finds the first hit for static barriers."""
     n = len(prices)
     up_off = np.zeros(n, dtype=np.int32)
     dn_off = np.zeros(n, dtype=np.int32)
@@ -50,9 +45,10 @@ def _find_first_hit_static(
 
 
 @dataclass
-@labeler("take_profit")
+@register_target("take_profit")
 class TakeProfitLabeler(Labeler):
-    """First-touch labeling with symmetric fixed-percentage barriers.
+    """
+    First-touch labeling with symmetric fixed-percentage barriers.
 
     Barriers:
       - TP = close[t0] * (1 + barrier_pct)
@@ -163,11 +159,7 @@ class TakeProfitLabeler(Labeler):
         group_df: pl.DataFrame,
         data_context: dict[str, Any] | None = None,
     ) -> pl.DataFrame:
-        """Soft triple ``(p_fall, p_none, p_rise)`` from barrier-hit timing.
-
-        Same calibration scheme as :class:`TripleBarrierLabeler` but with the
-        fixed ``±barrier_pct`` barriers from this labeler.
-        """
+        """Soft triple ``(p_fall, p_none, p_rise)`` from barrier-hit timing."""
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
         if group_df.height == 0:

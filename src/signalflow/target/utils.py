@@ -1,77 +1,33 @@
-"""Utility functions for target labeling.
+"""Utility functions for target labeling."""
 
-Provides functions for masking target labels during events
-and other labeling-related utilities.
-"""
 
-from __future__ import annotations
+from typing import Any
 
 import numpy as np
 import polars as pl
 from loguru import logger
 
-from signalflow.core.containers.signals import Signals
+
+def _signals_frame(signals: Any) -> pl.DataFrame:
+    """Extract a Polars frame from a signals container or raw frame."""
+    s = getattr(signals, "value", signals)
+    if not isinstance(s, pl.DataFrame):
+        raise TypeError(f"Unsupported signals value type: {type(s)}")
+    return s
 
 
 def mask_targets_by_signals(
     df: pl.DataFrame,
-    signals: Signals,
+    signals: Any,
     mask_signal_types: set[str],
     horizon_bars: int,
     cooldown_bars: int = 60,
     target_columns: list[str] | None = None,
     pair_col: str = "pair",
-    ts_col: str = "timestamp",
+    ts_col: str = "ts",
 ) -> pl.DataFrame:
-    """Mask target columns for timestamps overlapping with specified signals.
-
-    For each signal at time T with type in mask_signal_types:
-    - Masks range [T - horizon_bars, T + cooldown_bars]
-
-    This is useful for excluding labels that overlap with exogenous events
-    (e.g., flash crashes, global market events) from training data, since
-    no feature could predict such events.
-
-    Args:
-        df: DataFrame with target columns.
-        signals: Signals object containing detected events.
-        mask_signal_types: Signal types to mask (e.g. {"flash_crash", "global_event"}).
-        horizon_bars: Forward horizon (bars before signal that "see" it).
-        cooldown_bars: Bars after signal to mask (default: 60).
-        target_columns: Columns to mask (default: all columns ending with "_label").
-        pair_col: Pair column name (default: "pair").
-        ts_col: Timestamp column name (default: "timestamp").
-
-    Returns:
-        DataFrame with affected target columns set to null.
-
-    Example:
-        ```python
-        from signalflow.detector import ZScoreAnomalyDetector
-        from signalflow.target.utils import mask_targets_by_signals
-
-        # Detect anomalies
-        detector = ZScoreAnomalyDetector(threshold=4.0)
-        signals = detector.run(raw_data_view)
-
-        # Mask labels overlapping with flash crashes
-        labeled_df = mask_targets_by_signals(
-            df=labeled_df,
-            signals=signals,
-            mask_signal_types={"anomaly_low"},  # flash crashes
-            horizon_bars=60,
-            cooldown_bars=60,
-        )
-        ```
-
-    Note:
-        - Masking is done per-pair: signal at time T for pair A only masks
-          labels for pair A at affected timestamps.
-        - If signals DataFrame is empty or has no matching signal_types,
-          the input DataFrame is returned unchanged.
-    """
-    # Get events matching the specified signal types
-    signals_df = signals.value
+    """Mask target columns for timestamps overlapping with specified signals."""
+    signals_df = _signals_frame(signals)
 
     if signals_df.height == 0:
         return df
@@ -80,14 +36,12 @@ def mask_targets_by_signals(
         logger.warning("Signals DataFrame has no 'signal_type' column, returning unchanged")
         return df
 
-    # Filter to matching signal types
     events = signals_df.filter(pl.col("signal_type").is_in(list(mask_signal_types)))
 
     if events.height == 0:
         logger.debug(f"No signals matching types {mask_signal_types}, returning unchanged")
         return df
 
-    # Determine target columns to mask
     if target_columns is None:
         target_columns = [c for c in df.columns if c.endswith("_label")]
 
@@ -100,10 +54,8 @@ def mask_targets_by_signals(
         logger.warning(f"Target columns {target_columns} not found in DataFrame")
         return df
 
-    # Get all unique timestamps for efficient index lookup
     df.select([pair_col, ts_col]).unique().sort([pair_col, ts_col])
 
-    # Process per pair for correct masking
     masked_rows: list[pl.DataFrame] = []
 
     for pair_name in df.get_column(pair_col).unique().to_list():
@@ -132,7 +84,6 @@ def mask_targets_by_signals(
         if n_masked > 0:
             logger.debug(f"Masking {n_masked} timestamps for pair {pair_name}")
 
-            # Create masked DataFrame
             mask_series = pl.Series("_mask", mask)
             pair_df = (
                 pair_df.with_columns(mask_series)
@@ -167,45 +118,12 @@ def mask_targets_by_timestamps(
     horizon_bars: int,
     cooldown_bars: int = 60,
     target_columns: list[str] | None = None,
-    ts_col: str = "timestamp",
+    ts_col: str = "ts",
 ) -> pl.DataFrame:
-    """Mask target columns for timestamps overlapping with event timestamps.
-
-    Simpler version of mask_targets_by_signals that works with raw timestamps
-    instead of Signals objects. Applies masking globally (not per-pair).
-
-    Args:
-        df: DataFrame with target columns.
-        event_timestamps: List of event timestamps to mask around.
-        horizon_bars: Forward horizon (bars before event that "see" it).
-        cooldown_bars: Bars after event to mask (default: 60).
-        target_columns: Columns to mask (default: all columns ending with "_label").
-        ts_col: Timestamp column name (default: "timestamp").
-
-    Returns:
-        DataFrame with affected target columns set to null.
-
-    Example:
-        ```python
-        from signalflow.target.utils import mask_targets_by_timestamps
-        from datetime import datetime
-
-        # Mask around known events
-        labeled_df = mask_targets_by_timestamps(
-            df=labeled_df,
-            event_timestamps=[
-                datetime(2024, 3, 1, 10, 30),  # Known flash crash
-                datetime(2024, 5, 15, 14, 0),  # Fed announcement
-            ],
-            horizon_bars=60,
-            cooldown_bars=120,
-        )
-        ```
-    """
+    """Mask target columns for timestamps overlapping event timestamps."""
     if not event_timestamps:
         return df
 
-    # Determine target columns to mask
     if target_columns is None:
         target_columns = [c for c in df.columns if c.endswith("_label")]
 
