@@ -70,7 +70,7 @@ from signalflow.detector import (
 )
 
 
-from signalflow.engine import Engine, ExchangeBroker, Fill, Intent, Order, SimBroker
+from signalflow.engine import BinanceBroker, Engine, ExchangeBroker, Fill, Intent, Order, SimBroker
 from signalflow.strategy import (
     OBSERVATION_SCHEMA_VERSION,
     Entry,
@@ -80,7 +80,7 @@ from signalflow.strategy import (
     RulesStrategy,
     StrategyModel,
 )
-from signalflow.flow import Flow, Run
+from signalflow.flow import Flow, LiveFeed, PollingFeed, ReplayFeed, Run, run_live_loop
 
 
 from signalflow.experiment import ArtifactCache, Experiment, Scorecard, bootstrap_ci, monte_carlo_bounds
@@ -116,9 +116,9 @@ __all__ = [
     "SignalDetector", "SmaCrossDetector", "ThresholdDetector",
     "RevertDetector", "MarketDropDetector",
 
-    "Engine", "SimBroker", "ExchangeBroker", "Fill", "Order", "Intent",
+    "Engine", "SimBroker", "ExchangeBroker", "BinanceBroker", "Fill", "Order", "Intent",
     "RulesStrategy", "Entry", "Exit", "Risk", "Observation", "StrategyModel", "OBSERVATION_SCHEMA_VERSION",
-    "Flow", "Run",
+    "Flow", "Run", "LiveFeed", "ReplayFeed", "PollingFeed", "run_live_loop",
 
     "Experiment", "Scorecard", "ArtifactCache", "bootstrap_ci", "monte_carlo_bounds",
 ] + _OPT

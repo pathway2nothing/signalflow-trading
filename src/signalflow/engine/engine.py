@@ -20,6 +20,7 @@ class Engine:
         self.balances: dict[str, float] = dict(self.initial_capital)
         self.positions: dict[str, Position] = {}
         self.event_log: list[Fill] = []
+        self.marks: dict[str, float] = {}
 
 
     def apply(self, fills: list[Fill]) -> None:
@@ -54,6 +55,7 @@ class Engine:
 
         self.balances.setdefault(fill.fee_asset, 0.0)
         self.balances[fill.fee_asset] -= fill.fee
+        self.marks[fill.pair] = fill.price
 
         if pos.qty > 0:
             self.positions[fill.pair] = pos
@@ -64,12 +66,22 @@ class Engine:
 
 
     def equity(self, prices: dict[str, float]) -> float:
+        """Value the book in ``target``, carrying forward the last-known price for
+        any held asset missing from ``prices`` (gappy/staggered multi-asset data)."""
+        self.marks.update(prices)
         total = 0.0
         for asset, amount in self.balances.items():
             if abs(amount) < 1e-15:
                 continue
-            total += amount * cross_rate(asset, self.target, prices)
+            total += amount * self._rate(asset)
         return total
+
+    def _rate(self, asset: str) -> float:
+        try:
+            return cross_rate(asset, self.target, self.marks)
+        except KeyError:
+            pos = self.positions.get(f"{asset}{self.target}")
+            return pos.avg_price if pos is not None and pos.avg_price > 0 else 0.0
 
     def snapshot(self, ts, prices: dict[str, float]) -> PortfolioSnapshot:
         return PortfolioSnapshot(

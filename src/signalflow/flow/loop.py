@@ -65,11 +65,14 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
 
     eq_ts, eq_val = [], []
     peak = float("-inf")
+    started = False
     for bar in data.iter_bars():
         snap = engine.snapshot(bar.ts, bar.prices)
+        if not started:
+            eq_ts.append(bar.ts)
+            eq_val.append(snap.equity)
+            started = True
         peak = max(peak, snap.equity)
-        eq_ts.append(bar.ts)
-        eq_val.append(snap.equity)
         sig_frame = by_ts.get(bar.ts)
         if sig_frame is None:
             sig_frame = pl.DataFrame(schema=_EMPTY_SIGNALS_SCHEMA)
@@ -78,6 +81,8 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
         intents = flow.risk.clip(intents, snap, peak)
         fills = broker.execute(_orders(intents, bar.prices, bar.ts), bar)
         engine.apply(fills)
+        eq_ts.append(bar.ts)
+        eq_val.append(engine.equity(bar.prices))
 
     curve = pl.DataFrame({"ts": eq_ts, "equity": eq_val})
     return Run(flow.name, mode.value, curve, engine.event_log, target, promotable=True)

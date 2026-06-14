@@ -55,6 +55,7 @@ jobs:
     needs: release
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       id-token: write
       contents: read
@@ -74,10 +75,9 @@ jobs:
         python -m pip install --upgrade pip build
         python -m build
 
-    - name: Publish to PyPI
+    - name: Publish to PyPI (trusted publishing, OIDC)
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
         skip-existing: true
 
   publish-docs:
