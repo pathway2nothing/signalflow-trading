@@ -11,7 +11,7 @@
 **Real-time-first framework for trading signal research and execution**
 
 <p>
-<a href="https://pypi.org/project/signalflow-trading/"><img src="https://img.shields.io/badge/version-0.8.1-7c3aed" alt="Version"></a>
+<a href="https://pypi.org/project/signalflow-trading/"><img src="https://img.shields.io/badge/version-0.8.2-7c3aed" alt="Version"></a>
 <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-3b82f6?logo=python&logoColor=white" alt="Python 3.12+"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e" alt="License: MIT"></a>
 <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-1a1a2e" alt="Code style: ruff"></a>
@@ -21,7 +21,7 @@
 
 ---
 
-SignalFlow V5 is a Polars-backed framework for algorithmic trading research that
+SignalFlow is a Polars-backed framework for algorithmic trading research that
 takes a strategy from idea to backtest to live with **one object you can save and
 ship**. The public surface is six nouns:
 

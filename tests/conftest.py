@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for the SignalFlow V5 test suite."""
+"""Shared pytest fixtures for the SignalFlow test suite."""
 
 
 import warnings

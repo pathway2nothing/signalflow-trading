@@ -139,7 +139,7 @@ class MetaLabelLabeler(Labeler):
         self.output_columns = cols
 
     def labels(self, data, at=None) -> pl.DataFrame:
-        """V5 Target entry point for meta-labeling."""
+        """Target entry point for meta-labeling."""
         signal_keys = data.frame.select([self.pair_col, self.ts_col])
         computed = self.compute(data.frame, data_context={"signal_keys": signal_keys})
         from signalflow.target.base import LABEL_COL

@@ -3,7 +3,7 @@ SignalFlow - real-time-first framework for trading signal research and execution
 
 import signalflow as sf
 
-The public surface is the V5 six-noun model: Dataset, Transform, Models, Flow,
+The public surface is the six-noun model: Dataset, Transform, Models, Flow,
 Engine, Run - plus the WoE/IV feature policy, samplers, detectors, and strategy
 models.
 """

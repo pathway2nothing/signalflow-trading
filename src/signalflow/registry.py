@@ -7,7 +7,7 @@ from config is ``registry.create(ComponentType.TRANSFORM, "revert_confluence",
 **params)``-shaped. Seven types instead of the old 21.
 
 The design (lazy autodiscovery, dataclass-field schema introspection) is the
-proven one from the previous framework, trimmed to the V5 type set.
+proven one from the previous framework, trimmed to the current type set.
 """
 
 
