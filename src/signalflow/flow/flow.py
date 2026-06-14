@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, replace
 
 from signalflow.enums import RunMode
 from signalflow.errors import UntrainedModelError
+from signalflow.flow.live import ReplayFeed, run_live_loop
 from signalflow.flow.loop import run_event_loop, run_quicktest
 from signalflow.strategy.risk import Risk
 from signalflow.strategy.rules import RulesStrategy
@@ -42,17 +43,58 @@ class Flow:
         broker = broker or self._sim_broker()
         return run_event_loop(self, data, capital, target, broker, RunMode.BACKTEST)
 
-    def paper(self, data, capital, target: str | None = None, broker=None, load_data: bool = True):
+    def paper(self, data, capital, target: str | None = None, broker=None):
         broker = broker or self._sim_broker()
         return run_event_loop(self, data, capital, target, broker, RunMode.PAPER)
 
-    def live(self, data, capital, target: str | None = None, broker=None, load_data: bool = True, armed: bool = False):
+    def live(
+        self,
+        feed,
+        capital,
+        target: str | None = None,
+        broker=None,
+        armed: bool = False,
+        max_bars: int | None = None,
+        state_path: str | None = None,
+    ):
+        """Trade a live (or replayed) feed via the real-time loop.
+
+        ``feed`` may be a LiveFeed or a Dataset (wrapped in a ReplayFeed). Armed
+        trading requires an explicit ExchangeBroker; SimBroker is paper-only.
+        """
         if armed and broker is None:
             raise UntrainedModelError(
                 "armed live requires an explicit ExchangeBroker; refusing to send real orders via SimBroker"
             )
         broker = broker or self._sim_broker()
-        return run_event_loop(self, data, capital, target, broker, RunMode.LIVE)
+        if not hasattr(feed, "stream"):
+            feed = ReplayFeed(feed)
+        return run_live_loop(
+            self, feed, capital, broker, target=target, max_bars=max_bars, state_path=state_path
+        )
+
+    def simulate(
+        self,
+        data,
+        capital,
+        target: str | None = None,
+        broker=None,
+        warmup: int = 0,
+        maxlen: int = 5000,
+        state_path: str | None = None,
+    ):
+        """Full-speed incremental live simulation (walk-forward).
+
+        Replays a Dataset through the live decision loop with no real-time wait:
+        the flow sees only data up to each bar, recomputed step by step, exactly
+        as in live. ``warmup`` reserves a leading lookback window that fills the
+        buffer without trading. Use it to confirm the live path before arming.
+        """
+        broker = broker or self._sim_broker()
+        feed = ReplayFeed(data, warmup_bars=warmup)
+        return run_live_loop(
+            self, feed, capital, broker, target=target, maxlen=maxlen, state_path=state_path
+        )
 
     def _sim_broker(self):
         from signalflow.engine.broker import SimBroker

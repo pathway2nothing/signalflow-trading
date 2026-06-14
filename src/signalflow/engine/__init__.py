@@ -1,6 +1,6 @@
 """Event-sourced execution Engine, brokers, and clock."""
 
-from signalflow.engine.broker import Broker, ExchangeBroker, SimBroker
+from signalflow.engine.broker import BinanceBroker, Broker, ExchangeBroker, SimBroker
 from signalflow.engine.clock import Clock
 from signalflow.engine.engine import Engine
 from signalflow.engine.types import Fill, Intent, Order, PortfolioSnapshot, Position, cross_rate, parse_pair
@@ -10,6 +10,7 @@ __all__ = [
     "Broker",
     "SimBroker",
     "ExchangeBroker",
+    "BinanceBroker",
     "Clock",
     "Fill",
     "Order",

@@ -55,8 +55,8 @@ class RulesStrategy:
         sig = obs.signals
         if "signal" not in sig.columns:
             return intents
-        rows = sig.to_dicts()
-        for row in rows:
+        opened: set[str] = set()
+        for row in sig.to_dicts():
             pair = row["pair"]
             s = row.get("signal")
             if pair in held:
@@ -64,6 +64,9 @@ class RulesStrategy:
                     intents.append(
                         Intent(pair, IntentKind.CLOSE, Side.SELL, qty=held[pair].qty, reason="fall_exit")
                     )
+                    closing.add(pair)
+                continue
+            if pair in opened:
                 continue
             if s == RISE and n_open < self.entry.max_positions:
                 p_succ = row.get("p_success")
@@ -72,5 +75,6 @@ class RulesStrategy:
                 notional = self.entry.size_pct * port.equity
                 if notional > 0:
                     intents.append(Intent(pair, IntentKind.OPEN, Side.BUY, notional=notional, reason="signal"))
+                    opened.add(pair)
                     n_open += 1
         return intents
