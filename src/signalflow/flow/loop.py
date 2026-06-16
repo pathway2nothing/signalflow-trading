@@ -1,11 +1,10 @@
 """The decision loop - one loop for backtest/paper/live."""
 
-
 import polars as pl
 
 from signalflow.engine.engine import Engine
 from signalflow.engine.types import Order
-from signalflow.enums import NONE, RISE, IntentKind, RunMode
+from signalflow.enums import NONE, RISE, IntentKind, OrderType, RunMode
 from signalflow.strategy.observation import Observation
 
 _EMPTY_SIGNALS_SCHEMA = {"pair": pl.Utf8, "ts": pl.Datetime("ms"), "signal": pl.Utf8, "p_success": pl.Float64}
@@ -43,12 +42,18 @@ def _orders(intents, prices, ts):
         price = prices.get(it.pair)
         if price is None:
             continue
+        otype = OrderType.LIMIT if it.limit_price is not None else OrderType.MARKET
+        ref = it.limit_price if it.limit_price is not None else price
         if it.kind == IntentKind.OPEN:
-            qty = (it.notional or 0.0) / price
+            qty = (it.notional or 0.0) / ref
             if qty > 0:
-                orders.append(Order(it.pair, it.side, qty, ts=ts, reason=it.reason))
+                orders.append(
+                    Order(it.pair, it.side, qty, type=otype, limit_price=it.limit_price, ts=ts, reason=it.reason)
+                )
         elif it.qty and it.qty > 0:
-            orders.append(Order(it.pair, it.side, it.qty, ts=ts, reason=it.reason))
+            orders.append(
+                Order(it.pair, it.side, it.qty, type=otype, limit_price=it.limit_price, ts=ts, reason=it.reason)
+            )
     return orders
 
 
@@ -101,7 +106,9 @@ def run_quicktest(flow, data, capital, target, horizon: int = 24, fee: float = 0
     frame = enriched.frame.sort(["pair", "ts"]).with_columns(
         (pl.col("close").shift(-horizon).over("pair") / pl.col("close") - 1.0).alias("_fwd")
     )
-    sig_parts = [d.compute(frame).filter(pl.col("signal") == RISE).select(["pair", "ts", "_fwd"]) for d in flow.detectors]
+    sig_parts = [
+        d.compute(frame).filter(pl.col("signal") == RISE).select(["pair", "ts", "_fwd"]) for d in flow.detectors
+    ]
     rises = pl.concat(sig_parts) if sig_parts else frame.head(0).select(["pair", "ts", "_fwd"])
     rises = rises.drop_nulls("_fwd").sort("ts")
 

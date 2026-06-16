@@ -1,11 +1,9 @@
 """ForecastModel - the trainable tier-1 model."""
 
-
+import json
 import warnings
 from dataclasses import dataclass, field
 from datetime import timedelta
-
-warnings.filterwarnings("ignore", message="X does not have valid feature names")
 
 import numpy as np
 import polars as pl
@@ -14,11 +12,13 @@ from sklearn.base import clone
 
 from signalflow.data.dataset import Dataset
 from signalflow.errors import UntrainedModelError
-from signalflow.model.oos import build_fingerprint, make_folds, median_dt
+from signalflow.model.oos import build_fingerprint, make_folds, median_dt, parse_duration, rolling_folds, stable_hash
 from signalflow.sampler import Sampler, UniformSampler
 from signalflow.target import LABEL_COL, Target
 from signalflow.transform import FeaturePipe
 from signalflow.transform.encode import IVSelector, WoE
+
+warnings.filterwarnings("ignore", message="X does not have valid feature names")
 
 _DEFAULT = "default"
 _RESERVED = {"pair", "ts", "open", "high", "low", "close", "volume", "signal"}
@@ -31,8 +31,9 @@ def _make_estimator(backend, params: dict):
     if b == "lightgbm":
         from lightgbm import LGBMClassifier
 
-        return LGBMClassifier(**{"n_estimators": 200, "num_leaves": 31, "learning_rate": 0.05,
-                                 "verbosity": -1, **params})
+        return LGBMClassifier(
+            **{"n_estimators": 200, "num_leaves": 31, "learning_rate": 0.05, "verbosity": -1, **params}
+        )
     if b in ("logreg", "logistic"):
         from sklearn.linear_model import LogisticRegression
 
@@ -77,7 +78,6 @@ class ForecastModel:
             self.select = IVSelector()
         self._fitted = False
 
-
     @property
     def is_fitted(self) -> bool:
         return getattr(self, "_fitted", False)
@@ -86,8 +86,7 @@ class ForecastModel:
         if not self.is_fitted:
             raise UntrainedModelError(f"ForecastModel(output={self.output!r}) is not fitted")
 
-
-    def fit(self, data: Dataset, sampler: Sampler | None = None) -> "ForecastModel":
+    def fit(self, data: Dataset, sampler: Sampler | None = None, cache=None) -> "ForecastModel":
         if self.target is None:
             raise ValueError("ForecastModel requires a target to fit")
         sampler = sampler or self.sampler or UniformSampler()
@@ -108,26 +107,47 @@ class ForecastModel:
         if base.height < self.min_train_rows:
             raise ValueError(f"not enough labeled samples to fit ({base.height})")
 
-
         ts_unique = base.get_column("ts").unique().sort().to_list()
-        folds = make_folds(ts_unique, self.n_folds)
         embargo = timedelta(seconds=self.target.horizon * median_dt(ts_unique))
+        folds = self._walk_forward_folds(ts_unique, embargo)
         oos_parts: list[pl.DataFrame] = []
+        self.refits_: list[dict] = []
+        target_cfg = self.target.to_config()
+        stack_fp = self._stack_fingerprint(data) if cache is not None else None
         for fold in folds:
             train = base.filter(pl.col("ts") < (fold.test_start_ts - embargo))
+            if fold.train_start_ts is not None:
+                train = train.filter(pl.col("ts") >= fold.train_start_ts)
             test = base.filter((pl.col("ts") >= fold.test_start_ts) & (pl.col("ts") <= fold.test_end_ts))
             if train.height < self.min_train_rows or test.height == 0:
                 continue
-            preds = self._fit_fold_predict(train, test)
-            if preds is not None:
-                oos_parts.append(preds)
+            cached = self._load_fold(cache, stack_fp, fold, embargo) if cache is not None else None
+            if cached is not None:
+                preds, state = cached
+            else:
+                preds, enc = self._fit_fold_predict(train, test)
+                if preds is None:
+                    continue
+                state = enc.state_dict() if enc is not None else None
+                if cache is not None:
+                    self._store_fold(cache, stack_fp, fold, embargo, preds, state)
+            oos_parts.append(preds)
+            if state is not None:
+                self.refits_.append(
+                    {
+                        "test_start": fold.test_start_ts,
+                        "train_start": fold.train_start_ts,
+                        "train_end": fold.test_start_ts - embargo,
+                        "target": target_cfg,
+                        "state": state,
+                    }
+                )
 
         self.oos_ = (
-            pl.concat(oos_parts)
+            pl.concat(oos_parts).unique(subset=["pair", "ts"], keep="first").sort(["pair", "ts"])
             if oos_parts
             else pl.DataFrame(schema={"pair": pl.Utf8, "ts": base.schema["ts"], self.output: pl.Float64})
         )
-
 
         self.encode_, self.select_, self.model_ = self._fit_stack(base)
 
@@ -149,7 +169,7 @@ class ForecastModel:
         if sel is not None:
             sel.fit(frame, y)
             cols = [c for c in cols if c in sel.keep_]
-        cols = cols or list((enc.outputs if enc else self.features.outputs))
+        cols = cols or list(enc.outputs if enc else self.features.outputs)
         X = frame.select(cols).fill_null(0.0).to_numpy()
         est = _make_estimator(self.backend, self.backend_params)
         w = train.get_column("_w").to_numpy() if "_w" in train.columns else None
@@ -160,10 +180,68 @@ class ForecastModel:
             est.fit(X, y.to_numpy(), sample_weight=w)
         return enc, sel, est
 
-    def _fit_fold_predict(self, train: pl.DataFrame, test: pl.DataFrame) -> pl.DataFrame | None:
+    def _fit_fold_predict(self, train: pl.DataFrame, test: pl.DataFrame):
         enc, sel, est = self._fit_stack(train)
         p = self._predict_stack(enc, sel, est, test)
-        return test.select(["pair", "ts"]).with_columns(pl.Series(self.output, p))
+        return test.select(["pair", "ts"]).with_columns(pl.Series(self.output, p)), enc
+
+    def _walk_forward_folds(self, ts_unique: list, embargo: timedelta):
+        """Rolling refit folds driven by the encoder's ``refit``/``window``; else n_folds."""
+        enc = self.encode
+        if isinstance(enc, WoE) and enc.refit and enc.window:
+            try:
+                rf = rolling_folds(ts_unique, parse_duration(enc.refit), parse_duration(enc.window), embargo)
+            except (KeyError, ValueError, IndexError):
+                rf = []
+            if rf:
+                return rf
+        return make_folds(ts_unique, self.n_folds)
+
+    def _stack_fingerprint(self, data: Dataset) -> str:
+        """Identity of the fold-producing stack: configs + code + dataset."""
+        from signalflow.experiment.cache import code_fingerprint
+
+        return stable_hash(
+            {
+                "features": self.features.to_config(),
+                "encode": self.encode.to_config() if isinstance(self.encode, WoE) else None,
+                "select": {"min_iv": getattr(self.select, "min_iv", None)} if self.select else None,
+                "target": self.target.to_config(),
+                "backend": self.backend if isinstance(self.backend, str) else type(self.backend).__name__,
+                "backend_params": self.backend_params,
+                "output": self.output,
+                "dataset": data.source_params,
+                "woe_code": code_fingerprint(WoE),
+                "model_code": code_fingerprint(type(self)),
+            }
+        )
+
+    def _fold_keys(self, cache, stack_fp: str, fold, embargo: timedelta):
+        parts = {
+            "stack": stack_fp,
+            "train_start": str(fold.train_start_ts),
+            "train_end": str(fold.test_start_ts - embargo),
+            "test_start": str(fold.test_start_ts),
+            "test_end": str(fold.test_end_ts),
+        }
+        return (
+            cache.key(parts, kind="oos_for_training"),
+            cache.key({**parts, "artifact": "woe_state"}, kind="oos_for_training"),
+        )
+
+    def _load_fold(self, cache, stack_fp: str, fold, embargo: timedelta):
+        okey, skey = self._fold_keys(cache, stack_fp, fold, embargo)
+        preds = cache.get(okey)
+        state_df = cache.get(skey)
+        if preds is None or state_df is None:
+            return None
+        raw = state_df.get_column("state")[0]
+        return preds, (None if raw == "null" else json.loads(raw))
+
+    def _store_fold(self, cache, stack_fp: str, fold, embargo: timedelta, preds, state) -> None:
+        okey, skey = self._fold_keys(cache, stack_fp, fold, embargo)
+        cache.put(okey, preds)
+        cache.put(skey, pl.DataFrame({"state": [json.dumps(state) if state is not None else "null"]}))
 
     def _predict_stack(self, enc, sel, est, frame: pl.DataFrame) -> np.ndarray:
         cols = getattr(est, "_sf_cols", None)
@@ -177,15 +255,18 @@ class ForecastModel:
     def _fresh_encode(self):
         if self.encode is None:
             return None
-        return WoE(binning=self.encode.binning, refit=self.encode.refit, window=self.encode.window,
-                   smoothing=self.encode.smoothing, columns=list(self.features.outputs))
+        return WoE(
+            binning=self.encode.binning,
+            refit=self.encode.refit,
+            window=self.encode.window,
+            smoothing=self.encode.smoothing,
+            columns=list(self.features.outputs),
+        )
 
     def _fresh_select(self):
         if self.select is None:
             return None
-        return IVSelector(min_iv=self.select.min_iv, max_bins=self.select.max_bins,
-                          smoothing=self.select.smoothing)
-
+        return IVSelector(min_iv=self.select.min_iv, max_bins=self.select.max_bins, smoothing=self.select.smoothing)
 
     def predict(self, data: Dataset) -> pl.DataFrame:
         """Production prediction (in-sample on history - never feed to training)."""
@@ -204,6 +285,18 @@ class ForecastModel:
             logger.warning(f"predict_oos: {missing} rows outside cached OOS span (null)")
         return out
 
+    def woe_history(self) -> list[dict]:
+        """Per-refit WoE state (bin edges + WoE table + IV) across the walk-forward."""
+        self._check_fitted()
+        return getattr(self, "refits_", [])
+
+    def dump_woe_history(self, path: str) -> str:
+        """Serialize the refit timeline (binning + statistics) to portable JSON."""
+        import json
+
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(self.woe_history(), fh, default=str)
+        return path
 
     def _build_fingerprint(self, data: Dataset, ts_unique: list) -> None:
         enc_cfg = self.encode_.to_config()["params"] if self.encode_ else None
@@ -234,7 +327,6 @@ class ForecastModel:
             "output": self.output,
             "warmup": self.features.warmup,
         }
-
 
     def save(self, uri: str) -> str:
         from signalflow.model.store import save_model

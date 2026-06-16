@@ -1,6 +1,5 @@
 """Run - the result of executing a Flow."""
 
-
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -17,7 +16,6 @@ class Run:
     fills: list[Fill] = field(default_factory=list)
     target: str = "USDT"
     promotable: bool = True
-
 
     @property
     def initial_equity(self) -> float:
@@ -57,6 +55,7 @@ class Run:
         return {
             "name": self.name,
             "mode": self.mode,
+            "target": self.target,
             "promotable": self.promotable,
             "n_fills": len(self.fills),
             "initial_equity": round(self.initial_equity, 2),
