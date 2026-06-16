@@ -132,6 +132,7 @@ nav:
     - Data Stores: guide/data-stores.md
     - Custom Data Types: guide/custom-data-types.md
     - Custom Detectors: guide/custom-detectors.md
+    - Live & Walk-Forward: guide/live-and-walk-forward.md
     - Signal Validators: guide/validators.md
     - Advanced Strategies: guide/advanced-strategies.md
     - State Persistence: guide/state-persistence.md

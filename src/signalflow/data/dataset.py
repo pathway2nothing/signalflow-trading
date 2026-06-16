@@ -1,6 +1,5 @@
 """Dataset - one lazy Polars-backed market-data container."""
 
-
 from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 from typing import NamedTuple
@@ -27,9 +26,7 @@ class Dataset:
     source_name: str = ""
     source_params: dict = field(default_factory=dict)
     quote: str = "USDT"
-    load_data: bool = False
     provenance: Provenance = Provenance.FULL
-
 
     @classmethod
     def from_source(
@@ -49,7 +46,6 @@ class Dataset:
             quote=quote,
         )
 
-
     def pairs(self) -> list[str]:
         return self.frame.get_column("pair").unique(maintain_order=True).to_list()
 
@@ -67,13 +63,10 @@ class Dataset:
     def height(self) -> int:
         return self.frame.height
 
-
     def with_frame(self, frame: pl.DataFrame, *, provenance: Provenance | None = None) -> "Dataset":
         return replace(self, frame=frame, provenance=provenance or self.provenance)
 
-    def with_forecasts(
-        self, cols: pl.DataFrame, *, provenance: Provenance = Provenance.FULL
-    ) -> "Dataset":
+    def with_forecasts(self, cols: pl.DataFrame, *, provenance: Provenance = Provenance.FULL) -> "Dataset":
         """Join forecast columns (keyed by pair, ts) and record their provenance."""
         merged = self.frame.join(cols, on=["pair", "ts"], how="left")
         return replace(self, frame=merged, provenance=provenance)
@@ -90,7 +83,6 @@ class Dataset:
     def select_pairs(self, pairs: list[str]) -> "Dataset":
         return replace(self, frame=self.frame.filter(pl.col("pair").is_in(pairs)))
 
-
     def prices_at(self, ts) -> dict[str, float]:
         slice_ = self.frame.filter(pl.col("ts") == ts)
         return dict(zip(slice_.get_column("pair"), slice_.get_column("close"), strict=True))
@@ -106,7 +98,6 @@ class Dataset:
         if inverse:
             return 1.0 / inverse
         raise KeyError(f"no cross rate {base}->{quote} in data")
-
 
     def iter_bars(self, columns: list[str] | None = None) -> Iterator[Bar]:
         """Yield one :class:`Bar` per timestamp in order (the replay backbone)."""
@@ -134,4 +125,4 @@ def data(
     return Dataset.from_source(src, pairs=pairs, start=start, end=end, interval=interval, quote=quote)
 
 
-__all__ = ["Dataset", "Bar", "data", "CANONICAL_COLUMNS"]
+__all__ = ["CANONICAL_COLUMNS", "Bar", "Dataset", "data"]

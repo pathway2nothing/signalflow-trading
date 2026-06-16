@@ -111,9 +111,29 @@ class WoE(Transform):
 
     @classmethod
     def from_config(cls, cfg: dict) -> "WoE":
-        """Rebuild the recipe (hyperparameters); the fitted table persists via the model pickle."""
+        """Rebuild the recipe (hyperparameters); the fitted table is restored via load_state."""
         params = dict(cfg.get("params") or {})
         binning = params.get("binning")
         if isinstance(binning, dict):
             params["binning"] = Binning(**binning)
         return cls(**params)
+
+    def state_dict(self) -> dict:
+        """Portable fitted state: bin edges + WoE table + IV per column (JSON-able)."""
+        self._require_fitted("woe_")
+        return {
+            "columns": list(self.columns_),
+            "binning": self.binning.to_dict(),
+            "smoothing": self.smoothing,
+            "edges": {c: self.edges_[c].tolist() for c in self.columns_},
+            "woe": {c: self.woe_[c].tolist() for c in self.columns_},
+            "iv": {c: float(self.iv_[c]) for c in self.columns_},
+        }
+
+    def load_state(self, state: dict) -> "WoE":
+        """Restore fitted edges/WoE/IV produced by :meth:`state_dict`."""
+        self.columns_ = list(state["columns"])
+        self.edges_ = {c: np.asarray(state["edges"][c], dtype=float) for c in self.columns_}
+        self.woe_ = {c: np.asarray(state["woe"][c], dtype=float) for c in self.columns_}
+        self.iv_ = {c: float(state["iv"][c]) for c in self.columns_}
+        return self

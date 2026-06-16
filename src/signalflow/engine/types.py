@@ -1,6 +1,5 @@
 """Engine value types - intents, orders, fills, positions."""
 
-
 from dataclasses import dataclass, field
 
 from signalflow.enums import IntentKind, OrderType, Side
@@ -39,6 +38,7 @@ class Intent:
     side: Side
     qty: float | None = None
     notional: float | None = None
+    limit_price: float | None = None
     reason: str = ""
 
 

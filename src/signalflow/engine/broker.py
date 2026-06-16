@@ -1,6 +1,5 @@
 """Brokers - turn orders into fills."""
 
-
 import hashlib
 import hmac
 import json
@@ -10,9 +9,11 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+import polars as pl
+
 from signalflow.decorators import broker
 from signalflow.engine.types import Fill, Order
-from signalflow.enums import Side
+from signalflow.enums import OrderType, Side
 
 
 @runtime_checkable
@@ -35,7 +36,12 @@ class SimBroker(Broker):
             price = bar.prices.get(o.pair)
             if price is None or o.qty <= 0:
                 continue
-            exec_price = price * (1 + self.slippage) if o.side == Side.BUY else price * (1 - self.slippage)
+            if o.type == OrderType.LIMIT:
+                exec_price = self._limit_fill(o, bar, price)
+                if exec_price is None:
+                    continue
+            else:
+                exec_price = price * (1 + self.slippage) if o.side == Side.BUY else price * (1 - self.slippage)
             fee = o.qty * exec_price * self.fee_rate
             fills.append(
                 Fill(
@@ -49,6 +55,24 @@ class SimBroker(Broker):
                 )
             )
         return fills
+
+    def _limit_fill(self, order: Order, bar, close: float) -> "float | None":
+        """Fill a resting limit at its price if the bar traded through it, else skip."""
+        if order.limit_price is None:
+            return None
+        high, low = self._bar_high_low(bar, order.pair, close)
+        if order.side == Side.BUY:
+            return order.limit_price if low <= order.limit_price else None
+        return order.limit_price if high >= order.limit_price else None
+
+    @staticmethod
+    def _bar_high_low(bar, pair: str, close: float) -> "tuple[float, float]":
+        frame = getattr(bar, "frame", None)
+        if frame is not None and {"high", "low"} <= set(frame.columns):
+            row = frame.filter(pl.col("pair") == pair)
+            if row.height:
+                return float(row.get_column("high")[0]), float(row.get_column("low")[0])
+        return close, close
 
 
 @broker("exchange")
@@ -98,12 +122,17 @@ class BinanceBroker(ExchangeBroker):
         params = {
             "symbol": order.pair,
             "side": order.side.name,
-            "type": "MARKET",
             "quantity": repr(order.qty),
             "newOrderRespType": "FULL",
             "recvWindow": self.recv_window,
             "timestamp": int(time.time() * 1000),
         }
+        if order.type == OrderType.LIMIT and order.limit_price is not None:
+            params["type"] = "LIMIT"
+            params["timeInForce"] = "GTC"
+            params["price"] = repr(order.limit_price)
+        else:
+            params["type"] = "MARKET"
         query = urllib.parse.urlencode(params)
         signature = hmac.new(self.api_secret.encode(), query.encode(), hashlib.sha256).hexdigest()
         url = f"{self.base_url}/api/v3/order?{query}&signature={signature}"
