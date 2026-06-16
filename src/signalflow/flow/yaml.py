@@ -1,6 +1,5 @@
 """Flow serialization - deployment is data, not code."""
 
-
 import yaml
 
 from signalflow.enums import ComponentType
@@ -8,6 +7,7 @@ from signalflow.errors import ArtifactError
 from signalflow.registry import registry
 from signalflow.strategy.risk import Risk
 from signalflow.strategy.rules import Entry, Exit, RulesStrategy
+from signalflow.transform.base import build_transform
 
 
 def _model_uri(model, slot: str, model_dir: str | None) -> str:
@@ -82,9 +82,7 @@ def load_flow(path: str):
         doc = yaml.safe_load(fh)
 
     forecasts = {slot: ForecastModel.load(uri) for slot, uri in (doc.get("forecasts") or {}).items()}
-    detectors = [
-        registry.create(ComponentType.TRANSFORM, d["transform"], **d["params"]) for d in (doc.get("detectors") or [])
-    ]
+    detectors = [build_transform(d) for d in (doc.get("detectors") or [])]
     return Flow(
         name=doc["name"],
         forecasts=forecasts,
