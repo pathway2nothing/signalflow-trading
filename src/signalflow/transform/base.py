@@ -19,7 +19,6 @@ base applies them ``.over("pair")`` on a ts-sorted frame, so a rolling window
 physically cannot cross a pair boundary or see past ``t``.
 """
 
-
 import dataclasses
 from abc import ABC, abstractmethod
 
@@ -33,7 +32,6 @@ class Transform(ABC):
 
     requires_fit: bool = False
     requires_target: bool = False
-
 
     @property
     def name(self) -> str:
@@ -54,6 +52,11 @@ class Transform(ABC):
                 params[f.name] = val.to_config() if isinstance(val, Transform) else val
         return {"transform": self.name, "role": self.role, "params": params}
 
+    @classmethod
+    def from_config(cls, cfg: dict) -> "Transform":
+        """Inverse of :meth:`to_config`, rebuilding nested transforms recursively."""
+        params = {k: _rebuild_value(v) for k, v in (cfg.get("params") or {}).items()}
+        return cls(**params)
 
     @property
     def warmup(self) -> int:
@@ -64,7 +67,6 @@ class Transform(ABC):
     def outputs(self) -> list[str]:
         """Column names this transform appends."""
 
-
     def fit(self, df: pl.DataFrame, target: pl.Series | None = None) -> "Transform":
         """Stateful transforms override; stateless ones are a no-op."""
         return self
@@ -72,7 +74,6 @@ class Transform(ABC):
     @abstractmethod
     def compute(self, df: pl.DataFrame) -> pl.DataFrame:
         """Append :pyattr:`outputs` to ``df`` (causal)."""
-
 
     def _require_fitted(self, attr: str) -> None:
         if not hasattr(self, attr):
@@ -89,3 +90,24 @@ class Feature(Transform):
     def compute(self, df: pl.DataFrame) -> pl.DataFrame:
         sorted_df = df.sort(["pair", "ts"])
         return sorted_df.with_columns([e.over("pair") for e in self.exprs()])
+
+
+def _is_transform_config(value: object) -> bool:
+    return isinstance(value, dict) and "transform" in value
+
+
+def _rebuild_value(value: object) -> object:
+    if _is_transform_config(value):
+        return build_transform(value)
+    if isinstance(value, list):
+        return [build_transform(v) if _is_transform_config(v) else v for v in value]
+    return value
+
+
+def build_transform(cfg: dict) -> Transform:
+    """Reconstruct any registered transform (recursively) from its ``to_config``."""
+    from signalflow.enums import ComponentType
+    from signalflow.registry import registry
+
+    cls = registry.get(ComponentType.TRANSFORM, cfg["transform"])
+    return cls.from_config(cfg)

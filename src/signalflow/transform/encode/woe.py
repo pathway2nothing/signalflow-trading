@@ -1,6 +1,5 @@
 """WoE target-encoding - the default feature policy."""
 
-
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -58,7 +57,6 @@ class WoE(Transform):
     requires_fit = True
     requires_target = True
 
-
     @property
     def outputs(self) -> list[str]:
         cols = getattr(self, "columns_", [])
@@ -110,3 +108,12 @@ class WoE(Transform):
                 "columns": self.columns,
             },
         }
+
+    @classmethod
+    def from_config(cls, cfg: dict) -> "WoE":
+        """Rebuild the recipe (hyperparameters); the fitted table persists via the model pickle."""
+        params = dict(cfg.get("params") or {})
+        binning = params.get("binning")
+        if isinstance(binning, dict):
+            params["binning"] = Binning(**binning)
+        return cls(**params)
