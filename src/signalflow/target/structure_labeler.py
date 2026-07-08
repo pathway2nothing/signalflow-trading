@@ -11,7 +11,6 @@ Two approaches:
 Both support fixed-percentage and rolling z-score swing filters.
 """
 
-
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -97,14 +96,10 @@ class StructureLabeler(Labeler):
 
         price = pl.col(self.price_col)
 
-
         lookback_window = self.lookback + 1
-        self.lookforward + 1
-
 
         lookback_max = price.rolling_max(window_size=lookback_window, min_samples=1)
         lookback_min = price.rolling_min(window_size=lookback_window, min_samples=1)
-
 
         lookforward_max = (
             price.shift(-1).rolling_max(window_size=self.lookforward, min_samples=1).shift(-(self.lookforward - 1))
@@ -122,14 +117,12 @@ class StructureLabeler(Labeler):
             ]
         )
 
-
         df = df.with_columns(
             [
                 pl.max_horizontal("_lb_max", "_lf_max").alias("_win_max"),
                 pl.min_horizontal("_lb_min", "_lf_min").alias("_win_min"),
             ]
         )
-
 
         df = df.with_columns(
             pl.when((pl.col("_win_min") > 0) & (pl.col("_win_max") != pl.col("_win_min")))
@@ -138,7 +131,6 @@ class StructureLabeler(Labeler):
             .alias("_swing")
         )
 
-
         df = df.with_columns(
             [
                 (price == pl.col("_win_max")).alias("_is_max"),
@@ -146,16 +138,13 @@ class StructureLabeler(Labeler):
             ]
         )
 
-
         if self.min_swing_zscore is not None:
-
             df = df.with_columns(
                 [
                     pl.col("_swing").rolling_mean(window_size=self.vol_window, min_samples=20).alias("_swing_mean"),
                     pl.col("_swing").rolling_std(window_size=self.vol_window, min_samples=20).alias("_swing_std"),
                 ]
             )
-
 
             df = df.with_columns(
                 pl.when(pl.col("_swing_std") > 0)
@@ -166,9 +155,7 @@ class StructureLabeler(Labeler):
 
             threshold_mask = pl.col("_zscore") >= self.min_swing_zscore
         else:
-
             threshold_mask = pl.col("_swing") >= self.min_swing_pct
-
 
         label_expr = (
             pl.when(threshold_mask & pl.col("_is_max"))
@@ -181,7 +168,6 @@ class StructureLabeler(Labeler):
 
         df = df.with_columns(label_expr)
 
-
         if self.include_meta:
             df = df.with_columns(
                 pl.when(pl.col(self.out_col).is_not_null())
@@ -189,7 +175,6 @@ class StructureLabeler(Labeler):
                 .otherwise(pl.lit(None))
                 .alias("swing_pct")
             )
-
 
         temp_cols = [
             "_lb_max",
@@ -285,12 +270,10 @@ class ZigzagStructureLabeler(Labeler):
 
         prices = group_df[self.price_col].to_numpy().astype(np.float64)
 
-
         if self.min_swing_zscore is not None:
             thresholds = self._adaptive_thresholds(group_df, prices)
         else:
             thresholds = np.full(len(prices), self.min_swing_pct)
-
 
         labels, swing_pcts = self._zigzag(prices, thresholds)
 
@@ -310,31 +293,24 @@ class ZigzagStructureLabeler(Labeler):
 
         return df
 
-
     def _adaptive_thresholds(self, df: pl.DataFrame, prices: np.ndarray) -> np.ndarray:
         """Compute per-bar thresholds: zscore x rolling_vol x sqrt(vol_window)."""
         n = len(prices)
         if n < 2:
             return np.full(n, np.inf)
 
-
         price_col = pl.col(self.price_col)
         log_ret = (price_col / price_col.shift(1)).log()
 
-
         rolling_vol = log_ret.rolling_std(window_size=self.vol_window, min_samples=20)
-
 
         vol_arr = df.select(rolling_vol.alias("vol"))["vol"].to_numpy()
 
-
         thresholds = self.min_swing_zscore * vol_arr * np.sqrt(self.vol_window)
-
 
         thresholds = np.where(np.isnan(thresholds), np.inf, thresholds)
 
         return thresholds
-
 
     def _zigzag(self, prices: np.ndarray, thresholds: np.ndarray) -> tuple[list[str | None], np.ndarray]:
         """Run zigzag algorithm with per-bar adaptive thresholds."""
@@ -344,7 +320,6 @@ class ZigzagStructureLabeler(Labeler):
 
         if n < 2:
             return labels, swing_pcts
-
 
         high_idx = 0
         low_idx = 0
@@ -361,12 +336,10 @@ class ZigzagStructureLabeler(Labeler):
                 swing = (prices[high_idx] - prices[low_idx]) / prices[low_idx]
                 if swing >= thresholds[i]:
                     if high_idx > low_idx:
-
                         labels[low_idx] = "local_min"
                         swing_pcts[low_idx] = swing
                         direction = 1
                     else:
-
                         labels[high_idx] = "local_max"
                         swing_pcts[high_idx] = swing
                         direction = -1
@@ -375,7 +348,6 @@ class ZigzagStructureLabeler(Labeler):
 
         if direction == 0:
             return labels, swing_pcts
-
 
         if direction == 1:
             candidate_idx = high_idx
@@ -389,13 +361,11 @@ class ZigzagStructureLabeler(Labeler):
 
             if direction == 1:
                 if prices[i] >= candidate_price:
-
                     candidate_idx = i
                     candidate_price = prices[i]
                 elif candidate_price > 0:
                     reversal = (candidate_price - prices[i]) / candidate_price
                     if reversal >= threshold:
-
                         labels[candidate_idx] = "local_max"
                         swing_pcts[candidate_idx] = reversal
                         direction = -1
@@ -409,7 +379,6 @@ class ZigzagStructureLabeler(Labeler):
                 elif candidate_price > 0:
                     reversal = (prices[i] - candidate_price) / candidate_price
                     if reversal >= threshold:
-
                         labels[candidate_idx] = "local_min"
                         swing_pcts[candidate_idx] = reversal
                         direction = 1

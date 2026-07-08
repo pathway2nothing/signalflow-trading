@@ -10,12 +10,19 @@ from signalflow.engine.types import Fill
 
 @dataclass
 class Run:
+    """Result of executing a Flow: equity curve, fills, and derived metrics.
+
+    ``promotable`` is false for an in-sample model backtest; ``oos`` flags a
+    leak-free out-of-sample run.
+    """
+
     name: str
     mode: str
     equity_curve: pl.DataFrame
     fills: list[Fill] = field(default_factory=list)
     target: str = "USDT"
     promotable: bool = True
+    oos: bool = False
 
     @property
     def initial_equity(self) -> float:
@@ -45,18 +52,42 @@ class Run:
         peak = np.maximum.accumulate(eq)
         return float(np.max((peak - eq) / peak)) if np.all(peak > 0) else 0.0
 
-    def sharpe(self, periods_per_year: int = 365 * 24) -> float:
+    def periods_per_year(self) -> float:
+        """Annualization factor derived from the equity curve's median bar spacing."""
+        seconds_per_year = 365.0 * 24.0 * 3600.0
+        ec = self.equity_curve
+        if ec.height >= 3 and "ts" in ec.columns:
+            secs = ec.get_column("ts").sort().diff().drop_nulls().dt.total_seconds()
+            positive = secs.filter(secs > 0)
+            if positive.len() > 0:
+                median_dt = float(positive.median())
+                if median_dt > 0:
+                    return seconds_per_year / median_dt
+        return 8760.0
+
+    def sharpe(self, periods_per_year: float | None = None) -> float:
+        """Annualized Sharpe of per-bar equity returns (zero risk-free rate).
+
+        ``periods_per_year`` defaults to the factor implied by the equity curve's median
+        bar spacing (:meth:`periods_per_year`), so hourly bars annualize by ~8760.
+        """
         r = self.returns
         if r.size < 2 or r.std() == 0:
             return 0.0
-        return float(r.mean() / r.std() * np.sqrt(periods_per_year))
+        ppy = self.periods_per_year() if periods_per_year is None else periods_per_year
+        return float(r.mean() / r.std() * np.sqrt(ppy))
 
     def scorecard(self) -> dict:
+        """Standard metric dict: ``name``, ``mode``, ``target``, ``promotable``, ``oos``,
+        ``n_fills``, ``initial_equity``, ``final_equity``, ``total_return``,
+        ``max_drawdown``, and ``sharpe``.
+        """
         return {
             "name": self.name,
             "mode": self.mode,
             "target": self.target,
             "promotable": self.promotable,
+            "oos": self.oos,
             "n_fills": len(self.fills),
             "initial_equity": round(self.initial_equity, 2),
             "final_equity": round(self.final_equity, 2),

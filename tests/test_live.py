@@ -46,6 +46,35 @@ def test_state_persists_and_resumes(small_ds, tmp_path):
     assert load_state(restored, path)
     assert restored.balances == eng.balances
     assert set(restored.positions) == set(eng.positions)
+    assert len(restored.event_log) == len(eng.event_log)
+    for k, pos in eng.positions.items():
+        assert restored.positions[k].opened_ts == pos.opened_ts
+
+
+def test_armed_live_halts_on_tripped_kill_switch(small_ds, tmp_path):
+    ks = tmp_path / "kill.txt"
+    ks.write_text("tripped")
+    flow = sf.Flow(
+        name="armed",
+        detectors=[sf.SmaCrossDetector(fast=3, slow=8)],
+        strategy=sf.RulesStrategy(entry=sf.Entry(size_pct=0.5), exit=sf.Exit(tp=0.01, sl=0.01)),
+        risk=sf.Risk(kill_switch_path=str(ks)),
+    )
+    with pytest.raises(sf.KillSwitchTripped):
+        run_live_loop(flow, sf.ReplayFeed(small_ds), 10_000.0, sf.ExchangeBroker(), max_bars=5)
+
+
+def test_backtest_kill_switch_stays_silent(small_ds, tmp_path):
+    ks = tmp_path / "kill.txt"
+    ks.write_text("tripped")
+    flow = sf.Flow(
+        name="silent",
+        detectors=[sf.SmaCrossDetector(fast=3, slow=8)],
+        strategy=sf.RulesStrategy(entry=sf.Entry(size_pct=0.5), exit=sf.Exit(tp=0.01, sl=0.01)),
+        risk=sf.Risk(kill_switch_path=str(ks)),
+    )
+    run = flow.backtest(small_ds, capital=10_000)
+    assert all(f.side != sf.Side.BUY for f in run.fills)
 
 
 def test_binance_broker_requires_keys():
@@ -81,3 +110,53 @@ def test_simulate_warmup_window_runs(small_ds):
     run = _flow().simulate(small_ds, capital=10_000, warmup=30)
     assert run.promotable is False
     assert run.equity_curve.height > 0
+
+
+def _warmup60_flow():
+    return sf.Flow(
+        name="warm",
+        detectors=[sf.SmaCrossDetector(fast=3, slow=59)],
+        strategy=sf.RulesStrategy(entry=sf.Entry(size_pct=0.5), exit=sf.Exit(tp=0.01, sl=0.01)),
+    )
+
+
+def test_simulate_default_warmup_consumes_declared(small_ds):
+    flow = _warmup60_flow()
+    assert flow.required_warmup == 60
+
+    default = flow.simulate(small_ds, capital=10_000)
+    explicit = flow.simulate(small_ds, capital=10_000, warmup=60)
+
+    assert default.final_equity == pytest.approx(explicit.final_equity, abs=1e-9)
+    assert len(default.fills) == len(explicit.fills)
+
+    first_60 = small_ds.frame.get_column("ts").unique().sort().to_list()[:60]
+    assert all(f.ts not in set(first_60) for f in default.fills)
+
+
+def test_required_warmup_combines_feature_model_and_detector(small_ds):
+    model = sf.ForecastModel(
+        target=sf.FixedHorizon(bars=12),
+        features=sf.FeaturePipe(sf.SMA(40)),
+        output="p_rise",
+        n_folds=3,
+    ).fit(small_ds)
+    flow = sf.Flow(
+        name="combo",
+        forecasts={"m": model},
+        detectors=[sf.SmaCrossDetector(fast=3, slow=59)],
+        strategy=sf.RulesStrategy(entry=sf.Entry(size_pct=0.5)),
+    )
+    assert flow.required_warmup == 60
+
+
+def test_polling_feed_warmup_resolves_from_flow():
+    from signalflow.flow.live import resolve_warmup_bars
+
+    feed = sf.PollingFeed(source=sf.MemorySource(), pairs=["BTCUSDT"], interval="1h")
+    assert feed.warmup_bars is None
+
+    flow = _warmup60_flow()
+    required = resolve_warmup_bars(flow, feed)
+    assert required == 60
+    assert feed.warmup_bars == 60

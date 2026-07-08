@@ -1,6 +1,5 @@
 """Core enums and signal constants."""
 
-
 from enum import StrEnum
 
 
@@ -18,6 +17,11 @@ NONE: str = Signal.NONE.value
 
 SIGNAL_COL = "signal"
 """Reserved column name a detector writes its discrete signal into."""
+
+RESERVED_COLUMNS = frozenset(
+    {"pair", "ts", "open", "high", "low", "close", "volume", "signal", "label", "_w", "weight"}
+)
+"""Column names never treated as model features (OHLCV keys, signal, label, and sample weights)."""
 
 
 class Side(StrEnum):
@@ -90,7 +94,7 @@ class RawDataType(StrEnum):
 
 
 class ComponentType(StrEnum):
-    """The seven registry types."""
+    """The registry component types."""
 
     SOURCE = "source"
     TRANSFORM = "transform"
@@ -99,3 +103,4 @@ class ComponentType(StrEnum):
     SAMPLER = "sampler"
     BROKER = "broker"
     METRIC = "metric"
+    TARGET = "target"

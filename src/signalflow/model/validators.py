@@ -1,6 +1,5 @@
 """Validator combinators."""
 
-
 from functools import reduce
 
 import polars as pl
@@ -13,6 +12,10 @@ class _Combinator:
 
     def __init__(self, children: list):
         self.children = children
+
+    def to_config(self) -> dict:
+        """Scalar combinator params; children serialize separately as model URIs."""
+        return {}
 
     @property
     def is_fitted(self) -> bool:
@@ -33,7 +36,7 @@ class _Combinator:
         return frames
 
     def _join(self, frames: list[pl.DataFrame]) -> pl.DataFrame:
-        return reduce(lambda a, b: a.join(b, on=["pair", "ts"], how="outer_coalesce"), frames)
+        return reduce(lambda a, b: a.join(b, on=["pair", "ts"], how="full", coalesce=True), frames)
 
     def _aggregate(self, joined: pl.DataFrame, value_cols: list[str]) -> pl.Series:
         raise NotImplementedError
@@ -72,6 +75,9 @@ class VoteValidator(_Combinator):
     def __init__(self, children: list, threshold: float = 0.5):
         super().__init__(children)
         self.threshold = threshold
+
+    def to_config(self) -> dict:
+        return {"threshold": self.threshold}
 
     def _aggregate(self, joined, value_cols):
         votes = [(pl.col(c) > self.threshold).cast(pl.Float64) for c in value_cols]

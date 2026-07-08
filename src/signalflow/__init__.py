@@ -8,7 +8,6 @@ Engine, Run - plus the WoE/IV feature policy, samplers, detectors, and strategy
 models.
 """
 
-
 from signalflow._version import __version__
 
 
@@ -27,11 +26,12 @@ from signalflow.enums import (
 )
 from signalflow.errors import (
     ArtifactError,
+    DegenerateTargetError,
     FingerprintMismatch,
+    FlowConfigError,
     KillSwitchTripped,
     LeakageError,
     PipeError,
-    RiskViolation,
     SchemaVersionError,
     SignalFlowError,
     UnfittedTransformError,
@@ -44,7 +44,7 @@ from signalflow.registry import registry
 from signalflow.data import BinanceSource, Dataset, MemorySource, data
 
 
-from signalflow.transform import SMA, Feature, FeaturePipe, Transform
+from signalflow.transform import SMA, Feature, FeaturePipe, Transform, build_pipe
 from signalflow.transform.encode import Binning, IVSelector, WoE
 
 
@@ -60,7 +60,15 @@ from signalflow.sampler import (
 )
 
 
-from signalflow.model import ForecastModel, MaxValidator, MeanValidator, VoteValidator
+from signalflow.model import (
+    ForecastModel,
+    MaxValidator,
+    MeanValidator,
+    VoteValidator,
+    WalkForwardFold,
+    WalkForwardResult,
+    walk_forward,
+)
 from signalflow.detector import (
     MarketDropDetector,
     RevertDetector,
@@ -70,7 +78,18 @@ from signalflow.detector import (
 )
 
 
-from signalflow.engine import BinanceBroker, Engine, ExchangeBroker, Fill, Intent, Order, SimBroker
+from signalflow.engine import (
+    BinanceBroker,
+    Broker,
+    Engine,
+    ExchangeBroker,
+    Fill,
+    Intent,
+    Order,
+    PortfolioSnapshot,
+    Position,
+    SimBroker,
+)
 from signalflow.strategy import (
     OBSERVATION_SCHEMA_VERSION,
     Entry,
@@ -96,29 +115,90 @@ except Exception:
 
 __all__ = [
     "__version__",
-
-    "RISE", "FALL", "NONE", "Signal",
-    "Side", "OrderType", "PositionSide", "IntentKind", "RunMode", "Provenance", "ComponentType",
+    "RISE",
+    "FALL",
+    "NONE",
+    "Signal",
+    "Side",
+    "OrderType",
+    "PositionSide",
+    "IntentKind",
+    "RunMode",
+    "Provenance",
+    "ComponentType",
     "registry",
-
-    "SignalFlowError", "UntrainedModelError", "LeakageError", "PipeError", "RiskViolation",
-    "KillSwitchTripped", "ArtifactError", "FingerprintMismatch", "SchemaVersionError",
-    "UnknownComponentError", "UnfittedTransformError",
-
-    "data", "Dataset", "BinanceSource", "MemorySource",
-
-    "Transform", "Feature", "FeaturePipe", "SMA", "WoE", "Binning", "IVSelector",
-
-    "target", "Target", "FixedHorizon", "TripleBarrier",
-    "Sampler", "SampleSet", "UniformSampler", "MetaLabelingSampler", "CUSUMSampler", "UniquenessSampler",
-
-    "ForecastModel", "MeanValidator", "MaxValidator", "VoteValidator",
-    "SignalDetector", "SmaCrossDetector", "ThresholdDetector",
-    "RevertDetector", "MarketDropDetector",
-
-    "Engine", "SimBroker", "ExchangeBroker", "BinanceBroker", "Fill", "Order", "Intent",
-    "RulesStrategy", "Entry", "Exit", "Risk", "Observation", "StrategyModel", "OBSERVATION_SCHEMA_VERSION",
-    "Flow", "Run", "LiveFeed", "ReplayFeed", "PollingFeed", "run_live_loop",
-
-    "Experiment", "Scorecard", "ArtifactCache", "bootstrap_ci", "monte_carlo_bounds",
+    "SignalFlowError",
+    "UntrainedModelError",
+    "FlowConfigError",
+    "LeakageError",
+    "PipeError",
+    "KillSwitchTripped",
+    "ArtifactError",
+    "FingerprintMismatch",
+    "SchemaVersionError",
+    "UnknownComponentError",
+    "UnfittedTransformError",
+    "DegenerateTargetError",
+    "data",
+    "Dataset",
+    "BinanceSource",
+    "MemorySource",
+    "Transform",
+    "Feature",
+    "FeaturePipe",
+    "build_pipe",
+    "SMA",
+    "WoE",
+    "Binning",
+    "IVSelector",
+    "target",
+    "Target",
+    "FixedHorizon",
+    "TripleBarrier",
+    "Sampler",
+    "SampleSet",
+    "UniformSampler",
+    "MetaLabelingSampler",
+    "CUSUMSampler",
+    "UniquenessSampler",
+    "ForecastModel",
+    "MeanValidator",
+    "MaxValidator",
+    "VoteValidator",
+    "walk_forward",
+    "WalkForwardResult",
+    "WalkForwardFold",
+    "SignalDetector",
+    "SmaCrossDetector",
+    "ThresholdDetector",
+    "RevertDetector",
+    "MarketDropDetector",
+    "Engine",
+    "Broker",
+    "SimBroker",
+    "ExchangeBroker",
+    "BinanceBroker",
+    "Fill",
+    "Order",
+    "Intent",
+    "Position",
+    "PortfolioSnapshot",
+    "RulesStrategy",
+    "Entry",
+    "Exit",
+    "Risk",
+    "Observation",
+    "StrategyModel",
+    "OBSERVATION_SCHEMA_VERSION",
+    "Flow",
+    "Run",
+    "LiveFeed",
+    "ReplayFeed",
+    "PollingFeed",
+    "run_live_loop",
+    "Experiment",
+    "Scorecard",
+    "ArtifactCache",
+    "bootstrap_ci",
+    "monte_carlo_bounds",
 ] + _OPT

@@ -72,7 +72,6 @@ def _meta_triple_barrier(
                 decided = 1
                 break
         if decided == 0:
-
             r_end = (log_close[max_j] - c0) * s
             out_label[i] = 0
             out_pnl[i] = r_end
@@ -144,7 +143,16 @@ class MetaLabelLabeler(Labeler):
         computed = self.compute(data.frame, data_context={"signal_keys": signal_keys})
         from signalflow.target.base import LABEL_COL
 
-        numeric = self._label_to_numeric(computed.get_column(self.out_col))
+        numeric = self._label_to_numeric(computed.get_column(self.out_col), self.positive_classes)
+        distinct = sorted(numeric.drop_nulls().unique().to_list())
+        if len(distinct) < 2:
+            from signalflow.errors import DegenerateTargetError
+
+            raise DegenerateTargetError(
+                f"{type(self).__name__}.labels coerced to a degenerate target: non-null labels "
+                f"collapse to {distinct} distinct value(s). Multi-class labelers need an explicit "
+                f"positive-class mapping via the `positive_classes` class attribute."
+            )
         result = (
             computed.select([self.pair_col, self.ts_col])
             .with_columns(numeric.alias(LABEL_COL))
@@ -244,7 +252,6 @@ class MetaLabelLabeler(Labeler):
                 continue
             j = i + h
             if j >= end:
-
                 continue
             r = (log_close[j] - log_close[i]) * s
             signed_pnl[i] = r

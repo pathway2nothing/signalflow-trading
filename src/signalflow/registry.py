@@ -10,7 +10,6 @@ The design (lazy autodiscovery, dataclass-field schema introspection) is the
 proven one from the previous framework, trimmed to the current type set.
 """
 
-
 import dataclasses
 import importlib
 import pkgutil
@@ -55,7 +54,6 @@ class Registry:
     _items: dict[ComponentType, dict[str, ComponentInfo]] = field(default_factory=dict)
     _discovered: bool = field(default=False, repr=False)
 
-
     def register(
         self,
         component_type: ComponentType,
@@ -65,18 +63,25 @@ class Registry:
         role: str = "",
         override: bool = False,
     ) -> None:
+        """Register ``cls`` under ``name`` for ``component_type``; raise unless ``override``
+        when the name is taken."""
         if not isinstance(name, str) or not name.strip():
             raise ValueError("name must be a non-empty string")
         key = name.strip().lower()
         bucket = self._items.setdefault(component_type, {})
         if key in bucket and not override:
-            raise ValueError(f"{component_type.value}:{key} already registered")
+            existing = bucket[key].cls
+            raise ValueError(
+                f"{component_type.value}:{key} already registered by "
+                f"{existing.__module__}.{existing.__qualname__}; refusing to replace it with "
+                f"{cls.__module__}.{cls.__qualname__} (pass override=True to shadow deliberately)"
+            )
         if key in bucket and override:
             logger.warning(f"Overriding {component_type.value}:{key} with {cls.__name__}")
         bucket[key] = ComponentInfo.from_class(cls, role=role)
 
-
     def get(self, component_type: ComponentType, name: str) -> type[Any]:
+        """Return the registered class for ``name``; raise ``UnknownComponentError`` if absent."""
         self._discover_if_needed()
         bucket = self._items.get(component_type, {})
         key = name.lower()
@@ -84,11 +89,10 @@ class Registry:
             return bucket[key].cls
         except KeyError as e:
             available = ", ".join(sorted(bucket))
-            raise UnknownComponentError(
-                f"{component_type.value}:{key} not found. Available: [{available}]"
-            ) from e
+            raise UnknownComponentError(f"{component_type.value}:{key} not found. Available: [{available}]") from e
 
     def get_info(self, component_type: ComponentType, name: str) -> ComponentInfo:
+        """Return the ``ComponentInfo`` (class, role, docs) for ``name``."""
         self._discover_if_needed()
         bucket = self._items.get(component_type, {})
         key = name.lower()
@@ -96,23 +100,24 @@ class Registry:
             return bucket[key]
         except KeyError as e:
             available = ", ".join(sorted(bucket))
-            raise UnknownComponentError(
-                f"{component_type.value}:{key} not found. Available: [{available}]"
-            ) from e
+            raise UnknownComponentError(f"{component_type.value}:{key} not found. Available: [{available}]") from e
 
     def create(self, component_type: ComponentType, name: str, **kwargs: Any) -> Any:
+        """Instantiate the registered class for ``name`` with ``kwargs``."""
         return self.get(component_type, name)(**kwargs)
 
     def list(self, component_type: ComponentType) -> list[str]:
+        """Sorted registered names for one component type."""
         self._discover_if_needed()
         return sorted(self._items.get(component_type, {}))
 
     def snapshot(self) -> "dict[str, list[str]]":
+        """Every registered name grouped by component type: ``{type: [names]}``."""
         self._discover_if_needed()
         return {t.value: sorted(v) for t, v in self._items.items()}
 
-
     def get_schema(self, component_type: ComponentType, name: str) -> dict[str, Any]:
+        """Introspected config schema for ``name``: class, role, and dataclass parameters."""
         info = self.get_info(component_type, name)
         cls = info.cls
         params: list[dict[str, Any]] = []
@@ -152,7 +157,6 @@ class Registry:
             s = s[8:-2]
         return s
 
-
     def _discover_if_needed(self) -> None:
         if not self._discovered:
             self.autodiscover()
@@ -187,7 +191,10 @@ class Registry:
             try:
                 ep.load()
             except Exception as e:
-                logger.warning(f"autodiscover: failed entry-point {ep.name!r}: {e}")
+                logger.error(
+                    f"autodiscover: entry-point {ep.name!r} failed to register; "
+                    f"the first registration wins and this plugin's colliding component is dropped: {e}"
+                )
 
 
 registry = Registry()

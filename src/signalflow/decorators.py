@@ -1,6 +1,5 @@
 """Semantic registration decorators."""
 
-
 from collections.abc import Callable
 from typing import TypeVar
 
@@ -10,13 +9,13 @@ from signalflow.registry import registry
 T = TypeVar("T", bound=type)
 
 
-def _make(component_type: ComponentType, role: str) -> Callable[[str], Callable[[T], T]]:
-    def decorator(name: str) -> Callable[[T], T]:
+def _make(component_type: ComponentType, role: str) -> Callable[..., Callable[[T], T]]:
+    def decorator(name: str, override: bool = False) -> Callable[[T], T]:
         def wrap(cls: T) -> T:
             cls._sf_name = name
             cls._sf_role = role
             cls._sf_type = component_type
-            registry.register(component_type, name, cls, role=role, override=True)
+            registry.register(component_type, name, cls, role=role, override=override)
             return cls
 
         return wrap

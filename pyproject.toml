@@ -1,6 +1,6 @@
 [project]
 name = "signalflow-trading"
-version = "0.8.4"
+version = "0.8.5"
 description = "SignalFlow: modular framework for trading signal generation, validation and execution"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,7 +13,6 @@ license = { file = "LICENSE" }
 dependencies = [
     "polars>=0.20.0",
     "numpy>=1.24.0",
-    "scipy>=1.11.0",
     "scikit-learn>=1.3.0",
     "lightgbm>=4.0.0",
     "pyyaml>=6.0",

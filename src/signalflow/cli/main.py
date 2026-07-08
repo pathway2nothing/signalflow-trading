@@ -9,6 +9,8 @@ The registry autodiscovers components lazily, so importing :mod:`signalflow` and
 touching ``registry.snapshot()`` is enough to populate ``sf list``.
 """
 
+import contextlib
+import sys
 
 import click
 
@@ -17,6 +19,15 @@ from signalflow.enums import ComponentType
 
 _TYPE_MAP = {t.value: t for t in ComponentType}
 _TYPE_CHOICES = sorted(_TYPE_MAP)
+
+
+def _configure_stdio() -> None:
+    """Force UTF-8 output so component docs with non-cp1252 glyphs never crash the console."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            with contextlib.suppress(ValueError, OSError):
+                reconfigure(encoding="utf-8", errors="replace")
 
 
 def _emit(line: str = "") -> None:
@@ -40,7 +51,6 @@ def _print_table(title: str, rows: list[tuple[str, str]], headers: tuple[str, st
     except Exception:
         pass
 
-
     if title:
         _emit(title)
     width = max((len(left) for left, _ in rows), default=len(headers[0]))
@@ -55,6 +65,7 @@ def _print_table(title: str, rows: list[tuple[str, str]], headers: tuple[str, st
 @click.version_option(version=sf.__version__, prog_name="sf", message="%(prog)s %(version)s")
 def main() -> None:
     """SignalFlow - research, backtest, and promote trading flows."""
+    _configure_stdio()
 
 
 @main.command(name="list")
@@ -76,9 +87,7 @@ def list_(type_: str | None) -> None:
 
     key = type_.strip().lower()
     if key not in _TYPE_MAP:
-        raise click.BadArgumentUsage(
-            f"unknown type {type_!r}; choose from: {', '.join(_TYPE_CHOICES)}"
-        )
+        raise click.BadArgumentUsage(f"unknown type {type_!r}; choose from: {', '.join(_TYPE_CHOICES)}")
     component_type = _TYPE_MAP[key]
     names = sf.registry.list(component_type)
     if not names:
@@ -94,6 +103,56 @@ def list_(type_: str | None) -> None:
             summary = ""
         rows.append((name, summary))
     _print_table(f"{key} components ({len(names)})", rows, ("name", "summary"))
+
+
+def _describe_instance(component_type: ComponentType, name: str) -> tuple[str, str]:
+    """Return ``(outputs, warmup)`` from a default-constructed instance, ``n/a`` on failure."""
+    try:
+        obj = sf.registry.create(component_type, name)
+        outputs = getattr(obj, "outputs", None)
+        warmup = getattr(obj, "warmup", None)
+        return (str(outputs) if outputs else "n/a", str(warmup) if warmup is not None else "n/a")
+    except Exception:
+        return "n/a", "n/a"
+
+
+@main.command()
+@click.argument("type_", metavar="TYPE")
+@click.argument("name")
+def info(type_: str, name: str) -> None:
+    """Show a component's schema: description, role, module, parameters, outputs, warmup."""
+    key = type_.strip().lower()
+    if key not in _TYPE_MAP:
+        raise click.BadArgumentUsage(f"unknown type {type_!r}; choose from: {', '.join(_TYPE_CHOICES)}")
+    component_type = _TYPE_MAP[key]
+    try:
+        schema = sf.registry.get_schema(component_type, name)
+    except Exception as exc:
+        raise click.BadArgumentUsage(str(exc)) from exc
+
+    _emit(f"{schema['name']} ({schema['class_name']})")
+    if schema.get("description"):
+        _emit(schema["description"])
+    _emit(f"role: {schema.get('role', '') or 'n/a'}")
+    _emit(f"module: {schema.get('module', '') or 'n/a'}")
+    _emit()
+
+    rows = [
+        (
+            p["name"],
+            f"{p['type']}  default={p['default']!r}  required={p['required']}",
+        )
+        for p in schema.get("parameters", [])
+    ]
+    if rows:
+        _print_table("parameters", rows, ("param", "type / default"))
+    else:
+        _emit("parameters: (none)")
+
+    outputs, warmup = _describe_instance(component_type, name)
+    _emit()
+    _emit(f"outputs: {outputs}")
+    _emit(f"warmup: {warmup}")
 
 
 @main.command()

@@ -42,7 +42,7 @@ pip install signalflow-trading
 
 | Extra | Installs | For |
 |-------|----------|-----|
-| `signalflow-trading[ta]` | signalflow-ta | 256 technical-indicator features + 30 detectors |
+| `signalflow-trading[ta]` | signalflow-ta | 248 technical-indicator features + 21 detectors |
 | `signalflow-trading[labs]` | signalflow-labs[rl] | neural encoders, RL strategy, torch backends |
 | `signalflow-trading[live]` | mlflow, huggingface_hub | model artifact tracking / deploy |
 | `signalflow-trading[llm]` | httpx, pydantic | LLM-assisted strategy (any OpenAI-compatible server) |
@@ -113,7 +113,7 @@ a file. Model artifacts can live on the local filesystem, MLflow, or the Hugging
 Face Hub (`model.save("mlflow://...")`, `model.save("hf://...")`).
 
 ```python
-flow.save("flows/rsi_rise.yaml")
+flow.save("flows/rsi_rise.yaml", model_dir="flows/models")   # yaml + trained artifacts
 same = sf.Flow.load("flows/rsi_rise.yaml")
 assert same.backtest(ds, capital=50_000).final_equity == run.final_equity
 ```
@@ -126,7 +126,7 @@ MODEL, STRATEGY, SAMPLER, BROKER, METRIC.
 
 ```python
 sf.registry.snapshot()                          # {type: [names]}
-sf.registry.list(sf.ComponentType.TRANSFORM)    # core: ['sma', 'woe', ...]; +256 with [ta]
+sf.registry.list(sf.ComponentType.TRANSFORM)    # core: ['sma', 'woe', ...]; +248 features with [ta]
 ```
 
 Installing a plugin (`signalflow-ta`, `signalflow-labs`) auto-registers its
@@ -136,7 +136,7 @@ components via entry points - no imports or wiring needed.
 
 | Package | Description |
 |---------|-------------|
-| **signalflow-ta** | Technical-indicator plugin: 256 features + 30 detectors (`[ta]` extra) |
+| **signalflow-ta** | Technical-indicator plugin: 248 features + 21 detectors (`[ta]` extra) |
 | **signalflow-labs** | Neural encoders, RL strategy, torch backends (`[labs]` extra) |
 | **sf-prod** | Promotion, shadow/live rollout, monitoring |
 

@@ -18,7 +18,7 @@ If no tracking URI is configured we default to a local ``./mlruns`` file store s
 this works without a running server.
 """
 
-
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -34,11 +34,9 @@ _NAME_TAG = "sf_model_name"
 def _ensure_tracking_uri() -> None:
     import mlflow
 
-
     os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
 
     current = mlflow.get_tracking_uri()
-
 
     if not current or current in ("", "file:", "file:."):
         mlflow.set_tracking_uri(Path("./mlruns").resolve().as_uri())
@@ -56,24 +54,27 @@ def _parse_location(location: str) -> tuple[str, str | None]:
 
 
 def save(model, location: str) -> str:
+    """Persist ``model`` under ``location``; nests inside the caller's active run if any."""
     import mlflow
 
     name, _ = _parse_location(location)
     _ensure_tracking_uri()
 
+    inside_active_run = mlflow.active_run() is not None
     try:
-        mlflow.set_experiment(_EXPERIMENT)
         with tempfile.TemporaryDirectory() as tmp:
             write_layout(model, tmp)
-            with mlflow.start_run(tags={_NAME_TAG: name}) as run:
+            run_kwargs: dict = {"tags": {_NAME_TAG: name}}
+            if inside_active_run:
+                run_kwargs["nested"] = True
+            else:
+                mlflow.set_experiment(_EXPERIMENT)
+            with mlflow.start_run(**run_kwargs) as run:
                 mlflow.log_artifacts(tmp, artifact_path=_ARTIFACT_PATH)
                 model_uri = f"runs:/{run.info.run_id}/{_ARTIFACT_PATH}"
 
-
-                try:
+                with contextlib.suppress(Exception):
                     mlflow.register_model(model_uri, name)
-                except Exception:
-                    pass
     except ArtifactError:
         raise
     except Exception as exc:
@@ -97,11 +98,11 @@ def _download_from_run(name: str) -> str | None:
     from mlflow.tracking import MlflowClient
 
     client = MlflowClient()
-    exp = client.get_experiment_by_name(_EXPERIMENT)
-    if exp is None:
+    experiment_ids = [e.experiment_id for e in client.search_experiments()]
+    if not experiment_ids:
         return None
     runs = client.search_runs(
-        [exp.experiment_id],
+        experiment_ids,
         filter_string=f"tags.{_NAME_TAG} = '{name}'",
         order_by=["attribute.start_time DESC"],
         max_results=1,

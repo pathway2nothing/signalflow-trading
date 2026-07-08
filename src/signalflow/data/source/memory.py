@@ -1,12 +1,11 @@
 """Deterministic synthetic source - for tests, examples, and offline work."""
 
-
 import math
 from dataclasses import dataclass
 
 import polars as pl
 
-from signalflow.data.source.base import Source, validate_frame
+from signalflow.data.source.base import Source, parse_time, validate_frame
 from signalflow.decorators import source
 
 _INTERVAL_SECONDS = {
@@ -44,8 +43,8 @@ class MemorySource(Source):
         step = _INTERVAL_SECONDS.get(interval)
         if step is None:
             raise ValueError(f"unsupported interval {interval!r}")
-        start_dt = _parse(start)
-        end_dt = _parse(end) if end else start_dt + 5000 * step
+        start_dt = parse_time(start)
+        end_dt = parse_time(end) if end else start_dt + 5000 * step
         n = max(1, int((end_dt - start_dt) // step))
 
         frames: list[pl.DataFrame] = []
@@ -108,18 +107,3 @@ class _Lcg:
         r = math.sqrt(-2.0 * math.log(u1))
         self._spare = r * math.sin(2 * math.pi * u2)
         return r * math.cos(2 * math.pi * u2)
-
-
-def _parse(value: str | int) -> int:
-    """Parse an ISO date/datetime or epoch-seconds into epoch seconds."""
-    if isinstance(value, int):
-        return value
-    from datetime import datetime
-
-    txt = str(value)
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
-        try:
-            return int(datetime.strptime(txt, fmt).timestamp())
-        except ValueError:
-            continue
-    raise ValueError(f"cannot parse datetime {value!r}")

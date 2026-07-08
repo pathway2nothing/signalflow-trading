@@ -7,7 +7,6 @@ volume moving average.
 Implementation uses pure Polars expressions for performance.
 """
 
-
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -39,15 +38,19 @@ class VolumeRegimeLabeler(Labeler):
     Implementation:
         Uses pure Polars expressions instead of numpy loops for better
         performance and memory efficiency.
+
+    ``vol_sma_window`` accepts a bar count (int, assuming 1-minute data for the default)
+    or a duration string resolved against the dataset interval.
     """
 
     signal_category: SignalCategory = SignalCategory.VOLUME_LIQUIDITY
 
     soft_classes: ClassVar[tuple[str, ...]] = ("illiquidity", "normal_volume", "abnormal_volume")
+    duration_fields: ClassVar[tuple[str, ...]] = ("vol_sma_window",)
 
     volume_col: str = "volume"
     horizon: int = 60
-    vol_sma_window: int = 1440
+    vol_sma_window: int | str = 1440
     spike_threshold: float = 2.0
     drought_threshold: float = 0.3
 
@@ -56,7 +59,7 @@ class VolumeRegimeLabeler(Labeler):
     def __post_init__(self) -> None:
         if self.horizon <= 0:
             raise ValueError("horizon must be > 0")
-        if self.vol_sma_window <= 0:
+        if isinstance(self.vol_sma_window, int) and self.vol_sma_window <= 0:
             raise ValueError("vol_sma_window must be > 0")
         if self.drought_threshold >= self.spike_threshold:
             raise ValueError(
@@ -78,11 +81,9 @@ class VolumeRegimeLabeler(Labeler):
 
         vol = pl.col(self.volume_col)
 
-
         df = group_df.with_columns(
             vol.rolling_mean(window_size=self.vol_sma_window, min_samples=1).alias("_trailing_sma")
         )
-
 
         df = df.with_columns(
             vol.shift(-1)
@@ -91,14 +92,12 @@ class VolumeRegimeLabeler(Labeler):
             .alias("_forward_avg")
         )
 
-
         df = df.with_columns(
             pl.when(pl.col("_trailing_sma") > 0)
             .then(pl.col("_forward_avg") / pl.col("_trailing_sma"))
             .otherwise(pl.lit(None))
             .alias("_volume_ratio")
         )
-
 
         label_expr = (
             pl.when(pl.col("_volume_ratio").is_null())
@@ -115,7 +114,6 @@ class VolumeRegimeLabeler(Labeler):
 
         if self.include_meta:
             df = df.with_columns(pl.col("_volume_ratio").alias("volume_ratio"))
-
 
         df = df.drop(["_trailing_sma", "_forward_avg", "_volume_ratio"])
 

@@ -1,20 +1,24 @@
 """OOS plumbing - walk-forward fold splitting and the model fingerprint."""
 
-import hashlib
 import itertools
-import json
 from dataclasses import dataclass
 from datetime import timedelta
 
 import numpy as np
 
+from signalflow._hash import stable_hash
+
+__all__ = [
+    "Fold",
+    "build_fingerprint",
+    "make_folds",
+    "median_dt",
+    "parse_duration",
+    "rolling_folds",
+    "stable_hash",
+]
+
 _UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
-
-
-def stable_hash(obj) -> str:
-    """Deterministic content hash of a JSON-able object."""
-    blob = json.dumps(obj, sort_keys=True, default=str).encode()
-    return "sha256:" + hashlib.sha256(blob).hexdigest()[:24]
 
 
 def parse_duration(s: str) -> timedelta:

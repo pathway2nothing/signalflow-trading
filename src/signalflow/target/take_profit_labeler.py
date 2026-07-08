@@ -59,6 +59,9 @@ class TakeProfitLabeler(Labeler):
       - RISE if TP touched first (ties -> TP)
       - FALL if SL touched first
       - NONE if neither touched within horizon
+
+    ``horizon`` accepts a bar count (int, assuming 1-minute data for the default) or a
+    duration string (``"1d"``) resolved against the dataset interval.
     """
 
     soft_classes: ClassVar[tuple[str, ...]] = (
@@ -66,14 +69,15 @@ class TakeProfitLabeler(Labeler):
         SignalType.NONE.value,
         SignalType.RISE.value,
     )
+    duration_fields: ClassVar[tuple[str, ...]] = ("horizon",)
 
     price_col: str = "close"
 
-    horizon: int = 1440
+    horizon: int | str = 1440
     barrier_pct: float = 0.01
 
     def __post_init__(self) -> None:
-        if self.horizon <= 0:
+        if isinstance(self.horizon, int) and self.horizon <= 0:
             raise ValueError("horizon must be > 0")
         if self.barrier_pct <= 0:
             raise ValueError("barrier_pct must be > 0")

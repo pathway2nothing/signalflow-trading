@@ -9,19 +9,19 @@ class UntrainedModelError(SignalFlowError):
     """A Flow slot holds a model that has not been fitted."""
 
 
+class FlowConfigError(SignalFlowError):
+    """A Flow was assembled with an inconsistent wiring (missing slot, wrong target, bad broker)."""
+
+
 class LeakageError(SignalFlowError):
-    """Invariant L violated."""
+    """Downstream training consumed in-sample forecasts; use OOS predictions."""
 
 
 class PipeError(SignalFlowError):
     """A FeaturePipe was built with an incompatible transform."""
 
 
-class RiskViolation(SignalFlowError):
-    """A proposed intent breached a hard risk constraint."""
-
-
-class KillSwitchTripped(RiskViolation):
+class KillSwitchTripped(SignalFlowError):
     """The persistent kill switch is engaged; no orders may be sent."""
 
 
@@ -43,3 +43,7 @@ class UnknownComponentError(SignalFlowError, KeyError):
 
 class UnfittedTransformError(SignalFlowError):
     """A stateful transform (``requires_fit``) was used before ``fit``."""
+
+
+class DegenerateTargetError(SignalFlowError):
+    """A target coerced to a single class, so no classifier can be trained on it."""

@@ -14,7 +14,6 @@ Use cases:
     * a baseline for cross-asset correlation breaks.
 """
 
-
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -52,18 +51,22 @@ class MarketWideVolatilityRegimeLabeler(Labeler):
     Research provenance:
         iter-33 (sf-profit) ``soft_C1_mkt_vol`` - best soft MI 0.096
         against ``natr_ratio_60_1440`` on the validated pool.
+
+    ``lookback_window`` accepts a bar count (int, assuming 1-minute data for the default)
+    or a duration string resolved against the dataset interval.
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
 
     soft_classes: ClassVar[tuple[str, ...]] = ("mkt_low_vol", "mkt_mid_vol", "mkt_high_vol")
+    duration_fields: ClassVar[tuple[str, ...]] = ("lookback_window",)
     softness_k: float = 20.0
 
     price_col: str = "close"
     horizon: int = 60
     upper_quantile: float = 0.67
     lower_quantile: float = 0.33
-    lookback_window: int = 1440
+    lookback_window: int | str = 1440
 
     meta_columns: tuple[str, ...] = ("mkt_realized_vol", "mkt_vol_percentile")
 

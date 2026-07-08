@@ -13,7 +13,6 @@ vs 0.97 for volume_regime).
 Implementation uses pure Polars expressions for performance.
 """
 
-
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -28,15 +27,20 @@ from signalflow.target.labeler import Labeler
 @dataclass
 @register_target("volume_climax")
 class VolumeClimaxLabeler(Labeler):
-    """Label bars by forward max-volume vs trailing SMA ratio."""
+    """Label bars by forward max-volume vs trailing SMA ratio.
+
+    ``vol_sma_window`` accepts a bar count (int, assuming 1-minute data for the default)
+    or a duration string resolved against the dataset interval.
+    """
 
     signal_category: SignalCategory = SignalCategory.VOLUME_LIQUIDITY
 
     soft_classes: ClassVar[tuple[str, ...]] = ("calm_vol", "normal_vol", "climax")
+    duration_fields: ClassVar[tuple[str, ...]] = ("vol_sma_window",)
 
     volume_col: str = "volume"
     horizon: int = 240
-    vol_sma_window: int = 1440
+    vol_sma_window: int | str = 1440
     climax_threshold: float = 5.0
     calm_threshold: float = 1.5
 
@@ -45,7 +49,7 @@ class VolumeClimaxLabeler(Labeler):
     def __post_init__(self) -> None:
         if self.horizon <= 0:
             raise ValueError("horizon must be > 0")
-        if self.vol_sma_window <= 0:
+        if isinstance(self.vol_sma_window, int) and self.vol_sma_window <= 0:
             raise ValueError("vol_sma_window must be > 0")
         if self.calm_threshold >= self.climax_threshold:
             raise ValueError(

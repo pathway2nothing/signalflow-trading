@@ -1,6 +1,5 @@
 """Risk layer - deterministic hard constraints on proposed intents."""
 
-
 import os
 from dataclasses import dataclass
 
@@ -8,11 +7,15 @@ from loguru import logger
 
 from signalflow.engine.types import Intent, PortfolioSnapshot
 from signalflow.enums import IntentKind
+from signalflow.errors import KillSwitchTripped
 
 
 @dataclass
 class Risk:
-    """Clip intents against drawdown, position, and notional limits."""
+    """Clip intents against drawdown, position, and notional limits.
+
+    ``max_positions`` caps concurrent open positions global across pairs.
+    """
 
     max_drawdown: float = 1.0
     max_positions: int = 1_000
@@ -21,7 +24,6 @@ class Risk:
 
     def __post_init__(self) -> None:
         self._tripped = self._load_tripped()
-
 
     def _load_tripped(self) -> bool:
         return bool(self.kill_switch_path) and os.path.exists(self.kill_switch_path)
@@ -43,11 +45,20 @@ class Risk:
         if self.kill_switch_path and os.path.exists(self.kill_switch_path):
             os.remove(self.kill_switch_path)
 
-
-    def clip(self, intents: list[Intent], portfolio: PortfolioSnapshot, peak_equity: float) -> list[Intent]:
+    def clip(
+        self,
+        intents: list[Intent],
+        portfolio: PortfolioSnapshot,
+        peak_equity: float,
+        raise_on_trip: bool = False,
+    ) -> list[Intent]:
+        """Clip intents; with ``raise_on_trip`` a tripped kill switch halts loudly instead of dropping."""
         eq = portfolio.equity
         if peak_equity > 0 and (peak_equity - eq) / peak_equity >= self.max_drawdown:
             self.trip(f"drawdown {(peak_equity - eq) / peak_equity:.3f} >= {self.max_drawdown}")
+
+        if self._tripped and raise_on_trip:
+            raise KillSwitchTripped(f"kill switch engaged; refusing to send orders (path={self.kill_switch_path!r})")
 
         out: list[Intent] = []
         n_pos = len(portfolio.positions)

@@ -76,6 +76,10 @@ class FeaturePipe(Transform):
 
     @classmethod
     def load(cls, path: str) -> "FeaturePipe":
-        """Rebuild a pipe from a YAML file written by :meth:`save`."""
+        """Rebuild a pipe from a YAML file written by :meth:`save`; reject non-pipe roots."""
         with open(path, encoding="utf-8") as fh:
-            return build_transform(yaml.safe_load(fh))
+            result = build_transform(yaml.safe_load(fh))
+        if not isinstance(result, FeaturePipe):
+            root = getattr(result, "name", type(result).__name__)
+            raise PipeError(f"{path} does not describe a FeaturePipe; its root is {root!r}")
+        return result

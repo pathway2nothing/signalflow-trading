@@ -13,15 +13,16 @@ We welcome contributions to SignalFlow!
 ```bash
 git clone https://github.com/pathway2nothing/signalflow-trading.git
 cd signalflow-trading
-pip install -e ".[dev,docs,nn]"
+pip install -e ".[dev,docs]"
 ```
 
 ## Code Style
 
-- Use Black for formatting
-- Use Ruff for linting
+- Use `ruff format` for formatting
+- Use `ruff` for linting
 - Add type hints
 - Write Google-style docstrings
+- Run `pre-commit run --files <changed files>` before opening a PR (ruff, ruff-format, mypy)
 
 ## Testing
 ```bash

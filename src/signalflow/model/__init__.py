@@ -2,5 +2,14 @@
 
 from signalflow.model.forecast import ForecastModel
 from signalflow.model.validators import MaxValidator, MeanValidator, VoteValidator
+from signalflow.model.walkforward import WalkForwardFold, WalkForwardResult, walk_forward
 
-__all__ = ["ForecastModel", "MeanValidator", "MaxValidator", "VoteValidator"]
+__all__ = [
+    "ForecastModel",
+    "MaxValidator",
+    "MeanValidator",
+    "VoteValidator",
+    "WalkForwardFold",
+    "WalkForwardResult",
+    "walk_forward",
+]
