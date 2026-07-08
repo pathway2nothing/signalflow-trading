@@ -1,12 +1,12 @@
 """Flow serialization - deployment is data, not code."""
 
 import yaml
+from loguru import logger
 
-from signalflow.enums import ComponentType
+from signalflow._version import __version__
 from signalflow.errors import ArtifactError
-from signalflow.registry import registry
+from signalflow.strategy.base import build_strategy
 from signalflow.strategy.risk import Risk
-from signalflow.strategy.rules import Entry, Exit, RulesStrategy
 from signalflow.transform.base import build_transform
 
 
@@ -20,24 +20,25 @@ def _model_uri(model, slot: str, model_dir: str | None) -> str:
 
 
 def _strategy_cfg(strategy) -> dict:
-    if isinstance(strategy, RulesStrategy):
-        return {"name": "rules", "entry": vars(strategy.entry), "exit": vars(strategy.exit)}
-    return {"name": getattr(strategy, "_sf_name", type(strategy).__name__)}
+    to_config = getattr(strategy, "to_config", None)
+    if callable(to_config):
+        return to_config()
+    return {"name": getattr(strategy, "_sf_name", type(strategy).__name__), "params": {}}
 
 
 def _build_strategy(cfg: dict):
-    if cfg.get("name") == "rules":
-        return RulesStrategy(entry=Entry(**cfg["entry"]), exit=Exit(**cfg["exit"]))
-    return registry.create(ComponentType.STRATEGY, cfg["name"])
+    return build_strategy(cfg)
 
 
 def _validator_cfg(validator, model_dir: str | None) -> dict | None:
     if validator is None:
         return None
     if hasattr(validator, "children"):
+        params = validator.to_config() if hasattr(validator, "to_config") else {}
         return {
             "combinator": type(validator).__name__,
             "children": [_model_uri(c, f"val{i}", model_dir) for i, c in enumerate(validator.children)],
+            "params": params,
         }
     return {"uri": _model_uri(validator, "validator", model_dir)}
 
@@ -51,11 +52,23 @@ def _build_validator(cfg: dict | None):
         return ForecastModel.load(cfg["uri"])
     combos = {"MeanValidator": MeanValidator, "MaxValidator": MaxValidator, "VoteValidator": VoteValidator}
     children = [ForecastModel.load(u) for u in cfg["children"]]
-    return combos[cfg["combinator"]](children)
+    params = cfg.get("params") or {}
+    return combos[cfg["combinator"]](children, **params)
+
+
+def _warn_version_mismatch(saved: "str | None") -> None:
+    if not saved:
+        return
+    if str(saved).split(".")[:2] != __version__.split(".")[:2]:
+        logger.warning(
+            f"flow.yaml was written by signalflow {saved}; running {__version__} "
+            "(major/minor mismatch - behavior may differ)"
+        )
 
 
 def save_flow(flow, path: str, model_dir: str | None = None) -> str:
     doc = {
+        "signalflow_version": __version__,
         "name": flow.name,
         "quote": flow.quote,
         "forecasts": {slot: _model_uri(m, slot, model_dir) for slot, m in flow.forecasts.items()},
@@ -81,6 +94,7 @@ def load_flow(path: str):
     with open(path, encoding="utf-8") as fh:
         doc = yaml.safe_load(fh)
 
+    _warn_version_mismatch(doc.get("signalflow_version"))
     forecasts = {slot: ForecastModel.load(uri) for slot, uri in (doc.get("forecasts") or {}).items()}
     detectors = [build_transform(d) for d in (doc.get("detectors") or [])]
     return Flow(
@@ -88,7 +102,7 @@ def load_flow(path: str):
         forecasts=forecasts,
         detectors=detectors,
         validator=_build_validator(doc.get("validator")),
-        strategy=_build_strategy(doc.get("strategy") or {"name": "rules", "entry": {}, "exit": {}}),
+        strategy=_build_strategy(doc.get("strategy") or {"name": "rules", "params": {}}),
         risk=Risk(**(doc.get("risk") or {})),
         quote=doc.get("quote", "USDT"),
     )

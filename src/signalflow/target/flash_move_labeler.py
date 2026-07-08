@@ -12,7 +12,6 @@ matter for execution risk.
 Implementation uses pure Polars expressions for performance.
 """
 
-
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -27,15 +26,20 @@ from signalflow.target.labeler import Labeler
 @dataclass
 @register_target("flash_move")
 class FlashMoveLabeler(Labeler):
-    """Label bars by extreme forward short-horizon returns."""
+    """Label bars by extreme forward short-horizon returns.
+
+    ``vol_window`` accepts a bar count (int, assuming 1-minute data for the default)
+    or a duration string resolved against the dataset interval.
+    """
 
     signal_category: SignalCategory = SignalCategory.ANOMALY
 
     soft_classes: ClassVar[tuple[str, ...]] = ("flash_dn", "normal", "flash_up")
+    duration_fields: ClassVar[tuple[str, ...]] = ("vol_window",)
 
     price_col: str = "close"
     flash_horizon: int = 10
-    vol_window: int = 1440
+    vol_window: int | str = 1440
     sigma_multiplier: float = 3.0
 
     meta_columns: tuple[str, ...] = ("flash_ret", "flash_threshold")
@@ -43,7 +47,7 @@ class FlashMoveLabeler(Labeler):
     def __post_init__(self) -> None:
         if self.flash_horizon <= 0:
             raise ValueError("flash_horizon must be > 0")
-        if self.vol_window <= 1:
+        if isinstance(self.vol_window, int) and self.vol_window <= 1:
             raise ValueError("vol_window must be > 1")
         if self.sigma_multiplier <= 0:
             raise ValueError("sigma_multiplier must be > 0")

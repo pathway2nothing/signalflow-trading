@@ -1,6 +1,6 @@
 # Technical Analysis Module (signalflow-ta)
 
-API reference for `signalflow.ta` - 199+ technical indicators.
+API reference for `signalflow.ta` - 248 technical-indicator features + 21 detectors.
 
 !!! info "Separate Package"
     Install with `pip install signalflow-ta`. See the [ecosystem page](../ecosystem/signalflow-ta.md) for usage guide, examples, and pipeline factories.

@@ -1,364 +1,150 @@
 ---
 title: Glossary
-description: SignalFlow terminology explained in simple terms
+description: SignalFlow V5 terminology
 ---
 
 # Glossary
 
-A quick reference guide to SignalFlow terminology. Each term is explained in plain language with practical examples.
+Plain-language definitions of the SignalFlow vocabulary. For how the pieces fit
+together and where the invariants are enforced, see [Concepts](concepts.md).
 
 ---
 
-## Core Concepts
+## Core nouns
 
-### RawData
-**What it is**: A container for OHLCV (Open, High, Low, Close, Volume) market data.
-
-**Think of it as**: A spreadsheet with price history for one or more trading pairs.
+### Dataset
+One lazy, immutable market-data container built by `sf.data(...)`. The same object
+feeds `backtest`, `paper`, and `live` - there is no separate live data path to drift.
 
 ```python
-# RawData holds your market data
-raw_data = sf.load("binance", pairs=["BTC/USDT"], timeframe="1h")
-# raw_data.df is a Polars DataFrame with columns: timestamp, open, high, low, close, volume, pair
+import signalflow as sf
+ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 ```
 
----
+### Transform
+A column-producing step over a Dataset. Features (e.g. `SMA`) and detectors
+(e.g. `ThresholdDetector`) share one `Transform` contract, so both serialize the
+same way and both appear in the registry under a name.
 
-### Signal
-**What it is**: A *discrete recommendation* emitted by a detector - "enter here / skip here". A `Signals` container is a DataFrame of these recommendations.
-
-**Think of it as**: A list of "buy here" or "sell here" calls from your detector. The detector decides; the `Signal` is its discrete output.
-
-**Not the same as a Forecast**: a `Signal` is the detector's *decision*, while a [Forecast](#forecast) is a model's continuous *prediction* (e.g. `p_revert`) that a detector or validator may consume. Historically a `Signal(p_revert)` carried a probability; conceptually that probability is a Forecast, and `Signal` is now strictly the discrete recommendation.
-
-| Column | Description |
-|--------|-------------|
-| `timestamp` | When the signal occurred |
-| `pair` | Which trading pair |
-| `signal` | Direction: 1 (long), -1 (short), 0 (neutral) |
-| `probability` | Optional confidence score (0.0 to 1.0) |
+### FeaturePipe
+An ordered group of feature transforms. It is fit/serializable on its own and is
+what a `ForecastModel` computes its inputs from.
 
 ```python
-# Signals tell you WHEN to potentially trade
-signals = detector.run(raw_data.view())
-# signals.df might show: timestamp=2024-01-15 14:00, pair=BTC/USDT, signal=1
+pipe = sf.FeaturePipe(sf.SMA(10), sf.SMA(20))
 ```
 
+### Target
+The label definition a `ForecastModel` learns to predict - for example
+`FixedHorizon(bars=12)` (was price higher after 12 bars) or `TripleBarrier(...)`.
+Registered under the `TARGET` component type.
+
+### ForecastModel
+A trainable predictor that maps features to a probability column. `fit` trains it
+out-of-fold with an embargo; the two prediction methods differ deliberately:
+
+- **`predict`** - in-sample style prediction over any rows.
+- **`predict_oos`** - returns values **only inside the trained out-of-sample span**;
+  rows outside it are null. This is what keeps evaluation leak-free.
+
+### SignalDetector
+A deliberately simple, **non-learned** rule that turns a forecast (or raw columns)
+into a discrete signal. `ThresholdDetector(forecast="rise", p_min=0.6)` fires when a
+forecast column clears a threshold. Detectors are simple on purpose - the learning
+lives in the `ForecastModel`, so the decision rule stays inspectable and reproducible.
+
+### Validator slot
+An optional second-opinion model on a `Flow`. It holds a trained `ForecastModel` (or
+a combinator like `MeanValidator` / `MaxValidator` / `VoteValidator`) that can veto or
+reweight signals before they reach the strategy.
+
+### StrategyModel
+The component that turns validated signals into intents (which pair, which side, how
+much). `RulesStrategy` is the built-in rule-based strategy; `LLMStrategy` delegates to
+an OpenAI-compatible server.
+
+### Risk
+The limit layer on a `Flow`: `max_drawdown`, `max_positions`, `max_notional_per_pair`,
+and an optional kill-switch file. Intents that breach a limit are blocked.
+
+### Engine
+The decision/execution loop plus brokers. `SimBroker` fills simulated orders for
+backtest and paper; `BinanceBroker` routes real orders when a live run is `armed`.
+
+### Flow
+The central deployable unit: `forecasts -> detectors -> validator -> strategy -> risk`.
+Every forecast (and validator) slot must hold a **trained** model, or construction
+raises `UntrainedModelError`. The same Flow object runs `backtest`, `paper`, and `live`.
+
+### Run
+The result of executing a Flow: equity curve, fills, and a standard `.scorecard()`
+metric dict. `run.oos` flags an out-of-sample-only run.
+
+### Provenance
+The stamp recorded on model outputs that records which fold/span produced them. The
+leakage guard reads it to raise `LeakageError` when a model is scored on data it was
+trained on.
+
 ---
 
-### Forecast
-**What it is**: The continuous output of a *forecast model* - a prediction about the future (e.g. `p_revert`, an expected return), not a trade recommendation.
+## Encoding & warmup
 
-**Think of it as**: A model's opinion that a detector or validator reads as one more input. A detector turns Forecasts into discrete [Signals](#signal); a Forecast on its own places no trade.
-
-**How it enters a flow**: register a pinned, versioned model artefact with `.forecast(...)`, then let a consumer read a *window* of its values via `forecasts=[...]` / `forecast_window=`:
+### WoE / IV
+Weight-of-Evidence encoding is the default feature encoding: each feature is binned
+and mapped to the log-odds of the target, monotone and leak-aware because it is fit
+out-of-fold. **Information Value (IV)** scores each encoded feature; `IVSelector` keeps
+only columns whose IV clears a threshold.
 
 ```python
-flow = (
-    sf.flow()
-    .data(store="binance", pair="BTC/USDT")
-    .forecast("revert", mlflow="models:/revert/3")           # register pinned artefact (lazy)
-    .detector("example/sma_cross", forecasts=["revert"], forecast_window=30)
+from signalflow.transform.encode import WoE
+model = sf.ForecastModel(
+    target=sf.FixedHorizon(bars=12),
+    features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20)),
+    encode=WoE(refit="1d", window="365d"),   # rolling refit on a trailing year
 )
 ```
 
-See [ModelRef / forecast artefact](#modelref-forecast-artefact) and the [Model Integration guide](guide/model-integration.md).
+### Warmup
+The minimum number of leading bars a feature needs before its output is stable. A
+Flow derives `required_warmup` from its feature pipe; `simulate(warmup=N)` reserves a
+leading window that fills buffers without trading. Fixing the warmup makes backtest and
+live cold-start cut the identical slice, so parity holds.
 
 ---
 
-### ModelRef / forecast artefact
-**What it is**: A `ModelRef` is a declarative, *pinned* pointer to a forecast model that lives in an external registry (MLflow, HuggingFace). It carries no weights - only `name`, a mandatory `version`, and a `source`.
+## Backtest metrics
 
-**Why version is mandatory**: a floating `latest` silently breaks parity/reproducibility between training and live inference. `version="latest"` is rejected unless `SF_ALLOW_LATEST=1` (dev only).
+### Sharpe ratio
+Annualized risk-adjusted return. Rule of thumb: `< 0` losing, `0-1` mediocre, `1-2`
+good, `> 2` excellent. The annualization assumes bar-frequency returns; see
+`Run.sharpe`.
 
-**Lazy by design**: building a `ModelRef` (and registering it via `.forecast()`) never touches the network. Weights load only when a `Resolver`/`ModelRegistry` resolves the ref.
+### Max drawdown
+Largest peak-to-trough decline over the run - the worst losing streak.
 
-```python
-from signalflow.models import ModelRef
-
-ref = ModelRef.parse("models:/revert/3")   # or ModelRef.parse("revert@3")
-ref.uri                                     # "models:/revert/3"
-```
-
-See [`signalflow.models`](api/models.md).
+### Total return
+Final equity over initial equity, minus one.
 
 ---
 
-### feature_hash
-**What it is**: A stable SHA-256 of a feature *recipe* (the ordered list of features + their params + `ta_version` + `raw_data_type`), produced by `FeatureSpec` / `ModelFeaturesPipeline`.
-
-**Think of it as**: A fingerprint of *how* features are built. It is the same for two logically-equal pipelines (key order and float jitter normalized, defaults resolved) but changes whenever a param value, the order of features, or `ta_version` changes.
-
-**Why it matters**: it is a configuration-drift detector. Store the hash with a model artefact at train time; recompute and compare at serve time (`verify_hash`) and refuse to continue on mismatch - that is what keeps train↔serve features identical.
-
-See [Feature API](api/transform.md).
-
----
-
-### Warmup contract
-**What it is**: The reproducibility guarantee on a `Feature`. A feature declares `is_recursive` (its value depends on where the series starts) and `warmup_invariant` (it re-seeds deterministically so values converge regardless of entry point). `warmup` (property) is the minimum bars before output is stable.
-
-**Why it matters**: a recursive feature that is *not* warmup-invariant produces different values in live vs. backtest depending on the warmup start, breaking parity. `assert_reproducible()` raises on exactly that combination so the problem surfaces before production.
-
-**Warmup-silence (forecast window)**: a flow consumer that reads `forecasts=` must declare a fixed `forecast_window` *in bars*. Fixing the window (rather than "however much accumulated") makes backtest and live cold-start cut the identical slice, so parity holds.
-
-See [Feature API](api/transform.md) and the [Model Integration guide](guide/model-integration.md).
-
-### Detector
-**What it is**: A component that analyzes market data and outputs trading signals.
-
-**Think of it as**: A "signal finder" that scans price data for patterns.
-
-**Examples**:
-- `sma_cross` - Signal when fast SMA crosses slow SMA
-- `rsi_threshold` - Signal when RSI goes below 30 (oversold) or above 70 (overbought)
-- `macd_cross` - Signal when MACD line crosses signal line
-
-```python
-# Detector finds trading opportunities
-result = sf.Backtest("my_strategy").detector("sma_cross", fast=20, slow=50).run()
-```
-
----
-
-### Labeler (Target Generator)
-**What it is**: A component that labels signals as "successful" or "unsuccessful" based on future price movement.
-
-**Think of it as**: A "hindsight checker" that looks at what happened AFTER each signal.
-
-**Common labelers**:
-
-| Labeler | How it works |
-|---------|--------------|
-| `triple_barrier` | Success if price hits take-profit before stop-loss or time limit |
-| `fixed_horizon` | Success if price is higher after N bars (for long signals) |
-
-```python
-# Labeler tells you if signals would have been profitable
-result = sf.Backtest("my_strategy").labeler("triple_barrier", tp=0.02, sl=0.01).run()
-```
-
----
-
-### Validator
-**What it is**: A machine learning model that predicts whether a signal will be successful.
-
-**Think of it as**: An "AI filter" that rejects bad signals before you trade them.
-
-**How it works**:
-1. Train on historical signals + their labels (success/failure)
-2. Predict probability of success for new signals
-3. Only trade signals with high predicted probability
-
-```python
-# Validator filters signals using ML
-result = (
-    sf.Backtest("ml_strategy")
-    .detector("sma_cross")
-    .labeler("triple_barrier", tp=0.02, sl=0.01)
-    .validator("lightgbm")  # ML model filters signals
-    .run()
-)
-```
-
----
-
-### Feature / FeaturePipeline
-**What it is**: Calculated values derived from raw price data that help ML models make decisions.
-
-**Think of it as**: "Clues" that the ML model uses to predict signal success.
-
-**Examples**:
-- RSI value at signal time
-- Volatility over last 20 bars
-- Distance from 200-day moving average
-
-**Where features live (v2)**: `flow` no longer constructs features - the `.features()` builder method was removed. Features now live *inside* a forecast artefact (pinned with its weights) or as primitive parameters on a detector. The `FeaturePipeline` class itself remains the computation engine and can be used directly to compute feature columns from a DataFrame:
-
-```python
-from signalflow.feature import FeaturePipeline, ExampleRsiFeature, ExampleSmaFeature
-
-pipeline = FeaturePipeline(
-    features=[ExampleRsiFeature(period=14), ExampleSmaFeature(period=20)],
-    raw_data_type="spot",
-)
-features_df = pipeline.compute(df)
-```
-
-For the train↔serve reproducibility wrapper (recipe + [feature_hash](#feature_hash)) see `ModelFeaturesPipeline` in the [Feature API](api/transform.md).
-
----
-
-### Entry Rule
-**What it is**: Logic that determines HOW to enter a trade when a signal is received.
-
-**Think of it as**: "How much to buy and at what price."
-
-**Common entry rules**:
-- `market` - Enter immediately at market price
-- `limit` - Enter only at a specific price
-- `signal` - Use signal's suggested size
-
----
-
-### Exit Rule
-**What it is**: Logic that determines WHEN and HOW to exit a trade.
-
-**Think of it as**: "When to sell and take profit or cut losses."
-
-**Common exit rules**:
-
-| Exit Rule | Description |
-|-----------|-------------|
-| `tp_sl` | Exit at take-profit or stop-loss price |
-| `trailing_stop` | Stop-loss that follows price up |
-| `time_exit` | Exit after N bars regardless of profit |
-| `volatility_exit` | Exit based on ATR multiplier |
-
-```python
-result = sf.Backtest("my_strategy").exit(tp=0.03, sl=0.015).run()
-```
-
----
-
-### Position
-**What it is**: An active trade from entry to exit.
-
-**Think of it as**: "I bought X amount at price Y, and I'm holding it."
-
-**SignalFlow model**: Each position has exactly ONE entry and ONE exit. For multiple buys/sells, create multiple positions.
-
----
-
-### Strategy
-**What it is**: The complete trading system combining detector, validator, entry rules, and exit rules.
-
-**Think of it as**: Your complete trading plan: "Find signals → Filter them → Enter trades → Exit trades."
-
----
-
-## Pipeline Stages
-
-```
-┌─────────┐    ┌──────────┐    ┌─────────┐    ┌───────────┐    ┌──────────┐
-│  Data   │───▶│ Forecast │───▶│ Detector│───▶│ Validator │───▶│ Strategy │
-└─────────┘    └──────────┘    └─────────┘    └───────────┘    └──────────┘
-   OHLCV       (optional)        Signals      Filtered sigs     Entry/Exit
-              pinned model
-```
-
-Features are no longer a top-level stage: a forecast model (registered with `.forecast()`) carries its own feature recipe inside the artefact, and detectors compute any primitive features they need internally. A detector or validator reads a forecast via `forecasts=[...]` with a fixed `forecast_window`.
-
----
-
-## Backtest Metrics
-
-### Sharpe Ratio
-**What it is**: Risk-adjusted return. Higher is better.
-
-**Rule of thumb**:
-- < 0: Losing money
-- 0-1: Mediocre
-- 1-2: Good
-- > 2: Excellent
-
----
-
-### Max Drawdown
-**What it is**: Largest peak-to-trough decline during the backtest.
-
-**Think of it as**: "The worst losing streak."
-
-**Example**: -15% drawdown means at some point you lost 15% from your peak equity.
-
----
-
-### Win Rate
-**What it is**: Percentage of profitable trades.
-
-**Warning**: High win rate doesn't mean profitable strategy! A 90% win rate with tiny wins and huge losses = net loss.
-
----
-
-### Profit Factor
-**What it is**: Gross profit divided by gross loss.
-
-**Rule of thumb**:
-- < 1: Losing money
-- 1-1.5: Break-even to weak
-- 1.5-2: Good
-- > 2: Excellent
-
----
-
-## Meta-Labeling
-
-**What it is**: A technique from Marcos López de Prado where ML predicts signal success rather than direction.
-
-**Traditional ML**: Model predicts "buy" or "sell"
-
-**Meta-labeling**: Detector predicts direction → ML predicts "will this signal succeed?"
-
-**Why it's better**:
-1. Detector handles the hard part (finding patterns)
-2. ML handles filtering (rejecting bad signals)
-3. Easier to train, more robust results
-
----
-
-## Validation Methods
-
-### Temporal Cross-Validation
-**What it is**: Train/test split that respects time order.
-
-**Why needed**: You can't train on future data (look-ahead bias).
-
-```
-[=====TRAIN=====][TEST]   Fold 1
-[========TRAIN========][TEST]   Fold 2
-[===========TRAIN===========][TEST]   Fold 3
-```
-
----
-
-### Walk-Forward Validation
-**What it is**: Rolling window training that simulates real trading.
-
-**How it works**:
-1. Train on window 1 → Test on next period
-2. Move window forward → Retrain → Test
-3. Combine all test results
-
-```
-Window 1: [====TRAIN====][TEST]
-Window 2:      [====TRAIN====][TEST]
-Window 3:           [====TRAIN====][TEST]
-```
-
----
-
-## Common Abbreviations
+## Abbreviations
 
 | Abbreviation | Meaning |
 |--------------|---------|
 | OHLCV | Open, High, Low, Close, Volume |
+| OOS | Out-of-Sample (evaluation span) |
+| IS | In-Sample (training span) |
+| WoE | Weight of Evidence |
+| IV | Information Value |
 | SMA | Simple Moving Average |
-| EMA | Exponential Moving Average |
 | RSI | Relative Strength Index |
-| MACD | Moving Average Convergence Divergence |
 | ATR | Average True Range |
-| TP | Take Profit |
-| SL | Stop Loss |
-| OOS | Out-of-Sample (test data) |
-| IS | In-Sample (training data) |
-| ML | Machine Learning |
-| CV | Cross-Validation |
 | DD | Drawdown |
 
 ---
 
-## See Also
+## See also
 
-- [Quick Start](quickstart.md) - Build your first strategy
-- [API Reference](api/index.md) - Detailed class documentation
-- [Advanced Strategies](guide/advanced-strategies.md) - Position sizing, filters, aggregation
+- [Concepts](concepts.md) - the tier stack and the invariants
+- [Quick Start](quickstart.md) - build your first Flow
+- [API Reference](api/index.md) - class-level documentation

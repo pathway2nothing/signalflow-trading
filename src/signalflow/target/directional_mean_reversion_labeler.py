@@ -44,6 +44,7 @@ class DirectionalMeanReversionLabeler(Labeler):
         "no_revert",
         "revert_long",
     )
+    positive_classes: ClassVar[tuple[str, ...]] = ("revert_long", "revert_short")
     softness_k: float = 5.0
 
     price_col: str = "close"
@@ -97,7 +98,6 @@ class DirectionalMeanReversionLabeler(Labeler):
 
         oversold = pl.col("_z_now") < pl.lit(-self.stretch_threshold)
         overbought = pl.col("_z_now") > pl.lit(self.stretch_threshold)
-
 
         long_reverted = oversold & (pl.col("_z_fwd") >= pl.lit(-self.revert_threshold))
         short_reverted = overbought & (pl.col("_z_fwd") <= pl.lit(self.revert_threshold))

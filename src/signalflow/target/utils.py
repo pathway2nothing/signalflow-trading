@@ -1,6 +1,5 @@
 """Utility functions for target labeling."""
 
-
 from typing import Any
 
 import numpy as np
@@ -53,8 +52,6 @@ def mask_targets_by_signals(
     if not existing_cols:
         logger.warning(f"Target columns {target_columns} not found in DataFrame")
         return df
-
-    df.select([pair_col, ts_col]).unique().sort([pair_col, ts_col])
 
     masked_rows: list[pl.DataFrame] = []
 

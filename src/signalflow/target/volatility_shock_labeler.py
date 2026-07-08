@@ -8,7 +8,6 @@ than absolute levels. Complements :class:`VolatilityRegimeLabeler`.
 Implementation uses pure Polars expressions for performance.
 """
 
-
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -41,15 +40,19 @@ class VolatilityShockLabeler(Labeler):
         6. If z >  shock_threshold      -> ``"vol_shock_up"``
            If z < -shock_threshold      -> ``"vol_shock_down"``
            Otherwise                     -> ``"vol_normal"``
+
+    ``past_vol_window`` accepts a bar count (int, assuming 1-minute data for the default)
+    or a duration string resolved against the dataset interval.
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
 
     soft_classes: ClassVar[tuple[str, ...]] = ("vol_shock_down", "vol_normal", "vol_shock_up")
+    duration_fields: ClassVar[tuple[str, ...]] = ("past_vol_window",)
 
     price_col: str = "close"
     horizon: int = 120
-    past_vol_window: int = 1440
+    past_vol_window: int | str = 1440
     vol_window_short: int = 60
     shock_threshold: float = 1.0
 
@@ -58,7 +61,7 @@ class VolatilityShockLabeler(Labeler):
     def __post_init__(self) -> None:
         if self.horizon <= 0:
             raise ValueError("horizon must be > 0")
-        if self.past_vol_window <= self.vol_window_short:
+        if isinstance(self.past_vol_window, int) and self.past_vol_window <= self.vol_window_short:
             raise ValueError("past_vol_window must be > vol_window_short")
         if self.shock_threshold <= 0:
             raise ValueError("shock_threshold must be > 0")

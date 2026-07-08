@@ -10,12 +10,18 @@ from signalflow.strategy.observation import Observation
 _EMPTY_SIGNALS_SCHEMA = {"pair": pl.Utf8, "ts": pl.Datetime("ms"), "signal": pl.Utf8, "p_success": pl.Float64}
 
 
-def enriched_signals(flow, data) -> pl.DataFrame:
-    """Precompute forecast columns, run detectors, and (event-gated) validator scores."""
+def enriched_signals(flow, data, oos: bool = False) -> pl.DataFrame:
+    """Precompute forecast columns, run detectors, and (event-gated) validator scores.
+
+    When ``oos`` is true, every forecast slot and the validator use leak-free
+    out-of-fold predictions; rows outside the model's OOS coverage are null, so
+    detectors do not fire there. Leave it false for the production in-sample path.
+    """
     enriched = data
     for slot, model in flow.forecasts.items():
         out = getattr(model, "output", "p_rise")
-        pred = model.predict(data).rename({out: f"{slot}/{out}"})
+        pred = model.predict_oos(data) if oos else model.predict(data)
+        pred = pred.rename({out: f"{slot}/{out}"})
         enriched = enriched.with_forecasts(pred)
 
     parts = []
@@ -31,7 +37,8 @@ def enriched_signals(flow, data) -> pl.DataFrame:
 
     if flow.validator is not None and signals.height > 0:
         vcol = getattr(flow.validator, "output", "p_success")
-        vp = flow.validator.predict(data).select(["pair", "ts", vcol]).rename({vcol: "p_success"})
+        vpred = flow.validator.predict_oos(data) if oos else flow.validator.predict(data)
+        vp = vpred.select(["pair", "ts", vcol]).rename({vcol: "p_success"})
         signals = signals.join(vp, on=["pair", "ts"], how="left")
     return signals
 
@@ -57,12 +64,16 @@ def _orders(intents, prices, ts):
     return orders
 
 
-def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: dict | None = None):
+EMPTY_SIGNALS_SCHEMA = _EMPTY_SIGNALS_SCHEMA
+orders_from_intents = _orders
+
+
+def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: dict | None = None, oos: bool = False):
     from signalflow.flow.run import Run
 
     target = target or data.quote
     engine = Engine(capital, target=target, quote=data.quote)
-    signals = enriched_signals(flow, data)
+    signals = enriched_signals(flow, data, oos=oos)
     by_ts: dict = {}
     if signals.height:
         for key, df in signals.group_by("ts"):
@@ -90,7 +101,8 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
         eq_val.append(engine.equity(bar.prices))
 
     curve = pl.DataFrame({"ts": eq_ts, "equity": eq_val})
-    return Run(flow.name, mode.value, curve, engine.event_log, target, promotable=True)
+    promotable = oos or not flow.forecasts
+    return Run(flow.name, mode.value, curve, engine.event_log, target, promotable=promotable, oos=oos)
 
 
 def run_quicktest(flow, data, capital, target, horizon: int = 24, fee: float = 0.001):
@@ -123,3 +135,12 @@ def run_quicktest(flow, data, capital, target, horizon: int = 24, fee: float = 0
         eq_ts, eq_val = [frame.get_column("ts").min()], [equity]
     curve = pl.DataFrame({"ts": eq_ts, "equity": eq_val})
     return Run(flow.name, RunMode.QUICKTEST.value, curve, [], target, promotable=False)
+
+
+__all__ = [
+    "EMPTY_SIGNALS_SCHEMA",
+    "enriched_signals",
+    "orders_from_intents",
+    "run_event_loop",
+    "run_quicktest",
+]

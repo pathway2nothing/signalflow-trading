@@ -116,23 +116,20 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quick Start: quickstart.md
+    - Concepts: concepts.md
     - Glossary: glossary.md
   - Tutorials:
-    - notebooks/index.md
     - "01 - Quick Start": notebooks/01_quickstart.ipynb
-    - "02 - Custom Detector": notebooks/02_custom_detector.ipynb
-    - "03 - Data Loading & Resampling": notebooks/03_data_loading.ipynb
-    - "04 - Pipeline Visualization": notebooks/04_visualization.ipynb
-    - "05 - Advanced Strategies": notebooks/05_advanced_strategies.ipynb
   - User Guide:
     - CLI & YAML Config: guide/cli.md
+    - Custom Detectors: guide/custom-detectors.md
+    - Live & Walk-Forward: guide/live-and-walk-forward.md
+  - Legacy (V4):
     - Signal Architecture & Meta-Labeling: guide/signal-architecture.md
     - Semantic Decorators: guide/semantic-decorators.md
     - Data Sources: guide/data-sources.md
     - Data Stores: guide/data-stores.md
     - Custom Data Types: guide/custom-data-types.md
-    - Custom Detectors: guide/custom-detectors.md
-    - Live & Walk-Forward: guide/live-and-walk-forward.md
     - Signal Validators: guide/validators.md
     - Advanced Strategies: guide/advanced-strategies.md
     - State Persistence: guide/state-persistence.md
@@ -142,7 +139,6 @@ nav:
     - Overview: ecosystem/index.md
     - signalflow-ta: ecosystem/signalflow-ta.md
     - signalflow-labs: ecosystem/signalflow-labs.md
-    - sf-kedro: ecosystem/sf-kedro.md
   - API Reference:
     - api/index.md
     - Data: api/data.md

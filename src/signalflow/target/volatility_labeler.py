@@ -7,7 +7,6 @@ a rolling lookback window.
 Implementation uses pure Polars expressions for performance.
 """
 
-
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -37,18 +36,23 @@ class VolatilityRegimeLabeler(Labeler):
     Implementation:
         Uses pure Polars expressions instead of numpy loops for better
         performance and memory efficiency.
+
+    ``lookback_window`` accepts a bar count (int, assuming 1-minute data for the default)
+    or a duration string resolved against the dataset interval.
     """
 
     signal_category: SignalCategory = SignalCategory.VOLATILITY
 
     soft_classes: ClassVar[tuple[str, ...]] = ("low_volatility", "mid_volatility", "high_volatility")
+    positive_classes: ClassVar[tuple[str, ...]] = ("high_volatility",)
+    duration_fields: ClassVar[tuple[str, ...]] = ("lookback_window",)
     softness_k: float = 20.0
 
     price_col: str = "close"
     horizon: int = 60
     upper_quantile: float = 0.67
     lower_quantile: float = 0.33
-    lookback_window: int = 1440
+    lookback_window: int | str = 1440
 
     meta_columns: tuple[str, ...] = ("realized_vol", "vol_percentile")
 
@@ -74,9 +78,7 @@ class VolatilityRegimeLabeler(Labeler):
         if self.price_col not in group_df.columns:
             raise ValueError(f"Missing required column '{self.price_col}'")
 
-
         df = group_df.with_columns((pl.col(self.price_col) / pl.col(self.price_col).shift(1)).log().alias("_log_ret"))
-
 
         df = df.with_columns(
             pl.col("_log_ret")
@@ -86,11 +88,9 @@ class VolatilityRegimeLabeler(Labeler):
             .alias("_realized_vol")
         )
 
-
         df = df.with_columns(
             self._rolling_percentile_expr("_realized_vol", self.lookback_window).alias("_vol_percentile")
         )
-
 
         label_expr = (
             pl.when(pl.col("_vol_percentile").is_null())
@@ -112,7 +112,6 @@ class VolatilityRegimeLabeler(Labeler):
                     pl.col("_vol_percentile").alias("vol_percentile"),
                 ]
             )
-
 
         df = df.drop(["_log_ret", "_realized_vol", "_vol_percentile"])
 
@@ -162,7 +161,6 @@ class VolatilityRegimeLabeler(Labeler):
         """Compute rolling percentile using Polars expressions."""
         col = pl.col(col_name)
 
-
         return pl.struct([col.alias("val"), pl.int_range(pl.len()).alias("idx")]).map_batches(
             lambda s: self._compute_percentile_series(s, window),
             return_dtype=pl.Float64,
@@ -185,11 +183,9 @@ class VolatilityRegimeLabeler(Labeler):
             start = max(0, i - window + 1)
             window_vals = vals[start : i + 1]
 
-
             valid = window_vals[~np.isnan(window_vals)]
             if len(valid) < 2:
                 continue
-
 
             result[i] = float(np.mean(valid <= vals[i]))
 

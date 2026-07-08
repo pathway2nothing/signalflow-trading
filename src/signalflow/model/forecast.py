@@ -10,9 +10,10 @@ import polars as pl
 from loguru import logger
 from sklearn.base import clone
 
+from signalflow._hash import code_fingerprint, stable_hash
 from signalflow.data.dataset import Dataset
-from signalflow.errors import UntrainedModelError
-from signalflow.model.oos import build_fingerprint, make_folds, median_dt, parse_duration, rolling_folds, stable_hash
+from signalflow.errors import DegenerateTargetError, FingerprintMismatch, UntrainedModelError
+from signalflow.model.oos import build_fingerprint, make_folds, median_dt, parse_duration, rolling_folds
 from signalflow.sampler import Sampler, UniformSampler
 from signalflow.target import LABEL_COL, Target
 from signalflow.transform import FeaturePipe
@@ -21,7 +22,6 @@ from signalflow.transform.encode import IVSelector, WoE
 warnings.filterwarnings("ignore", message="X does not have valid feature names")
 
 _DEFAULT = "default"
-_RESERVED = {"pair", "ts", "open", "high", "low", "close", "volume", "signal"}
 
 
 def _make_estimator(backend, params: dict):
@@ -56,12 +56,18 @@ def _encode_frame(enc: WoE | None, features: FeaturePipe, feat_frame: pl.DataFra
 
 @dataclass
 class ForecastModel:
-    """Trainable continuous predictor; outputs one probability column."""
+    """Trainable continuous predictor; outputs one probability column.
+
+    ``encode`` accepts a :class:`WoE`, ``None`` to disable encoding, or the
+    ``"default"`` sentinel that ``__post_init__`` resolves to a default ``WoE``.
+    Fitted encoders/selectors live on ``encode_``/``select_``; the declarative
+    ``encode``/``select`` fields are never overwritten by ``fit``.
+    """
 
     backend: object = "lightgbm"
     target: Target | None = None
     features: FeaturePipe | None = None
-    encode: object = _DEFAULT
+    encode: "WoE | None | str" = _DEFAULT
     select: object = _DEFAULT
     sampler: Sampler | None = None
     backend_params: dict = field(default_factory=dict)
@@ -87,6 +93,17 @@ class ForecastModel:
             raise UntrainedModelError(f"ForecastModel(output={self.output!r}) is not fitted")
 
     def fit(self, data: Dataset, sampler: Sampler | None = None, cache=None) -> "ForecastModel":
+        """Train the model and compute leak-free out-of-fold predictions.
+
+        Fits embargoed walk-forward folds (embargo width = the target horizon), stores
+        the stitched out-of-fold predictions on ``oos_``, then fits the final production
+        stack on all data. When ``encode`` is a rolling ``WoE`` the folds follow its
+        ``refit``/``window``; otherwise ``n_folds`` equal folds are used. Passing an
+        ``ArtifactCache`` reuses unchanged folds and recomputes only new ones.
+
+        Returns:
+            The fitted model (``self``).
+        """
         if self.target is None:
             raise ValueError("ForecastModel requires a target to fit")
         sampler = sampler or self.sampler or UniformSampler()
@@ -108,7 +125,8 @@ class ForecastModel:
             raise ValueError(f"not enough labeled samples to fit ({base.height})")
 
         ts_unique = base.get_column("ts").unique().sort().to_list()
-        embargo = timedelta(seconds=self.target.horizon * median_dt(ts_unique))
+        horizon_bars = self.target.horizon_bars(data)
+        embargo = timedelta(seconds=horizon_bars * median_dt(ts_unique))
         folds = self._walk_forward_folds(ts_unique, embargo)
         oos_parts: list[pl.DataFrame] = []
         self.refits_: list[dict] = []
@@ -125,7 +143,7 @@ class ForecastModel:
             if cached is not None:
                 preds, state = cached
             else:
-                preds, enc = self._fit_fold_predict(train, test)
+                preds, enc = self._fit_fold_predict(train, test, fold=fold)
                 if preds is None:
                     continue
                 state = enc.state_dict() if enc is not None else None
@@ -151,16 +169,28 @@ class ForecastModel:
 
         self.encode_, self.select_, self.model_ = self._fit_stack(base)
 
-        self.encode = self.encode_
-        self.select = self.select_
-
         self._build_fingerprint(data, ts_unique)
         self._fitted = True
         logger.debug(f"ForecastModel fitted: oos rows={self.oos_.height}, folds={len(folds)}")
         return self
 
-    def _fit_stack(self, train: pl.DataFrame):
+    def _fit_stack(self, train: pl.DataFrame, fold=None):
         y = train.get_column(LABEL_COL)
+        est = _make_estimator(self.backend, self.backend_params)
+        if len(np.unique(y.to_numpy())) < 2:
+            if fold is None:
+                raise DegenerateTargetError(
+                    f"ForecastModel(output={self.output!r}) final production fit has a single-class "
+                    f"target (value={float(y.mean())}); refusing to store a constant predictor."
+                )
+            logger.warning(
+                f"ForecastModel(output={self.output!r}) inner fold "
+                f"[{fold.train_start_ts}..{fold.test_start_ts}] has a single-class target; "
+                f"storing a constant predictor for this fold only."
+            )
+            est._sf_degenerate = float(y.mean())
+            est._sf_cols = list(self.features.outputs)
+            return None, None, est
         enc = self._fresh_encode()
         if enc is not None:
             enc.fit(train, y)
@@ -171,17 +201,13 @@ class ForecastModel:
             cols = [c for c in cols if c in sel.keep_]
         cols = cols or list(enc.outputs if enc else self.features.outputs)
         X = frame.select(cols).fill_null(0.0).to_numpy()
-        est = _make_estimator(self.backend, self.backend_params)
         w = train.get_column("_w").to_numpy() if "_w" in train.columns else None
         est._sf_cols = cols
-        if len(np.unique(y.to_numpy())) < 2:
-            est._sf_degenerate = float(y.mean())
-        else:
-            est.fit(X, y.to_numpy(), sample_weight=w)
+        est.fit(X, y.to_numpy(), sample_weight=w)
         return enc, sel, est
 
-    def _fit_fold_predict(self, train: pl.DataFrame, test: pl.DataFrame):
-        enc, sel, est = self._fit_stack(train)
+    def _fit_fold_predict(self, train: pl.DataFrame, test: pl.DataFrame, fold=None):
+        enc, sel, est = self._fit_stack(train, fold=fold)
         p = self._predict_stack(enc, sel, est, test)
         return test.select(["pair", "ts"]).with_columns(pl.Series(self.output, p)), enc
 
@@ -199,8 +225,6 @@ class ForecastModel:
 
     def _stack_fingerprint(self, data: Dataset) -> str:
         """Identity of the fold-producing stack: configs + code + dataset."""
-        from signalflow.experiment.cache import code_fingerprint
-
         return stable_hash(
             {
                 "features": self.features.to_config(),
@@ -260,13 +284,21 @@ class ForecastModel:
             refit=self.encode.refit,
             window=self.encode.window,
             smoothing=self.encode.smoothing,
+            positive_threshold=self.encode.positive_threshold,
+            positive_classes=self.encode.positive_classes,
             columns=list(self.features.outputs),
         )
 
     def _fresh_select(self):
         if self.select is None:
             return None
-        return IVSelector(min_iv=self.select.min_iv, max_bins=self.select.max_bins, smoothing=self.select.smoothing)
+        return IVSelector(
+            min_iv=self.select.min_iv,
+            max_bins=self.select.max_bins,
+            smoothing=self.select.smoothing,
+            positive_threshold=getattr(self.select, "positive_threshold", 0.0),
+            positive_classes=getattr(self.select, "positive_classes", None),
+        )
 
     def predict(self, data: Dataset) -> pl.DataFrame:
         """Production prediction (in-sample on history - never feed to training)."""
@@ -275,15 +307,41 @@ class ForecastModel:
         p = self._predict_stack(self.encode_, self.select_, self.model_, feat)
         return feat.select(["pair", "ts"]).with_columns(pl.Series(self.output, p))
 
-    def predict_oos(self, data: Dataset) -> pl.DataFrame:
-        """Leak-free out-of-fold predictions over the training span."""
+    def predict_oos(self, data: Dataset, strict: bool = False) -> pl.DataFrame:
+        """Leak-free out-of-fold predictions over the training span.
+
+        With ``strict``, rows outside the cached OOS span raise
+        :class:`FingerprintMismatch` instead of warning and returning nulls.
+        """
         self._check_fitted()
         want = data.index()
         out = want.join(self.oos_, on=["pair", "ts"], how="left")
         missing = out.get_column(self.output).null_count()
         if missing:
+            if strict:
+                raise FingerprintMismatch(
+                    f"predict_oos: {missing} of {out.height} requested rows fall outside the cached OOS "
+                    f"span for ForecastModel(output={self.output!r}); refit or widen the span"
+                )
             logger.warning(f"predict_oos: {missing} rows outside cached OOS span (null)")
         return out
+
+    def operating_point(self, data: Dataset, quantile: float, column: str | None = None, oos: bool = False) -> float:
+        """Score quantile as a firing threshold; caller must pass train-window data for leak safety."""
+        self._check_fitted()
+        preds = self.predict_oos(data) if oos else self.predict(data)
+        col = self._score_column(preds, column)
+        return float(preds.get_column(col).drop_nulls().quantile(quantile))
+
+    def _score_column(self, preds: pl.DataFrame, column: str | None) -> str:
+        scores = [c for c in preds.columns if c not in ("pair", "ts", "_w")]
+        if column is not None:
+            if column not in preds.columns:
+                raise ValueError(f"operating_point: column {column!r} not found; available score columns: {scores}")
+            return column
+        if len(scores) != 1:
+            raise ValueError(f"operating_point: {len(scores)} score columns {scores}; pass column= to disambiguate")
+        return scores[0]
 
     def woe_history(self) -> list[dict]:
         """Per-refit WoE state (bin edges + WoE table + IV) across the walk-forward."""
@@ -314,8 +372,8 @@ class ForecastModel:
                 "refit": getattr(self.encode_, "refit", None),
                 "window": getattr(self.encode_, "window", None),
                 "n_folds": self.n_folds,
-                "purge": self.target.horizon,
-                "embargo": self.target.horizon,
+                "purge": self.target.horizon_bars(data),
+                "embargo": self.target.horizon_bars(data),
                 "span": [str(ts_unique[0]), str(ts_unique[-1])] if ts_unique else None,
             },
             output=self.output,

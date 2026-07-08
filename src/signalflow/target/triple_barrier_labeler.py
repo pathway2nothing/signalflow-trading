@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -48,25 +47,30 @@ def _find_first_hit(
 @dataclass
 @register_target("triple_barrier_labeler")
 class TripleBarrierLabeler(Labeler):
-    """Triple-Barrier Labeling (De Prado), Numba-accelerated."""
+    """Triple-Barrier Labeling (De Prado), Numba-accelerated.
+
+    ``horizon`` accepts a bar count (int, assuming 1-minute data for the default) or a
+    duration string (``"1d"``) resolved against the dataset interval.
+    """
 
     soft_classes: ClassVar[tuple[str, ...]] = (
         SignalType.FALL.value,
         SignalType.NONE.value,
         SignalType.RISE.value,
     )
+    duration_fields: ClassVar[tuple[str, ...]] = ("horizon",)
 
     price_col: str = "close"
 
     vol_window: int = 60
-    horizon: int = 1440
+    horizon: int | str = 1440
     profit_multiplier: float = 1.0
     stop_loss_multiplier: float = 1.0
 
     def __post_init__(self) -> None:
         if self.vol_window <= 1:
             raise ValueError("vol_window must be > 1")
-        if self.horizon <= 0:
+        if isinstance(self.horizon, int) and self.horizon <= 0:
             raise ValueError("horizon must be > 0")
         if self.profit_multiplier <= 0 or self.stop_loss_multiplier <= 0:
             raise ValueError("profit_multiplier/stop_loss_multiplier must be > 0")

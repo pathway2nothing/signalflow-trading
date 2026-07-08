@@ -1,13 +1,13 @@
 ---
 title: signalflow-ta
-description: Technical analysis extension with 199+ indicators for SignalFlow
+description: Technical analysis extension with 248 features + 21 detectors for SignalFlow
 ---
 
 # signalflow-ta - Technical Analysis
 
-**signalflow-ta** extends SignalFlow with 199+ technical analysis indicators
-organized into 8 modules. Each indicator is a standard `Feature` class that
-integrates directly with `FeaturePipeline` and the component registry.
+**signalflow-ta** extends SignalFlow with 248 technical-analysis features and
+21 signal detectors. Each indicator is a standard `Feature` class that integrates
+directly with `FeaturePipe` and the component registry.
 
 ---
 
@@ -17,7 +17,7 @@ integrates directly with `FeaturePipeline` and the component registry.
 pip install signalflow-ta
 ```
 
-Requires `signalflow-trading >= 0.5.0`.
+Requires `signalflow-trading >= 0.8.0`.
 
 ---
 
@@ -26,13 +26,18 @@ Requires `signalflow-trading >= 0.5.0`.
 | Module | Count | Description |
 |--------|------:|-------------|
 | **Momentum** | 18 | RSI, MACD, Stochastic, ROC, CCI, Williams %R, and kinematics analogs |
-| **Overlap** | 26 | SMA, EMA, DEMA, TEMA, HMA, KAMA, ALMA, JMA, and price transforms |
-| **Volatility** | 40 | ATR, Bollinger, Keltner, Donchian bands, and energy-based indicators |
-| **Volume** | 16 | OBV, A/D, MFI, CMF, KVO, and market dynamics analogs |
-| **Trend** | 22 | ADX, Aroon, Supertrend, PSAR, Ichimoku, and physics-based strength |
-| **Statistics** | 73 | Dispersion, distribution, memory, cycles, complexity, DSP, regression |
+| **Overlap** | 30 | SMA, EMA, DEMA, TEMA, HMA, KAMA, ALMA, JMA, and price transforms |
+| **Volatility** | 21 | ATR, Bollinger, Keltner, Donchian bands, and energy-based indicators |
+| **Volume** | 18 | OBV, A/D, MFI, CMF, KVO, and market dynamics analogs |
+| **Trend** | 30 | ADX, Aroon, Supertrend, PSAR, Ichimoku, and physics-based strength |
+| **Statistics** | 122 | Dispersion, distribution, memory, cycles, complexity, DSP, regression |
+| **Probabilistic** | 4 | Distributional and probabilistic features |
 | **Performance** | 2 | Log return, percent return |
 | **Divergence** | 2 | RSI divergence, MACD divergence detectors |
+| **Global** | 1 | Cross-sectional / market-wide feature |
+
+Totals: **248 features + 21 detectors** (registered names; regenerate with the
+command in the repo's component-count check).
 
 ---
 
@@ -98,7 +103,7 @@ full_pipeline = FeaturePipeline(features=all_ta_pipe(normalized=True))
 | `stat_pipe()` | All statistical indicators |
 | `performance_pipe()` | LogReturn, PctReturn |
 | `divergence_pipe()` | RSI divergence, MACD divergence |
-| `all_ta_pipe()` | All 199+ indicators |
+| `all_ta_pipe()` | All 248 features |
 
 ---
 

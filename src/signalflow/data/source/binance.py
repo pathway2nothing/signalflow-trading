@@ -1,6 +1,5 @@
 """Binance source - real public klines REST, stdlib-only (no extra deps)."""
 
-
 import json
 import time
 import urllib.error
@@ -10,8 +9,7 @@ from dataclasses import dataclass
 import polars as pl
 from loguru import logger
 
-from signalflow.data.source.base import Source, validate_frame
-from signalflow.data.source.memory import _parse
+from signalflow.data.source.base import Source, parse_time, validate_frame
 from signalflow.decorators import source
 
 _BASE = "https://api.binance.com/api/v3/klines"
@@ -45,8 +43,8 @@ class BinanceSource(Source):
     ) -> pl.DataFrame:
         if interval not in _MS:
             raise ValueError(f"unsupported interval {interval!r}")
-        start_ms = _parse(start) * 1000
-        end_ms = (_parse(end) * 1000) if end else int(time.time() * 1000)
+        start_ms = parse_time(start) * 1000
+        end_ms = (parse_time(end) * 1000) if end else int(time.time() * 1000)
         frames = [self._fetch_pair(p, start_ms, end_ms, interval) for p in pairs]
         return validate_frame(pl.concat([f for f in frames if f.height > 0]))
 
@@ -79,15 +77,19 @@ class BinanceSource(Source):
             )
         ts, o, h, lo, c, v = zip(*rows, strict=True)
         return pl.DataFrame(
-            {"pair": [pair] * len(rows), "ts": list(ts), "open": list(o), "high": list(h),
-             "low": list(lo), "close": list(c), "volume": list(v)}
+            {
+                "pair": [pair] * len(rows),
+                "ts": list(ts),
+                "open": list(o),
+                "high": list(h),
+                "low": list(lo),
+                "close": list(c),
+                "volume": list(v),
+            }
         ).with_columns(pl.col("ts").cast(pl.Datetime("ms")))
 
     def _request(self, pair: str, interval: str, start_ms: int, end_ms: int) -> list:
-        url = (
-            f"{self.base_url}?symbol={pair}&interval={interval}"
-            f"&startTime={start_ms}&endTime={end_ms}&limit={_LIMIT}"
-        )
+        url = f"{self.base_url}?symbol={pair}&interval={interval}&startTime={start_ms}&endTime={end_ms}&limit={_LIMIT}"
         last_err: Exception | None = None
         for attempt in range(self.max_retries):
             try:

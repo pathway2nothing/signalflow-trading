@@ -6,7 +6,7 @@ title: Ecosystem
 
 SignalFlow is a modular ecosystem of Python packages for algorithmic trading.
 Each package focuses on a specific domain while sharing the core framework's
-component registry, data containers, and pipeline patterns.
+component registry, data containers, and Flow patterns.
 
 ---
 
@@ -14,12 +14,13 @@ component registry, data containers, and pipeline patterns.
 
 <div class="grid cards" markdown>
 
--   :material-package-variant-closed:{ .lg .middle } **signalflow-trading** `v0.6.0` (Core)
+-   :material-package-variant-closed:{ .lg .middle } **signalflow-trading** `v0.8.4` (Core)
 
     ---
 
-    Core framework: data containers, signal detection, backtesting, strategy execution,
-    state persistence, statistical analysis. Component registry, Polars-first processing, DuckDB storage.
+    Core framework: `Dataset`, `Transform`/`FeaturePipe`, `ForecastModel`, `Flow`,
+    `Engine`, `Run`. Component registry, Polars-first processing, deploy-is-data
+    YAML serialization.
 
     ```bash
     pip install signalflow-trading
@@ -27,42 +28,32 @@ component registry, data containers, and pipeline patterns.
 
     [:material-github: GitHub](https://github.com/pathway2nothing/signalflow-trading){ .md-button }
 
--   :material-chart-bell-curve-cumulative:{ .lg .middle } **[signalflow-ta](signalflow-ta.md)** `v0.6.0`
+-   :material-chart-bell-curve-cumulative:{ .lg .middle } **[signalflow-ta](signalflow-ta.md)** `v0.8.2`
 
     ---
 
-    189+ technical indicators across 8 modules: momentum, overlap, volatility,
-    volume, trend, statistics, performance, divergence. 24 signal detectors.
+    248 technical-indicator features across 8 modules (momentum, overlap, volatility,
+    volume, trend, statistics, performance, divergence) plus 21 signal detectors.
     Physics-based market analogs and AutoFeatureNormalizer.
 
     ```bash
-    pip install signalflow-ta
+    pip install "signalflow-trading[ta]"
     ```
 
     [:material-github: GitHub](https://github.com/pathway2nothing/signalflow-ta){ .md-button }
 
--   :material-brain:{ .lg .middle } **[signalflow-labs](signalflow-labs.md)** `v0.6.0`
+-   :material-brain:{ .lg .middle } **[signalflow-labs](signalflow-labs.md)** `v0.8.2`
 
     ---
 
-    14 neural encoders (LSTM, GRU, Transformer, PatchTST, TCN, TSMixer, InceptionTime),
-    7 classification heads, 4 loss functions. Built on PyTorch Lightning.
+    Neural encoders (LSTM, GRU, Transformer, PatchTST, TCN, TSMixer, InceptionTime),
+    classification heads, and an RL strategy. Built on PyTorch.
 
     ```bash
-    pip install signalflow-labs
+    pip install "signalflow-trading[labs]"
     ```
 
     [:material-github: GitHub](https://github.com/pathway2nothing/signalflow-labs){ .md-button }
-
--   :material-pipe:{ .lg .middle } **[sf-kedro](sf-kedro.md)** `v0.5.0`
-
-    ---
-
-    Universal ML pipelines: backtest, analyze, train, tune (Optuna), validate (walk-forward).
-    Flow configuration via YAML. MLflow and Telegram integrations.
-
-    [:material-github: GitHub](https://github.com/pathway2nothing/sf-kedro){ .md-button }
-
 
 </div>
 
@@ -71,31 +62,28 @@ component registry, data containers, and pipeline patterns.
 ## Architecture
 
 All packages share the SignalFlow component registry via semantic decorators
-(`@sf.detector`, `@sf.feature`, `@sf.entry`, `@sf.exit`, etc.).
-Components from any installed package are automatically discoverable:
+(`@sf.detector`, `@sf.feature`, `@sf.transform`, `@sf.model`, `@sf.strategy`).
+Components from any installed package are discoverable through the same registry:
 
 ```python
-from signalflow.core import default_registry, SfComponentType
+import signalflow as sf
+import signalflow.ta  # noqa: F401 - registers the ta components
 
-# signalflow-ta indicators
-rsi_cls = default_registry.get(SfComponentType.FEATURE, "momentum/rsi")
-
-# signalflow-labs validators
-validator_cls = default_registry.get(SfComponentType.VALIDATOR, "temporal_validator")
-
-# Custom components (via entry-point autodiscovery)
-custom_cls = default_registry.get(SfComponentType.DETECTOR, "custom/my_detector")
+rsi_cls = sf.registry.get(sf.ComponentType.TRANSFORM, "momentum/rsi")
+sf.registry.snapshot()  # {type: [names]} across every installed package
 ```
+
+Installing a plugin auto-registers its components via the `signalflow.components`
+entry point - no imports or wiring needed.
 
 ### Dependency Chain
 
 ```
 signalflow-trading              # Core (required)
-├── signalflow-ta               # 189+ indicators
-├── signalflow-labs               # Neural network encoders
-├── sf-kedro                    # ML pipelines
+├── signalflow-ta               # 248 features + 21 detectors
+├── signalflow-labs             # Neural encoders, RL strategy
 └── sf-custom                   # User components (entry-point autodiscovery)
 ```
 
 Extension packages use Python namespace packages under `signalflow.*`.
-Custom packages use `signalflow.components` entry point for automatic registration.
+Custom packages register through the `signalflow.components` entry point.

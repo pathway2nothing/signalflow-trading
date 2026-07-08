@@ -6,10 +6,10 @@ import numpy as np
 import polars as pl
 
 from signalflow.decorators import transform
+from signalflow.enums import RESERVED_COLUMNS
+from signalflow.errors import DegenerateTargetError
 from signalflow.transform.base import Transform
 from signalflow.transform.encode import stats
-
-RESERVED = {"pair", "ts", "open", "high", "low", "close", "volume", "signal", "label", "_w", "weight"}
 
 
 @dataclass
@@ -34,28 +34,54 @@ def _feature_columns(df: pl.DataFrame, explicit: list[str] | None) -> list[str]:
     return [
         c
         for c, dt in zip(df.columns, df.dtypes, strict=True)
-        if c not in RESERVED and not c.endswith("__woe") and dt.is_numeric()
+        if c not in RESERVED_COLUMNS and not c.endswith("__woe") and dt.is_numeric()
     ]
 
 
-def _binarize(target: pl.Series) -> np.ndarray:
-    arr = target.to_numpy()
-    return (arr > 0).astype(np.int64)
+def _binarize(
+    target: pl.Series,
+    positive_threshold: float = 0.0,
+    positive_classes: "tuple[float, ...] | None" = None,
+) -> np.ndarray:
+    """Coerce a target to a binary event mask; raise if it collapses to one class."""
+    arr = target.to_numpy().astype(float)
+    if positive_classes is not None:
+        y = np.isin(arr, np.asarray(positive_classes, dtype=float)).astype(np.int64)
+    else:
+        y = (arr > positive_threshold).astype(np.int64)
+    if np.unique(y).size < 2:
+        raise DegenerateTargetError(
+            f"binarization collapsed to a single class (positive_threshold={positive_threshold}, "
+            f"positive_classes={positive_classes}); no Weight-of-Evidence can be estimated."
+        )
+    return y
 
 
 @transform("woe")
 @dataclass
 class WoE(Transform):
-    """Encode every feature column via Weight of Evidence against the target."""
+    """Encode every feature column via Weight of Evidence against the target.
+
+    ``refit`` is the rolling retrain cadence and ``window`` the trailing training span
+    (duration strings such as ``"1d"``/``"365d"``); either set to ``None`` (or ``""`` for
+    back-compat) disables rolling refit and fits once over all data.
+    ``positive_threshold``/``positive_classes`` control how the target is binarized.
+    """
 
     binning: Binning = field(default_factory=lambda: Binning("monotonic", 10))
-    refit: str = "1d"
-    window: str = "365d"
+    refit: str | None = "1d"
+    window: str | None = "365d"
     smoothing: float = 0.5
+    positive_threshold: float = 0.0
+    positive_classes: tuple[float, ...] | None = None
     columns: list[str] | None = None
 
     requires_fit = True
     requires_target = True
+
+    def __post_init__(self) -> None:
+        if self.positive_classes is not None:
+            self.positive_classes = tuple(float(c) for c in self.positive_classes)
 
     @property
     def outputs(self) -> list[str]:
@@ -65,7 +91,7 @@ class WoE(Transform):
     def fit(self, df: pl.DataFrame, target: pl.Series | None = None) -> "WoE":
         if target is None:
             raise ValueError("WoE.fit requires a target (requires_target=True)")
-        y = _binarize(target)
+        y = _binarize(target, self.positive_threshold, self.positive_classes)
         cols = _feature_columns(df, self.columns)
         self.columns_ = cols
         self.edges_ = {}
@@ -105,6 +131,8 @@ class WoE(Transform):
                 "refit": self.refit,
                 "window": self.window,
                 "smoothing": self.smoothing,
+                "positive_threshold": self.positive_threshold,
+                "positive_classes": list(self.positive_classes) if self.positive_classes is not None else None,
                 "columns": self.columns,
             },
         }

@@ -1,74 +1,62 @@
 # Installation
 
-Get SignalFlow up and running in minutes.
-
 ---
 
 ## Requirements
 
 - **Python 3.12+**
-- **4GB RAM** minimum (16GB recommended for backtesting)
+- **4GB RAM** minimum (16GB recommended for larger backtests)
 
 ---
 
 ## Install
 
-### Core Framework
-
 ```bash
 pip install signalflow-trading
 ```
 
-### With Technical Analysis (189+ indicators)
+### Extras
+
+Install extras with `pip install "signalflow-trading[<extra>]"`.
+
+| Extra | Installs | For |
+|-------|----------|-----|
+| `ta` | signalflow-ta | 248 technical-indicator features + 21 detectors |
+| `labs` | signalflow-labs[rl] | neural encoders, RL strategy, torch backends |
+| `live` | mlflow, huggingface_hub | model artifact tracking / deploy |
+| `llm` | httpx, pydantic | LLM-assisted strategy (any OpenAI-compatible server) |
+| `all` | ta + labs + live + llm | everything |
+| `dev` | pytest, ruff, mypy | development |
+| `test` | pytest | test run only |
+| `docs` | mkdocs, mkdocs-material, mkdocstrings | building this site |
 
 ```bash
-pip install signalflow-ta
+pip install "signalflow-trading[ta]"          # core + technical-analysis plugin
+pip install "signalflow-trading[all]"         # everything
 ```
 
-### With Neural Networks (14 encoders, PyTorch Lightning)
+### Virtual environment (recommended)
 
 ```bash
-pip install signalflow-nn
-```
-
-### Full Research Stack
-
-```bash
-pip install signalflow-trading signalflow-ta signalflow-nn
-```
-
-### Virtual Environment (Recommended)
-
-```bash
-# Create environment
-python -m venv signalflow-env
-source signalflow-env/bin/activate  # Windows: signalflow-env\Scripts\activate
-
-# Install core + extensions
-pip install signalflow-trading
-pip install signalflow-ta    # technical analysis indicators
-pip install signalflow-nn    # neural network validators
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install "signalflow-trading[ta]"
 ```
 
 ---
 
-## Verify Installation
+## Verify installation
 
 ```python
 import signalflow as sf
-from signalflow.core import RawData, Signals
 
-print(f"SignalFlow {sf.__version__} installed")
-
-# Check registered components
-from signalflow.core import default_registry, SfComponentType
-detectors = default_registry.list(SfComponentType.DETECTOR)
-print(f"Detectors available: {len(detectors)}")
+print(sf.__version__)
+print(sf.registry.snapshot())   # {type: [names]} across every installed package
 ```
 
 ---
 
-## Platform Notes
+## Platform notes
 
 === "Linux"
     Works out of the box.
@@ -77,35 +65,12 @@ print(f"Detectors available: {len(detectors)}")
     Supports both Intel and Apple Silicon (M1/M2/M3/M4).
 
 === "Windows"
-    Works in Command Prompt or PowerShell.
+    Works in Command Prompt or PowerShell. Set `PYTHONUTF8=1` if Polars table
+    output errors on a non-UTF-8 code page.
 
 ---
 
-## GPU Support (signalflow-nn)
-
-```bash
-# Check CUDA version: nvidia-smi
-pip install torch --index-url https://download.pytorch.org/whl/cu121
-pip install signalflow-nn
-```
-
----
-
-## Troubleshooting
-
-**Import errors?**
-```bash
-pip install --force-reinstall signalflow-trading
-```
-
-**Python version too old?**
-```bash
-python --version  # Must be 3.12+
-```
-
----
-
-## Next Steps
+## Next steps
 
 <div class="grid cards" markdown>
 
@@ -113,18 +78,18 @@ python --version  # Must be 3.12+
 
     ---
 
-    Build your first strategy in 5 minutes
+    Build and round-trip your first Flow.
 
--   :material-tag-multiple:{ .lg .middle } **[Semantic Decorators](../guide/semantic-decorators.md)**
+-   :material-sitemap:{ .lg .middle } **[Concepts](../concepts.md)**
 
     ---
 
-    Register custom components with type-safe decorators
+    The tier stack and the invariants.
 
 -   :material-puzzle:{ .lg .middle } **[Ecosystem](../ecosystem/index.md)**
 
     ---
 
-    signalflow-ta, signalflow-nn, sf-kedro, sf-ui
+    signalflow-ta and signalflow-labs.
 
 </div>

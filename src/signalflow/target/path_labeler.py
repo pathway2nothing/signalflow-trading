@@ -17,7 +17,6 @@ All three use Numba-accelerated inner loops where the operation is not
 expressible as a Polars rolling expression.
 """
 
-
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -113,11 +112,16 @@ def _hurst_forward(log_ret: np.ndarray, horizon: int, step: int) -> np.ndarray:
 @dataclass
 @register_target("hurst_regime")
 class HurstRegimeLabeler(Labeler):
-    """Label bars by forward Hurst-exponent regime."""
+    """Label bars by forward Hurst-exponent regime.
+
+    The binary target treats the mean-reverting regime as the positive class; random-walk
+    and trending regimes are the negative class.
+    """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
 
     soft_classes: ClassVar[tuple[str, ...]] = ("mean_reverting", "random_walk", "trending")
+    positive_classes: ClassVar[tuple[str, ...]] = ("mean_reverting",)
     softness_k: float = 20.0
 
     price_col: str = "close"
@@ -247,6 +251,7 @@ class MeanReversionEventLabeler(Labeler):
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
 
     soft_classes: ClassVar[tuple[str, ...]] = ("mean_reverted", "trend_continuation", "no_reversion")
+    positive_classes: ClassVar[tuple[str, ...]] = ("mean_reverted",)
 
     price_col: str = "close"
     horizon: int = 240
@@ -425,6 +430,7 @@ class TrendBreakLabeler(Labeler):
     signal_category: SignalCategory = SignalCategory.TREND_MOMENTUM
 
     soft_classes: ClassVar[tuple[str, ...]] = ("no_break", "continue", "break")
+    positive_classes: ClassVar[tuple[str, ...]] = ("break",)
 
     price_col: str = "close"
     window: int = 240

@@ -1,6 +1,5 @@
 """Sampler contract - which points to train on, and with what weights."""
 
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -28,14 +27,15 @@ class Sampler(ABC):
         return getattr(self, "_sf_name", type(self).__name__)
 
     @abstractmethod
-    def sample(self, data: Dataset) -> SampleSet: ...
+    def sample(self, data: Dataset) -> SampleSet:
+        """Select training rows from ``data``, returning their index, optional weights,
+        and a provenance stamp."""
+        ...
 
     @staticmethod
     def _require_oos(provenance: Provenance) -> None:
         if Provenance(provenance) != Provenance.OOS:
-            raise LeakageError(
-                "training set built on in-sample forecasts; use detector.run(data, oos=True)"
-            )
+            raise LeakageError("training set built on in-sample forecasts; use detector.run(data, oos=True)")
 
     def to_config(self) -> dict:
         import dataclasses

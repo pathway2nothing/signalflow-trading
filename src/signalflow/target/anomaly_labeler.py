@@ -29,6 +29,9 @@ class AnomalyLabeler(Labeler):
         5. If additionally the return is negative AND happened in < flash_horizon
            bars -> "extreme_negative_anomaly"
         6. Otherwise -> null (no label)
+
+    ``vol_window`` accepts a bar count (int, assuming 1-minute data for the default)
+    or a duration string resolved against the dataset interval.
     """
 
     signal_category: SignalCategory = SignalCategory.ANOMALY
@@ -38,10 +41,11 @@ class AnomalyLabeler(Labeler):
         "normal",
         "extreme_positive_anomaly",
     )
+    duration_fields: ClassVar[tuple[str, ...]] = ("vol_window",)
 
     price_col: str = "close"
     horizon: int = 60
-    vol_window: int = 1440
+    vol_window: int | str = 1440
     threshold_return_std: float = 4.0
     flash_horizon: int = 10
 
@@ -50,7 +54,7 @@ class AnomalyLabeler(Labeler):
     def __post_init__(self) -> None:
         if self.horizon <= 0:
             raise ValueError("horizon must be > 0")
-        if self.vol_window <= 0:
+        if isinstance(self.vol_window, int) and self.vol_window <= 0:
             raise ValueError("vol_window must be > 0")
         if self.threshold_return_std <= 0:
             raise ValueError("threshold_return_std must be > 0")
@@ -74,18 +78,15 @@ class AnomalyLabeler(Labeler):
 
         price = pl.col(self.price_col)
 
-
         df = group_df.with_columns(
             (price / price.shift(1)).log().alias("_log_ret"),
         )
-
 
         df = df.with_columns(
             pl.col("_log_ret")
             .rolling_std(window_size=self.vol_window, min_samples=max(2, self.vol_window // 4))
             .alias("_rolling_vol"),
         )
-
 
         df = df.with_columns(
             (price.shift(-self.horizon) / price).log().alias("_forward_ret"),
@@ -94,9 +95,7 @@ class AnomalyLabeler(Labeler):
             pl.col("_forward_ret").abs().alias("_forward_ret_abs"),
         )
 
-
         horizon_threshold = pl.col("_rolling_vol") * self.threshold_return_std * math.sqrt(self.horizon)
-
 
         flash_threshold = pl.col("_rolling_vol") * self.threshold_return_std * math.sqrt(self.flash_horizon)
         df = df.with_columns(
@@ -127,7 +126,6 @@ class AnomalyLabeler(Labeler):
 
         df = df.with_columns(label_expr)
 
-
         if self.include_meta:
             df = df.with_columns(
                 [
@@ -136,7 +134,6 @@ class AnomalyLabeler(Labeler):
                 ]
             )
 
-
         df = df.drop(
             [
                 c
@@ -144,7 +141,6 @@ class AnomalyLabeler(Labeler):
                 if c in df.columns
             ]
         )
-
 
         if self.mask_to_signals and data_context is not None and "signal_keys" in data_context:
             df = self._apply_signal_mask(df, data_context, group_df)

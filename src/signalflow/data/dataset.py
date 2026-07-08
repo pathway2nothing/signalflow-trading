@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import NamedTuple
 
 import polars as pl
@@ -89,15 +90,9 @@ class Dataset:
 
     def cross_rate(self, base: str, quote: str, prices: dict[str, float]) -> float:
         """Price of ``base`` denominated in ``quote`` given a pair->close map."""
-        if base == quote:
-            return 1.0
-        direct = prices.get(f"{base}{quote}")
-        if direct is not None:
-            return direct
-        inverse = prices.get(f"{quote}{base}")
-        if inverse:
-            return 1.0 / inverse
-        raise KeyError(f"no cross rate {base}->{quote} in data")
+        from signalflow.engine.types import cross_rate
+
+        return cross_rate(base, quote, prices)
 
     def iter_bars(self, columns: list[str] | None = None) -> Iterator[Bar]:
         """Yield one :class:`Bar` per timestamp in order (the replay backbone)."""
@@ -115,13 +110,22 @@ def data(
     end: str | None = None,
     interval: str = "1m",
     quote: str = "USDT",
+    cache_dir: "str | Path | None" = None,
     **source_kwargs,
 ) -> Dataset:
-    """Build a Dataset from a registered source name or a Source instance."""
+    """Build a Dataset from a registered source name or a Source instance.
+
+    When ``cache_dir`` is set the resolved source is wrapped in a disk cache that
+    fetches only spans absent from ``<cache_dir>/<interval>/<PAIR>.parquet``.
+    """
     from signalflow.enums import ComponentType
     from signalflow.registry import registry
 
     src = registry.create(ComponentType.SOURCE, source, **source_kwargs) if isinstance(source, str) else source
+    if cache_dir is not None:
+        from signalflow.data.source.cached import CachedSource
+
+        src = CachedSource(src, cache_dir)
     return Dataset.from_source(src, pairs=pairs, start=start, end=end, interval=interval, quote=quote)
 
 

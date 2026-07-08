@@ -20,7 +20,6 @@ only the framework wiring changed:
 Subclasses register themselves with ``@register_target("<snake_case>")``.
 """
 
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar
@@ -30,7 +29,8 @@ import polars as pl
 from signalflow.data.dataset import Dataset
 from signalflow.enums import RawDataType, SignalCategory
 from signalflow.enums import Signal as SignalType
-from signalflow.target.base import LABEL_COL, Target
+from signalflow.errors import DegenerateTargetError
+from signalflow.target.base import LABEL_COL, Target, resolve_bars
 
 Signals = Any
 
@@ -76,8 +76,18 @@ class Labeler(Target, ABC):
     soft_classes: ClassVar[tuple[str, ...]] = ()
     """Ordered class names emitted by :meth:`compute_soft` as ``p_<class>`` columns."""
 
+    positive_classes: ClassVar[tuple[str, ...]] = ()
+    """String labels mapped to the positive class (1.0); other non-null labels map to 0.0.
+
+    Empty means the legacy coercion (anything not in the negative vocabulary becomes 1.0).
+    Multi-class labelers must set this so their labels do not collapse to a constant.
+    """
+
     soft_col_prefix: ClassVar[str] = "p_"
     """Prefix prepended to each soft class name to form the output column."""
+
+    duration_fields: ClassVar[tuple[str, ...]] = ()
+    """Field names whose value may be a duration string, resolved to bars at ``labels()`` time."""
 
     pair_col: str = "pair"
     ts_col: str = "ts"
@@ -85,7 +95,6 @@ class Labeler(Target, ABC):
     keep_input_columns: bool = False
     output_columns: list[str] | None = None
     filter_signal_type: SignalType | None = None
-
 
     mask_to_signals: bool = False
     out_col: str = "label"
@@ -95,17 +104,14 @@ class Labeler(Target, ABC):
     softness_k: float = 3.0
     """Sigmoid steepness for soft probability calibration."""
 
-
     @property
     def horizon(self) -> int:
         """Forward bars consumed - used for purge/embargo in the walk-forward CV."""
 
-
         own = self.__dict__.get("horizon")
         if isinstance(own, int) and own > 0:
             return own
-        for attr in ("max_horizon", "max_bars", "n_bars", "lookforward",
-                     "max_lookforward", "flash_horizon", "window"):
+        for attr in ("max_horizon", "max_bars", "n_bars", "lookforward", "max_lookforward", "flash_horizon", "window"):
             val = getattr(self, attr, None)
             if isinstance(val, int) and val > 0:
                 return val
@@ -117,24 +123,53 @@ class Labeler(Target, ABC):
                 pass
         return 1
 
+    def _effective_horizon(self) -> int | str:
+        """Raw forward-look value, keeping a duration string unresolved for ``horizon_bars``."""
+        candidates = [self.__dict__.get("horizon")]
+        for attr in ("max_horizon", "max_bars", "n_bars", "lookforward", "max_lookforward", "flash_horizon", "window"):
+            candidates.append(getattr(self, attr, None))
+        for val in candidates:
+            if isinstance(val, str) and val:
+                return val
+            if isinstance(val, int) and not isinstance(val, bool) and val > 0:
+                return val
+        return self.horizon
+
+    def _resolve_durations(self, data: Dataset) -> "Labeler":
+        """Return a copy with duration-string fields resolved to bar counts, or self if none."""
+        import dataclasses
+
+        overrides = {
+            name: resolve_bars(getattr(self, name), data)
+            for name in self.duration_fields
+            if isinstance(getattr(self, name), str)
+        }
+        return dataclasses.replace(self, **overrides) if overrides else self
+
     def labels(self, data: Dataset, at: pl.DataFrame | None = None) -> pl.DataFrame:
         """Target contract: return numeric ``[pair, ts, label]``."""
-        computed = self.compute(data.frame)
-        if self.out_col not in computed.columns:
-            raise ValueError(
-                f"{type(self).__name__}.labels: out_col {self.out_col!r} missing from compute() output"
+        target = self._resolve_durations(data)
+        computed = target.compute(data.frame)
+        if target.out_col not in computed.columns:
+            raise ValueError(f"{type(self).__name__}.labels: out_col {target.out_col!r} missing from compute() output")
+        numeric = self._label_to_numeric(computed.get_column(target.out_col), target.positive_classes)
+        distinct = sorted(numeric.drop_nulls().unique().to_list())
+        if len(distinct) < 2:
+            raise DegenerateTargetError(
+                f"{type(self).__name__}.labels coerced to a degenerate target: non-null labels "
+                f"collapse to {distinct} distinct value(s). Multi-class labelers need an explicit "
+                f"positive-class mapping via the `positive_classes` class attribute."
             )
-        numeric = self._label_to_numeric(computed.get_column(self.out_col))
         result = (
-            computed.select([self.pair_col, self.ts_col])
+            computed.select([target.pair_col, target.ts_col])
             .with_columns(numeric.alias(LABEL_COL))
-            .rename({self.pair_col: "pair", self.ts_col: "ts"})
+            .rename({target.pair_col: "pair", target.ts_col: "ts"})
             .select(["pair", "ts", LABEL_COL])
         )
         return self._restrict(result, at)
 
     @staticmethod
-    def _label_to_numeric(col: pl.Series) -> pl.Series:
+    def _label_to_numeric(col: pl.Series, positive_classes: tuple[str, ...] = ()) -> pl.Series:
         """Coerce a hard-label series into a numeric event/no-event label."""
         dtype = col.dtype
         if dtype.is_numeric():
@@ -144,16 +179,24 @@ class Labeler(Target, ABC):
 
         norm = col.cast(pl.Utf8).str.to_lowercase().str.strip_chars()
 
-
-        expr = (
-            pl.when(norm.is_null())
-            .then(pl.lit(None, dtype=pl.Float64))
-            .when(norm.is_in(list(_NEGATIVE_LABELS)))
-            .then(pl.lit(0.0))
-            .otherwise(pl.lit(1.0))
-        )
+        if positive_classes:
+            positives = [str(c).lower().strip() for c in positive_classes]
+            expr = (
+                pl.when(norm.is_null())
+                .then(pl.lit(None, dtype=pl.Float64))
+                .when(norm.is_in(positives))
+                .then(pl.lit(1.0))
+                .otherwise(pl.lit(0.0))
+            )
+        else:
+            expr = (
+                pl.when(norm.is_null())
+                .then(pl.lit(None, dtype=pl.Float64))
+                .when(norm.is_in(list(_NEGATIVE_LABELS)))
+                .then(pl.lit(0.0))
+                .otherwise(pl.lit(1.0))
+            )
         return pl.select(expr.alias("label")).get_column("label")
-
 
     def compute(
         self,

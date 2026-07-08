@@ -1,251 +1,100 @@
 ---
 title: Home
 description: >
-  SignalFlow is a high-performance Python framework for algorithmic trading,
-  signal detection, meta-labeling validation, and strategy execution.
+  SignalFlow is a Polars-backed Python framework for trading signal research
+  and execution - one deployable object from idea to backtest to live.
 
 hide:
   - navigation
 ---
 
-# Signalflow-trading - High-Performance Algorithmic Trading Framework
+# SignalFlow
 
 > Current stable version: **{{ project_version }}**
 
-**signalflow-trading** is a high-performance Python framework for
-**algorithmic trading**, **quantitative finance**, and
-**ML-powered signal validation**.
+SignalFlow is a Polars-backed framework for algorithmic trading research that
+takes a strategy from idea to backtest to live with **one object you can save
+and ship**. The public surface is six nouns.
 
 ---
 
-## What's New in v0.6
+## The six nouns
 
-<div class="grid cards" markdown>
+| Noun | What it is |
+|------|------------|
+| **Dataset** | One lazy, immutable market-data container. `sf.data(...)` builds it; the same object feeds backtest, paper, and live. |
+| **Transform** | A column-producing step - features (`SMA` in core; `RSI`, `ATR`, `ZScore`, ... via the `signalflow-ta` plugin) and detectors (`SmaCrossDetector`, `ThresholdDetector`) share one contract. |
+| **Models** | `ForecastModel` (trainable predictor -> probability column) plus validator combinators. |
+| **Flow** | The central, deployable, tradeable unit: forecasts -> detectors -> validator -> strategy -> risk. |
+| **Engine** | The decision/execution loop and brokers (`SimBroker` for backtest/paper, `BinanceBroker` for armed live). |
+| **Run** | The result of executing a Flow - equity curve, fills, and a standard `.scorecard()`. |
 
--   :material-code-braces:{ .lg .middle } **Fluent Builder API**
-
-    ---
-
-    Clean, chainable API for backtesting with IDE autocomplete
-
-    ```python
-    result = (
-        sf.Backtest("my_strategy")
-        .data(raw=my_data)
-        .detector("sma_cross")
-        .exit(tp=0.03, sl=0.015)
-        .run()
-    )
-    ```
-
--   :material-graph:{ .lg .middle } **Flow Builder**
-
-    ---
-
-    Execute strategies as directed flows with metric nodes, LTTB downsampling, and artifact caching
-
-    ```python
-    flow = (
-        FlowBuilder("research")
-        .data(store="binance", pair="BTC/USDT")
-        .detector("sma_cross")
-        .metric("sharpe_ratio")
-        .build()
-    )
-    ```
-
--   :material-tag-multiple:{ .lg .middle } **Semantic Decorators**
-
-    ---
-
-    Type-safe component registration: `@sf.detector()`, `@sf.feature()`, `@sf.entry()`, `@sf.exit()`, `@sf.executor()`
-
--   :material-database:{ .lg .middle } **State Persistence**
-
-    ---
-
-    Event log as source of truth: `StrategyStore` with `read_trades` / `verify_snapshot`; state is `fold(events)`, the snapshot is a verifiable cache
-
--   :material-chart-scatter-plot:{ .lg .middle } **Statistical Analysis**
-
-    ---
-
-    Numba-accelerated Monte Carlo, Bootstrap CI, and significance tests
-
--   :material-console:{ .lg .middle } **CLI & YAML Config**
-
-    ---
-
-    Run backtests from command line with YAML configuration and `search_space()` for tuning
-
-</div>
+See the [Concepts](concepts.md) page for the tier stack and the invariants, and
+the [Glossary](glossary.md) for per-term definitions.
 
 ---
 
-<div class="grid cards" markdown>
-
--   :material-lightning-bolt:{ .lg .middle } **High Performance**
-
-    ---
-
-    Polars-first processing for 100+ pairs, 500k+ candles. Numba JIT for statistics
-
--   :material-puzzle:{ .lg .middle } **Modular Design**
-
-    ---
-
-    Component registry with pluggable detectors, validators, features, and strategies
-
--   :material-chart-line:{ .lg .middle } **Production Ready**
-
-    ---
-
-    Same code for backtesting, paper trading, and live execution
-
--   :material-brain:{ .lg .middle } **ML-Powered**
-
-    ---
-
-    scikit-learn, XGBoost, LightGBM, PyTorch signal validation with meta-labeling
-
-</div>
-
----
-
-## The Signal Pipeline
-
-```mermaid
-flowchart LR
-    A[Market Data] --> B[Signal Detection]
-    B --> C[Signal Validation]
-    C --> D[Strategy Execution]
-
-    style A fill:#14b8a6,stroke:#0d9488,stroke-width:2px,color:#fff
-    style B fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
-    style C fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:#fff
-    style D fill:#22c55e,stroke:#16a34a,stroke-width:2px,color:#fff
-```
-
-### 1. Data & Features
-
-- **7 Exchange Sources**: Binance, Bybit, OKX, Deribit, Kraken, Hyperliquid, WhiteBIT
-- DuckDB, SQLite, PostgreSQL storage backends
-- 189+ technical indicators via [signalflow-ta](ecosystem/signalflow-ta.md)
-
-### 2. Signal Detection
-
-- Classical algorithms (SMA crossover, MACD, RSI, structure detection)
-- Neural network predictions via [signalflow-labs](ecosystem/signalflow-labs.md)
-- Custom detectors via `@sf.detector("name")`
-
-### 3. Signal Validation (Meta-Labeling)
-
-- Lopez de Prado's meta-labeling methodology
-- scikit-learn, XGBoost, LightGBM classifiers
-- Deep learning validators via PyTorch Lightning
-
-### 4. Strategy Execution
-
-- **Entry/exit rules**: signal-based, model-driven, composite
-- **Position sizing**: Kelly Criterion, volatility targeting, risk parity, martingale
-- **Entry filters**: regime, volatility, drawdown, correlation, time-of-day
-- **Signal aggregation**: majority, weighted, unanimous, meta-labeling
-- **Real-time**: Paper trading with `RealtimeRunner`, monitoring, alerts
-- **State persistence**: Redis/DuckDB/Memory with crash recovery
-
----
-
-## Quick Example
+## Idea -> first backtest
 
 ```python
 import signalflow as sf
 
-result = (
-    sf.Backtest("momentum_strategy")
-    .data(raw=my_raw_data)
-    .detector("example/sma_cross", fast_period=20, slow_period=50)
-    .entry(size_pct=0.1, max_positions=5)
-    .exit(tp=0.03, sl=0.015, trailing=0.02)
-    .capital(50_000)
-    .fee(0.001)
-    .run()
-)
+ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 
-print(result.summary())
-result.plot()
+model = sf.ForecastModel(target=sf.FixedHorizon(bars=12),
+                         features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20), sf.SMA(50)))
+model.fit(ds)                                          # train tier-1 forecaster
+
+flow = sf.Flow(name="sma_rise",
+               forecasts={"rise": model},
+               detectors=[sf.ThresholdDetector(forecast="rise", p_min=0.6)],
+               strategy=sf.RulesStrategy())
+run = flow.backtest(ds, capital=50_000)
+print(run.scorecard())                                 # total_return, sharpe, max_drawdown, ...
 ```
 
-### Custom Components
+The [Quick Start](quickstart.md) walks through this same example plus the
+save/load round-trip.
+
+---
+
+## Three invariants worth knowing
+
+**Leak-free OOS by mechanism.** A `ForecastModel` trains out-of-fold with an
+embargo, and `predict_oos` returns values only inside the trained out-of-sample
+span. A `Provenance` stamp and the `LeakageError` guard make in-sample scoring a
+raised exception, not a silent bias.
+
+**Backtest == simulate.** `flow.backtest` precomputes signals over a finished
+Dataset; `flow.simulate` replays the identical loop used live, one bar at a time.
+When a flow is causal the two agree exactly, so a mismatch is a look-ahead bug you
+can catch before deploying.
+
+**Deploy is data.** `flow.save(path, model_dir=...)` serializes the whole stack
+(config plus trained artifacts) to YAML and a model directory; `sf.Flow.load(path)`
+brings it back to a byte-identical backtest. Promoting a strategy is moving a file.
+
+---
+
+## Backtest -> paper -> live
+
+One decision core drives all three modes. Backtest and paper replay a finished
+Dataset; live consumes a streaming feed and routes orders to a real venue when
+`armed=True`.
 
 ```python
-import signalflow as sf
-from signalflow.detector import SignalDetector
+flow.paper(ds, capital=50_000)                         # sim fills over a Dataset
 
-@sf.detector("my/custom_detector")
-class CustomDetector(SignalDetector):
-    def detect(self, data):
-        return signals
+feed = sf.PollingFeed(sf.BinanceSource(), pairs=["BTCUSDT"], interval="1m")
+flow.live(feed, capital=50_000)                        # live data, SimBroker (paper)
 ```
 
-Available decorators: `@sf.detector()`, `@sf.feature()`, `@sf.entry()`, `@sf.exit()`, `@sf.executor()`, `@sf.data_source()`, `@sf.data_store()`, `@sf.strategy_store()`, `@sf.register()`
+See [Live & Walk-Forward](guide/live-and-walk-forward.md) for the walk-forward
+and rolling-refit workflow.
 
 ---
 
-## Key Features
-
-### :octicons-zap-16: Polars-First Performance
-Core data processing uses Polars for extreme efficiency on large datasets, with seamless Pandas compatibility.
-
-### :octicons-beaker-16: Advanced Labeling
-Triple Barrier Method, Fixed Horizon, Trend Scanning, Volatility and Volume labelers. Numba-accelerated (45s to 0.3s).
-
-### :octicons-graph-16: 189+ Technical Indicators
-The [signalflow-ta](ecosystem/signalflow-ta.md) extension: momentum, volatility, trend, statistics, and physics-based market analogs.
-
-### :octicons-rocket-16: Paper Trading & Monitoring
-`RealtimeRunner` with async data sync, virtual broker, drawdown/stuck-position alerts, and crash recovery.
-
-### :octicons-cpu-16: Statistical Validation
-Monte Carlo simulation, Bootstrap confidence intervals, significance tests - all Numba JIT-compiled.
-
-### :octicons-plug-16: Flow Builder
-Execute strategies as directed acyclic graphs with metric nodes, progress callbacks, and LTTB downsampling.
-
----
-
-## Technology Stack
-
-<div class="grid" markdown>
-
-=== "Data Processing"
-    - **Polars** - High-performance DataFrames
-    - **DuckDB** - Embedded analytics database
-    - **Pandas** - Compatibility layer
-    - **NumPy** - Numerical computing
-
-=== "Machine Learning"
-    - **scikit-learn** - Classical ML models
-    - **XGBoost / LightGBM** - Gradient boosting
-    - **PyTorch + Lightning** - Deep learning
-    - **Optuna** - Hyperparameter optimization
-    - **Numba** - JIT compilation
-
-=== "Trading"
-    - **signalflow-ta** - 189+ indicators
-    - **pandas-ta** - TA foundation
-    - **Plotly** - Interactive charts
-
-=== "Infrastructure"
-    - **Redis** - State persistence (production)
-    - **DuckDB / SQLite / PostgreSQL** - Storage
-    - **Kedro** - Pipeline orchestration
-    - **FastAPI** - Web backend (sf-ui)
-
-</div>
-
----
-
-## SignalFlow Ecosystem
+## SignalFlow ecosystem
 
 <div class="grid cards" markdown>
 
@@ -253,7 +102,7 @@ Execute strategies as directed acyclic graphs with metric nodes, progress callba
 
     ---
 
-    Data containers, signal detection, backtesting, strategy execution, state persistence, statistical analysis
+    Dataset, Transform, ForecastModel, Flow, Engine, Run. Polars-first, deploy-is-data.
 
     ```bash
     pip install signalflow-trading
@@ -263,34 +112,27 @@ Execute strategies as directed acyclic graphs with metric nodes, progress callba
 
     ---
 
-    189+ technical indicators, 24 signal detectors, physics-based market analogs, AutoFeatureNormalizer
+    248 technical-indicator features + 21 detectors, physics-based market analogs.
 
     ```bash
-    pip install signalflow-ta
+    pip install "signalflow-trading[ta]"
     ```
 
 -   :material-brain:{ .lg .middle } **[signalflow-labs](ecosystem/signalflow-labs.md)**
 
     ---
 
-    14 neural encoders (LSTM, Transformer, PatchTST, TCN), 7 heads, 4 loss functions
+    Neural encoders (LSTM, Transformer, PatchTST, TCN) and an RL strategy.
 
     ```bash
-    pip install signalflow-labs
+    pip install "signalflow-trading[labs]"
     ```
-
--   :material-pipe:{ .lg .middle } **[sf-kedro](ecosystem/sf-kedro.md)**
-
-    ---
-
-    Universal ML pipelines: backtest, analyze, train, tune, validate with Optuna and MLflow
-
 
 </div>
 
 ---
 
-## Getting Started
+## Getting started
 
 <div class="grid cards" markdown>
 
@@ -298,52 +140,35 @@ Execute strategies as directed acyclic graphs with metric nodes, progress callba
 
     ---
 
-    Install SignalFlow and set up your environment
+    Install SignalFlow and verify the registry.
 
 -   :material-rocket-launch:{ .lg .middle } **[Quick Start](quickstart.md)**
 
     ---
 
-    Build your first strategy in 5 minutes
+    Build and round-trip your first Flow.
 
--   :material-tag-multiple:{ .lg .middle } **[Semantic Decorators](guide/semantic-decorators.md)**
-
-    ---
-
-    Register custom components with type-safe decorators
-
--   :material-strategy:{ .lg .middle } **[Advanced Strategies](guide/advanced-strategies.md)**
+-   :material-sitemap:{ .lg .middle } **[Concepts](concepts.md)**
 
     ---
 
-    Position sizing, entry filters, signal aggregation
-
--   :material-puzzle:{ .lg .middle } **[Ecosystem](ecosystem/index.md)**
-
-    ---
-
-    signalflow-ta, signalflow-labs, sf-kedro
+    The tier stack, the invariants, and where they are enforced.
 
 -   :material-code-braces:{ .lg .middle } **[API Reference](api/index.md)**
 
     ---
 
-    Complete documentation for all classes and methods
+    Full documentation for every public class and method.
 
 </div>
 
 ---
 
-## Support
-
-- **GitHub**: [github.com/pathway2nothing/signalflow-trading](https://github.com/pathway2nothing/signalflow-trading)
-- **Issues**: [Report bugs or request features](https://github.com/pathway2nothing/signalflow-trading/issues)
-
----
-
 ## License
 
-SignalFlow is open source software released under the [MIT License](https://opensource.org/licenses/MIT).
+SignalFlow is released under the [MIT License](https://opensource.org/licenses/MIT).
 
 !!! warning "Disclaimer"
-    SignalFlow is provided for research purposes. Trading financial instruments carries risk. Past performance does not guarantee future results. Use at your own risk.
+    SignalFlow is provided for research purposes. Trading financial instruments
+    carries risk. Past performance does not guarantee future results. Use at your
+    own risk.

@@ -11,8 +11,8 @@ stamps the resulting Dataset's ``provenance`` so the MetaLabelingSampler's leak
 guard (Invariant L) can verify it.
 """
 
-
 from abc import abstractmethod
+from typing import ClassVar
 
 import polars as pl
 
@@ -24,9 +24,16 @@ from signalflow.transform.base import Transform
 class SignalDetector(Transform):
     """Transform whose single output column is ``signal``."""
 
+    required_targets: ClassVar[dict] = {}
+    """Slot -> acceptable registered target names; empty imposes no constraint."""
+
     @property
     def outputs(self) -> list[str]:
         return [SIGNAL_COL]
+
+    def required_slots(self) -> "tuple[str, ...]":
+        """Forecast slot names this detector reads; empty when it fuses none."""
+        return ()
 
     @abstractmethod
     def detect(self, df: pl.DataFrame) -> pl.DataFrame:

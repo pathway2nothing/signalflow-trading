@@ -94,15 +94,19 @@ class TimeToBarrierLabeler(Labeler):
     load on ``p_sl_fast``; trades that never touch either load on
     ``p_vertical``. This is useful for ranking trades by *expected speed* of
     resolution, not just direction.
+
+    ``horizon`` accepts a bar count (int, assuming 1-minute data for the default) or a
+    duration string (``"1d"``) resolved against the dataset interval.
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_DIRECTION
 
     soft_classes: ClassVar[tuple[str, ...]] = ("sl_fast", "vertical", "pt_fast")
+    duration_fields: ClassVar[tuple[str, ...]] = ("horizon",)
 
     price_col: str = "close"
     vol_window: int = 60
-    horizon: int = 1440
+    horizon: int | str = 1440
     profit_multiplier: float = 1.0
     stop_loss_multiplier: float = 1.0
 
@@ -112,7 +116,7 @@ class TimeToBarrierLabeler(Labeler):
     def __post_init__(self) -> None:
         if self.vol_window <= 1:
             raise ValueError("vol_window must be > 1")
-        if self.horizon <= 0:
+        if isinstance(self.horizon, int) and self.horizon <= 0:
             raise ValueError("horizon must be > 0")
         if self.profit_multiplier <= 0 or self.stop_loss_multiplier <= 0:
             raise ValueError("profit_multiplier/stop_loss_multiplier must be > 0")
@@ -204,12 +208,10 @@ class TimeToBarrierLabeler(Labeler):
         pt = df.get_column("_pt").fill_null(np.nan).to_numpy().astype(np.float64)
         sl = df.get_column("_sl").fill_null(np.nan).to_numpy().astype(np.float64)
 
-
         n = prices.shape[0]
         h = int(self.horizon)
         pt_off = np.zeros(n, dtype=np.int32)
         sl_off = np.zeros(n, dtype=np.int32)
-
 
         for i in range(n):
             if np.isnan(pt[i]) or np.isnan(sl[i]):

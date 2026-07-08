@@ -1,22 +1,19 @@
 """Persistence layer round-trip tests."""
 
-
 import os
 import warnings
 
 import numpy as np
 import pytest
 
-warnings.filterwarnings("ignore", message="X does not have valid feature names")
-
-pytestmark = pytest.mark.filterwarnings(
-    "ignore:X does not have valid feature names"
-)
-
 from signalflow.data import data
 from signalflow.model import ForecastModel
 from signalflow.target import FixedHorizon
 from signalflow.transform import SMA, FeaturePipe
+
+warnings.filterwarnings("ignore", message="X does not have valid feature names")
+
+pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature names")
 
 
 @pytest.fixture(scope="module")
@@ -59,6 +56,36 @@ def test_mlflow_round_trip(fitted, tmp_path, monkeypatch):
 
     model, ds = fitted
     uri = model.save("mlflow://models/sf_test_model")
+    assert uri.startswith("mlflow://")
+    loaded = ForecastModel.load(uri)
+    _assert_round_trip(loaded, model, ds)
+
+
+def test_mlflow_save_inside_active_run(fitted, tmp_path):
+    import mlflow
+
+    tracking = (tmp_path / "mlruns").resolve().as_uri()
+    mlflow.set_tracking_uri(tracking)
+
+    model, ds = fitted
+    mlflow.set_experiment("caller_experiment")
+    caller_exp = mlflow.get_experiment_by_name("caller_experiment")
+
+    with mlflow.start_run() as parent:
+        parent_id = parent.info.run_id
+        uri = model.save("mlflow://models/sf_nested_model")
+
+        active = mlflow.active_run()
+        assert active is not None
+        assert active.info.run_id == parent_id
+        assert active.info.experiment_id == caller_exp.experiment_id
+
+        children = mlflow.search_runs(
+            experiment_ids=[caller_exp.experiment_id],
+            filter_string=f"tags.mlflow.parentRunId = '{parent_id}'",
+        )
+        assert len(children) >= 1
+
     assert uri.startswith("mlflow://")
     loaded = ForecastModel.load(uri)
     _assert_round_trip(loaded, model, ds)

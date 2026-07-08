@@ -1,6 +1,5 @@
 """Foundation: enums, registry, errors, data layer, transforms."""
 
-
 import polars as pl
 import pytest
 
@@ -20,9 +19,60 @@ def test_registry_has_seven_types():
     assert "sma_cross" in sf.registry.list(sf.ComponentType.TRANSFORM)
 
 
+def test_registry_lists_targets():
+    names = sf.registry.list(sf.ComponentType.TARGET)
+    assert len(names) >= 26
+    for expected in ("fixed_horizon", "triple_barrier", "trend_scanning"):
+        assert expected in names
+
+
+def test_make_target_builds_from_registry():
+    from signalflow.target import FixedHorizon, make_target
+
+    t = make_target("fixed_horizon", bars=12)
+    assert isinstance(t, FixedHorizon)
+    assert t.bars == 12
+
+
+def test_target_schema_introspection():
+    schema = sf.registry.get_schema(sf.ComponentType.TARGET, "triple_barrier_labeler")
+    params = {p["name"]: p for p in schema["parameters"]}
+    assert params["horizon"]["type"] == "int | str"
+
+
 def test_registry_unknown_raises():
     with pytest.raises(sf.UnknownComponentError):
         sf.registry.get(sf.ComponentType.TRANSFORM, "does_not_exist")
+
+
+def test_registry_collision_raises_and_keeps_first():
+    from signalflow.decorators import feature
+
+    @feature("spec007_collide")
+    class FirstImpl:
+        pass
+
+    with pytest.raises(ValueError):
+
+        @feature("spec007_collide")
+        class SecondImpl:
+            pass
+
+    assert sf.registry.get(sf.ComponentType.TRANSFORM, "spec007_collide") is FirstImpl
+
+
+def test_registry_override_replaces():
+    from signalflow.decorators import feature
+
+    @feature("spec007_override")
+    class OrigImpl:
+        pass
+
+    @feature("spec007_override", override=True)
+    class NewImpl:
+        pass
+
+    assert sf.registry.get(sf.ComponentType.TRANSFORM, "spec007_override") is NewImpl
 
 
 def test_dataset_basics(ds):

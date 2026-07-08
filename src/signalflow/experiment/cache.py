@@ -11,47 +11,17 @@ Keys also carry a ``kind`` discriminator so out-of-sample-for-training artifacts
 (``kind="inference"``) can never collide.
 """
 
-
-import inspect
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import polars as pl
 
+from signalflow._hash import code_fingerprint, stable_hash
 from signalflow.errors import ArtifactError
-from signalflow.model.oos import stable_hash
 
 VALID_KINDS = ("oos_for_training", "inference")
 
-
-def code_fingerprint(obj) -> str:
-    """
-    Hash the source of a callable/class (or its module version) so an edit to
-    the producing code changes the cache key.
-
-    Falls back to a module-version / qualified-name identity when source is not
-    retrievable (e.g. C extensions, builtins).
-    """
-    target = obj
-
-    if not (inspect.isclass(obj) or inspect.isfunction(obj) or inspect.ismethod(obj)):
-        if callable(obj) and not inspect.isbuiltin(obj):
-            target = type(obj)
-        else:
-            target = type(obj)
-    try:
-        src = inspect.getsource(target)
-        return stable_hash({"src": src})
-    except (OSError, TypeError):
-        module = getattr(target, "__module__", "?")
-        version = "?"
-        try:
-            import importlib
-
-            version = getattr(importlib.import_module(module), "__version__", "?")
-        except Exception:
-            pass
-        return stable_hash({"module": module, "qualname": getattr(target, "__qualname__", repr(target)), "version": version})
+__all__ = ["ArtifactCache", "code_fingerprint", "stable_hash"]
 
 
 class ArtifactCache:
@@ -60,7 +30,6 @@ class ArtifactCache:
     def __init__(self, root: str) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
-
 
     def key(self, parts: dict, *, producer=None, kind: str = "inference") -> str:
         """Compute the content-addressed key for ``parts``."""
@@ -78,7 +47,6 @@ class ArtifactCache:
         safe = key.replace(":", "_")
         return self.root / f"{safe}.parquet"
 
-
     def get(self, key: str) -> pl.DataFrame | None:
         path = self._path(key)
         if not path.exists():
@@ -94,7 +62,6 @@ class ArtifactCache:
         tmp = self._path(key).with_suffix(".parquet.tmp")
         df.write_parquet(tmp)
         tmp.replace(self._path(key))
-
 
     def compute_cached(self, key: str, fn: Callable[[], pl.DataFrame]) -> pl.DataFrame:
         """Return the cached frame for ``key`` or compute it via ``fn`` and store it."""
