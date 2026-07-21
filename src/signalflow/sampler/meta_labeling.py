@@ -1,6 +1,5 @@
 """MetaLabelingSampler - train only where a detector fired."""
 
-
 import polars as pl
 
 from signalflow.data.dataset import Dataset
@@ -17,7 +16,7 @@ class MetaLabelingSampler(Sampler):
         self.signals = signals
 
     def sample(self, data: Dataset) -> SampleSet:
-        self._require_oos(self.signals.provenance)
+        self._require_oos(self.signals)
         events = self.signals.frame.filter(pl.col(SIGNAL_COL) != NONE)
         weights = events.get_column("weight") if "weight" in events.columns else None
         return SampleSet(

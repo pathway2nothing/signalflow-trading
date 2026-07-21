@@ -18,7 +18,6 @@ If no tracking URI is configured we default to a local ``./mlruns`` file store s
 this works without a running server.
 """
 
-import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -54,13 +53,20 @@ def _parse_location(location: str) -> tuple[str, str | None]:
 
 
 def save(model, location: str) -> str:
-    """Persist ``model`` under ``location``; nests inside the caller's active run if any."""
+    """Persist ``model`` under ``location``; nests inside the caller's active run if any.
+
+    On a successful registry write the returned URI is pinned to the new version
+    (``mlflow://models/<name>@<version>``) so a later load is reproducible; if
+    registration fails the URI stays unversioned and load resolves ``latest``.
+    """
     import mlflow
+    from loguru import logger
 
     name, _ = _parse_location(location)
     _ensure_tracking_uri()
 
     inside_active_run = mlflow.active_run() is not None
+    version: str | None = None
     try:
         with tempfile.TemporaryDirectory() as tmp:
             write_layout(model, tmp)
@@ -72,14 +78,21 @@ def save(model, location: str) -> str:
             with mlflow.start_run(**run_kwargs) as run:
                 mlflow.log_artifacts(tmp, artifact_path=_ARTIFACT_PATH)
                 model_uri = f"runs:/{run.info.run_id}/{_ARTIFACT_PATH}"
-
-                with contextlib.suppress(Exception):
-                    mlflow.register_model(model_uri, name)
+                try:
+                    registered = mlflow.register_model(model_uri, name)
+                    version = getattr(registered, "version", None)
+                except Exception as exc:
+                    logger.warning(
+                        f"mlflow: registration failed for {name!r}; URI stays unversioned "
+                        f"and load will resolve 'latest': {exc}"
+                    )
     except ArtifactError:
         raise
     except Exception as exc:
         raise ArtifactError(f"mlflow save failed for {location!r}: {exc}") from exc
 
+    if version is not None:
+        return f"mlflow://models/{name}@{version}"
     return f"mlflow://models/{name}"
 
 
@@ -117,8 +130,12 @@ def _download_from_run(name: str) -> str | None:
 
 
 def load(location: str):
+    from loguru import logger
+
     name, ref = _parse_location(location)
     _ensure_tracking_uri()
+    if ref is None:
+        logger.warning("mlflow uri has no @version; resolving 'latest' is not reproducible")
 
     try:
         local = _download_from_registry(name, ref)

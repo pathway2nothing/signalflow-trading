@@ -32,6 +32,7 @@ from signalflow.errors import (
     KillSwitchTripped,
     LeakageError,
     PipeError,
+    RegistryError,
     SchemaVersionError,
     SignalFlowError,
     UnfittedTransformError,
@@ -39,6 +40,17 @@ from signalflow.errors import (
     UntrainedModelError,
 )
 from signalflow.registry import registry
+from signalflow.decorators import (
+    broker as register_broker,
+    detector as register_detector,
+    feature as register_feature,
+    metric as register_metric,
+    model as register_model,
+    sampler as register_sampler,
+    source as register_source,
+    strategy as register_strategy,
+    transform as register_transform,
+)
 
 
 from signalflow.data import BinanceSource, Dataset, MemorySource, data
@@ -46,10 +58,11 @@ from signalflow.data import BinanceSource, Dataset, MemorySource, data
 
 from signalflow.transform import SMA, Feature, FeaturePipe, Transform, build_pipe
 from signalflow.transform.encode import Binning, IVSelector, WoE
+from signalflow.transform.store import FeatureStore
 
 
 from signalflow import target
-from signalflow.target import FixedHorizon, Target, TripleBarrier
+from signalflow.target import FixedHorizon, ReversionBarrier, Target, TripleBarrier, VolHorizon, VolTripleBarrier
 from signalflow.sampler import (
     CUSUMSampler,
     MetaLabelingSampler,
@@ -67,6 +80,7 @@ from signalflow.model import (
     VoteValidator,
     WalkForwardFold,
     WalkForwardResult,
+    classification_scorecard,
     walk_forward,
 )
 from signalflow.detector import (
@@ -102,12 +116,25 @@ from signalflow.strategy import (
 from signalflow.flow import Flow, LiveFeed, PollingFeed, ReplayFeed, Run, run_live_loop
 
 
-from signalflow.experiment import ArtifactCache, Experiment, Scorecard, bootstrap_ci, monte_carlo_bounds
+from signalflow.experiment import (
+    ArtifactCache,
+    Experiment,
+    Scorecard,
+    bootstrap_ci,
+    experiment_run,
+    monte_carlo_bounds,
+    run_experiment,
+    seed_everything,
+)
 
 
 _OPT = []
 try:
-    from signalflow.strategy import LLMClient, LLMStrategy, OpenAICompatClient
+    from signalflow.strategy import (
+        LLMClient as LLMClient,
+        LLMStrategy as LLMStrategy,
+        OpenAICompatClient as OpenAICompatClient,
+    )
 
     _OPT += ["LLMStrategy", "LLMClient", "OpenAICompatClient"]
 except Exception:
@@ -127,6 +154,15 @@ __all__ = [
     "Provenance",
     "ComponentType",
     "registry",
+    "register_transform",
+    "register_feature",
+    "register_detector",
+    "register_model",
+    "register_strategy",
+    "register_sampler",
+    "register_broker",
+    "register_metric",
+    "register_source",
     "SignalFlowError",
     "UntrainedModelError",
     "FlowConfigError",
@@ -139,6 +175,7 @@ __all__ = [
     "UnknownComponentError",
     "UnfittedTransformError",
     "DegenerateTargetError",
+    "RegistryError",
     "data",
     "Dataset",
     "BinanceSource",
@@ -146,6 +183,7 @@ __all__ = [
     "Transform",
     "Feature",
     "FeaturePipe",
+    "FeatureStore",
     "build_pipe",
     "SMA",
     "WoE",
@@ -155,6 +193,9 @@ __all__ = [
     "Target",
     "FixedHorizon",
     "TripleBarrier",
+    "VolTripleBarrier",
+    "VolHorizon",
+    "ReversionBarrier",
     "Sampler",
     "SampleSet",
     "UniformSampler",
@@ -168,6 +209,7 @@ __all__ = [
     "walk_forward",
     "WalkForwardResult",
     "WalkForwardFold",
+    "classification_scorecard",
     "SignalDetector",
     "SmaCrossDetector",
     "ThresholdDetector",
@@ -201,4 +243,8 @@ __all__ = [
     "ArtifactCache",
     "bootstrap_ci",
     "monte_carlo_bounds",
-] + _OPT
+    "experiment_run",
+    "seed_everything",
+    "run_experiment",
+    *_OPT,
+]

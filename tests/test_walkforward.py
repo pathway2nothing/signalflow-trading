@@ -57,3 +57,21 @@ def test_evaluate_one_row_per_fold(wf_result):
     assert scores.height == len(result.folds)
     assert "score" in scores.columns
     assert scores.get_column("score").null_count() == 0
+
+
+def test_fold_predictions_match_full_history_predictions():
+    ds = data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-06-01", interval="1h")
+    model = ForecastModel(
+        target=FixedHorizon(bars=12),
+        features=FeaturePipe(SMA(50)),
+        encode=None,
+        select=None,
+    )
+    result = walk_forward(model, ds, train="60d", step="10d")
+    assert result.folds
+    for fold in result.folds:
+        full = fold.model.predict(ds).rename({"p_rise": "p_full"})
+        joined = fold.oos.join(full, on=["pair", "ts"], how="inner")
+        assert joined.height == fold.oos.height
+        diff = (joined.get_column("p_rise") - joined.get_column("p_full")).abs().max()
+        assert diff == 0.0

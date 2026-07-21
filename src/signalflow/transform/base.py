@@ -24,11 +24,15 @@ from abc import ABC, abstractmethod
 
 import polars as pl
 
-from signalflow.errors import UnfittedTransformError
+from signalflow.errors import PipeError, UnfittedTransformError
 
 
 class Transform(ABC):
-    """Base contract for every computation in the framework."""
+    """Base contract for every computation in the framework.
+
+    A parameterized subclass must be a ``@dataclass`` (or override ``to_config``)
+    so its constructor parameters round-trip through flow.yaml.
+    """
 
     requires_fit: bool = False
     requires_target: bool = False
@@ -42,7 +46,16 @@ class Transform(ABC):
         return getattr(self, "_sf_role", "transform")
 
     def to_config(self) -> dict:
-        """Round-trippable ``{transform, role, params}`` (registry reconstructs it)."""
+        """Round-trippable ``{transform, role, params}`` (registry reconstructs it).
+
+        Subclasses carrying constructor parameters must be dataclasses so those
+        parameters can be captured for the flow.yaml round-trip.
+        """
+        if not dataclasses.is_dataclass(self) and type(self).__init__ is not object.__init__:
+            raise PipeError(
+                f"{type(self).__qualname__} is not a dataclass; its constructor parameters "
+                f"cannot be captured for flow.yaml round-trip"
+            )
         params = {}
         if dataclasses.is_dataclass(self):
             for f in dataclasses.fields(self):

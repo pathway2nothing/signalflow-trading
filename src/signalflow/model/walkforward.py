@@ -12,12 +12,36 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
+import numpy as np
 import polars as pl
+from loguru import logger
 
 from signalflow.data.dataset import Dataset
 from signalflow.experiment.cache import ArtifactCache
 from signalflow.model.forecast import ForecastModel
 from signalflow.model.oos import parse_duration
+from signalflow.target import LABEL_COL
+
+_METRIC_PRESETS = ("auc", "pr_auc", "brier")
+
+
+def _resolve_metric(name: str, output_col: str) -> "Callable[[pl.DataFrame], float]":
+    """Build a per-fold scorer for a preset name (``auc``/``pr_auc``/``brier``)."""
+    if name not in _METRIC_PRESETS:
+        raise ValueError(f"unknown metric preset {name!r}; choose from {list(_METRIC_PRESETS)} or pass a callable")
+    from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
+
+    def score(frame: pl.DataFrame) -> float:
+        df = frame.drop_nulls(subset=[output_col, LABEL_COL])
+        y = df.get_column(LABEL_COL).cast(pl.Int8).to_numpy()
+        p = df.get_column(output_col).to_numpy()
+        if name == "brier":
+            return float(brier_score_loss(y, p)) if y.size else float("nan")
+        if len(np.unique(y)) < 2:
+            return float("nan")
+        return float(roc_auc_score(y, p)) if name == "auc" else float(average_precision_score(y, p))
+
+    return score
 
 
 @dataclass
@@ -45,8 +69,12 @@ class WalkForwardResult:
             return pl.DataFrame()
         return pl.concat(parts).unique(subset=["pair", "ts"], keep="first").sort(["pair", "ts"])
 
-    def evaluate(self, metric: Callable[[pl.DataFrame], float]) -> pl.DataFrame:
-        """One row per fold: its window bounds and ``metric(fold.oos)``."""
+    def evaluate(self, metric: "Callable[[pl.DataFrame], float] | str") -> pl.DataFrame:
+        """One row per fold: its window bounds and ``metric(fold.oos)``.
+
+        ``metric`` is a callable on a fold's OOS frame, or a preset name
+        (``"auc"``, ``"pr_auc"``, ``"brier"``); an unknown name raises ``ValueError``.
+        """
         rows = [
             {
                 "fold": i,
@@ -54,7 +82,7 @@ class WalkForwardResult:
                 "train_end": f.train_end,
                 "test_start": f.test_start,
                 "test_end": f.test_end,
-                "score": float(metric(f.oos)),
+                "score": float((_resolve_metric(metric, f.model.output) if isinstance(metric, str) else metric)(f.oos)),
             }
             for i, f in enumerate(self.folds)
         ]
@@ -111,6 +139,23 @@ def _windows(
     return windows
 
 
+def _test_slice(data: Dataset, test_start: datetime, test_end: datetime, warmup: int) -> Dataset:
+    """Test window plus the trailing ``warmup`` bars per pair so features start hot."""
+    frame = data.frame.filter(pl.col("ts") < test_end)
+    if warmup <= 0:
+        return Dataset(frame=frame.filter(pl.col("ts") >= test_start), quote=data.quote)
+    history = frame.filter(pl.col("ts") < test_start)
+    lookback = history.filter(pl.col("ts").rank("ordinal", descending=True).over("pair") <= warmup)
+    short = lookback.group_by("pair").len().filter(pl.col("len") < warmup)
+    if short.height:
+        logger.warning(
+            f"walk_forward: pairs with less than {warmup} lookback bars before {test_start}: "
+            f"{short.get_column('pair').to_list()}"
+        )
+    window = frame.filter(pl.col("ts") >= test_start)
+    return Dataset(frame=pl.concat([lookback, window]).sort(["pair", "ts"]), quote=data.quote)
+
+
 def walk_forward(
     model: "ForecastModel",
     data: Dataset,
@@ -120,6 +165,7 @@ def walk_forward(
     end: "datetime | None" = None,
     save_to: "str | None" = None,
     cache: "ArtifactCache | None" = None,
+    feature_store=None,
 ) -> WalkForwardResult:
     """Calendar-stepped walk-forward: refit ``model`` per fold on the trailing ``train`` window.
 
@@ -133,8 +179,8 @@ def walk_forward(
     for i, (train_start, train_end, test_start, test_end) in enumerate(windows):
         fold_model = copy.deepcopy(model)
         train_ds = data.slice_time(train_start, train_end)
-        fold_model.fit(train_ds, cache=cache)
-        test_ds = data.slice_time(test_start, test_end)
+        fold_model.fit(train_ds, cache=cache, feature_store=feature_store)
+        test_ds = _test_slice(data, test_start, test_end, fold_model.features.warmup)
         preds = fold_model.predict(test_ds)
         oos = preds.join(labels_all, on=["pair", "ts"], how="left") if labels_all is not None else preds
         oos = oos.filter((pl.col("ts") >= test_start) & (pl.col("ts") < test_end)).sort(["pair", "ts"])

@@ -85,6 +85,17 @@ def test_wider_span_fetches_only_missing_tail(tmp_path):
     assert tail_start > _parse("2023-01-01")
 
 
+def test_repeat_request_no_tail_refetch(tmp_path):
+    counting = CountingSource(TsSource())
+    cached = CachedSource(counting, tmp_path)
+
+    cached.fetch(["BTCUSDT"], "2023-01-01", "2023-01-10", "1h")
+    before = len(counting.calls)
+    cached.fetch(["BTCUSDT"], "2023-01-01", "2023-01-10", "1h")
+
+    assert len(counting.calls) == before
+
+
 def test_cached_data_identical_to_uncached(tmp_path):
     cached = CachedSource(TsSource(), tmp_path)
     cached.fetch(["BTCUSDT"], "2023-01-01", "2023-01-10", "1h")

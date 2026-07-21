@@ -5,7 +5,7 @@ API reference for `signalflow.ta` - 248 technical-indicator features + 21 detect
 !!! info "Separate Package"
     Install with `pip install signalflow-ta`. See the [ecosystem page](../ecosystem/signalflow-ta.md) for usage guide, examples, and pipeline factories.
 
-All classes extend `signalflow.feature.base.Feature` and are registered via semantic decorators (e.g., `@sf.feature("name")`). Import directly from `signalflow.ta`:
+All classes extend `signalflow.transform.Feature` and are registered via semantic decorators (e.g., `@sf.register_feature("name")`). Import directly from `signalflow.ta`:
 
 ```python
 import signalflow.ta as ta

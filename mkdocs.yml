@@ -124,17 +124,7 @@ nav:
     - CLI & YAML Config: guide/cli.md
     - Custom Detectors: guide/custom-detectors.md
     - Live & Walk-Forward: guide/live-and-walk-forward.md
-  - Legacy (V4):
-    - Signal Architecture & Meta-Labeling: guide/signal-architecture.md
-    - Semantic Decorators: guide/semantic-decorators.md
-    - Data Sources: guide/data-sources.md
-    - Data Stores: guide/data-stores.md
-    - Custom Data Types: guide/custom-data-types.md
-    - Signal Validators: guide/validators.md
-    - Advanced Strategies: guide/advanced-strategies.md
-    - State Persistence: guide/state-persistence.md
-    - Statistical Analysis: guide/statistical-analysis.md
-    - Model Integration: guide/model-integration.md
+    - Declarative Experiments: guide/experiments.md
   - Ecosystem:
     - Overview: ecosystem/index.md
     - signalflow-ta: ecosystem/signalflow-ta.md

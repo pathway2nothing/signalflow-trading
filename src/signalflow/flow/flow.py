@@ -1,6 +1,7 @@
 """Flow - the declarative, deployable, tradeable unit."""
 
 from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING
 
 from signalflow.enums import ComponentType, RunMode
 from signalflow.errors import FlowConfigError, UnknownComponentError, UntrainedModelError
@@ -9,17 +10,22 @@ from signalflow.flow.loop import run_event_loop, run_quicktest
 from signalflow.strategy.risk import Risk
 from signalflow.strategy.rules import RulesStrategy
 
+if TYPE_CHECKING:
+    from signalflow.detector.base import SignalDetector
+    from signalflow.model.forecast import ForecastModel
+    from signalflow.strategy.protocol import StrategyModel
+
 
 @dataclass
 class Flow:
     """The framework's central noun: what you research, promote, and trade."""
 
     name: str
-    forecasts: dict = field(default_factory=dict)
-    detectors: list = field(default_factory=list)
-    strategy: object = field(default_factory=RulesStrategy)
+    forecasts: "dict[str, ForecastModel]" = field(default_factory=dict)
+    detectors: "list[SignalDetector]" = field(default_factory=list)
+    strategy: "StrategyModel" = field(default_factory=RulesStrategy)
     risk: Risk = field(default_factory=Risk)
-    validator: object | None = None
+    validator: "ForecastModel | None" = None
     quote: str = "USDT"
 
     def __post_init__(self) -> None:
@@ -125,8 +131,10 @@ class Flow:
         target: str | None = None,
         broker=None,
         armed: bool = False,
+        maxlen: int = 5000,
         max_bars: int | None = None,
         state_path: str | None = None,
+        compute_window: "int | None" = None,
     ):
         """Trade a live (or replayed) feed via the real-time loop.
 
@@ -140,7 +148,18 @@ class Flow:
         broker = broker or self._sim_broker()
         if not hasattr(feed, "stream"):
             feed = ReplayFeed(feed)
-        return run_live_loop(self, feed, capital, broker, target=target, max_bars=max_bars, state_path=state_path)
+        return run_live_loop(
+            self,
+            feed,
+            capital,
+            broker,
+            target=target,
+            maxlen=maxlen,
+            max_bars=max_bars,
+            state_path=state_path,
+            armed=armed,
+            compute_window=compute_window,
+        )
 
     def simulate(
         self,
@@ -151,6 +170,7 @@ class Flow:
         warmup: int | None = None,
         maxlen: int = 5000,
         state_path: str | None = None,
+        compute_window: "int | None" = None,
     ):
         """Full-speed incremental live simulation (walk-forward).
 
@@ -163,7 +183,16 @@ class Flow:
         broker = broker or self._sim_broker()
         warmup = self.required_warmup if warmup is None else warmup
         feed = ReplayFeed(data, warmup_bars=warmup)
-        return run_live_loop(self, feed, capital, broker, target=target, maxlen=maxlen, state_path=state_path)
+        return run_live_loop(
+            self,
+            feed,
+            capital,
+            broker,
+            target=target,
+            maxlen=maxlen,
+            state_path=state_path,
+            compute_window=compute_window,
+        )
 
     def _sim_broker(self):
         from signalflow.engine.broker import SimBroker
@@ -173,15 +202,23 @@ class Flow:
     def replace(self, **changes) -> "Flow":
         return replace(self, **changes)
 
-    def save(self, path: str, model_dir: str | None = None) -> str:
+    def save(self, path: str, model_dir: str | None = None, run=None) -> str:
         """Serialize the flow to YAML at ``path`` and return it.
 
         Each forecast/validator must already have a pinned URI, or pass ``model_dir`` to
         save the trained artifacts there. ``load`` restores a byte-identical backtest.
+        Passing ``run`` also writes its ``scorecard()`` to ``scorecard.json`` beside the
+        yaml as promotion evidence.
         """
         from signalflow.flow.yaml import save_flow
 
-        return save_flow(self, path, model_dir=model_dir)
+        return save_flow(self, path, model_dir=model_dir, run=run)
+
+    def save_bundle(self, dir_path: str, run) -> str:
+        """Write a promotable bundle (flow.yaml + models + scorecard.json + manifest.json)."""
+        from signalflow.flow.bundle import write_bundle
+
+        return write_bundle(self, run, dir_path)
 
     @classmethod
     def load(cls, path: str) -> "Flow":

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import numpy as np
+from loguru import logger
 
 from signalflow._hash import stable_hash
 
@@ -47,8 +48,10 @@ def median_dt(ts_sorted: list) -> float:
 def make_folds(ts_unique_sorted: list, n_folds: int) -> list[Fold]:
     """Split sorted unique timestamps into n_folds contiguous blocks."""
     n = len(ts_unique_sorted)
+    requested = n_folds
     if n < n_folds + 1:
         n_folds = max(2, min(n_folds, n))
+        logger.warning(f"make_folds: requested {requested} folds but only {n} unique timestamps; using {n_folds}")
     bounds = np.linspace(0, n, n_folds + 1, dtype=int)
     folds: list[Fold] = []
     for k in range(1, n_folds):

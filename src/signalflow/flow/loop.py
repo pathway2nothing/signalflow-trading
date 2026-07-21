@@ -1,13 +1,17 @@
 """The decision loop - one loop for backtest/paper/live."""
 
 import polars as pl
+from loguru import logger
 
 from signalflow.engine.engine import Engine
 from signalflow.engine.types import Order
-from signalflow.enums import NONE, RISE, IntentKind, OrderType, RunMode
+from signalflow.enums import FALL, NONE, RISE, SIGNAL_COL, IntentKind, OrderType, RunMode
+from signalflow.errors import PipeError
 from signalflow.strategy.observation import Observation
 
 _EMPTY_SIGNALS_SCHEMA = {"pair": pl.Utf8, "ts": pl.Datetime("ms"), "signal": pl.Utf8, "p_success": pl.Float64}
+
+MIN_OOS_COVERAGE = 0.95
 
 
 def enriched_signals(flow, data, oos: bool = False) -> pl.DataFrame:
@@ -26,10 +30,24 @@ def enriched_signals(flow, data, oos: bool = False) -> pl.DataFrame:
 
     parts = []
     for det in flow.detectors:
+        try:
+            computed = det.compute(enriched.frame)
+        except Exception as e:
+            raise PipeError(f"detector {det.name!r} failed during compute: {e}") from e
+        if SIGNAL_COL not in computed.columns:
+            raise PipeError(
+                f"detector {det.name!r} did not produce the {SIGNAL_COL!r} column; produced columns: {computed.columns}"
+            )
+        emitted = set(computed.get_column(SIGNAL_COL).drop_nulls().unique().to_list())
+        invalid = emitted - {RISE, FALL, NONE}
+        if invalid:
+            raise PipeError(
+                f"detector {det.name!r} emitted invalid signal values {sorted(invalid)}; "
+                f"expected only {sorted({RISE, FALL, NONE})}"
+            )
         s = (
-            det.compute(enriched.frame)
-            .filter(pl.col("signal") != NONE)
-            .select(["pair", "ts", "signal"])
+            computed.filter(pl.col(SIGNAL_COL) != NONE)
+            .select(["pair", "ts", SIGNAL_COL])
             .with_columns(pl.lit(det.name).alias("detector"))
         )
         parts.append(s)
@@ -68,12 +86,25 @@ EMPTY_SIGNALS_SCHEMA = _EMPTY_SIGNALS_SCHEMA
 orders_from_intents = _orders
 
 
+def _oos_coverage(flow, data) -> "float | None":
+    if not flow.forecasts:
+        return None
+    fractions = []
+    for model in flow.forecasts.values():
+        pred = model.predict_oos(data)
+        col = getattr(model, "output", "p_rise")
+        fractions.append(1.0 - pred.get_column(col).null_count() / max(pred.height, 1))
+    return min(fractions)
+
+
 def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: dict | None = None, oos: bool = False):
     from signalflow.flow.run import Run
 
     target = target or data.quote
     engine = Engine(capital, target=target, quote=data.quote)
     signals = enriched_signals(flow, data, oos=oos)
+    if data.frame.height == 0:
+        logger.warning(f"backtest of {flow.name!r}: dataset is empty (0 bars)")
     by_ts: dict = {}
     if signals.height:
         for key, df in signals.group_by("ts"):
@@ -101,8 +132,15 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
         eq_val.append(engine.equity(bar.prices))
 
     curve = pl.DataFrame({"ts": eq_ts, "equity": eq_val})
-    promotable = oos or not flow.forecasts
-    return Run(flow.name, mode.value, curve, engine.event_log, target, promotable=promotable, oos=oos)
+    coverage = _oos_coverage(flow, data) if oos else None
+    if coverage is not None and coverage < 1.0:
+        logger.warning(
+            f"backtest of {flow.name!r}: only {coverage:.1%} of requested rows are covered by cached OOS predictions"
+        )
+    promotable = (oos and (coverage is None or coverage >= MIN_OOS_COVERAGE)) or not flow.forecasts
+    return Run(
+        flow.name, mode.value, curve, engine.event_log, target, promotable=promotable, oos=oos, oos_coverage=coverage
+    )
 
 
 def run_quicktest(flow, data, capital, target, horizon: int = 24, fee: float = 0.001):

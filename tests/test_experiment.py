@@ -1,14 +1,9 @@
 """Experiment lifecycle tests."""
 
-
 import warnings
 
 import polars as pl
 import pytest
-
-warnings.filterwarnings("ignore", message="X does not have valid feature names")
-
-pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature names")
 
 import signalflow as sf
 from signalflow.experiment import (
@@ -19,6 +14,10 @@ from signalflow.experiment import (
     monte_carlo_bounds,
 )
 from signalflow.experiment.scorecard import SCORECARD_KEYS
+
+warnings.filterwarnings("ignore", message="X does not have valid feature names")
+
+pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature names")
 
 
 @pytest.fixture(scope="module")
@@ -76,6 +75,42 @@ def test_scorecard_from_run_directly(fitted_flow):
     run = flow.backtest(ds, capital=50_000)
     card = Scorecard.from_run(run)
     assert set(SCORECARD_KEYS).issubset(card.keys())
+
+
+def test_seed_everything_is_deterministic():
+    import numpy as np
+
+    from signalflow import seed_everything
+
+    seed_everything(7)
+    first = np.random.rand(5)
+    seed_everything(7)
+    second = np.random.rand(5)
+    assert np.array_equal(first, second)
+
+
+def test_experiment_run_oos_records_flags(fitted_flow):
+    flow, ds = fitted_flow
+    exp = Experiment("e_oos", baseline=None)
+    run = exp.run(flow, ds, capital=50_000, oos=True)
+    assert exp.last_run.oos is True and run.oos is True
+    card = exp.scorecard()
+    assert "promotable" in card and "oos" in card
+
+
+def test_experiment_run_tracking_logs_params(tmp_path):
+    pytest.importorskip("mlflow")
+    import mlflow
+
+    from signalflow import experiment_run
+
+    uri = f"sqlite:///{(tmp_path / 'mlflow.db').as_posix()}"
+    with experiment_run("d12_exp", params={"seed": 7, "backend": "lightgbm"}, tracking_uri=uri) as tracker:
+        assert tracker is not None
+    mlflow.set_tracking_uri(uri)
+    runs = mlflow.search_runs(experiment_names=["d12_exp"])
+    assert len(runs) == 1
+    assert int(runs.iloc[0]["params.seed"]) == 7
 
 
 def test_lifecycle_timestamps_explicit(fitted_flow):

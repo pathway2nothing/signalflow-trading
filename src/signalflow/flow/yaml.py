@@ -4,7 +4,7 @@ import yaml
 from loguru import logger
 
 from signalflow._version import __version__
-from signalflow.errors import ArtifactError
+from signalflow.errors import ArtifactError, UnknownComponentError
 from signalflow.strategy.base import build_strategy
 from signalflow.strategy.risk import Risk
 from signalflow.transform.base import build_transform
@@ -66,7 +66,32 @@ def _warn_version_mismatch(saved: "str | None") -> None:
         )
 
 
-def save_flow(flow, path: str, model_dir: str | None = None) -> str:
+def _validate_registered(flow) -> None:
+    from signalflow.enums import ComponentType
+    from signalflow.registry import registry
+
+    for det in flow.detectors:
+        cfg = det.to_config()
+        try:
+            registry.get(ComponentType.TRANSFORM, cfg["transform"])
+        except UnknownComponentError as e:
+            raise ArtifactError(
+                f"flow.save: detector {cfg['transform']!r} ({type(det).__qualname__}) is not registered; "
+                f"register it with @detector(...) so load can rebuild it"
+            ) from e
+    strategy_name = _strategy_cfg(flow.strategy).get("name")
+    if strategy_name:
+        try:
+            registry.get(ComponentType.STRATEGY, strategy_name)
+        except UnknownComponentError as e:
+            raise ArtifactError(
+                f"flow.save: strategy {strategy_name!r} ({type(flow.strategy).__qualname__}) is not registered; "
+                f"register it with @strategy(...) so load can rebuild it"
+            ) from e
+
+
+def save_flow(flow, path: str, model_dir: str | None = None, run=None) -> str:
+    _validate_registered(flow)
     doc = {
         "signalflow_version": __version__,
         "name": flow.name,
@@ -84,6 +109,12 @@ def save_flow(flow, path: str, model_dir: str | None = None) -> str:
     }
     with open(path, "w", encoding="utf-8") as fh:
         yaml.safe_dump(doc, fh, sort_keys=False, allow_unicode=True)
+    if run is not None:
+        import json
+        import os
+
+        with open(os.path.join(os.path.dirname(path) or ".", "scorecard.json"), "w", encoding="utf-8") as fh:
+            json.dump(run.scorecard(), fh, indent=2)
     return path
 
 

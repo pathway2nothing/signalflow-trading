@@ -21,7 +21,7 @@ from typing import Any
 from loguru import logger
 
 from signalflow.enums import ComponentType
-from signalflow.errors import UnknownComponentError
+from signalflow.errors import RegistryError, UnknownComponentError
 
 
 @dataclass
@@ -33,9 +33,10 @@ class ComponentInfo:
     docstring: str = ""
     summary: str = ""
     module: str = ""
+    legacy: bool = False
 
     @classmethod
-    def from_class(cls, component_cls: type[Any], role: str = "") -> "ComponentInfo":
+    def from_class(cls, component_cls: type[Any], role: str = "", legacy: bool = False) -> "ComponentInfo":
         doc = (component_cls.__doc__ or "").strip()
         summary = doc.split("\n", 1)[0] if doc else ""
         return cls(
@@ -44,6 +45,7 @@ class ComponentInfo:
             docstring=doc,
             summary=summary,
             module=getattr(component_cls, "__module__", ""),
+            legacy=legacy,
         )
 
 
@@ -62,23 +64,24 @@ class Registry:
         *,
         role: str = "",
         override: bool = False,
+        legacy: bool = False,
     ) -> None:
         """Register ``cls`` under ``name`` for ``component_type``; raise unless ``override``
         when the name is taken."""
         if not isinstance(name, str) or not name.strip():
-            raise ValueError("name must be a non-empty string")
+            raise RegistryError("name must be a non-empty string")
         key = name.strip().lower()
         bucket = self._items.setdefault(component_type, {})
         if key in bucket and not override:
             existing = bucket[key].cls
-            raise ValueError(
+            raise RegistryError(
                 f"{component_type.value}:{key} already registered by "
                 f"{existing.__module__}.{existing.__qualname__}; refusing to replace it with "
                 f"{cls.__module__}.{cls.__qualname__} (pass override=True to shadow deliberately)"
             )
         if key in bucket and override:
             logger.warning(f"Overriding {component_type.value}:{key} with {cls.__name__}")
-        bucket[key] = ComponentInfo.from_class(cls, role=role)
+        bucket[key] = ComponentInfo.from_class(cls, role=role, legacy=legacy)
 
     def get(self, component_type: ComponentType, name: str) -> type[Any]:
         """Return the registered class for ``name``; raise ``UnknownComponentError`` if absent."""
@@ -185,11 +188,23 @@ class Registry:
                 logger.debug(f"autodiscover: skip {modname}: {e}")
 
     def _discover_entry_points(self) -> None:
+        from signalflow._version import PLUGIN_API_VERSION
+
         eps = entry_points()
         group = eps.select(group="signalflow.components") if hasattr(eps, "select") else []
         for ep in group:
             try:
-                ep.load()
+                module = ep.load()
+                declared = getattr(module, "SIGNALFLOW_PLUGIN_API", None)
+                if declared is None:
+                    logger.warning(
+                        f"plugin {ep.name!r} does not declare SIGNALFLOW_PLUGIN_API; assuming {PLUGIN_API_VERSION}"
+                    )
+                elif declared != PLUGIN_API_VERSION:
+                    logger.error(
+                        f"plugin {ep.name!r} targets plugin API {declared}, core provides {PLUGIN_API_VERSION}; "
+                        f"components may misbehave - upgrade the plugin or the core"
+                    )
             except Exception as e:
                 logger.error(
                     f"autodiscover: entry-point {ep.name!r} failed to register; "

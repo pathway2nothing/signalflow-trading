@@ -1,6 +1,5 @@
 """Engine - the one event-sourced execution core."""
 
-
 from signalflow.engine.types import Fill, PortfolioSnapshot, Position, cross_rate, parse_pair
 from signalflow.enums import Side
 
@@ -20,8 +19,12 @@ class Engine:
         self.balances: dict[str, float] = dict(self.initial_capital)
         self.positions: dict[str, Position] = {}
         self.event_log: list[Fill] = []
+        self.order_log: list = []
         self.marks: dict[str, float] = {}
 
+    def record_order(self, event) -> None:
+        """Append an OrderEvent to the parallel audit/recovery log (never mutates the book)."""
+        self.order_log.append(event)
 
     def apply(self, fills: list[Fill]) -> None:
         for f in fills:
@@ -37,9 +40,7 @@ class Engine:
             self.balances[quote] -= fill.notional
             self.balances[base] += fill.qty
             new_qty = pos.qty + fill.qty
-            pos.avg_price = (
-                (pos.avg_price * pos.qty + fill.price * fill.qty) / new_qty if new_qty > 0 else 0.0
-            )
+            pos.avg_price = (pos.avg_price * pos.qty + fill.price * fill.qty) / new_qty if new_qty > 0 else 0.0
             pos.qty = new_qty
             if pos.opened_ts is None:
                 pos.opened_ts = fill.ts
@@ -52,7 +53,6 @@ class Engine:
                 pos.avg_price = 0.0
                 pos.opened_ts = None
 
-
         self.balances.setdefault(fill.fee_asset, 0.0)
         self.balances[fill.fee_asset] -= fill.fee
         self.marks[fill.pair] = fill.price
@@ -63,7 +63,6 @@ class Engine:
             self.positions.pop(fill.pair, None)
         if record:
             self.event_log.append(fill)
-
 
     def equity(self, prices: dict[str, float]) -> float:
         """Value the book in ``target``, carrying forward the last-known price for
@@ -92,7 +91,6 @@ class Engine:
             equity=self.equity(prices),
             prices=dict(prices),
         )
-
 
     @classmethod
     def fold(cls, fills: list[Fill], capital: dict[str, float] | float, target: str = "USDT") -> "Engine":

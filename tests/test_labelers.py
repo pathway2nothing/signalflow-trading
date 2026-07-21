@@ -201,3 +201,112 @@ def test_label_to_numeric_helper():
 
     n = pl.Series([0, 1, 2, 3])
     assert Labeler._label_to_numeric(n).to_list() == [0.0, 1.0, 2.0, 3.0]
+
+
+def _frame(close, pair="BTCUSDT"):
+    from datetime import datetime, timedelta
+
+    n = len(close)
+    ts = [datetime(2023, 1, 1) + timedelta(hours=i) for i in range(n)]
+    c = list(map(float, close))
+    return pl.DataFrame(
+        {
+            "pair": [pair] * n,
+            "ts": ts,
+            "open": c,
+            "high": [x * 1.001 for x in c],
+            "low": [x * 0.999 for x in c],
+            "close": c,
+            "volume": [1.0] * n,
+        }
+    )
+
+
+def _ds(close):
+    from signalflow.data.dataset import Dataset
+
+    return Dataset(frame=_frame(close))
+
+
+def test_vol_triple_barrier_scan():
+    import numpy as np
+
+    from signalflow.target import VolTripleBarrier
+
+    n = 12
+    sigma = np.full(n, 0.01)
+    close = np.full(n, 100.0)
+    flat_high = np.full(n, 100.0)
+    flat_low = np.full(n, 100.0)
+    t = VolTripleBarrier(tp_mult=2, sl_mult=1, max_bars=10)
+
+    tp_high = flat_high.copy()
+    tp_high[3] = 102.5
+    assert t._scan(close, tp_high, flat_low, sigma)[0] == 1.0
+
+    sl_low = flat_low.copy()
+    sl_low[2] = 98.5
+    assert t._scan(close, flat_high, sl_low, sigma)[0] == 0.0
+
+    assert t._scan(close, flat_high, flat_low, sigma)[0] == 0.0
+    t3 = VolTripleBarrier(tp_mult=2, sl_mult=1, max_bars=10, three_class=True)
+    assert t3._scan(close, flat_high, flat_low, sigma)[0] == 2.0
+
+    sig_nan = sigma.copy()
+    sig_nan[0] = np.nan
+    assert np.isnan(t._scan(close, tp_high, flat_low, sig_nan)[0])
+
+
+def test_vol_horizon_labels():
+    from signalflow.target import VolHorizon
+
+    up = VolHorizon(bars=3, k=0.5, vol_window=50).labels(_ds([100.0] * 10 + [110.0] * 10))
+    s = up.sort("ts").get_column("label").to_list()
+    assert s[7] == 1
+    assert s[2] is None
+
+    down = VolHorizon(bars=3, k=0.5, vol_window=50).labels(_ds([110.0] * 10 + [100.0] * 10))
+    assert down.sort("ts").get_column("label").to_list()[7] == 0
+
+
+def test_reversion_barrier_scan():
+    import numpy as np
+
+    from signalflow.target import ReversionBarrier
+
+    n = 10
+    close = np.full(n, 98.0)
+    anchor = np.full(n, 100.0)
+    flat_high = np.full(n, 98.0)
+    flat_low = np.full(n, 98.0)
+    r = ReversionBarrier(sl_pct=0.02, max_bars=5)
+
+    recross = flat_high.copy()
+    recross[2] = 100.5
+    assert r._scan(close, recross, flat_low, anchor)[0] == 1.0
+
+    stopped = flat_low.copy()
+    stopped[1] = 95.0
+    assert r._scan(close, flat_high, stopped, anchor)[0] == 0.0
+
+    above = np.full(n, 101.0)
+    assert np.isnan(r._scan(above, recross, flat_low, anchor)[0])
+
+
+def test_new_targets_registered_and_fit():
+    from signalflow.enums import ComponentType
+    from signalflow.target.base import make_target
+
+    for name in ("vol_triple_barrier", "vol_horizon", "reversion_barrier"):
+        cls = sf.registry.get(ComponentType.TARGET, name)
+        assert sf.registry.get_info(ComponentType.TARGET, name).legacy is False
+        cfg = cls().to_config()
+        assert type(make_target(cfg["target"], **cfg["params"])) is cls
+
+    ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-05-01", interval="1h")
+    model = sf.ForecastModel(
+        target=sf.VolHorizon(bars=12), features=sf.FeaturePipe(sf.SMA(10)), encode=None, select=None
+    ).fit(ds)
+    assert model.is_fitted
+    for scan_target in (sf.VolTripleBarrier(max_bars=12), sf.ReversionBarrier(anchor_bars=48, max_bars=24)):
+        assert scan_target.labels(ds).columns == ["pair", "ts", "label"]

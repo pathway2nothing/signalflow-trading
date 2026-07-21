@@ -23,6 +23,7 @@ class Run:
     target: str = "USDT"
     promotable: bool = True
     oos: bool = False
+    oos_coverage: "float | None" = None
 
     @property
     def initial_equity(self) -> float:
@@ -82,7 +83,7 @@ class Run:
         ``n_fills``, ``initial_equity``, ``final_equity``, ``total_return``,
         ``max_drawdown``, and ``sharpe``.
         """
-        return {
+        card = {
             "name": self.name,
             "mode": self.mode,
             "target": self.target,
@@ -95,6 +96,9 @@ class Run:
             "max_drawdown": round(self.max_drawdown, 4),
             "sharpe": round(self.sharpe(), 3),
         }
+        if self.oos_coverage is not None:
+            card["oos_coverage"] = round(self.oos_coverage, 4)
+        return card
 
     def __repr__(self) -> str:
         sc = self.scorecard()

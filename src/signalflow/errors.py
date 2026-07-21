@@ -41,6 +41,10 @@ class UnknownComponentError(SignalFlowError, KeyError):
     """A name was not found in the registry."""
 
 
+class RegistryError(SignalFlowError, ValueError):
+    """A component could not be registered (empty name or a name collision)."""
+
+
 class UnfittedTransformError(SignalFlowError):
     """A stateful transform (``requires_fit``) was used before ``fit``."""
 

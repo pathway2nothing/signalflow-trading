@@ -91,6 +91,59 @@ def test_mlflow_save_inside_active_run(fitted, tmp_path):
     _assert_round_trip(loaded, model, ds)
 
 
+def test_mlflow_uri_pins_version_on_registration(fitted, tmp_path, monkeypatch):
+    pytest.importorskip("mlflow")
+    from types import SimpleNamespace
+
+    import mlflow
+
+    monkeypatch.chdir(tmp_path)
+    mlflow.set_tracking_uri((tmp_path / "mlruns").resolve().as_uri())
+    monkeypatch.setattr(mlflow, "register_model", lambda uri, name: SimpleNamespace(version="7"))
+
+    model, _ = fitted
+    uri = model.save("mlflow://models/d17_pin_test")
+    assert uri == "mlflow://models/d17_pin_test@7"
+
+
+def test_mlflow_uri_unversioned_on_registration_failure(fitted, tmp_path, monkeypatch):
+    pytest.importorskip("mlflow")
+    import mlflow
+
+    def _boom(uri, name):
+        raise RuntimeError("registry unavailable")
+
+    monkeypatch.chdir(tmp_path)
+    mlflow.set_tracking_uri((tmp_path / "mlruns").resolve().as_uri())
+    monkeypatch.setattr(mlflow, "register_model", _boom)
+
+    model, _ = fitted
+    uri = model.save("mlflow://models/d17_unver_test")
+    assert uri == "mlflow://models/d17_unver_test"
+
+
+def test_mlflow_load_warns_without_version(fitted, tmp_path, monkeypatch):
+    pytest.importorskip("mlflow")
+    import mlflow
+    from loguru import logger
+
+    monkeypatch.chdir(tmp_path)
+    mlflow.set_tracking_uri((tmp_path / "mlruns").resolve().as_uri())
+    monkeypatch.setattr(mlflow, "register_model", lambda uri, name: None)
+
+    model, _ = fitted
+    uri = model.save("mlflow://models/d17_warn_test")
+    assert "@" not in uri
+
+    msgs: list[str] = []
+    sink = logger.add(lambda m: msgs.append(str(m)), level="WARNING")
+    try:
+        ForecastModel.load(uri)
+    finally:
+        logger.remove(sink)
+    assert any("no @version" in m for m in msgs)
+
+
 @pytest.mark.skipif(
     not (os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")),
     reason="no HF_TOKEN set",

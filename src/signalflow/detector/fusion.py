@@ -7,6 +7,7 @@ import polars as pl
 from signalflow.decorators import detector
 from signalflow.detector.base import SignalDetector
 from signalflow.enums import FALL, NONE, RISE, SIGNAL_COL
+from signalflow.errors import FlowConfigError
 
 
 @detector("threshold")
@@ -17,6 +18,10 @@ class ThresholdDetector(SignalDetector):
     forecast: str = ""
     p_min: float = 0.6
     output: str = "p_rise"
+
+    def __post_init__(self) -> None:
+        if not self.forecast:
+            raise FlowConfigError("ThresholdDetector requires forecast=<slot name>; got an empty string")
 
     def required_slots(self) -> "tuple[str, ...]":
         return (self.forecast,) if self.forecast else ()
@@ -35,6 +40,10 @@ class RevertDetector(SignalDetector):
     regime: str | None = None
     p_min: float = 0.65
     regime_max: float = 0.3
+
+    def __post_init__(self) -> None:
+        if not self.revert:
+            raise FlowConfigError("RevertDetector requires revert=<slot name>; got an empty string")
 
     def required_slots(self) -> "tuple[str, ...]":
         slots = [s for s in (self.revert, self.regime) if s]
@@ -55,6 +64,10 @@ class MarketDropDetector(SignalDetector):
     drop: str = ""
     p_min: float = 0.6
     output: str = "p_drop"
+
+    def __post_init__(self) -> None:
+        if not self.drop:
+            raise FlowConfigError("MarketDropDetector requires drop=<slot name>; got an empty string")
 
     def required_slots(self) -> "tuple[str, ...]":
         return (self.drop,) if self.drop else ()

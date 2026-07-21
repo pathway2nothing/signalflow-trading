@@ -74,6 +74,14 @@ path in `enriched_signals` (`flow/loop.py`) which routes every forecast and the
 validator through `predict_oos` so detectors cannot fire on in-sample rows. A
 `Provenance` stamp records which span produced each output.
 
+When you hand-attach model predictions to a Dataset to train a downstream model
+(meta-labeling / validators), use **`Dataset.with_oos_forecasts(model)`** — it calls
+`predict_oos` and records each attached column's provenance as OOS by construction.
+The leak guard reads that per-column provenance: attaching plain `predict()` output
+via `with_forecasts(...)` records it as full-provenance, so `Sampler._require_oos`
+raises a `LeakageError` naming the offending column. `with_oos_forecasts` is the only
+supported way to hand-attach predictions for training.
+
 ---
 
 ## Invariant 2: backtest == simulate

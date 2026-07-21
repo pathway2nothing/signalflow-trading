@@ -33,9 +33,27 @@ class Sampler(ABC):
         ...
 
     @staticmethod
-    def _require_oos(provenance: Provenance) -> None:
-        if Provenance(provenance) != Provenance.OOS:
-            raise LeakageError("training set built on in-sample forecasts; use detector.run(data, oos=True)")
+    def _require_oos(data: "Dataset", columns: "list[str] | None" = None) -> None:
+        """Verify forecast provenance is OOS before training on it.
+
+        Prefers per-column provenance when tracked; otherwise falls back to the
+        frame-level tag for backward compatibility.
+        """
+        col_prov = getattr(data, "col_provenance", None) or {}
+        tracked = {c: col_prov[c] for c in (columns if columns is not None else col_prov) if c in col_prov}
+        if tracked:
+            offenders = [c for c, p in tracked.items() if Provenance(p) != Provenance.OOS]
+            if offenders:
+                raise LeakageError(
+                    f"training set built on non-OOS forecast column(s) {offenders}; "
+                    f"attach predictions with Dataset.with_oos_forecasts(model)"
+                )
+            return
+        if Provenance(data.provenance) != Provenance.OOS:
+            raise LeakageError(
+                "training set built on in-sample forecasts; use detector.run(data, oos=True) "
+                "or Dataset.with_oos_forecasts(model)"
+            )
 
     def to_config(self) -> dict:
         import dataclasses

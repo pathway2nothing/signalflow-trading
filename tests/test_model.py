@@ -1,8 +1,40 @@
 """ForecastModel: walk-forward fit, predict vs predict_oos, OOS artifact."""
 
+from dataclasses import dataclass
+
+import polars as pl
 import pytest
 
 import signalflow as sf
+
+
+@dataclass
+class _AllNanFeature(sf.Feature):
+    """Feature whose single output column is entirely NaN."""
+
+    @property
+    def outputs(self) -> list[str]:
+        return ["all_nan"]
+
+    def exprs(self) -> list[pl.Expr]:
+        return [(pl.col("close") * float("nan")).alias("all_nan")]
+
+
+@dataclass
+class _PartialNanFeature(sf.Feature):
+    """Feature that is NaN on the upper ~30% of close values."""
+
+    @property
+    def outputs(self) -> list[str]:
+        return ["partial_nan"]
+
+    def exprs(self) -> list[pl.Expr]:
+        return [
+            pl.when(pl.col("close") > pl.col("close").quantile(0.7))
+            .then(float("nan"))
+            .otherwise(pl.col("close"))
+            .alias("partial_nan")
+        ]
 
 
 def test_untrained_guard(ds):
@@ -75,6 +107,47 @@ def test_string_horizon_embargo_resolves_not_fallback():
     assert fh.horizon_bars(small) == 24
     assert FixedHorizon(bars=24).horizon_bars(small) == 24
     assert TripleBarrierLabeler(horizon="1d", vol_window=12).horizon_bars(small) == 24
+
+
+def test_make_folds_clamps_to_available_timestamps():
+    from datetime import datetime
+
+    from signalflow.model.oos import make_folds
+
+    ts = [datetime(2023, 1, 1, h) for h in range(3)]
+    folds = make_folds(ts, 10)
+    assert 1 <= len(folds) < 10
+
+
+def test_fingerprint_records_effective_folds():
+    m = sf.ForecastModel(
+        target=sf.FixedHorizon(12), features=sf.FeaturePipe(sf.SMA(20)), encode=None, select=None, n_folds=5
+    ).fit(sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h"))
+    cv = m.fingerprint["cv"]
+    assert cv["n_folds"] == 5
+    assert cv["n_folds_effective"] == 4
+
+
+def test_all_nan_feature_raises(ds):
+    m = sf.ForecastModel(
+        target=sf.FixedHorizon(12), features=sf.FeaturePipe(_AllNanFeature()), encode=None, select=None
+    )
+    with pytest.raises(sf.PipeError):
+        m.fit(ds)
+
+
+def test_partial_nan_rows_are_dropped(ds):
+    clean = sf.ForecastModel(
+        target=sf.FixedHorizon(12), features=sf.FeaturePipe(sf.SMA(20)), encode=None, select=None
+    ).fit(ds)
+    dirty = sf.ForecastModel(
+        target=sf.FixedHorizon(12),
+        features=sf.FeaturePipe(sf.SMA(20), _PartialNanFeature()),
+        encode=None,
+        select=None,
+    ).fit(ds)
+    assert dirty.oos_.height > 0
+    assert dirty.oos_.height < clean.oos_.height
 
 
 def test_model_embargo_uses_resolved_horizon():

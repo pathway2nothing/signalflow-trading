@@ -1,347 +1,119 @@
-# Command Line Interface
+# CLI & YAML Config
 
-SignalFlow includes a CLI (`sf`) for running backtests from the command line.
+The `sf` command line wraps the same package you import as `signalflow`. It has
+five commands: `list`, `info`, `run`, `promote`, and `version`. Everything it
+runs is registry-driven, so any component you register with `@sf.register_*`
+shows up automatically.
 
----
+Invoke it as `sf <command>` once installed, or `python -m signalflow.cli.main
+<command>` from a checkout.
 
-## Installation
+## `list` - enumerate the registry
 
-The CLI is automatically installed with the package:
+List every registered component grouped by type, or pass a single type to get a
+table with one-line summaries.
 
-```bash
-pip install signalflow-trading
+```console
+$ sf list
+broker (3)
+  binance
+  exchange
+  sim
+
+sampler (4)
+  cusum
+  meta_labeling
+  uniform
+  uniqueness
+...
 ```
 
-Verify installation:
-
-```bash
-sf --help
+```console
+$ sf list transform
+             transform components (8)
+name          summary
+------------  --------------------------------------------------
+feature_pipe  Run child transforms in order; outputs are ...
+sma           Simple moving average of close.
+sma_cross     RISE when the fast SMA crosses above the slow SMA.
+threshold     RISE when a forecast's probability exceeds p_min.
+...
 ```
 
----
+The valid types are `source`, `transform`, `target`, `model`, `strategy`,
+`sampler`, `broker`, and `metric`.
 
-## Commands
+## `info` - inspect one component
 
-### `sf init` - Create Config File
+Show a component's schema: description, role, module, its constructor parameters
+(name, type, default, required), and the outputs/warmup of a default instance.
 
-Generate a sample YAML configuration file:
+```console
+$ sf info transform threshold
+threshold (ThresholdDetector)
+RISE when a forecast's probability exceeds ``p_min``.
+role: detector
+module: signalflow.detector.fusion
 
-```bash
-# Create backtest.yaml (default)
-sf init
+parameters
+param     type / default
+--------  -------------------------------------
+forecast  str  default=''  required=False
+p_min     float  default=0.6  required=False
+output    str  default='p_rise'  required=False
 
-# Custom filename
-sf init --output my_strategy.yaml
-
-# Overwrite existing file
-sf init --force
+outputs: n/a
+warmup: n/a
 ```
 
-### `sf validate` - Validate Config
+## `run` - backtest a flow.yaml
 
-Check configuration for errors before running:
+Load a saved flow, build a dataset from a registered source, backtest, and print
+the scorecard. Data options default to a small `memory` dataset for a quick smoke
+test.
 
-```bash
-sf validate backtest.yaml
+```console
+$ sf run flow.yaml --source memory --pairs BTCUSDT --start 2023-01-01 --end 2023-03-01 --interval 1h --capital 10000
+scorecard - sma_rise
+metric          value
+--------------  --------
+name            sma_rise
+mode            backtest
+promotable      True
+oos             False
+n_fills         11
+initial_equity  10000.0
+final_equity    9797.93
+total_return    -0.0202
+max_drawdown    0.0336
+sharpe          -2.412
 ```
 
-Output:
-```
-Validating: backtest.yaml
-Config is valid!
-```
+Options: `--source`, `--pairs` (comma-separated), `--start`, `--end`,
+`--interval`, `--capital`.
 
-Or if there are issues:
-```
-Validating: backtest.yaml
-WARNING: TP (1.0%) < SL (2.0%), risk/reward < 1
-Config is valid (with warnings)
-```
+## `promote` - validate and show the promotion op
 
-### `sf run` - Run Backtest
+Load and validate a flow, then report the registry operation promotion would
+perform. The real promotion into sf-prod happens there, not here.
 
-Execute a backtest from YAML config:
-
-```bash
-# Basic run
-sf run backtest.yaml
-
-# Save results to JSON
-sf run backtest.yaml --output results.json
-
-# Show plots after completion
-sf run backtest.yaml --plot
-
-# Quiet mode (no progress bar)
-sf run backtest.yaml --quiet
-
-# All options
-sf run backtest.yaml -o results.json -p -q
+```console
+$ sf promote flow.yaml --to shadow
+validated flow 'sma_rise' from flow.yaml
+would register: stage=shadow flow='sma_rise' quote=USDT
+no server contacted - real promotion happens in sf-prod.
 ```
 
-Output:
-```
-Loading config: backtest.yaml
-Running backtest: my_strategy
+## `version` - print the installed version
 
-==================================================
-         BACKTEST RESULT
-==================================================
-  Total Return:    +15.23%
---------------------------------------------------
-  Trades:                  42
-  Win Rate:             61.9%
-  Profit Factor:         1.85
---------------------------------------------------
-  Initial Capital:  $50,000.00
-  Final Capital:    $57,615.00
-  Max Drawdown:         -5.2%
-  Sharpe Ratio:          1.42
-==================================================
+```console
+$ sf version
+0.8.5
 ```
 
-### `sf list` - List Components
+## Where flow.yaml comes from
 
-Discover available components from the registry:
-
-```bash
-# List signal detectors
-sf list detectors
-
-# With detailed descriptions
-sf list detectors --verbose
-
-# List strategy metrics
-sf list metrics
-
-# List features
-sf list features
-
-# List all registered components
-sf list all
-```
-
-Example output:
-```
-Available detectors (10):
-----------------------------------------
-  anomaly_detector
-  example/sma_cross
-  local_extrema_detector
-  market_wide/agreement
-  market_wide/cusum
-  market_wide/zscore
-  percentile_regime_detector
-  structure_detector
-  volatility_detector
-  zscore_anomaly_detector
-```
-
----
-
-## YAML Configuration Reference
-
-### Complete Example
-
-```yaml
-# backtest.yaml - Full configuration example
-
-# Strategy identification
-strategy:
-  id: my_momentum_strategy
-
-# Data source configuration
-data:
-  source: data/binance.duckdb   # Path to DuckDB file
-  pairs:
-    - BTCUSDT
-    - ETHUSDT
-    - BNBUSDT
-  start: "2024-01-01"           # ISO date string
-  end: "2024-06-01"             # Optional, defaults to now
-  timeframe: 1h                 # 1m, 5m, 15m, 1h, 4h, 1d
-  data_type: perpetual          # spot | futures | perpetual
-
-# Signal detector configuration
-detector:
-  name: example/sma_cross       # Registry name
-  params:
-    fast_period: 20
-    slow_period: 50
-    # Add any detector-specific parameters
-
-# Entry rules
-entry:
-  size: 1000                    # Fixed size in quote currency
-  size_pct: 0.1                 # OR percentage of capital (overrides size)
-  max_positions: 5              # Maximum concurrent positions
-  max_per_pair: 1               # Maximum positions per trading pair
-
-# Exit rules
-exit:
-  tp: 0.03                      # Take profit: 3%
-  sl: 0.015                     # Stop loss: 1.5%
-  trailing: 0.02                # Trailing stop: 2% (optional)
-  time_limit: 100               # Max bars to hold (optional)
-
-# Capital and fees
-capital: 50000                  # Initial capital
-fee: 0.001                      # Trading fee: 0.1%
-
-# Runtime options
-show_progress: true             # Show progress bar
-```
-
-### Minimal Example
-
-```yaml
-# Minimum required configuration
-data:
-  source: data/prices.duckdb
-  pairs: [BTCUSDT]
-  start: "2024-01-01"
-
-detector:
-  name: example/sma_cross
-```
-
-### Configuration Sections
-
-#### `strategy`
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `id` | string | `"backtest"` | Strategy identifier |
-
-#### `data`
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `source` | string | Yes | Path to DuckDB file |
-| `pairs` | list | Yes | Trading pairs to load |
-| `start` | string | Yes | Start date (ISO format) |
-| `end` | string | No | End date (defaults to now) |
-| `timeframe` | string | No | Candle timeframe (default: `"1h"`) |
-| `data_type` | string | No | Data type (default: `"perpetual"`) |
-
-#### `detector`
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | Registry name (e.g., `"example/sma_cross"`) |
-| `params` | object | No | Detector-specific parameters |
-
-#### `entry`
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `rule` | string | `"signal"` | Entry rule name from registry |
-| `size` | float | `100.0` | Fixed position size |
-| `size_pct` | float | - | Position size as % of capital |
-| `max_positions` | int | `10` | Max concurrent positions |
-| `max_per_pair` | int | `1` | Max positions per pair |
-
-#### `exit`
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `rule` | string | - | Exit rule name from registry |
-| `tp` | float | `0.02` | Take profit percentage |
-| `sl` | float | `0.01` | Stop loss percentage |
-| `trailing` | float | - | Trailing stop percentage |
-| `time_limit` | int | - | Max bars to hold |
-
-#### Root Level
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `capital` | float | `10000.0` | Initial capital |
-| `fee` | float | `0.001` | Trading fee rate |
-| `show_progress` | bool | `true` | Show progress bar |
-
----
-
-## Using Custom Detectors
-
-To use custom detectors in YAML config, first register them:
-
-```python
-# my_detectors.py
-import signalflow as sf
-from signalflow.detector import SignalDetector
-
-@sf.detector("my_namespace/rsi_crossover")
-class RsiCrossoverDetector(SignalDetector):
-    def __init__(self, period: int = 14, overbought: float = 70, oversold: float = 30):
-        self.period = period
-        self.overbought = overbought
-        self.oversold = oversold
-
-    def detect(self, features, context=None):
-        # Detection logic
-        ...
-```
-
-Then import before running CLI:
-
-```python
-# run_backtest.py
-import my_detectors  # Register custom detectors
-
-# Now run CLI programmatically
-from signalflow.cli.main import cli
-cli()
-```
-
-Or ensure the module is imported in your environment before running `sf`.
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `SF_LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) |
-| `SF_DATA_DIR` | Default data directory |
-
----
-
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Error (invalid config, runtime error, etc.) |
-
----
-
-## Tips
-
-### Quick Iteration
-
-```bash
-# Edit config, validate, run cycle
-vim backtest.yaml
-sf validate backtest.yaml && sf run backtest.yaml
-```
-
-### Comparing Strategies
-
-```bash
-# Run multiple configs
-sf run strategy_a.yaml -o results_a.json
-sf run strategy_b.yaml -o results_b.json
-
-# Compare results with jq
-jq '.metrics.total_return' results_a.json results_b.json
-```
-
-### Debugging
-
-```bash
-# Verbose output
-sf list detectors -v
-
-# Check available components
-sf list all
-```
+A `flow.yaml` is what `Flow.save(path)` writes: the flow name, quote, forecast
+model URIs, detector configs, the strategy, and risk limits. `Flow.load(path)`
+rebuilds a byte-identical flow. See [Custom Detectors](custom-detectors.md) for
+how a registered detector round-trips through it.

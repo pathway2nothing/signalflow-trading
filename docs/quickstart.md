@@ -45,8 +45,8 @@ plus a model directory. `sf.Flow.load` restores a byte-identical backtest, so
 promoting a strategy is moving a file.
 
 ```python
-flow.save("flows/rsi_rise.yaml", model_dir="flows/models")   # yaml + trained artifacts
-same = sf.Flow.load("flows/rsi_rise.yaml")
+flow.save("flows/sma_rise.yaml", model_dir="flows/models")   # yaml + trained artifacts
+same = sf.Flow.load("flows/sma_rise.yaml")
 assert same.backtest(ds, capital=50_000).final_equity == run.final_equity
 ```
 
@@ -65,6 +65,35 @@ flow.paper(ds, capital=50_000)                         # sim fills over a Datase
 feed = sf.PollingFeed(sf.BinanceSource(), pairs=["BTCUSDT"], interval="1m")
 flow.live(feed, capital=50_000)                        # live data, SimBroker (paper)
 ```
+
+---
+
+## Cache fetched data
+
+Pass `cache_dir=` and the source fetches only the spans you do not already have on
+disk; a repeated request for a covered range hits the parquet cache and makes no
+network call.
+
+```python
+ds = sf.data("binance", pairs=["BTCUSDT"], start="2023-01-01", interval="1h", cache_dir="data/cache")
+```
+
+---
+
+## Score honestly
+
+The default backtest of a model flow is in-sample and not promotable. Pass
+`oos=True` to score on the model's leak-free out-of-fold predictions instead:
+
+```python
+run = flow.backtest(ds, capital=50_000, oos=True)
+print(run.scorecard())        # now oos=True; promotable flips on coverage
+```
+
+An `oos=True` run also reports `oos_coverage` - the fraction of requested rows
+that fall inside the cached OOS span. A run is `promotable` only when that
+coverage clears the threshold, so a partially-covered period cannot be promoted by
+accident.
 
 ---
 

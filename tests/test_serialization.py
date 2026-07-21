@@ -193,6 +193,48 @@ def test_llm_flow_save_load_decide(tmp_path):
     assert isinstance(loaded.strategy.decide(obs), list)
 
 
+def test_flow_save_unregistered_detector_raises(tmp_path):
+    from dataclasses import dataclass
+
+    @dataclass
+    class UnregisteredDetector(sf.SignalDetector):
+        n: int = 3
+
+        def detect(self, df):
+            return df.with_columns(pl.lit(sf.NONE).alias("signal"))
+
+    flow = sf.Flow(name="unreg", detectors=[UnregisteredDetector()])
+    with pytest.raises(sf.ArtifactError) as exc:
+        flow.save(str(tmp_path / "flow.yaml"))
+    assert "UnregisteredDetector" in str(exc.value)
+
+
+def test_non_dataclass_transform_registration_rejected():
+    from signalflow.decorators import detector
+
+    with pytest.raises(TypeError, match="dataclass"):
+
+        @detector("plain_reject_test")
+        class PlainReject(sf.SignalDetector):
+            def __init__(self, lookback=12):
+                self.lookback = lookback
+
+            def detect(self, df):
+                return df.with_columns(pl.lit(sf.NONE).alias("signal"))
+
+
+def test_non_dataclass_to_config_raises():
+    class PlainNoReg(sf.SignalDetector):
+        def __init__(self, lookback=12):
+            self.lookback = lookback
+
+        def detect(self, df):
+            return df.with_columns(pl.lit(sf.NONE).alias("signal"))
+
+    with pytest.raises(sf.PipeError):
+        PlainNoReg(5).to_config()
+
+
 def test_woe_fitted_state_survives_pickle():
     n = 300
     df = pl.DataFrame({"f1": [float(i % 17) for i in range(n)], "f2": [float(i % 23) for i in range(n)]})

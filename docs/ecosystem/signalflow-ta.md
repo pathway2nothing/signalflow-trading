@@ -47,7 +47,7 @@ command in the repo's component-count check).
 
 ```python
 import signalflow.ta as ta
-from signalflow.feature import FeaturePipeline
+from signalflow.transform import FeaturePipe
 
 # Create indicators
 rsi = ta.RsiMom(period=14)
@@ -55,7 +55,7 @@ bbands = ta.BollingerVol(period=20, num_std=2.0)
 atr = ta.AtrVol(period=14)
 
 # Use in pipeline
-pipeline = FeaturePipeline(features=[rsi, bbands, atr])
+pipeline = FeaturePipe(rsi, bbands, atr)
 features_df = pipeline.compute(df)
 ```
 
@@ -69,13 +69,13 @@ from signalflow.ta.pipes import (
     volatility_bands_pipe,
     all_ta_pipe,
 )
-from signalflow.feature import FeaturePipeline
+from signalflow.transform import FeaturePipe
 
 # Compose a custom set
-pipeline = FeaturePipeline(features=[
+pipeline = FeaturePipe(
     *momentum_core_pipe(normalized=True),
     *volatility_bands_pipe(),
-])
+)
 
 # Or use all indicators at once
 full_pipeline = FeaturePipeline(features=all_ta_pipe(normalized=True))
@@ -114,10 +114,10 @@ Every indicator follows a consistent pattern:
 ```python
 from dataclasses import dataclass
 import signalflow as sf
-from signalflow.feature.base import Feature
+from signalflow.transform import Feature
 
+@sf.register_feature("momentum/rsi")
 @dataclass
-@sf.feature("momentum/rsi")
 class RsiMom(Feature):
     period: int = 14
 

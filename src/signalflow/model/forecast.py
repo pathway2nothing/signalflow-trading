@@ -12,7 +12,13 @@ from sklearn.base import clone
 
 from signalflow._hash import code_fingerprint, stable_hash
 from signalflow.data.dataset import Dataset
-from signalflow.errors import DegenerateTargetError, FingerprintMismatch, UntrainedModelError
+from signalflow.errors import (
+    DegenerateTargetError,
+    FingerprintMismatch,
+    FlowConfigError,
+    PipeError,
+    UntrainedModelError,
+)
 from signalflow.model.oos import build_fingerprint, make_folds, median_dt, parse_duration, rolling_folds
 from signalflow.sampler import Sampler, UniformSampler
 from signalflow.target import LABEL_COL, Target
@@ -42,7 +48,7 @@ def _make_estimator(backend, params: dict):
         from sklearn.ensemble import RandomForestClassifier
 
         return RandomForestClassifier(**params)
-    raise ValueError(f"unknown backend {backend!r}")
+    raise FlowConfigError(f"unknown backend {backend!r}")
 
 
 def _encode_frame(enc: WoE | None, features: FeaturePipe, feat_frame: pl.DataFrame):
@@ -92,7 +98,7 @@ class ForecastModel:
         if not self.is_fitted:
             raise UntrainedModelError(f"ForecastModel(output={self.output!r}) is not fitted")
 
-    def fit(self, data: Dataset, sampler: Sampler | None = None, cache=None) -> "ForecastModel":
+    def fit(self, data: Dataset, sampler: Sampler | None = None, cache=None, feature_store=None) -> "ForecastModel":
         """Train the model and compute leak-free out-of-fold predictions.
 
         Fits embargoed walk-forward folds (embargo width = the target horizon), stores
@@ -105,10 +111,14 @@ class ForecastModel:
             The fitted model (``self``).
         """
         if self.target is None:
-            raise ValueError("ForecastModel requires a target to fit")
+            raise FlowConfigError("ForecastModel requires a target to fit")
         sampler = sampler or self.sampler or UniformSampler()
 
-        feat = self.features.compute(data.frame)
+        feat = (
+            feature_store.compute(self.features, data)
+            if feature_store is not None
+            else self.features.compute(data.frame)
+        )
         ss = sampler.sample(data)
         idx = ss.index
         if ss.weights is not None:
@@ -121,8 +131,23 @@ class ForecastModel:
             .drop_nulls(subset=[LABEL_COL, *self.features.outputs])
             .sort("ts")
         )
+        float_cols = [c for c in self.features.outputs if base.schema[c] in (pl.Float32, pl.Float64)]
+        if float_cols:
+            nan_frac = {c: base.get_column(c).is_nan().mean() for c in float_cols}
+            dead = [c for c, frac in nan_frac.items() if frac == 1.0]
+            if dead:
+                raise PipeError(
+                    f"feature columns are entirely NaN over the training set: {dead}; check feature warmup and inputs"
+                )
+            before = base.height
+            base = base.filter(~pl.any_horizontal([pl.col(c).is_nan() for c in float_cols]))
+            if before and base.height < before * 0.5:
+                logger.warning(
+                    f"ForecastModel.fit: NaN filtering dropped {before - base.height} of {before} rows; "
+                    f"NaN fractions: {nan_frac}"
+                )
         if base.height < self.min_train_rows:
-            raise ValueError(f"not enough labeled samples to fit ({base.height})")
+            raise DegenerateTargetError(f"not enough labeled samples to fit ({base.height})")
 
         ts_unique = base.get_column("ts").unique().sort().to_list()
         horizon_bars = self.target.horizon_bars(data)
@@ -166,10 +191,16 @@ class ForecastModel:
             if oos_parts
             else pl.DataFrame(schema={"pair": pl.Utf8, "ts": base.schema["ts"], self.output: pl.Float64})
         )
+        if self.oos_.height > 0 and self.oos_.get_column(self.output).n_unique() == 1:
+            constant = self.oos_.get_column(self.output)[0]
+            logger.warning(
+                f"ForecastModel(output={self.output!r}): OOS predictions are constant ({constant}); "
+                f"the model likely learned nothing"
+            )
 
         self.encode_, self.select_, self.model_ = self._fit_stack(base)
 
-        self._build_fingerprint(data, ts_unique)
+        self._build_fingerprint(data, ts_unique, n_folds_effective=len(folds))
         self._fitted = True
         logger.debug(f"ForecastModel fitted: oos rows={self.oos_.height}, folds={len(folds)}")
         return self
@@ -300,10 +331,14 @@ class ForecastModel:
             positive_classes=getattr(self.select, "positive_classes", None),
         )
 
-    def predict(self, data: Dataset) -> pl.DataFrame:
+    def predict(self, data: Dataset, feature_store=None) -> pl.DataFrame:
         """Production prediction (in-sample on history - never feed to training)."""
         self._check_fitted()
-        feat = self.features.compute(data.frame)
+        feat = (
+            feature_store.compute(self.features, data)
+            if feature_store is not None
+            else self.features.compute(data.frame)
+        )
         p = self._predict_stack(self.encode_, self.select_, self.model_, feat)
         return feat.select(["pair", "ts"]).with_columns(pl.Series(self.output, p))
 
@@ -356,7 +391,7 @@ class ForecastModel:
             json.dump(self.woe_history(), fh, default=str)
         return path
 
-    def _build_fingerprint(self, data: Dataset, ts_unique: list) -> None:
+    def _build_fingerprint(self, data: Dataset, ts_unique: list, n_folds_effective: "int | None" = None) -> None:
         enc_cfg = self.encode_.to_config()["params"] if self.encode_ else None
         sel_cfg = {"min_iv": self.select_.min_iv} if self.select_ else None
         self.fingerprint = build_fingerprint(
@@ -372,6 +407,7 @@ class ForecastModel:
                 "refit": getattr(self.encode_, "refit", None),
                 "window": getattr(self.encode_, "window", None),
                 "n_folds": self.n_folds,
+                "n_folds_effective": n_folds_effective,
                 "purge": self.target.horizon_bars(data),
                 "embargo": self.target.horizon_bars(data),
                 "span": [str(ts_unique[0]), str(ts_unique[-1])] if ts_unique else None,

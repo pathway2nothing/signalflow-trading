@@ -38,6 +38,30 @@ flow.live(feed, capital=10_000, armed=True,     # real orders
 gap between the bar's close and order execution; a breach of the latency budget
 is logged.
 
+## Calendar walk-forward
+
+`sf.walk_forward` turns a declarative model template into per-fold models trained
+on trailing calendar windows and evaluated on the next step. Each fold predicts
+with a **hot warmup window** - the trailing `warmup` bars are prepended to the test
+slice so features start valid, exactly as production would see them.
+
+```python
+model = sf.ForecastModel(
+    target=sf.FixedHorizon(bars=12),
+    features=sf.FeaturePipe(sf.SMA(20), sf.SMA(50)),
+    encode=None,
+    select=None,
+)
+result = sf.walk_forward(model, ds, train="90d", step="30d")
+
+scores = result.evaluate(lambda oos: float(oos.get_column("p_rise").mean()))
+print(scores)                 # one row per fold with its window bounds and score
+merged = result.oos()         # all folds' out-of-sample rows, deduped by (pair, ts)
+```
+
+Pass `save_to="mlflow://models/exp_{fold}"` to persist each fold's fitted model;
+the `{fold}` placeholder is filled with the fold index.
+
 ## Rolling refit on a trailing window
 
 When a flow's `ForecastModel` uses a WoE encoder, the walk-forward refits the

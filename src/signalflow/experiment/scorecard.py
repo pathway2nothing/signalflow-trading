@@ -1,6 +1,5 @@
 """Scorecard - one stable-shape summary of a Run."""
 
-
 from signalflow.experiment.stats import bootstrap_ci, monte_carlo_bounds
 
 SCORECARD_KEYS = (
@@ -13,6 +12,8 @@ SCORECARD_KEYS = (
     "bootstrap_ci",
     "monte_carlo",
     "delta",
+    "promotable",
+    "oos",
 )
 
 
@@ -36,7 +37,11 @@ class Scorecard:
             "bootstrap_ci": {"low": lo, "high": hi, "alpha": alpha},
             "monte_carlo": mc,
             "delta": None,
+            "promotable": bool(run.promotable),
+            "oos": bool(run.oos),
         }
+        if getattr(run, "oos_coverage", None) is not None:
+            card["oos_coverage"] = float(run.oos_coverage)
 
         if baseline is not None:
             card["delta"] = {

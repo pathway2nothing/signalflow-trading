@@ -12,18 +12,28 @@ from signalflow.registry import registry
 
 LABEL_COL = "label"
 
+NATIVE_TARGETS = frozenset(
+    {"fixed_horizon", "triple_barrier", "vol_triple_barrier", "vol_horizon", "reversion_barrier"}
+)
+"""V5-native target names; everything else registers as a legacy labeler."""
+
 
 def register_target(name: str) -> Callable[[type], type]:
-    """Register a Target subclass in the central registry under ``name``."""
+    """Register a Target subclass in the central registry under ``name``.
+
+    Names outside :data:`NATIVE_TARGETS` register as legacy labelers so listings
+    and docs can separate them from the native V5 targets.
+    """
 
     def wrap(cls: type) -> type:
         cls._sf_name = name
         cls._sf_role = "target"
         cls._sf_type = ComponentType.TARGET
+        legacy = name.strip().lower() not in NATIVE_TARGETS
         bucket = registry._items.get(ComponentType.TARGET, {})
         existing = bucket.get(name.strip().lower())
         if existing is None or existing.cls is not cls:
-            registry.register(ComponentType.TARGET, name, cls, role="target")
+            registry.register(ComponentType.TARGET, name, cls, role="target", legacy=legacy)
         return cls
 
     return wrap

@@ -28,6 +28,7 @@ class Dataset:
     source_params: dict = field(default_factory=dict)
     quote: str = "USDT"
     provenance: Provenance = Provenance.FULL
+    col_provenance: dict = field(default_factory=dict)
 
     @classmethod
     def from_source(
@@ -68,9 +69,16 @@ class Dataset:
         return replace(self, frame=frame, provenance=provenance or self.provenance)
 
     def with_forecasts(self, cols: pl.DataFrame, *, provenance: Provenance = Provenance.FULL) -> "Dataset":
-        """Join forecast columns (keyed by pair, ts) and record their provenance."""
+        """Join forecast columns (keyed by pair, ts) and record each one's provenance."""
         merged = self.frame.join(cols, on=["pair", "ts"], how="left")
-        return replace(self, frame=merged, provenance=provenance)
+        new_cols = [c for c in cols.columns if c not in ("pair", "ts")]
+        col_prov = {**self.col_provenance, **{c: Provenance(provenance).value for c in new_cols}}
+        return replace(self, frame=merged, provenance=provenance, col_provenance=col_prov)
+
+    def with_oos_forecasts(self, model) -> "Dataset":
+        """Attach a model's leak-free out-of-fold predictions, stamped OOS by construction."""
+        pred = model.predict_oos(self)
+        return self.with_forecasts(pred, provenance=Provenance.OOS)
 
     def slice_time(self, start=None, end=None) -> "Dataset":
         """Rows with start <= ts < end (either bound optional). For walk-forward windows."""

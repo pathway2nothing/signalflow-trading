@@ -24,3 +24,9 @@ helper is a convenience loader that returns a ready-to-use `Dataset`.
 ::: signalflow.MemorySource
     options:
       show_root_heading: true
+
+## Disk cache
+
+::: signalflow.data.source.cached.CachedSource
+    options:
+      show_root_heading: true

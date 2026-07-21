@@ -10,6 +10,12 @@ from signalflow.data.source.base import Source, validate_frame
 
 _OVERLAP = timedelta(days=1)
 
+_STEP_S = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400}
+
+
+def _interval_step(interval: str) -> timedelta:
+    return timedelta(seconds=_STEP_S.get(interval, 0))
+
 
 def _parse_dt(value: str) -> datetime:
     """Parse an ISO date or datetime string into a naive datetime."""
@@ -60,7 +66,7 @@ class CachedSource(Source):
             return None
 
     def _missing_spans(
-        self, start: str, end: "str | None", cached: "pl.DataFrame | None"
+        self, start: str, end: "str | None", cached: "pl.DataFrame | None", interval: str
     ) -> "list[tuple[str, str | None]]":
         if cached is None or cached.height == 0:
             return [(start, end)]
@@ -72,14 +78,14 @@ class CachedSource(Source):
             spans.append((start, _fmt(have_min + _OVERLAP)))
         if end is None:
             spans.append((_fmt(have_max - _OVERLAP), None))
-        elif _parse_dt(end) > have_max:
+        elif _parse_dt(end) > have_max + _interval_step(interval):
             spans.append((_fmt(have_max - _OVERLAP), end))
         return spans
 
     def _fetch_pair(self, pair: str, start: str, end: "str | None", interval: str) -> pl.DataFrame:
         path = self._path(pair, interval)
         cached = self._read_cache(path)
-        spans = self._missing_spans(start, end, cached)
+        spans = self._missing_spans(start, end, cached, interval)
 
         parts = [cached] if cached is not None else []
         for span_start, span_end in spans:

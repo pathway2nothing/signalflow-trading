@@ -9,6 +9,20 @@ validator combinators aggregate several models into a single decision.
     options:
       show_root_heading: true
 
+## Walk-forward
+
+::: signalflow.walk_forward
+    options:
+      show_root_heading: true
+
+::: signalflow.WalkForwardResult
+    options:
+      show_root_heading: true
+
+::: signalflow.WalkForwardFold
+    options:
+      show_root_heading: true
+
 ## Validator combinators
 
 ::: signalflow.MeanValidator

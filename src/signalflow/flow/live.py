@@ -20,10 +20,48 @@ from loguru import logger
 from signalflow.data.dataset import Bar, Dataset
 from signalflow.engine.clock import Clock
 from signalflow.engine.engine import Engine
-from signalflow.engine.types import Fill, Position
+from signalflow.engine.types import Fill, OrderEvent, Position
 from signalflow.enums import RunMode, Side
 from signalflow.flow.loop import _EMPTY_SIGNALS_SCHEMA, _orders, enriched_signals
 from signalflow.strategy.observation import Observation
+
+
+def _order_id(broker, order) -> str:
+    """Client-order id for an order: the broker's own recipe for a Binance venue, else the sim recipe."""
+    from signalflow.engine.broker import BinanceBroker, sim_client_order_id
+
+    return broker.client_order_id(order) if isinstance(broker, BinanceBroker) else sim_client_order_id(order)
+
+
+def _order_status(order, fills) -> str:
+    """Fill status of ``order`` given this bar's fills (filled/partial/skipped)."""
+    for f in fills:
+        if f.pair == order.pair and f.side == order.side:
+            if abs(f.qty - order.qty) < 1e-9:
+                return "filled"
+            if 0 < f.qty < order.qty:
+                return "partial"
+    return "skipped"
+
+
+def _reconcile_on_resume(engine, broker) -> None:
+    """Query the venue for any 'placed' order lacking a 'result' and apply the missing fill."""
+    resolved = {e.client_order_id for e in engine.order_log if e.kind == "result"}
+    dangling = [e for e in engine.order_log if e.kind == "placed" and e.client_order_id not in resolved]
+    for ev in dangling:
+        try:
+            resp = broker.query_order(ev.pair, ev.client_order_id)
+        except Exception as exc:
+            logger.error(f"live: could not reconcile order {ev.client_order_id} on resume: {exc}")
+            continue
+        fill = broker._resp_to_fill(resp, ev)
+        if fill is not None:
+            engine.apply([fill])
+            engine.record_order(OrderEvent(ev.client_order_id, ev.pair, ev.side, ev.qty, ev.ts, "result", "filled"))
+            logger.warning(f"live: reconciled dangling order {ev.client_order_id}; synthesized fill qty={fill.qty}")
+        else:
+            engine.record_order(OrderEvent(ev.client_order_id, ev.pair, ev.side, ev.qty, ev.ts, "result", "unknown"))
+
 
 _INTERVAL_S = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400}
 
@@ -100,6 +138,7 @@ class PollingFeed(LiveFeed):
     warmup_bars: "int | None" = None
     max_bars: "int | None" = None
     lag_seconds: float = 3.0
+    backfill_bars: int = 5000
     clock: Clock = field(default_factory=lambda: Clock(RunMode.LIVE))
 
     def __post_init__(self) -> None:
@@ -122,12 +161,21 @@ class PollingFeed(LiveFeed):
             now = self.clock.wall()
             self.clock.sleep((now // step + 1) * step + self.lag_seconds - now)
             now = self.clock.wall()
-            fresh = _closed_only(
-                self.source.fetch(self.pairs, start=int(now - 2 * step), interval=self.interval), step, now
-            )
-            for bar in Dataset(frame=fresh, quote=self.quote).iter_bars():
-                if self._last_ts is not None and bar.ts <= self._last_ts:
-                    continue
+            if self._last_ts is not None:
+                start = max(
+                    int(self._last_ts.replace(tzinfo=UTC).timestamp()) + step, int(now - self.backfill_bars * step)
+                )
+            else:
+                start = int(now - 2 * step)
+            fresh = _closed_only(self.source.fetch(self.pairs, start=start, interval=self.interval), step, now)
+            new_bars = [
+                b
+                for b in Dataset(frame=fresh, quote=self.quote).iter_bars()
+                if self._last_ts is None or b.ts > self._last_ts
+            ]
+            if self._last_ts is not None and new_bars and (new_bars[0].ts - self._last_ts).total_seconds() > step:
+                logger.warning(f"PollingFeed: backfilled {len(new_bars)} missed bars after a gap")
+            for bar in new_bars:
                 self._last_ts = bar.ts
                 emitted += 1
                 yield bar
@@ -154,8 +202,8 @@ def _parse_ts(value):
         return value
 
 
-def save_state(engine: Engine, path: str) -> None:
-    """Persist balances/positions/marks and the fill log so a restart resumes the same book."""
+def save_state(engine: Engine, path: str, peak: "float | None" = None) -> None:
+    """Persist balances/positions/marks, the fill log, and the drawdown peak so a restart resumes."""
     state = {
         "balances": engine.balances,
         "positions": {
@@ -163,6 +211,7 @@ def save_state(engine: Engine, path: str) -> None:
             for k, v in engine.positions.items()
         },
         "marks": engine.marks,
+        "peak": peak,
         "event_log": [
             {
                 "pair": f.pair,
@@ -175,15 +224,27 @@ def save_state(engine: Engine, path: str) -> None:
             }
             for f in engine.event_log
         ],
+        "order_log": [
+            {
+                "client_order_id": e.client_order_id,
+                "pair": e.pair,
+                "side": e.side.value,
+                "qty": e.qty,
+                "ts": _iso(e.ts),
+                "kind": e.kind,
+                "status": e.status,
+            }
+            for e in engine.order_log
+        ],
     }
     with open(path, "w") as fh:
         json.dump(state, fh)
 
 
-def load_state(engine: Engine, path: str) -> bool:
-    """Restore a book saved by :func:`save_state`, including opened_ts and the fill log."""
+def load_state(engine: Engine, path: str) -> "dict | None":
+    """Restore a book saved by :func:`save_state`; return the parsed state dict (``None`` if absent)."""
     if not os.path.exists(path):
-        return False
+        return None
     with open(path) as fh:
         state = json.load(fh)
     engine.balances = dict(state.get("balances", {}))
@@ -204,7 +265,19 @@ def load_state(engine: Engine, path: str) -> bool:
         )
         for e in state.get("event_log", [])
     ]
-    return True
+    engine.order_log = [
+        OrderEvent(
+            client_order_id=e["client_order_id"],
+            pair=e["pair"],
+            side=Side(e["side"]),
+            qty=e["qty"],
+            ts=_parse_ts(e.get("ts")),
+            kind=e["kind"],
+            status=e.get("status", ""),
+        )
+        for e in state.get("order_log", [])
+    ]
+    return state
 
 
 def _close_epoch(bar_ts, step_s: int) -> float:
@@ -235,19 +308,28 @@ def run_live_loop(
     state_path: "str | None" = None,
     on_bar=None,
     max_latency_s: float = 10.0,
+    armed: bool = False,
+    compute_window: "int | None" = None,
 ):
     """Drive a Flow over a live (or replayed) feed.
 
     Warmup history fills the buffer without trading; decisions begin on the first
     streamed bar. Per live bar, decision latency (execution wall-clock minus the
     bar's close time) is measured and a breach of ``max_latency_s`` is logged.
-    Runs are not promotable.
+    Runs are not promotable. Per-bar signals are recomputed over the trailing
+    ``required_warmup + 1`` bars (``compute_window`` overrides); a transform that
+    under-declares its ``warmup`` will surface as ``simulate != backtest``.
     """
     from signalflow.engine.broker import ExchangeBroker
+    from signalflow.errors import FlowConfigError
     from signalflow.flow.run import Run
 
-    armed = isinstance(broker, ExchangeBroker)
+    if isinstance(broker, ExchangeBroker) and not armed:
+        raise FlowConfigError("a real ExchangeBroker requires Flow.live(..., armed=True); use SimBroker for paper")
+    if armed and flow.risk.max_drawdown >= 1.0 and flow.risk.max_notional_per_pair >= 1.0:
+        logger.warning("risk layer is effectively disabled (default limits) while trading armed")
     required_warmup = resolve_warmup_bars(flow, feed)
+    window = compute_window if compute_window is not None else required_warmup + 1
     logger.info(f"live: resolved warmup = {required_warmup} bars")
     if maxlen < required_warmup:
         raise ValueError(
@@ -263,8 +345,15 @@ def run_live_loop(
 
     target = target or feed.quote
     engine = Engine(capital, target=target, quote=feed.quote)
-    if state_path and load_state(engine, state_path):
-        logger.info(f"live: resumed book from {state_path}")
+    peak = float("-inf")
+    if state_path:
+        state = load_state(engine, state_path)
+        if state is not None:
+            logger.info(f"live: resumed book from {state_path}")
+            if state.get("peak") is not None:
+                peak = float(state["peak"])
+            if armed and isinstance(broker, ExchangeBroker) and hasattr(broker, "query_order"):
+                _reconcile_on_resume(engine, broker)
 
     buf: list = []
     for wbar in feed.warmup().iter_bars():
@@ -272,13 +361,13 @@ def run_live_loop(
     step_s = _INTERVAL_S.get(getattr(feed, "interval", None) or "")
 
     eq_ts, eq_val = [], []
-    peak = float("-inf")
     started = False
     for n, bar in enumerate(feed.stream()):
         buf.append(bar.frame)
         if len(buf) > maxlen:
             buf = buf[-maxlen:]
-        hist = Dataset(frame=pl.concat(buf), quote=feed.quote)
+        tail = buf[-window:] if len(buf) > window else buf
+        hist = Dataset(frame=pl.concat(tail), quote=feed.quote)
         signals = enriched_signals(flow, hist)
         sig_frame = (
             signals.filter(pl.col("ts") == bar.ts) if signals.height else pl.DataFrame(schema=_EMPTY_SIGNALS_SCHEMA)
@@ -291,7 +380,14 @@ def run_live_loop(
         peak = max(peak, snap.equity)
         obs = Observation(bar.ts, sig_frame, snap, mandate or {})
         intents = flow.risk.clip(flow.strategy.decide(obs), snap, peak, raise_on_trip=armed)
-        fills = broker.execute(_orders(intents, bar.prices, bar.ts), bar)
+        orders = _orders(intents, bar.prices, bar.ts)
+        for o in orders:
+            engine.record_order(OrderEvent(_order_id(broker, o), o.pair, o.side, o.qty, bar.ts, "placed"))
+        fills = broker.execute(orders, bar)
+        for o in orders:
+            engine.record_order(
+                OrderEvent(_order_id(broker, o), o.pair, o.side, o.qty, bar.ts, "result", _order_status(o, fills))
+            )
         engine.apply(fills)
         eq_ts.append(bar.ts)
         eq_val.append(engine.equity(bar.prices))
@@ -301,7 +397,7 @@ def run_live_loop(
             logger.warning(f"live: order latency {latency:.1f}s exceeds {max_latency_s}s budget at close {bar.ts}")
 
         if state_path:
-            save_state(engine, state_path)
+            save_state(engine, state_path, peak=peak)
         if on_bar is not None:
             on_bar(engine, bar, fills, latency)
         if max_bars is not None and n + 1 >= max_bars:

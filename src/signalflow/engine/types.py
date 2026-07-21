@@ -56,6 +56,19 @@ class Order:
 
 
 @dataclass
+class OrderEvent:
+    """One entry in the append-only order audit/recovery log (never mutates balances)."""
+
+    client_order_id: str
+    pair: str
+    side: Side
+    qty: float
+    ts: object
+    kind: str
+    status: str = ""
+
+
+@dataclass
 class Fill:
     """An executed order - the single source of truth the Engine folds."""
 

@@ -11,8 +11,7 @@ callable). The default clock is only invoked when no timestamp is given, and the
 tests pass explicit values, so behaviour stays reproducible.
 """
 
-
-from typing import Callable
+from collections.abc import Callable
 
 from signalflow.experiment.scorecard import Scorecard
 
@@ -30,7 +29,6 @@ class Experiment:
 
         self.log: dict = {"created": None, "first_result": None, "stages": []}
 
-
     def stamp(self, stage: str, ts=None):
         """Record ``stage`` with timestamp ``ts`` (or the clock's value)."""
         if ts is None and self._clock is not None:
@@ -40,16 +38,15 @@ class Experiment:
             self.log[stage] = ts
         return ts
 
-    def run(self, flow, data, capital, target=None, *, ts=None):
+    def run(self, flow, data, capital, target=None, *, oos: bool = False, broker=None, ts=None):
         """Backtest ``flow`` on ``data``, store the Run, and stamp ``first_result``."""
         if self.log["created"] is None:
             self.stamp("created", ts=ts)
-        run = flow.backtest(data, capital, target=target)
+        run = flow.backtest(data, capital, target=target, broker=broker, oos=oos)
         self.last_run = run
         self._last_run_args = {"data": data, "capital": capital, "target": target}
         self.stamp("first_result", ts=ts)
         return run
-
 
     def _resolve_baseline_run(self):
         if self.baseline is None:

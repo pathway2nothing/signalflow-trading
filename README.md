@@ -11,7 +11,7 @@
 **Real-time-first framework for trading signal research and execution**
 
 <p>
-<a href="https://pypi.org/project/signalflow-trading/"><img src="https://img.shields.io/badge/version-0.8.4-7c3aed" alt="Version"></a>
+<a href="https://pypi.org/project/signalflow-trading/"><img src="https://img.shields.io/badge/version-0.8.5-7c3aed" alt="Version"></a>
 <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-3b82f6?logo=python&logoColor=white" alt="Python 3.12+"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e" alt="License: MIT"></a>
 <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-1a1a2e" alt="Code style: ruff"></a>
@@ -113,16 +113,16 @@ a file. Model artifacts can live on the local filesystem, MLflow, or the Hugging
 Face Hub (`model.save("mlflow://...")`, `model.save("hf://...")`).
 
 ```python
-flow.save("flows/rsi_rise.yaml", model_dir="flows/models")   # yaml + trained artifacts
-same = sf.Flow.load("flows/rsi_rise.yaml")
+flow.save("flows/sma_rise.yaml", model_dir="flows/models")   # yaml + trained artifacts
+same = sf.Flow.load("flows/sma_rise.yaml")
 assert same.backtest(ds, capital=50_000).final_equity == run.final_equity
 ```
 
 ## Registry
 
 Every core class registers under a name - that name is what `flow.yaml`
-serializes and `sf list` enumerates. Seven `ComponentType`s: SOURCE, TRANSFORM,
-MODEL, STRATEGY, SAMPLER, BROKER, METRIC.
+serializes and `sf list` enumerates. Eight `ComponentType`s: SOURCE, TRANSFORM,
+TARGET, MODEL, STRATEGY, SAMPLER, BROKER, METRIC.
 
 ```python
 sf.registry.snapshot()                          # {type: [names]}

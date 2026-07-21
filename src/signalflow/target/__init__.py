@@ -26,6 +26,7 @@ from signalflow.target.path_labeler import (
     MeanReversionEventLabeler,
     TrendBreakLabeler,
 )
+from signalflow.target.reversion_barrier import ReversionBarrier
 from signalflow.target.sharpe_tercile_labeler import SharpeTercileLabeler
 from signalflow.target.structure_labeler import StructureLabeler, ZigzagStructureLabeler
 from signalflow.target.take_profit_labeler import TakeProfitLabeler
@@ -34,53 +35,54 @@ from signalflow.target.trend_scanning import TrendScanningLabeler
 from signalflow.target.triple_barrier import TripleBarrier
 from signalflow.target.triple_barrier_labeler import TripleBarrierLabeler
 from signalflow.target.utils import mask_targets_by_signals, mask_targets_by_timestamps
+from signalflow.target.vol_horizon import VolHorizon
+from signalflow.target.vol_triple_barrier import VolTripleBarrier
 from signalflow.target.volatility_labeler import VolatilityRegimeLabeler
 from signalflow.target.volatility_shock_labeler import VolatilityShockLabeler
 from signalflow.target.volume_climax_labeler import VolumeClimaxLabeler
 from signalflow.target.volume_labeler import VolumeRegimeLabeler
 
 __all__ = [
-
-    "Target",
-    "FixedHorizon",
-    "TripleBarrier",
-    "make_target",
-    "register_target",
-    "LABEL_COL",
-
-    "Labeler",
-    "adapter",
-    "mask_targets_by_signals",
-    "mask_targets_by_timestamps",
-
     "DEFAULT_HORIZONS",
     "DEFAULT_TARGET_TYPES",
-    "HorizonConfig",
-    "MultiTargetGenerator",
-    "TargetType",
-
+    "LABEL_COL",
     "AnomalyLabeler",
     "DirectionalMeanReversionLabeler",
     "DrawdownLabeler",
+    "FixedHorizon",
     "FixedHorizonLabeler",
     "FlashMoveLabeler",
     "HMMVolRegime2StateLabeler",
+    "HorizonConfig",
     "HurstRegimeLabeler",
+    "Labeler",
     "MarketWideVolatilityRegimeLabeler",
     "MeanReversionEventLabeler",
     "MeanReversionMagnitudeLabeler",
     "MetaLabelLabeler",
     "MultiHorizonMeanReversionLabeler",
+    "MultiTargetGenerator",
+    "ReversionBarrier",
     "SharpeTercileLabeler",
     "StructureLabeler",
     "TakeProfitLabeler",
+    "Target",
+    "TargetType",
     "TimeToBarrierLabeler",
     "TrendBreakLabeler",
     "TrendScanningLabeler",
+    "TripleBarrier",
     "TripleBarrierLabeler",
+    "VolHorizon",
+    "VolTripleBarrier",
     "VolatilityRegimeLabeler",
     "VolatilityShockLabeler",
     "VolumeClimaxLabeler",
     "VolumeRegimeLabeler",
     "ZigzagStructureLabeler",
+    "adapter",
+    "make_target",
+    "mask_targets_by_signals",
+    "mask_targets_by_timestamps",
+    "register_target",
 ]

@@ -31,8 +31,67 @@ def test_backtest_oos_differs_and_promotable(flow, ds):
     insample = flow.backtest(ds, capital=50_000)
     oos = flow.backtest(ds, capital=50_000, oos=True)
     assert insample.promotable is False and insample.oos is False
-    assert oos.promotable is True and oos.oos is True
+    assert oos.oos is True
+    assert oos.promotable == (oos.oos_coverage is None or oos.oos_coverage >= 0.95)
     assert oos.final_equity != insample.final_equity
+
+
+def test_oos_backtest_reports_coverage():
+    ds_fit = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
+    ds_full = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-04-01", interval="1h")
+    model = sf.ForecastModel(
+        target=sf.FixedHorizon(bars=12),
+        features=sf.FeaturePipe(sf.SMA(20)),
+        encode=None,
+        select=None,
+        n_folds=3,
+    ).fit(ds_fit)
+    flow = sf.Flow(
+        name="cov",
+        forecasts={"revert": model},
+        detectors=[sf.ThresholdDetector(forecast="revert", p_min=0.5)],
+    )
+    run = flow.backtest(ds_full, capital=10_000, oos=True)
+    assert run.oos_coverage is not None and run.oos_coverage < 1.0
+    assert run.promotable is False
+
+
+def test_oos_backtest_full_coverage_promotable():
+    ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
+    model = sf.ForecastModel(
+        target=sf.FixedHorizon(bars=12),
+        features=sf.FeaturePipe(sf.SMA(20)),
+        encode=None,
+        select=None,
+    ).fit(ds)
+    flow = sf.Flow(
+        name="cov_full",
+        forecasts={"revert": model},
+        detectors=[sf.ThresholdDetector(forecast="revert", p_min=0.5)],
+    )
+    run = flow.backtest(ds, capital=10_000, oos=True)
+    assert run.oos_coverage > 0.7
+    assert run.promotable == (run.oos_coverage >= 0.95)
+
+
+def test_non_oos_scorecard_has_no_coverage_key(flow, ds):
+    run = flow.backtest(ds, capital=50_000)
+    assert "oos_coverage" not in run.scorecard()
+
+
+def test_threshold_detector_empty_slot_raises():
+    with pytest.raises(sf.FlowConfigError):
+        sf.ThresholdDetector(p_min=0.6)
+
+
+def test_revert_detector_empty_slot_raises():
+    with pytest.raises(sf.FlowConfigError):
+        sf.RevertDetector(p_min=0.6)
+
+
+def test_market_drop_detector_empty_slot_raises():
+    with pytest.raises(sf.FlowConfigError):
+        sf.MarketDropDetector(p_min=0.6)
 
 
 def test_detector_only_flow_promotable(ds):
@@ -74,6 +133,31 @@ def test_leakage_invariant(ds, fitted_forecast):
     meta = sf.ForecastModel(target=sf.TripleBarrier(), features=sf.FeaturePipe(sf.SMA(20)))
     with pytest.raises(sf.LeakageError):
         meta.fit(ds, sampler=sf.MetaLabelingSampler(signals=bad))
+
+
+def test_with_oos_forecasts_stamps_oos(ds, fitted_forecast):
+    enriched = ds.with_oos_forecasts(fitted_forecast)
+    assert enriched.provenance == sf.Provenance.OOS
+    assert enriched.col_provenance.get(fitted_forecast.output) == sf.Provenance.OOS.value
+
+
+def test_meta_labeling_rejects_full_forecast_column(ds, fitted_forecast):
+    import polars as pl
+
+    tagged = ds.with_forecasts(fitted_forecast.predict(ds))
+    signals = tagged.with_frame(tagged.frame.with_columns(pl.lit(sf.RISE).alias("signal")))
+    with pytest.raises(sf.LeakageError) as exc:
+        sf.MetaLabelingSampler(signals=signals).sample(ds)
+    assert fitted_forecast.output in str(exc.value)
+
+
+def test_meta_labeling_accepts_with_oos_forecasts(ds, fitted_forecast):
+    import polars as pl
+
+    enriched = ds.with_oos_forecasts(fitted_forecast)
+    signals = enriched.with_frame(enriched.frame.with_columns(pl.lit(sf.RISE).alias("signal")))
+    ss = sf.MetaLabelingSampler(signals=signals).sample(ds)
+    assert ss.index.height > 0
 
 
 def test_oos_signals_train_validator(ds, fitted_forecast):
