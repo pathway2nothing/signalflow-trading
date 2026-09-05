@@ -9,18 +9,10 @@ from dataclasses import dataclass
 import polars as pl
 from loguru import logger
 
-from signalflow.data.source.base import Source, parse_time, validate_frame
+from signalflow.data.source.base import Source, interval_seconds, parse_time, validate_frame
 from signalflow.decorators import source
 
 _BASE = "https://api.binance.com/api/v3/klines"
-_MS = {
-    "1m": 60_000,
-    "5m": 300_000,
-    "15m": 900_000,
-    "1h": 3_600_000,
-    "4h": 14_400_000,
-    "1d": 86_400_000,
-}
 _LIMIT = 1000
 
 
@@ -39,29 +31,34 @@ class BinanceSource(Source):
         pairs: list[str],
         start: str,
         end: str | None = None,
-        interval: str = "1m",
+        interval: str = "1h",
     ) -> pl.DataFrame:
-        if interval not in _MS:
-            raise ValueError(f"unsupported interval {interval!r}")
+        interval_seconds(interval)  # fail fast on an unsupported interval
         start_ms = parse_time(start) * 1000
         end_ms = (parse_time(end) * 1000) if end else int(time.time() * 1000)
         frames = [self._fetch_pair(p, start_ms, end_ms, interval) for p in pairs]
         return validate_frame(pl.concat([f for f in frames if f.height > 0]))
 
     def _fetch_pair(self, pair: str, start_ms: int, end_ms: int, interval: str) -> pl.DataFrame:
-        step = _MS[interval]
+        step = interval_seconds(interval) * 1000
+        expected = max(1, (end_ms - start_ms) // (step * _LIMIT) + 1)
+        logger.info(f"binance: {pair} {interval}: fetching ~{expected} request(s)")
         rows: list[tuple] = []
+        n_req = 0
         cursor = start_ms
         while cursor < end_ms:
             batch = self._request(pair, interval, cursor, end_ms)
+            n_req += 1
             if not batch:
                 break
             for k in batch:
                 rows.append((k[0], float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])))
+            logger.debug(f"binance: {pair} {interval}: request {n_req}/~{expected}, +{len(batch)} bars ({len(rows)} total)")
             last_open = batch[-1][0]
             cursor = last_open + step
             if len(batch) < _LIMIT:
                 break
+        logger.info(f"binance: {pair} {interval}: fetched {len(rows)} bars in {n_req} request(s)")
         if not rows:
             logger.warning(f"binance: no klines for {pair}")
             return pl.DataFrame(

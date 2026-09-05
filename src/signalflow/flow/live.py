@@ -18,6 +18,7 @@ import polars as pl
 from loguru import logger
 
 from signalflow.data.dataset import Bar, Dataset
+from signalflow.data.source.base import INTERVAL_SECONDS, interval_seconds
 from signalflow.engine.clock import Clock
 from signalflow.engine.engine import Engine
 from signalflow.engine.types import Fill, OrderEvent, Position
@@ -63,7 +64,10 @@ def _reconcile_on_resume(engine, broker) -> None:
             engine.record_order(OrderEvent(ev.client_order_id, ev.pair, ev.side, ev.qty, ev.ts, "result", "unknown"))
 
 
-_INTERVAL_S = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400}
+
+
+_PROGRESS_EVERY = 500
+"""Live/simulate loops log a DEBUG progress line every this many bars (and on every fill)."""
 
 
 def _closed_only(frame: pl.DataFrame, step_s: int, now_s: float) -> pl.DataFrame:
@@ -145,7 +149,7 @@ class PollingFeed(LiveFeed):
         self._last_ts = None
 
     def warmup(self) -> Dataset:
-        step = _INTERVAL_S[self.interval]
+        step = interval_seconds(self.interval)
         now = float(self.clock.now() or self.clock.wall())
         start = int(now) - (self.warmup_bars + 1) * step
         frame = _closed_only(self.source.fetch(self.pairs, start=start, interval=self.interval), step, now)
@@ -155,7 +159,7 @@ class PollingFeed(LiveFeed):
         return ds
 
     def stream(self) -> Iterator[Bar]:
-        step = _INTERVAL_S[self.interval]
+        step = interval_seconds(self.interval)
         emitted = 0
         while self.max_bars is None or emitted < self.max_bars:
             now = self.clock.wall()
@@ -330,7 +334,7 @@ def run_live_loop(
         logger.warning("risk layer is effectively disabled (default limits) while trading armed")
     required_warmup = resolve_warmup_bars(flow, feed)
     window = compute_window if compute_window is not None else required_warmup + 1
-    logger.info(f"live: resolved warmup = {required_warmup} bars")
+    logger.debug(f"live: resolved warmup = {required_warmup} bars (window={window})")
     if maxlen < required_warmup:
         raise ValueError(
             f"maxlen={maxlen} is below the flow's required warmup of {required_warmup} bars; "
@@ -356,19 +360,26 @@ def run_live_loop(
                 _reconcile_on_resume(engine, broker)
 
     buf: list = []
+    t_run = time.perf_counter()
     for wbar in feed.warmup().iter_bars():
         buf.append(wbar.frame)
-    step_s = _INTERVAL_S.get(getattr(feed, "interval", None) or "")
+    step_s = INTERVAL_SECONDS.get(getattr(feed, "interval", None) or "")
+    mode = "simulate" if isinstance(feed, ReplayFeed) else "live"
+    logger.debug(
+        f"Flow.{mode}({flow.name!r}): warmup bars={len(buf)} window={window} maxlen={maxlen} "
+        f"capital={capital} armed={armed} broker={type(broker).__name__}"
+    )
 
     eq_ts, eq_val = [], []
     started = False
+    n_fills = n_signals = 0
     for n, bar in enumerate(feed.stream()):
         buf.append(bar.frame)
         if len(buf) > maxlen:
             buf = buf[-maxlen:]
         tail = buf[-window:] if len(buf) > window else buf
         hist = Dataset(frame=pl.concat(tail), quote=feed.quote)
-        signals = enriched_signals(flow, hist)
+        signals = enriched_signals(flow, hist, log=False)
         sig_frame = (
             signals.filter(pl.col("ts") == bar.ts) if signals.height else pl.DataFrame(schema=_EMPTY_SIGNALS_SCHEMA)
         )
@@ -389,8 +400,15 @@ def run_live_loop(
                 OrderEvent(_order_id(broker, o), o.pair, o.side, o.qty, bar.ts, "result", _order_status(o, fills))
             )
         engine.apply(fills)
+        n_fills += len(fills)
+        n_signals += sig_frame.height
         eq_ts.append(bar.ts)
         eq_val.append(engine.equity(bar.prices))
+        if fills or (n + 1) % _PROGRESS_EVERY == 0:
+            logger.debug(
+                f"Flow.{mode}: bar {n + 1} ts={bar.ts} signals={sig_frame.height} orders={len(orders)} "
+                f"fills={len(fills)} equity={eq_val[-1]:,.2f}"
+            )
 
         latency = (time.time() - _close_epoch(bar.ts, step_s)) if step_s else None
         if fills and latency is not None and latency > max_latency_s:
@@ -404,4 +422,10 @@ def run_live_loop(
             break
 
     curve = pl.DataFrame({"ts": eq_ts, "equity": eq_val})
-    return Run(flow.name, RunMode.LIVE.value, curve, engine.event_log, target, promotable=False)
+    run = Run(flow.name, RunMode.LIVE.value, curve, engine.event_log, target, promotable=False)
+    logger.info(
+        f"Flow.{mode}({flow.name!r}): bars={len(eq_val) - 1 if eq_val else 0:,} signals={n_signals:,} "
+        f"fills={n_fills:,} equity {run.initial_equity:,.2f} -> {run.final_equity:,.2f} ({run.total_return:+.2%}) "
+        f"max_dd={run.max_drawdown:.2%} ({time.perf_counter() - t_run:.2f}s)"
+    )
+    return run

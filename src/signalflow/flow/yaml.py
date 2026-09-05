@@ -19,7 +19,17 @@ def _model_uri(model, slot: str, model_dir: str | None) -> str:
     raise ArtifactError(f"forecast {slot!r} has no pinned URI; save it first or pass model_dir=")
 
 
-def _strategy_cfg(strategy) -> dict:
+def _strategy_cfg(strategy, model_dir: str | None = None, *, persist: bool = False) -> dict:
+    """Declarative strategy config; with ``persist`` first let the strategy pin its artifacts.
+
+    A strategy carrying a trained artifact (an RL policy, say) exposes
+    ``save_artifacts(model_dir)``, mirroring how forecast models are pinned to a
+    URI: it writes under ``model_dir`` and records the URI its ``to_config`` emits.
+    """
+    if persist:
+        save_artifacts = getattr(strategy, "save_artifacts", None)
+        if callable(save_artifacts):
+            save_artifacts(model_dir)
     to_config = getattr(strategy, "to_config", None)
     if callable(to_config):
         return to_config()
@@ -99,7 +109,7 @@ def save_flow(flow, path: str, model_dir: str | None = None, run=None) -> str:
         "forecasts": {slot: _model_uri(m, slot, model_dir) for slot, m in flow.forecasts.items()},
         "detectors": [d.to_config() for d in flow.detectors],
         "validator": _validator_cfg(flow.validator, model_dir),
-        "strategy": _strategy_cfg(flow.strategy),
+        "strategy": _strategy_cfg(flow.strategy, model_dir, persist=True),
         "risk": {
             "max_drawdown": flow.risk.max_drawdown,
             "max_positions": flow.risk.max_positions,
@@ -109,6 +119,11 @@ def save_flow(flow, path: str, model_dir: str | None = None, run=None) -> str:
     }
     with open(path, "w", encoding="utf-8") as fh:
         yaml.safe_dump(doc, fh, sort_keys=False, allow_unicode=True)
+    logger.debug(
+        f"Flow.save: {flow.name!r} -> {path} (forecasts={list(doc['forecasts'])}, "
+        f"detectors={[d['transform'] for d in doc['detectors']]}, strategy={doc['strategy']['name']!r}, "
+        f"model_dir={model_dir!r})"
+    )
     if run is not None:
         import json
         import os
@@ -126,6 +141,7 @@ def load_flow(path: str):
         doc = yaml.safe_load(fh)
 
     _warn_version_mismatch(doc.get("signalflow_version"))
+    logger.debug(f"Flow.load: {doc.get('name')!r} from {path} (signalflow {doc.get('signalflow_version')})")
     forecasts = {slot: ForecastModel.load(uri) for slot, uri in (doc.get("forecasts") or {}).items()}
     detectors = [build_transform(d) for d in (doc.get("detectors") or [])]
     return Flow(

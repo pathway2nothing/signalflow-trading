@@ -1,264 +1,112 @@
 ---
 title: signalflow-labs
-description: Deep learning extension for neural signal models in SignalFlow
+description: Torch backend, RL strategy, and parked neural stack for SignalFlow
 ---
 
-# signalflow-labs - Neural Networks
+# signalflow-labs - Torch & RL
 
-**signalflow-labs** extends SignalFlow with deep learning models built on
-PyTorch and Lightning. It provides a composable architecture where encoders and
-classification heads are mixed and matched via the component registry.
+**signalflow-labs** extends SignalFlow with PyTorch. Two components plug into
+the core `Flow` contract today; a larger neural time-series stack is kept as
+importable building blocks until it is re-adapted to the V5 model contract.
 
 ---
 
 ## Installation
 
 ```bash
-pip install signalflow-labs
+pip install signalflow-labs            # torch + lightning
+pip install "signalflow-labs[rl]"      # + stable-baselines3, gymnasium
 ```
 
-Requires `signalflow-trading`, `torch >= 2.2`, and `lightning >= 2.5`.
-
-For GPU support:
-```bash
-# Check CUDA version: nvidia-smi
-pip install torch --index-url https://download.pytorch.org/whl/cu121
-pip install signalflow-labs
-```
+Requires `signalflow-trading >= 0.8.5`, `torch >= 2.2`, `lightning >= 2.5`.
+Installing the package registers `strategy: rl` via the `signalflow.components`
+entry point.
 
 ---
 
-## Architecture
+## TorchMLPBackend
 
-signalflow-labs uses an **Encoder + Head** composition pattern:
-
-```
-Input [batch, seq_len, features]
-  → Encoder (LSTM, GRU, Transformer, TCN, PatchTST, ...)
-    → [batch, embedding_size]
-  → Head (MLP, Attention, Residual, Ordinal, ...)
-    → [batch, num_classes]
-```
-
-Components are loaded from the signalflow registry, making architectures fully
-configurable:
+A small MLP classifier exposing the sklearn estimator surface, usable wherever
+`ForecastModel` takes a `backend`. Training stays inside the core's embargoed
+walk-forward, so out-of-fold predictions, WoE encoding, and the flow round-trip
+are unchanged.
 
 ```python
-from signalflow.labs.model import TemporalClassificator
+import signalflow as sf
+import signalflow.labs as labs
 
-model = TemporalClassificator(
-    encoder_type="encoder/lstm",
-    encoder_params={"input_size": 10, "hidden_size": 128, "num_layers": 2},
-    head_type="head/cls/mlp",
-    head_params={"hidden_sizes": [64, 32]},
-    num_classes=3,
+model = sf.ForecastModel(
+    backend=labs.TorchMLPBackend(hidden_sizes=(64, 32), epochs=50),
+    target=sf.FixedHorizon(bars=12),
+    features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20), sf.SMA(50)),
 )
+model.fit(ds)
 ```
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `hidden_sizes` | `(64, 32)` | hidden layer widths |
+| `epochs` | `50` | full passes over the WoE matrix |
+| `lr` / `weight_decay` | `1e-3` / `0.0` | Adam settings |
+| `batch_size` | `256` | minibatch size |
+| `seed` | `0` | torch seed for reproducible fits |
 
 ---
 
-## Quick Start
+## RLStrategy and make_env
 
-### Training a Neural Model
-
-```python
-from pathlib import Path
-from signalflow.labs.model import TemporalClassificator
-from signalflow.labs.data import TimeSeriesPreprocessor, ScalerConfig
-
-# Configure preprocessing
-preprocessor = TimeSeriesPreprocessor(
-    default_config=ScalerConfig(method="robust", scope="group")
-)
-
-# Create model
-model = TemporalClassificator(
-    encoder_type="encoder/lstm",
-    encoder_params={"input_size": 10, "hidden_size": 64, "num_layers": 2},
-    head_type="head/cls/mlp",
-    head_params={"hidden_sizes": [128]},
-    num_classes=3,
-    preprocessor=preprocessor,
-    window_size=60,
-)
-
-# Train on signalflow DataFrames
-model.fit(X_train, y_train, log_dir=Path("./logs"))
-
-# Save/load model
-model.save("model.pkl")
-loaded = TemporalClassificator.load("model.pkl")
-```
-
-### Using Lightning Directly
+`make_env(flow, ds)` returns a gymnasium `Env` over the Engine replay. Each step
+is one bar; the observation is `Observation.to_vector()` - the same vector the
+live loop hands to `RLStrategy.decide` - and the reward is the log-change in
+equity. The action space is `Discrete(3)`: hold, open one position (`size_pct`
+of equity) on the strongest RISE pair not yet held, close all.
 
 ```python
-import lightning as L
-from signalflow.labs.model import TemporalClassificator
-from signalflow.labs.data import SignalDataModule
+from stable_baselines3 import PPO
 
-# Create model
-model = TemporalClassificator(
-    encoder_type="encoder/gru",
-    encoder_params={"input_size": 15, "hidden_size": 128},
-    head_type="head/cls/attention",
-    head_params={"num_heads": 4},
-    num_classes=3,
-)
+base = sf.Flow(name="rl", detectors=[sf.SmaCrossDetector()])
+policy = PPO("MlpPolicy", labs.make_env(base, ds)).learn(10_000)
 
-# Create data module
-data_module = SignalDataModule(
-    train_df=train_df,
-    val_df=val_df,
-    feature_cols=feature_cols,
-    label_col="label",
-    window_size=60,
-)
-
-# Train with Lightning
-trainer = L.Trainer(max_epochs=20, accelerator="auto")
-trainer.fit(model, data_module)
+flow = base.replace(strategy=labs.RLStrategy(model=policy, size_pct=0.1))
+run = flow.backtest(ds, capital=50_000)
 ```
+
+### Deploy is data
+
+`flow.save(path, model_dir=...)` persists the policy under
+`<model_dir>/strategy/` (SB3 `policy.zip` when the object has `save`/`load`,
+`policy.pkl` via cloudpickle otherwise) and writes the strategy config as:
+
+```yaml
+strategy:
+  name: rl
+  params:
+    size_pct: 0.1
+    policy_uri: file://flows/models/strategy/policy.zip
+    policy_class: stable_baselines3.ppo.ppo:PPO
+    schema_version: 1
+```
+
+`sf.Flow.load` rebuilds the strategy from that block and the backtest is
+byte-identical. `schema_version` is the `OBSERVATION_SCHEMA_VERSION` the policy
+was trained against; a mismatch at decision time raises `SchemaVersionError`.
 
 ---
 
-## Components
+## Parked neural stack
 
-### Encoders
+Importable, unit-tested where they are plain modules, but not registered and not
+wired into `Flow`:
 
-Sequence encoders that process windowed time series into fixed-size embeddings.
+| Module | Contents |
+|--------|----------|
+| `signalflow.labs.encoder` | 16 encoders - LSTM, GRU, TCN, Transformer, PatchTST, TSMixer, InceptionTime, ResNet1d, XceptionTime, Conv1d, XCM, gMLP, OmniScaleCNN, ConvTran, iTransformer, Mamba |
+| `signalflow.labs.head` | 7 heads - Linear, MLP, Residual, Attention, OrdinalRegression, Distribution, ClassificationWithConfidence |
+| `signalflow.labs.loss` | FocalLoss, DiceLoss, LDAMLoss, SymmetricCrossEntropyLoss |
+| `signalflow.labs.data`, `.model`, `.validator` | `TimeSeriesPreprocessor`, `SignalWindowDataset`, `SignalDataModule`, `TemporalClassificator`, `TemporalValidator` - pre-V5, integration tests skipped |
 
-| Class | Registry Name | Architecture |
-|-------|--------------|-------------|
-| `LSTMEncoder` | `encoder/lstm` | Bidirectional LSTM |
-| `GRUEncoder` | `encoder/gru` | Gated Recurrent Unit |
-| `TransformerEncoder` | `encoder/transformer` | Self-attention + positional encoding |
-| `PatchTSTEncoder` | `encoder/patchtst` | Patch-based Transformer |
-| `TCNEncoder` | `encoder/tcn` | Temporal Convolutional Network |
-| `TSMixerEncoder` | `encoder/tsmixer` | All-MLP mixer |
-| `InceptionTimeEncoder` | `encoder/inception_time` | Multi-scale convolutions |
-| `ResNet1dEncoder` | `encoder/resnet1d` | 1D ResNet |
-| `XceptionTimeEncoder` | `encoder/xception_time` | Depthwise separable conv |
-| `Conv1dEncoder` | `encoder/conv1d` | 1D CNN |
-| `XCMEncoder` | `encoder/xcm` | Cross-Channel Mixing |
-| `gMLPEncoder` | `encoder/gmlp` | Gating MLP |
-| `OmniScaleCNNEncoder` | `encoder/omniscale` | Multi-scale CNN |
-| `ConvTranEncoder` | `encoder/convtran` | Conv + Transformer hybrid |
-
-**Common parameters:**
-
-- `input_size` - Number of input features per timestep
-- `hidden_size` / `d_model` - Hidden dimensionality (default: 64)
-- `num_layers` - Number of stacked layers (default: 2)
-- Transformer-specific: `nhead`, `dim_feedforward`, `dropout`
-
-### Classification Heads
-
-Output heads that convert encoder embeddings to class predictions.
-
-| Class | Registry Name | Description |
-|-------|--------------|-------------|
-| `MLPClassifierHead` | `head/cls/mlp` | Standard MLP with configurable hidden layers |
-| `LinearClassifierHead` | `head/cls/linear` | Single linear projection |
-| `ResidualClassifierHead` | `head/cls/residual` | MLP with residual skip connections |
-| `AttentionClassifierHead` | `head/cls/attention` | Multi-head self-attention based |
-
-### Specialized Heads
-
-| Class | Registry Name | Description |
-|-------|--------------|-------------|
-| `DistributionHead` | `head/cls/distribution` | Soft label output via temperature-scaled softmax |
-| `OrdinalRegressionHead` | `head/cls/ordinal` | Ordered classification (fall < neutral < rise) |
-| `ClassificationWithConfidenceHead` | `head/cls/confidence` | Dual output: class logits + confidence score |
-
-**DistributionHead** is useful for KL-divergence training with soft labels.
-**OrdinalRegressionHead** exploits the natural ordering of signal classes.
-**ClassificationWithConfidenceHead** allows filtering predictions by model confidence.
-
----
-
-## Data Pipeline
-
-### TimeSeriesPreprocessor
-
-Per-asset feature scaling with configurable methods:
-
-```python
-from signalflow.labs.data import TimeSeriesPreprocessor, ScalerConfig
-
-preprocessor = TimeSeriesPreprocessor(
-    default_config=ScalerConfig(
-        method="robust",     # robust | standard | minmax
-        scope="group",       # group (per-asset) | global
-    )
-)
-
-# Fit on training data only
-preprocessor.fit(train_df, asset_col="pair")
-
-# Transform
-train_scaled = preprocessor.transform(train_df)
-test_scaled = preprocessor.transform(test_df)
-```
-
-### SignalWindowDataset
-
-Creates 3D tensors `[window_size, features]` at signal timestamps only:
-
-```python
-from signalflow.labs.data import SignalWindowDataset
-
-dataset = SignalWindowDataset(
-    df=scaled_df,
-    signal_timestamps=signal_timestamps,
-    feature_cols=feature_cols,
-    label_col="label",
-    window_size=60,
-    window_timeframe=1,  # 1 = every bar, 5 = dilated sampling
-)
-```
-
-### SignalDataModule
-
-Lightning DataModule with flexible splitting strategies:
-
-```python
-from signalflow.labs.data import SignalDataModule
-
-dm = SignalDataModule(
-    train_df=train_df,
-    val_df=val_df,
-    test_df=test_df,
-    feature_cols=feature_cols,
-    label_col="label",
-    window_size=60,
-    batch_size=64,
-)
-```
-
-Split strategies: **temporal** (chronological), **random**, **pair-based**.
-
----
-
-## Hyperparameter Tuning
-
-All components support Optuna integration:
-
-```python
-import optuna
-
-def objective(trial):
-    config = TemporalClassificator.tune(trial, model_size="medium")
-    model = TemporalClassificator(**config)
-    # train and evaluate...
-    return val_accuracy
-
-study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=50, timeout=3600)
-```
-
-Model size presets (`small`, `medium`, `large`) control search ranges for hidden
-dimensions, layer counts, and learning rates.
+All encoders share the interface `forward(x: [batch, seq_len, features]) ->
+[batch, embedding]`; heads take `[batch, embedding] -> [batch, num_classes]`.
 
 ---
 

@@ -13,7 +13,7 @@ import signalflow as sf
 @pytest.fixture(scope="session")
 def ds():
     """Small deterministic two-pair hourly dataset."""
-    return sf.data("memory", pairs=["BTCUSDT", "ETHUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
+    return sf.data("synthetic", pairs=["BTCUSDT", "ETHUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
 
 
 @pytest.fixture(scope="session")

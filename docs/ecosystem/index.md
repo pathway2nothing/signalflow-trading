@@ -14,7 +14,7 @@ component registry, data containers, and Flow patterns.
 
 <div class="grid cards" markdown>
 
--   :material-package-variant-closed:{ .lg .middle } **signalflow-trading** `v0.8.4` (Core)
+-   :material-package-variant-closed:{ .lg .middle } **signalflow-trading** `v0.8.5` (Core)
 
     ---
 
@@ -28,7 +28,7 @@ component registry, data containers, and Flow patterns.
 
     [:material-github: GitHub](https://github.com/pathway2nothing/signalflow-trading){ .md-button }
 
--   :material-chart-bell-curve-cumulative:{ .lg .middle } **[signalflow-ta](signalflow-ta.md)** `v0.8.2`
+-   :material-chart-bell-curve-cumulative:{ .lg .middle } **[signalflow-ta](signalflow-ta.md)** `v0.8.5`
 
     ---
 
@@ -42,12 +42,13 @@ component registry, data containers, and Flow patterns.
 
     [:material-github: GitHub](https://github.com/pathway2nothing/signalflow-ta){ .md-button }
 
--   :material-brain:{ .lg .middle } **[signalflow-labs](signalflow-labs.md)** `v0.8.2`
+-   :material-brain:{ .lg .middle } **[signalflow-labs](signalflow-labs.md)** `v0.8.5`
 
     ---
 
-    Neural encoders (LSTM, GRU, Transformer, PatchTST, TCN, TSMixer, InceptionTime),
-    classification heads, and an RL strategy. Built on PyTorch.
+    `TorchMLPBackend` for `ForecastModel` and `RLStrategy` + `make_env` (a gymnasium
+    env over the Engine replay), both round-tripping through flow YAML. Plus a parked
+    stack of 16 neural encoders, 7 heads, and 4 losses as building blocks. PyTorch.
 
     ```bash
     pip install "signalflow-trading[labs]"
@@ -81,7 +82,7 @@ entry point - no imports or wiring needed.
 ```
 signalflow-trading              # Core (required)
 ├── signalflow-ta               # 248 features + 21 detectors
-├── signalflow-labs             # Neural encoders, RL strategy
+├── signalflow-labs             # Torch backend, RL strategy, parked neural stack
 └── sf-custom                   # User components (entry-point autodiscovery)
 ```
 

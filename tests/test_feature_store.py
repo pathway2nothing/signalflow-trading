@@ -13,7 +13,7 @@ pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature na
 
 
 def _ds():
-    return sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
+    return sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
 
 
 def _count_compute(monkeypatch):
@@ -61,7 +61,7 @@ def test_span_change_is_cache_miss(tmp_path):
     store = sf.FeatureStore(tmp_path)
     pipe = sf.FeaturePipe(sf.SMA(20))
     a = _ds()
-    b = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-04-01", interval="1h")
+    b = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-04-01", interval="1h")
     assert store.key(pipe, a) != store.key(pipe, b)
 
 

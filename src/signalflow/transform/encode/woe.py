@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import polars as pl
+from loguru import logger
 
 from signalflow.decorators import transform
 from signalflow.enums import RESERVED_COLUMNS
@@ -106,6 +107,7 @@ class WoE(Transform):
             self.edges_[c] = edges
             self.woe_[c] = woe
             self.iv_[c] = iv
+        logger.trace(f"WoE.fit: {len(cols)} columns, rows={df.height:,}, positive_rate={float(y.mean()):.3f}")
         return self
 
     def compute(self, df: pl.DataFrame) -> pl.DataFrame:

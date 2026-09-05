@@ -37,7 +37,7 @@ def test_woe_state_round_trip():
 
 
 def test_model_records_rolling_refits():
-    ds = sf.data("memory", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-12", interval="1h")
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-12", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=6),
         features=sf.FeaturePipe(sf.SMA(5), sf.SMA(10)),
@@ -67,7 +67,7 @@ def _refit_model():
 def test_fold_cache_reuse_skips_recompute(tmp_path):
     from signalflow.experiment.cache import ArtifactCache
 
-    ds = sf.data("memory", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-12", interval="1h")
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-12", interval="1h")
     cache = ArtifactCache(str(tmp_path / "folds"))
 
     m1 = _refit_model().fit(ds, cache=cache)
@@ -86,7 +86,7 @@ def test_fold_cache_reuse_skips_recompute(tmp_path):
 
 
 def test_model_dump_woe_history(tmp_path):
-    ds = sf.data("memory", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-10", interval="1h")
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-10", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=6),
         features=sf.FeaturePipe(sf.SMA(5)),

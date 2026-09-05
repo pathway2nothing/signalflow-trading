@@ -165,7 +165,7 @@ def info(type_: str, name: str) -> None:
 
 @main.command()
 @click.argument("flow_yaml", type=click.Path(exists=True, dir_okay=False))
-@click.option("--source", default="memory", show_default=True, help="Registered data source name.")
+@click.option("--source", default="synthetic", show_default=True, help="Registered data source name.")
 @click.option("--pairs", default="BTCUSDT", show_default=True, help="Comma-separated trading pairs.")
 @click.option("--start", default="2023-01-01", show_default=True, help="Start date (ISO).")
 @click.option("--end", default=None, help="End date (ISO); optional.")

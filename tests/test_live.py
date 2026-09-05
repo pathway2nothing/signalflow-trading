@@ -16,7 +16,7 @@ _UNIX = datetime(1970, 1, 1)
 
 @pytest.fixture(scope="module")
 def small_ds():
-    return sf.data("memory", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-08", interval="1h")
+    return sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-08", interval="1h")
 
 
 def _flow():
@@ -131,7 +131,7 @@ class _UnderdeclaredDetector(sf.SignalDetector):
 
 
 def test_underdeclared_warmup_breaks_parity():
-    ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-15", interval="1h")
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-15", interval="1h")
     flow = sf.Flow(
         name="under",
         detectors=[_UnderdeclaredDetector()],
@@ -323,7 +323,7 @@ def test_polling_feed_backfills_gap():
 def test_polling_feed_warmup_resolves_from_flow():
     from signalflow.flow.live import resolve_warmup_bars
 
-    feed = sf.PollingFeed(source=sf.MemorySource(), pairs=["BTCUSDT"], interval="1h")
+    feed = sf.PollingFeed(source=sf.SyntheticSource(), pairs=["BTCUSDT"], interval="1h")
     assert feed.warmup_bars is None
 
     flow = _warmup60_flow()

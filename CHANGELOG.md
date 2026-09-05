@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Step-level logging across the core: one INFO summary per `ForecastModel.fit`,
+  `Flow.backtest`/`paper`, `Flow.simulate`/`live` and `walk_forward`, and DEBUG
+  detail (enable with `SF_VERBOSE=1` / `SF_LOG_LEVEL=DEBUG`) for data loading,
+  every `FeaturePipe` transform or fused feature group, fit internals (features,
+  sampler, labels, each fold with its kept-column count, final stack),
+  predictions, each forecast slot and detector in a run, the decision loop, live
+  progress, the feature store and flow save/load; WoE/IV internals per fold at
+  TRACE. `signalflow._logging.step` is the helper.
+- All fixed-width Binance kline intervals (`1s 1m 3m 5m 15m 30m 1h 2h 4h 6h 8h 12h
+  1d 3d 1w`) are accepted by `binance`, `synthetic`, the disk cache, and
+  `PollingFeed`, from one table - `INTERVAL_SECONDS` / `interval_seconds()` in
+  `data/source/base.py`. Calendar-month `1M` is rejected with a clear error.
+
+### Changed
+
+- Feature pipelines no longer re-sort and copy the frame per transform:
+  `ensure_sorted` (in `transform/base.py`) checks (pair, ts) order and sorts only
+  when needed, `FeaturePipe.compute` sorts once and chains consecutive expression
+  features into one lazy query with a single `collect()`, detectors and the
+  decision loop reuse the same check, and `Dataset.with_forecasts` appends
+  predictions without a join when they carry the frame's own (pair, ts) index.
+  The raw `Dataset.frame` is never modified.
+- `flow.save(model_dir=...)` now calls `strategy.save_artifacts(model_dir)` when a
+  strategy defines it, so strategies carrying trained artifacts (the labs
+  `RLStrategy`) pin them like forecast models and round-trip through `Flow.load`.
+- The built-in synthetic data source is now registered as `synthetic`
+  (`sf.data("synthetic", ...)`, class `SyntheticSource`, file
+  `data/source/synthetic.py`); `sf run --source` defaults to it. The old name
+  `memory` / `MemorySource` still resolves with a deprecation warning and is
+  no longer listed by `sf list source`.
+
 ## [0.8.5] - 2026-07-18
 
 ### Added

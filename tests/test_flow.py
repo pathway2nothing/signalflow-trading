@@ -37,8 +37,8 @@ def test_backtest_oos_differs_and_promotable(flow, ds):
 
 
 def test_oos_backtest_reports_coverage():
-    ds_fit = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
-    ds_full = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-04-01", interval="1h")
+    ds_fit = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
+    ds_full = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-04-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12),
         features=sf.FeaturePipe(sf.SMA(20)),
@@ -57,7 +57,7 @@ def test_oos_backtest_reports_coverage():
 
 
 def test_oos_backtest_full_coverage_promotable():
-    ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12),
         features=sf.FeaturePipe(sf.SMA(20)),

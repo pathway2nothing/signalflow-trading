@@ -109,7 +109,7 @@ def _make_flow_yaml(tmp_path, scorecard=None):
 def test_flow_save_with_run_writes_scorecard(tmp_path) -> None:
     import json
 
-    ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
     flow = sf.Flow(
         name="ev",
         detectors=[sf.SmaCrossDetector(fast=3, slow=8)],

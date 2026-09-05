@@ -99,7 +99,7 @@ def test_operating_point_ambiguous_lists_columns(fitted_forecast):
 
 
 def test_string_horizon_embargo_resolves_not_fallback():
-    small = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
+    small = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
     from signalflow.target import FixedHorizon, TripleBarrierLabeler
 
     fh = sf.FixedHorizon(bars="1d")
@@ -122,7 +122,7 @@ def test_make_folds_clamps_to_available_timestamps():
 def test_fingerprint_records_effective_folds():
     m = sf.ForecastModel(
         target=sf.FixedHorizon(12), features=sf.FeaturePipe(sf.SMA(20)), encode=None, select=None, n_folds=5
-    ).fit(sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h"))
+    ).fit(sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h"))
     cv = m.fingerprint["cv"]
     assert cv["n_folds"] == 5
     assert cv["n_folds_effective"] == 4
@@ -151,7 +151,7 @@ def test_partial_nan_rows_are_dropped(ds):
 
 
 def test_model_embargo_uses_resolved_horizon():
-    small = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
+    small = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
     str_model = sf.ForecastModel(
         target=sf.FixedHorizon(bars="1d"),
         features=sf.FeaturePipe(sf.SMA(5)),

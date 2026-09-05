@@ -93,6 +93,28 @@ class Transform(ABC):
             raise UnfittedTransformError(f"{self.name}: call fit() before compute()")
 
 
+def is_sorted_pair_ts(df: pl.DataFrame) -> bool:
+    """True when ``df`` is ordered by (pair, ts): pairs non-decreasing, ts non-decreasing within a pair."""
+    if "pair" not in df.columns or "ts" not in df.columns:
+        return False
+    if df.height < 2:
+        return True
+    if not df.get_column("pair").is_sorted():
+        return False
+    ts_ok = (pl.col("ts").diff() >= 0) | (pl.col("pair") != pl.col("pair").shift(1))
+    return bool(df.select(ts_ok.fill_null(True).all()).item())
+
+
+def ensure_sorted(df: pl.DataFrame) -> pl.DataFrame:
+    """``df`` ordered by (pair, ts) - the same object when it already is, so no copy is made.
+
+    Every causal computation needs this order; checking it costs two column scans,
+    while ``sort`` re-materializes the whole frame. Sources and pipes emit sorted
+    frames, so the check almost always succeeds and the sort is skipped.
+    """
+    return df if is_sorted_pair_ts(df) else df.sort(["pair", "ts"])
+
+
 class Feature(Transform):
     """A causal, stateless feature expressed as Polars expressions."""
 
@@ -100,9 +122,12 @@ class Feature(Transform):
     def exprs(self) -> list[pl.Expr]:
         """Expressions whose ``.alias(...)`` names match :pyattr:`outputs`."""
 
+    def window_exprs(self) -> list[pl.Expr]:
+        """:meth:`exprs` scoped ``.over("pair")`` - what actually runs on the sorted frame."""
+        return [e.over("pair") for e in self.exprs()]
+
     def compute(self, df: pl.DataFrame) -> pl.DataFrame:
-        sorted_df = df.sort(["pair", "ts"])
-        return sorted_df.with_columns([e.over("pair") for e in self.exprs()])
+        return ensure_sorted(df).with_columns(self.window_exprs())
 
 
 def _is_transform_config(value: object) -> bool:

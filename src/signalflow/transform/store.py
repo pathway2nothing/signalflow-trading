@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import polars as pl
+from loguru import logger
 
 from signalflow._hash import code_fingerprint, stable_hash
 from signalflow.data.dataset import Dataset
@@ -31,7 +32,9 @@ class FeatureStore:
     def compute(self, features: FeaturePipe, data: Dataset) -> pl.DataFrame:
         path = self.root / f"{self.key(features, data).replace(':', '_')}.parquet"
         if path.exists():
+            logger.debug(f"FeatureStore: hit {path.name} ({len(features.transforms)} transforms)")
             return pl.read_parquet(path)
+        logger.debug(f"FeatureStore: miss, computing {len(features.transforms)} transforms -> {path.name}")
         frame = features.compute(data.frame)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".parquet.tmp")

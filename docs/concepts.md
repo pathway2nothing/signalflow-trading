@@ -54,7 +54,7 @@ prediction methods are different on purpose:
 ```python
 import signalflow as sf
 
-ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 model = sf.ForecastModel(target=sf.FixedHorizon(bars=12),
                          features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20)))
 model.fit(ds)

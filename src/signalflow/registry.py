@@ -23,6 +23,11 @@ from loguru import logger
 from signalflow.enums import ComponentType
 from signalflow.errors import RegistryError, UnknownComponentError
 
+_DEPRECATED_NAMES: dict[tuple[ComponentType, str], str] = {
+    (ComponentType.SOURCE, "memory"): "synthetic",
+}
+"""Old registry names that still resolve (with a warning) to their current name."""
+
 
 @dataclass
 class ComponentInfo:
@@ -83,11 +88,20 @@ class Registry:
             logger.warning(f"Overriding {component_type.value}:{key} with {cls.__name__}")
         bucket[key] = ComponentInfo.from_class(cls, role=role, legacy=legacy)
 
+    @staticmethod
+    def _resolve(component_type: ComponentType, name: str) -> str:
+        key = name.lower()
+        current = _DEPRECATED_NAMES.get((component_type, key))
+        if current is None:
+            return key
+        logger.warning(f"{component_type.value}:{key!r} is a deprecated name; use {current!r}")
+        return current
+
     def get(self, component_type: ComponentType, name: str) -> type[Any]:
         """Return the registered class for ``name``; raise ``UnknownComponentError`` if absent."""
         self._discover_if_needed()
         bucket = self._items.get(component_type, {})
-        key = name.lower()
+        key = self._resolve(component_type, name)
         try:
             return bucket[key].cls
         except KeyError as e:
@@ -98,7 +112,7 @@ class Registry:
         """Return the ``ComponentInfo`` (class, role, docs) for ``name``."""
         self._discover_if_needed()
         bucket = self._items.get(component_type, {})
-        key = name.lower()
+        key = self._resolve(component_type, name)
         try:
             return bucket[key]
         except KeyError as e:

@@ -18,7 +18,7 @@ import polars as pl
 
 from signalflow.data.dataset import Dataset
 from signalflow.enums import SIGNAL_COL, Provenance
-from signalflow.transform.base import Transform
+from signalflow.transform.base import Transform, ensure_sorted
 
 
 class SignalDetector(Transform):
@@ -40,7 +40,7 @@ class SignalDetector(Transform):
         """Append a ``signal`` column (RISE/FALL/NONE). Must be causal (use .over('pair'))."""
 
     def compute(self, df: pl.DataFrame) -> pl.DataFrame:
-        return self.detect(df.sort(["pair", "ts"]))
+        return self.detect(ensure_sorted(df))
 
     def run(
         self,

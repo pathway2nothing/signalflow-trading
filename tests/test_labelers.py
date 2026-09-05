@@ -20,7 +20,7 @@ def test_import_labelers():
 
 @pytest.fixture(scope="module")
 def small_ds():
-    return sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
+    return sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
 
 
 def _labeler_cases():
@@ -160,7 +160,7 @@ def test_forecast_final_fit_degeneracy_raises_inner_fold_warns():
 
 
 def test_fixed_horizon_duration_string_matches_bars():
-    ds_1m = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-01-03", interval="1m")
+    ds_1m = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-01-03", interval="1m")
     from signalflow.target import FixedHorizon
 
     by_duration = FixedHorizon(bars="1h").labels(ds_1m)
@@ -303,7 +303,7 @@ def test_new_targets_registered_and_fit():
         cfg = cls().to_config()
         assert type(make_target(cfg["target"], **cfg["params"])) is cls
 
-    ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-05-01", interval="1h")
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-05-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.VolHorizon(bars=12), features=sf.FeaturePipe(sf.SMA(10)), encode=None, select=None
     ).fit(ds)

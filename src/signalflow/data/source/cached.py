@@ -1,20 +1,19 @@
 """Disk-backed OHLCV cache that wraps any Source and fetches only missing spans."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import polars as pl
 from loguru import logger
 
-from signalflow.data.source.base import Source, validate_frame
+from signalflow.data.source.base import INTERVAL_SECONDS, Source, validate_frame
 
 _OVERLAP = timedelta(days=1)
 
-_STEP_S = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400}
-
 
 def _interval_step(interval: str) -> timedelta:
-    return timedelta(seconds=_STEP_S.get(interval, 0))
+    """Bar width for cache-completeness checks; zero (never complete) for an unknown interval."""
+    return timedelta(seconds=INTERVAL_SECONDS.get(interval, 0))
 
 
 def _parse_dt(value: str) -> datetime:
@@ -33,11 +32,24 @@ def _fmt(moment: datetime) -> str:
 
 
 class CachedSource(Source):
-    """Wrap ``inner``, serving repeated requests from one growing parquet per (pair, interval)."""
+    """Wrap ``inner``, serving repeated requests from parquet cache under ``root``.
 
-    def __init__(self, inner: Source, root: "str | Path") -> None:
+    Layouts:
+
+    * flat (default) - one growing ``<root>/<interval>/<PAIR>.parquet``, written
+      only after the whole missing span is fetched;
+    * ``partition="day"`` - one ``<root>/<interval>/<PAIR>/<YYYY-MM-DD>.parquet``
+      per day, written as soon as that day is fetched, so an interrupted fetch
+      keeps every completed day. An incomplete trailing day (last bar short of
+      midnight) is re-fetched and merged on the next request.
+    """
+
+    def __init__(self, inner: Source, root: "str | Path", partition: "str | None" = None) -> None:
+        if partition not in (None, "day"):
+            raise ValueError(f"unsupported cache partition {partition!r}; use None or 'day'")
         self.inner = inner
         self.root = Path(root)
+        self.partition = partition
         self.name = getattr(inner, "name", "cached")
 
     def fetch(
@@ -45,7 +57,7 @@ class CachedSource(Source):
         pairs: list[str],
         start: str,
         end: "str | None" = None,
-        interval: str = "1m",
+        interval: str = "1h",
     ) -> pl.DataFrame:
         frames = [self._fetch_pair(pair, start, end, interval) for pair in pairs]
         frames = [f for f in frames if f.height > 0]
@@ -83,9 +95,15 @@ class CachedSource(Source):
         return spans
 
     def _fetch_pair(self, pair: str, start: str, end: "str | None", interval: str) -> pl.DataFrame:
+        if self.partition == "day":
+            return self._fetch_pair_daily(pair, start, end, interval)
         path = self._path(pair, interval)
         cached = self._read_cache(path)
         spans = self._missing_spans(start, end, cached, interval)
+        if spans:
+            logger.info(f"CachedSource: {pair} {interval}: fetching missing span(s) {spans}")
+        else:
+            logger.debug(f"CachedSource: {pair} {interval}: served from cache ({path})")
 
         parts = [cached] if cached is not None else []
         for span_start, span_end in spans:
@@ -105,4 +123,51 @@ class CachedSource(Source):
         frame = merged.filter(pl.col("ts") >= lo)
         if end is not None:
             frame = frame.filter(pl.col("ts") <= _parse_dt(end))
+        return frame
+
+    def _fetch_pair_daily(self, pair: str, start: str, end: "str | None", interval: str) -> pl.DataFrame:
+        step = _interval_step(interval)
+        start_dt = _parse_dt(start)
+        end_dt = _parse_dt(end) if end is not None else datetime.now(timezone.utc).replace(tzinfo=None)
+        day_dir = self.root / interval / pair
+        parts: list[pl.DataFrame] = []
+        day = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        while day <= end_dt:
+            day_end = day + timedelta(days=1)
+            path = day_dir / f"{day:%Y-%m-%d}.parquet"
+            cached = self._read_cache(path)
+            complete = (
+                cached is not None
+                and cached.height > 0
+                and step > timedelta(0)
+                and cached.get_column("ts").max() >= day_end - step
+            )
+            if not complete:
+                fetched = self.inner.fetch([pair], _fmt(day), _fmt(day_end), interval)
+                pieces = [p for p in (cached, fetched) if p is not None and p.height > 0]
+                merged = (
+                    pl.concat(pieces)
+                    .unique(subset=["pair", "ts"], keep="last")
+                    .sort(["pair", "ts"])
+                    .filter((pl.col("ts") >= day) & (pl.col("ts") < day_end))
+                    if pieces
+                    else None
+                )
+                if merged is not None and merged.height > 0:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = path.with_suffix(".parquet.tmp")
+                    merged.write_parquet(tmp)
+                    tmp.replace(path)
+                    logger.debug(f"CachedSource: {pair} {interval}: wrote {path.name} ({merged.height} rows)")
+                cached = merged
+            else:
+                logger.debug(f"CachedSource: {pair} {interval}: {path.name} served from cache")
+            if cached is not None and cached.height > 0:
+                parts.append(cached)
+            day = day_end
+        if not parts:
+            return self.inner.fetch([pair], start, end, interval)
+        frame = pl.concat(parts).filter(pl.col("ts") >= start_dt)
+        if end is not None:
+            frame = frame.filter(pl.col("ts") <= end_dt)
         return frame

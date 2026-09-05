@@ -54,7 +54,7 @@ pip install signalflow-trading
 ```python
 import signalflow as sf
 
-ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 
 model = sf.ForecastModel(target=sf.FixedHorizon(bars=12),
                          features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20), sf.SMA(50)))
@@ -89,7 +89,7 @@ flow.live(feed, capital=50_000, armed=True,             # real orders on Binance
 ```bash
 sf list                 # registry snapshot grouped by type
 sf list transform       # one type, with one-line summaries
-sf run flow.yaml --source memory --pairs BTCUSDT --start 2023-01-01 --interval 1h --capital 50000
+sf run flow.yaml --source synthetic --pairs BTCUSDT --start 2023-01-01 --interval 1h --capital 50000
 sf promote flow.yaml --to shadow   # validate + show the registry op (real promotion: sf-prod)
 sf version
 ```

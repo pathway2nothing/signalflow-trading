@@ -18,7 +18,7 @@ pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature na
 
 @pytest.fixture(scope="module")
 def fitted():
-    ds = data("memory", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+    ds = data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
     model = ForecastModel(
         backend="lightgbm",
         target=FixedHorizon(bars=12),

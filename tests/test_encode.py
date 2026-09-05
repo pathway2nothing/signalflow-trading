@@ -103,7 +103,7 @@ def test_woe_none_sentinel_round_trips():
 
 
 def test_woe_none_matches_empty_string_non_rolling():
-    data = sf.data("memory", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-10", interval="1h")
+    data = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-10", interval="1h")
 
     def _fit(refit, window):
         return sf.ForecastModel(

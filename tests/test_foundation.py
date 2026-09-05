@@ -14,7 +14,7 @@ def test_registry_has_seven_types():
     snap = sf.registry.snapshot()
 
     assert "transform" in snap
-    assert "memory" in sf.registry.list(sf.ComponentType.SOURCE)
+    assert "synthetic" in sf.registry.list(sf.ComponentType.SOURCE)
     assert "sma" in sf.registry.list(sf.ComponentType.TRANSFORM)
     assert "sma_cross" in sf.registry.list(sf.ComponentType.TRANSFORM)
 
@@ -199,3 +199,11 @@ def test_transform_roundtrip_config():
     cfg = pipe.to_config()
     assert cfg["transform"] == "feature_pipe"
     assert len(cfg["params"]["transforms"]) == 2
+
+
+def test_deprecated_source_name_resolves_to_synthetic():
+    from signalflow.data.source.synthetic import SyntheticSource
+
+    assert sf.registry.get(sf.ComponentType.SOURCE, "memory") is SyntheticSource
+    assert "memory" not in sf.registry.list(sf.ComponentType.SOURCE)
+    assert sf.MemorySource is sf.SyntheticSource

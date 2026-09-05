@@ -54,7 +54,7 @@ A detector that computes its own features (like the one above) needs no
 `forecasts` slot - the signal is derived directly from the data.
 
 ```python
-ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
+ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
 
 flow = sf.Flow(
     name="sma_rise",

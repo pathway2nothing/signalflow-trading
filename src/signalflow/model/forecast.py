@@ -1,6 +1,7 @@
 """ForecastModel - the trainable tier-1 model."""
 
 import json
+import time
 import warnings
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -10,6 +11,7 @@ import polars as pl
 from loguru import logger
 from sklearn.base import clone
 
+from signalflow._logging import frame_summary, step
 from signalflow._hash import code_fingerprint, stable_hash
 from signalflow.data.dataset import Dataset
 from signalflow.errors import (
@@ -113,17 +115,36 @@ class ForecastModel:
         if self.target is None:
             raise FlowConfigError("ForecastModel requires a target to fit")
         sampler = sampler or self.sampler or UniformSampler()
-
-        feat = (
-            feature_store.compute(self.features, data)
-            if feature_store is not None
-            else self.features.compute(data.frame)
+        t_fit = time.perf_counter()
+        backend_name = self.backend if isinstance(self.backend, str) else type(self.backend).__name__
+        logger.debug(
+            f"ForecastModel.fit({self.output}): backend={backend_name} target={self.target.name} "
+            f"features={len(self.features.outputs)} encode={'woe' if self.encode else 'none'} "
+            f"select={'iv' if self.select else 'none'} sampler={getattr(sampler, 'name', type(sampler).__name__)} "
+            f"data: {frame_summary(data.frame)}"
         )
-        ss = sampler.sample(data)
+
+        with step("ForecastModel.fit: features", store="yes" if feature_store is not None else "no") as log:
+            feat = (
+                feature_store.compute(self.features, data)
+                if feature_store is not None
+                else self.features.compute(data.frame)
+            )
+            log["rows"] = f"{feat.height:,}"
+        with step("ForecastModel.fit: sampler") as log:
+            ss = sampler.sample(data)
+            log["selected"] = f"{ss.index.height:,}/{data.height:,}"
+            log["weighted"] = "yes" if ss.weights is not None else "no"
         idx = ss.index
         if ss.weights is not None:
             idx = idx.with_columns(ss.weights.alias("_w"))
-        labels = self.target.labels(data, at=ss.index)
+        with step("ForecastModel.fit: labels", target=self.target.name) as log:
+            labels = self.target.labels(data, at=ss.index)
+            lab = labels.get_column(LABEL_COL).drop_nulls()
+            log["labeled"] = f"{lab.len():,}/{labels.height:,}"
+            if lab.len():
+                log["mean"] = f"{float(lab.cast(pl.Float64).mean()):.3f}"
+                log["unique"] = lab.n_unique()
 
         base = (
             idx.join(feat, on=["pair", "ts"], how="inner")
@@ -153,27 +174,44 @@ class ForecastModel:
         horizon_bars = self.target.horizon_bars(data)
         embargo = timedelta(seconds=horizon_bars * median_dt(ts_unique))
         folds = self._walk_forward_folds(ts_unique, embargo)
+        logger.debug(
+            f"ForecastModel.fit: training set rows={base.height:,} features={len(self.features.outputs)} "
+            f"span={ts_unique[0]}..{ts_unique[-1]}; folds={len(folds)} horizon_bars={horizon_bars} embargo={embargo}"
+        )
         oos_parts: list[pl.DataFrame] = []
         self.refits_: list[dict] = []
         target_cfg = self.target.to_config()
         stack_fp = self._stack_fingerprint(data) if cache is not None else None
-        for fold in folds:
+        n_cached = 0
+        for i, fold in enumerate(folds, 1):
+            t_fold = time.perf_counter()
             train = base.filter(pl.col("ts") < (fold.test_start_ts - embargo))
             if fold.train_start_ts is not None:
                 train = train.filter(pl.col("ts") >= fold.train_start_ts)
             test = base.filter((pl.col("ts") >= fold.test_start_ts) & (pl.col("ts") <= fold.test_end_ts))
             if train.height < self.min_train_rows or test.height == 0:
+                logger.debug(
+                    f"ForecastModel.fit: fold {i}/{len(folds)} skipped (train rows={train.height}, test rows={test.height})"
+                )
                 continue
             cached = self._load_fold(cache, stack_fp, fold, embargo) if cache is not None else None
             if cached is not None:
                 preds, state = cached
+                n_cached += 1
             else:
-                preds, enc = self._fit_fold_predict(train, test, fold=fold)
+                preds, enc, kept = self._fit_fold_predict(train, test, fold=fold)
                 if preds is None:
                     continue
                 state = enc.state_dict() if enc is not None else None
                 if cache is not None:
                     self._store_fold(cache, stack_fp, fold, embargo, preds, state)
+            logger.debug(
+                f"ForecastModel.fit: fold {i}/{len(folds)} "
+                f"{'cached' if cached is not None else f'fitted kept={kept}/{len(self.features.outputs)}'}: "
+                f"train rows={train.height:,} (..{fold.test_start_ts - embargo}) "
+                f"test rows={test.height:,} ({fold.test_start_ts}..{fold.test_end_ts}) "
+                f"({time.perf_counter() - t_fold:.2f}s)"
+            )
             oos_parts.append(preds)
             if state is not None:
                 self.refits_.append(
@@ -198,11 +236,17 @@ class ForecastModel:
                 f"the model likely learned nothing"
             )
 
-        self.encode_, self.select_, self.model_ = self._fit_stack(base)
+        with step("ForecastModel.fit: final production stack", rows=f"{base.height:,}"):
+            self.encode_, self.select_, self.model_ = self._fit_stack(base)
 
         self._build_fingerprint(data, ts_unique, n_folds_effective=len(folds))
         self._fitted = True
-        logger.debug(f"ForecastModel fitted: oos rows={self.oos_.height}, folds={len(folds)}")
+        kept = len(getattr(self.model_, "_sf_cols", []) or [])
+        logger.info(
+            f"ForecastModel.fit({self.output}): {len(oos_parts)}/{len(folds)} folds ({n_cached} cached), "
+            f"oos rows={self.oos_.height:,}, features kept {kept}/{len(self.features.outputs)}, "
+            f"backend={backend_name} ({time.perf_counter() - t_fit:.2f}s)"
+        )
         return self
 
     def _fit_stack(self, train: pl.DataFrame, fold=None):
@@ -238,9 +282,11 @@ class ForecastModel:
         return enc, sel, est
 
     def _fit_fold_predict(self, train: pl.DataFrame, test: pl.DataFrame, fold=None):
+        """Fit one fold's stack and score its test rows; also report how many columns the stack kept."""
         enc, sel, est = self._fit_stack(train, fold=fold)
         p = self._predict_stack(enc, sel, est, test)
-        return test.select(["pair", "ts"]).with_columns(pl.Series(self.output, p)), enc
+        kept = len(getattr(est, "_sf_cols", None) or [])
+        return test.select(["pair", "ts"]).with_columns(pl.Series(self.output, p)), enc, kept
 
     def _walk_forward_folds(self, ts_unique: list, embargo: timedelta):
         """Rolling refit folds driven by the encoder's ``refit``/``window``; else n_folds."""
@@ -334,12 +380,14 @@ class ForecastModel:
     def predict(self, data: Dataset, feature_store=None) -> pl.DataFrame:
         """Production prediction (in-sample on history - never feed to training)."""
         self._check_fitted()
-        feat = (
-            feature_store.compute(self.features, data)
-            if feature_store is not None
-            else self.features.compute(data.frame)
-        )
-        p = self._predict_stack(self.encode_, self.select_, self.model_, feat)
+        with step(f"ForecastModel.predict({self.output})") as log:
+            feat = (
+                feature_store.compute(self.features, data)
+                if feature_store is not None
+                else self.features.compute(data.frame)
+            )
+            p = self._predict_stack(self.encode_, self.select_, self.model_, feat)
+            log["rows"] = f"{feat.height:,}"
         return feat.select(["pair", "ts"]).with_columns(pl.Series(self.output, p))
 
     def predict_oos(self, data: Dataset, strict: bool = False) -> pl.DataFrame:
@@ -352,6 +400,7 @@ class ForecastModel:
         want = data.index()
         out = want.join(self.oos_, on=["pair", "ts"], how="left")
         missing = out.get_column(self.output).null_count()
+        logger.debug(f"ForecastModel.predict_oos({self.output}): rows={out.height:,} covered={out.height - missing:,}")
         if missing:
             if strict:
                 raise FingerprintMismatch(

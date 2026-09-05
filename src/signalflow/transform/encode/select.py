@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 
 import polars as pl
+from loguru import logger
+
+from signalflow._logging import names
 
 from signalflow.decorators import transform
 from signalflow.enums import RESERVED_COLUMNS
@@ -55,6 +58,10 @@ class IVSelector(Transform):
             if iv >= self.min_iv:
                 keep.append(c)
         self.keep_ = keep
+        dropped = [c for c in self.iv_ if c not in keep]
+        logger.trace(
+            f"IVSelector.fit: kept {len(keep)}/{len(self.iv_)} columns (min_iv={self.min_iv}); dropped {names(dropped)}"
+        )
         return self
 
     def compute(self, df: pl.DataFrame) -> pl.DataFrame:

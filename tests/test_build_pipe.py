@@ -25,7 +25,7 @@ class _BoomFeature(Feature):
 
 @pytest.fixture(scope="module")
 def sample():
-    return data("memory", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+    return data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 
 
 def test_builds_from_sma():

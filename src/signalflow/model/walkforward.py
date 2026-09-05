@@ -8,6 +8,7 @@ Replaces the rolling monthly loop every experiment reimplements::
 """
 
 import copy
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -174,9 +175,15 @@ def walk_forward(
     ``save_to`` may template the fold index, e.g. ``"mlflow://models/exp_{fold}"``.
     """
     windows = _windows(data, train, step, start, end)
+    t_wf = time.perf_counter()
+    logger.debug(f"walk_forward: {len(windows)} folds, train={train} step={step}, data rows={data.height:,}")
     labels_all = model.target.labels(data) if model.target is not None else None
     folds: list[WalkForwardFold] = []
     for i, (train_start, train_end, test_start, test_end) in enumerate(windows):
+        t_fold = time.perf_counter()
+        logger.debug(
+            f"walk_forward: fold {i + 1}/{len(windows)} train=[{train_start}..{train_end}) test=[{test_start}..{test_end})"
+        )
         fold_model = copy.deepcopy(model)
         train_ds = data.slice_time(train_start, train_end)
         fold_model.fit(train_ds, cache=cache, feature_store=feature_store)
@@ -196,4 +203,6 @@ def walk_forward(
                 oos=oos,
             )
         )
+        logger.debug(f"walk_forward: fold {i + 1}/{len(windows)} oos rows={oos.height:,} ({time.perf_counter() - t_fold:.2f}s)")
+    logger.info(f"walk_forward: {len(folds)} folds fitted, train={train} step={step} ({time.perf_counter() - t_wf:.2f}s)")
     return WalkForwardResult(folds=folds)

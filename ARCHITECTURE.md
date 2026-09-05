@@ -14,7 +14,7 @@ promotion, and trading all move the same artifact.
 
 | Module | Responsibility |
 |--------|----------------|
-| `data/` | `Dataset` (`data/dataset.py`) - lazy, immutable market-data container; sources under `data/source/` (`memory.py`, `binance.py`, `cached.py`). |
+| `data/` | `Dataset` (`data/dataset.py`) - lazy, immutable market-data container; sources under `data/source/` (`synthetic.py`, `binance.py`, `cached.py`). |
 | `transform/` | `Transform` base and `FeaturePipe` (`transform/pipe.py`), the `SMA` feature, WoE/IV encoders (`transform/encode/`), and `build_pipe` (`transform/build.py`). |
 | `target/` | `Target` base (`target/base.py`) and the labelers (`FixedHorizon`, `TripleBarrier`, and the rest of `target/*.py`). |
 | `model/` | `ForecastModel` (`model/forecast.py`), walk-forward (`model/walkforward.py`), OOS/fold helpers (`model/oos.py`), validator combinators (`model/validators.py`), persistence (`model/store/`). |

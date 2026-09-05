@@ -18,7 +18,7 @@ feeds `backtest`, `paper`, and `live` - there is no separate live data path to d
 
 ```python
 import signalflow as sf
-ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 ```
 
 ### Transform

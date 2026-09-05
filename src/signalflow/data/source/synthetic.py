@@ -5,29 +5,26 @@ from dataclasses import dataclass
 
 import polars as pl
 
-from signalflow.data.source.base import Source, parse_time, validate_frame
+from signalflow.data.source.base import Source, interval_seconds, parse_time, validate_frame
 from signalflow.decorators import source
-
-_INTERVAL_SECONDS = {
-    "1m": 60,
-    "5m": 300,
-    "15m": 900,
-    "1h": 3600,
-    "4h": 14400,
-    "1d": 86400,
-}
 
 
 def _seed_for(pair: str, base: int) -> int:
     return base + sum(ord(c) for c in pair) * 2654435761 & 0x7FFFFFFF
 
 
-@source("memory")
+@source("synthetic")
 @dataclass
-class MemorySource(Source):
-    """Synthetic OHLCV generator (deterministic)."""
+class SyntheticSource(Source):
+    """Synthetic OHLCV generator: a deterministic random walk, not market data.
 
-    name: str = "memory"
+    Prices start near ``start_price`` (offset by a hash of the pair name) and
+    follow a log-normal walk with per-bar ``drift`` and ``vol``; volume is noise
+    around 100. Pair names only seed the generator - ``BTCUSDT`` here has nothing
+    to do with real BTC quotes. Use ``binance`` for real candles.
+    """
+
+    name: str = "synthetic"
     seed: int = 7
     drift: float = 0.00001
     vol: float = 0.002
@@ -38,11 +35,9 @@ class MemorySource(Source):
         pairs: list[str],
         start: str,
         end: str | None = None,
-        interval: str = "1m",
+        interval: str = "1h",
     ) -> pl.DataFrame:
-        step = _INTERVAL_SECONDS.get(interval)
-        if step is None:
-            raise ValueError(f"unsupported interval {interval!r}")
+        step = interval_seconds(interval)
         start_dt = parse_time(start)
         end_dt = parse_time(end) if end else start_dt + 5000 * step
         n = max(1, int((end_dt - start_dt) // step))
@@ -85,6 +80,10 @@ class MemorySource(Source):
                 ).with_columns(pl.col("ts").cast(pl.Datetime("ms")))
             )
         return validate_frame(pl.concat(frames))
+
+
+MemorySource = SyntheticSource
+"""Deprecated alias for :class:`SyntheticSource`; the registry name ``memory`` maps to ``synthetic``."""
 
 
 class _Lcg:

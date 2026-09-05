@@ -1,35 +1,48 @@
 """The decision loop - one loop for backtest/paper/live."""
 
+import time
+
 import polars as pl
 from loguru import logger
 
+from signalflow._logging import frame_summary, step
 from signalflow.engine.engine import Engine
 from signalflow.engine.types import Order
 from signalflow.enums import FALL, NONE, RISE, SIGNAL_COL, IntentKind, OrderType, RunMode
 from signalflow.errors import PipeError
 from signalflow.strategy.observation import Observation
+from signalflow.transform.base import ensure_sorted
 
 _EMPTY_SIGNALS_SCHEMA = {"pair": pl.Utf8, "ts": pl.Datetime("ms"), "signal": pl.Utf8, "p_success": pl.Float64}
 
 MIN_OOS_COVERAGE = 0.95
 
 
-def enriched_signals(flow, data, oos: bool = False) -> pl.DataFrame:
+def enriched_signals(flow, data, oos: bool = False, log: bool = True) -> pl.DataFrame:
     """Precompute forecast columns, run detectors, and (event-gated) validator scores.
 
     When ``oos`` is true, every forecast slot and the validator use leak-free
     out-of-fold predictions; rows outside the model's OOS coverage are null, so
     detectors do not fire there. Leave it false for the production in-sample path.
+    ``log=False`` silences the per-slot/per-detector DEBUG lines (the live loop
+    calls this every bar and reports progress itself).
     """
     enriched = data
     for slot, model in flow.forecasts.items():
         out = getattr(model, "output", "p_rise")
+        t0 = time.perf_counter()
         pred = model.predict_oos(data) if oos else model.predict(data)
+        if log:
+            logger.debug(
+                f"forecast slot {slot!r}: {'oos' if oos else 'in-sample'} rows={pred.height:,} "
+                f"non-null={pred.height - pred.get_column(out).null_count():,} ({time.perf_counter() - t0:.2f}s)"
+            )
         pred = pred.rename({out: f"{slot}/{out}"})
         enriched = enriched.with_forecasts(pred)
 
     parts = []
     for det in flow.detectors:
+        t0 = time.perf_counter()
         try:
             computed = det.compute(enriched.frame)
         except Exception as e:
@@ -50,14 +63,24 @@ def enriched_signals(flow, data, oos: bool = False) -> pl.DataFrame:
             .select(["pair", "ts", SIGNAL_COL])
             .with_columns(pl.lit(det.name).alias("detector"))
         )
+        if log:
+            sig = s.get_column(SIGNAL_COL)
+            logger.debug(
+                f"detector {det.name!r}: signals={s.height:,} (rise={(sig == RISE).sum():,}, "
+                f"fall={(sig == FALL).sum():,}) over rows={computed.height:,} ({time.perf_counter() - t0:.2f}s)"
+            )
         parts.append(s)
     signals = pl.concat(parts) if parts else pl.DataFrame(schema={**_EMPTY_SIGNALS_SCHEMA, "detector": pl.Utf8})
 
     if flow.validator is not None and signals.height > 0:
         vcol = getattr(flow.validator, "output", "p_success")
+        t0 = time.perf_counter()
         vpred = flow.validator.predict_oos(data) if oos else flow.validator.predict(data)
         vp = vpred.select(["pair", "ts", vcol]).rename({vcol: "p_success"})
         signals = signals.join(vp, on=["pair", "ts"], how="left")
+        if log:
+            scored = signals.height - signals.get_column("p_success").null_count()
+            logger.debug(f"validator: scored {scored:,}/{signals.height:,} signals ({time.perf_counter() - t0:.2f}s)")
     return signals
 
 
@@ -101,8 +124,15 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
     from signalflow.flow.run import Run
 
     target = target or data.quote
+    t_run = time.perf_counter()
+    logger.debug(
+        f"Flow.{mode.value}({flow.name!r}): capital={capital} target={target} oos={oos} "
+        f"strategy={getattr(flow.strategy, 'name', type(flow.strategy).__name__)} data: {frame_summary(data.frame)}"
+    )
     engine = Engine(capital, target=target, quote=data.quote)
-    signals = enriched_signals(flow, data, oos=oos)
+    with step(f"Flow.{mode.value}: signals", forecasts=len(flow.forecasts), detectors=len(flow.detectors)) as log:
+        signals = enriched_signals(flow, data, oos=oos)
+        log["signals"] = f"{signals.height:,}"
     if data.frame.height == 0:
         logger.warning(f"backtest of {flow.name!r}: dataset is empty (0 bars)")
     by_ts: dict = {}
@@ -113,7 +143,10 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
     eq_ts, eq_val = [], []
     peak = float("-inf")
     started = False
+    n_bars = n_intents = n_orders = n_fills = 0
+    t_loop = time.perf_counter()
     for bar in data.iter_bars():
+        n_bars += 1
         snap = engine.snapshot(bar.ts, bar.prices)
         if not started:
             eq_ts.append(bar.ts)
@@ -125,11 +158,19 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
             sig_frame = pl.DataFrame(schema=_EMPTY_SIGNALS_SCHEMA)
         obs = Observation(bar.ts, sig_frame, snap, mandate or {})
         intents = flow.strategy.decide(obs)
+        n_intents += len(intents)
         intents = flow.risk.clip(intents, snap, peak)
-        fills = broker.execute(_orders(intents, bar.prices, bar.ts), bar)
+        orders = _orders(intents, bar.prices, bar.ts)
+        n_orders += len(orders)
+        fills = broker.execute(orders, bar)
+        n_fills += len(fills)
         engine.apply(fills)
         eq_ts.append(bar.ts)
         eq_val.append(engine.equity(bar.prices))
+    logger.debug(
+        f"Flow.{mode.value}: loop bars={n_bars:,} intents={n_intents:,} orders={n_orders:,} fills={n_fills:,} "
+        f"({time.perf_counter() - t_loop:.2f}s)"
+    )
 
     curve = pl.DataFrame({"ts": eq_ts, "equity": eq_val})
     coverage = _oos_coverage(flow, data) if oos else None
@@ -138,9 +179,15 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
             f"backtest of {flow.name!r}: only {coverage:.1%} of requested rows are covered by cached OOS predictions"
         )
     promotable = (oos and (coverage is None or coverage >= MIN_OOS_COVERAGE)) or not flow.forecasts
-    return Run(
+    run = Run(
         flow.name, mode.value, curve, engine.event_log, target, promotable=promotable, oos=oos, oos_coverage=coverage
     )
+    logger.info(
+        f"Flow.{mode.value}({flow.name!r}): bars={n_bars:,} signals={signals.height:,} fills={n_fills:,} "
+        f"equity {run.initial_equity:,.2f} -> {run.final_equity:,.2f} ({run.total_return:+.2%}) "
+        f"max_dd={run.max_drawdown:.2%} promotable={promotable} ({time.perf_counter() - t_run:.2f}s)"
+    )
+    return run
 
 
 def run_quicktest(flow, data, capital, target, horizon: int = 24, fee: float = 0.001):
@@ -153,7 +200,7 @@ def run_quicktest(flow, data, capital, target, horizon: int = 24, fee: float = 0
         out = getattr(model, "output", "p_rise")
         enriched = enriched.with_forecasts(model.predict(data).rename({out: f"{slot}/{out}"}))
 
-    frame = enriched.frame.sort(["pair", "ts"]).with_columns(
+    frame = ensure_sorted(enriched.frame).with_columns(
         (pl.col("close").shift(-horizon).over("pair") / pl.col("close") - 1.0).alias("_fwd")
     )
     sig_parts = [

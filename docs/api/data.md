@@ -21,7 +21,7 @@ helper is a convenience loader that returns a ready-to-use `Dataset`.
     options:
       show_root_heading: true
 
-::: signalflow.MemorySource
+::: signalflow.SyntheticSource
     options:
       show_root_heading: true
 

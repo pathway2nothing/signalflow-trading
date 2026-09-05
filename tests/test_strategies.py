@@ -18,7 +18,7 @@ from signalflow.strategy.observation import Observation
 
 @pytest.fixture(scope="module")
 def flow_data():
-    data = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+    data = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
     model = sf.ForecastModel(
         backend="lightgbm",
         target=sf.FixedHorizon(12),

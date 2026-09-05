@@ -8,7 +8,10 @@ Engine, Run - plus the WoE/IV feature policy, samplers, detectors, and strategy
 models.
 """
 
+from signalflow._logging import setup_logging as _setup_logging
 from signalflow._version import __version__
+
+_setup_logging()
 
 
 from signalflow.enums import (
@@ -53,7 +56,8 @@ from signalflow.decorators import (
 )
 
 
-from signalflow.data import BinanceSource, Dataset, MemorySource, data
+from signalflow.data import BinanceSource, Dataset, SyntheticSource, data
+from signalflow.data import MemorySource as MemorySource  # deprecated alias
 
 
 from signalflow.transform import SMA, Feature, FeaturePipe, Transform, build_pipe
@@ -179,7 +183,7 @@ __all__ = [
     "data",
     "Dataset",
     "BinanceSource",
-    "MemorySource",
+    "SyntheticSource",
     "Transform",
     "Feature",
     "FeaturePipe",

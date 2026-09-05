@@ -15,7 +15,7 @@ kind: experiment
 name: exp006
 seed: 7
 data:
-  source: memory
+  source: synthetic
   pairs: [BTCUSDT]
   start: "2023-01-01"
   end: "2023-06-01"

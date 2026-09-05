@@ -69,11 +69,11 @@ warmup: n/a
 ## `run` - backtest a flow.yaml
 
 Load a saved flow, build a dataset from a registered source, backtest, and print
-the scorecard. Data options default to a small `memory` dataset for a quick smoke
+the scorecard. Data options default to a small `synthetic` dataset for a quick smoke
 test.
 
 ```console
-$ sf run flow.yaml --source memory --pairs BTCUSDT --start 2023-01-01 --end 2023-03-01 --interval 1h --capital 10000
+$ sf run flow.yaml --source synthetic --pairs BTCUSDT --start 2023-01-01 --end 2023-03-01 --interval 1h --capital 10000
 scorecard - sma_rise
 metric          value
 --------------  --------

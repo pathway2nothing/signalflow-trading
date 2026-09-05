@@ -17,7 +17,7 @@ pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature na
 
 @pytest.fixture(scope="module")
 def promotable():
-    ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", end="2023-05-01", interval="1h")
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-05-01", interval="1h")
     model = sf.ForecastModel(target=sf.FixedHorizon(bars=6), features=sf.FeaturePipe(sf.SMA(20)), n_folds=3).fit(ds)
     flow = sf.Flow(
         name="bundleflow",

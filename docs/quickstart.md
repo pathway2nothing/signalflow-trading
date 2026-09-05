@@ -1,7 +1,7 @@
 # Quick Start
 
 Build your first Flow, back it, and round-trip it to disk. Everything here runs
-offline against the built-in `memory` source - no API keys.
+offline against the built-in `synthetic` source - no API keys.
 
 !!! tip "New to the vocabulary?"
     The [Concepts](concepts.md) page explains the tier stack and the invariants;
@@ -14,7 +14,7 @@ offline against the built-in `memory` source - no API keys.
 ```python
 import signalflow as sf
 
-ds = sf.data("memory", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 
 model = sf.ForecastModel(target=sf.FixedHorizon(bars=12),
                          features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20), sf.SMA(50)))
@@ -30,7 +30,7 @@ print(run.scorecard())                                 # total_return, sharpe, m
 
 What each step does:
 
-1. `sf.data("memory", ...)` builds a **Dataset** - one lazy, immutable container.
+1. `sf.data("synthetic", ...)` builds a **Dataset** - one lazy, immutable container.
 2. `sf.ForecastModel(...)` pairs a **Target** (`FixedHorizon`) with a **FeaturePipe**;
    `fit` trains it out-of-fold.
 3. `sf.Flow(...)` assembles the deployable stack: forecasts -> detectors -> strategy.
