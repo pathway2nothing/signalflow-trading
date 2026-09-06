@@ -12,23 +12,23 @@ import pytest
 import signalflow as sf
 
 GOLDEN_ROWS = 2832
-GOLDEN_CLOSE_SUM = 376989.908424
+GOLDEN_CLOSE_SUM = 118463128.998761
 
 # ForecastModel(SMA20, SMA10, SMA50, WoE, IVSelector -> FixedHorizon(12), Rolling(1d, 365d)), 2-pair hourly data.
 GOLDEN_OOS_ROWS = 2590
-GOLDEN_OOS_P_SUM = 1137.256767
-GOLDEN_PREDICT_P_SUM = 1278.285491  # WP2: null inside the warmup (98 rows with null SMA inputs)
+GOLDEN_OOS_P_SUM = 1230.481435
+GOLDEN_PREDICT_P_SUM = 1268.612507  # WP2: null inside the warmup (rows with null SMA inputs)
 
 # Flow(threshold p_min=0.6, RulesStrategy) backtest with capital 10_000.
 # WP2: predict is null inside the warmup, so no trades happen there.
-GOLDEN_MODEL_FLOW = {"n_fills": 9, "final_equity": 10016.43, "max_drawdown": 0.0055, "sharpe": 0.878}
-GOLDEN_MODEL_FLOW_OOS = {"n_fills": 12, "final_equity": 9981.07, "oos_coverage": 0.9145}
+GOLDEN_MODEL_FLOW = {"n_fills": 56, "final_equity": 10180.54, "max_drawdown": 0.0074, "sharpe": 3.053}
+GOLDEN_MODEL_FLOW_OOS = {"n_fills": 70, "final_equity": 9636.93, "oos_coverage": 0.9145}
 
 # Flow(SmaCrossDetector(10, 30), RulesStrategy) backtest with capital 10_000.
-GOLDEN_CROSS_FLOW = {"n_fills": 40, "final_equity": 9835.02, "max_drawdown": 0.0205, "sharpe": -4.446}
+GOLDEN_CROSS_FLOW = {"n_fills": 94, "final_equity": 9925.68, "max_drawdown": 0.0189, "sharpe": -1.119}
 
 # TripleBarrier(tp=0.03, sl=0.015, max_bars=100) labels over the dataset.
-GOLDEN_TRIPLE_BARRIER_POSITIVES = 254
+GOLDEN_TRIPLE_BARRIER_POSITIVES = 891
 
 
 @pytest.fixture(scope="module")

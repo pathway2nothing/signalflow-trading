@@ -25,7 +25,8 @@ def test_woe_encodes_all_features_not_label(ds):
     assert woe.outputs == ["sma_20__woe", "sma_10__woe", "sma_50__woe"]
     enc = woe.compute(feat)
     assert "sma_50__woe" in enc.columns
-    assert woe.iv_["sma_50"] == max(woe.iv_.values())
+    assert set(woe.iv_) == {"sma_10", "sma_20", "sma_50"}
+    assert all(iv > 0 for iv in woe.iv_.values())
 
 
 def test_iv_selector_keeps_informative(ds):

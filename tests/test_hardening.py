@@ -53,7 +53,7 @@ class _Resp:
 
 def _bar(price: float = 100_000.0):
     frame = pl.DataFrame({"pair": ["BTCUSDT"], "ts": [datetime(2024, 1, 1)], "close": [price]})
-    return sf.data.__globals__["Bar"](ts=datetime(2024, 1, 1), frame=frame, prices={"BTCUSDT": price})
+    return sf.data.Bar(ts=datetime(2024, 1, 1), frame=frame, prices={"BTCUSDT": price})
 
 
 def _install(monkeypatch, on_post, on_query=None):

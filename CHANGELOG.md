@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (breaking - the API is pre-1.0, no compatibility aliases are kept)
 
+- `sf.data(...)` is now `sf.dataset(...)` (`signalflow.data.dataset.dataset`); the
+  name `signalflow.data` is the data subpackage again, so `import
+  signalflow.data.source.binance` and dotted `monkeypatch` paths resolve.
+- `SyntheticSource` is calibrated to plausible markets: `drift`/`vol` are quoted
+  per day (defaults `0.0002` / `0.03`) and rescaled to the interval, well-known
+  base assets start near a realistic level and daily turnover (`BTCUSDT` ~ 100k,
+  `ETHBTC` ~ 0.04), volume scales with the interval and the size of each move;
+  new `turnover` field for pairs outside the table. Every synthetic series
+  changed, so golden constants were re-based.
+- `Dataset.__repr__` is one line (source, interval, pairs, rows, cols, span)
+  instead of the full frame.
 - `FeaturePipe` is now `FeaturePipeline` (`signalflow.transform.pipeline`); the
   registry name is `feature_pipeline` and the config role is `pipeline`. The
   constructor also accepts one list of transforms. `build_pipe()` became the
