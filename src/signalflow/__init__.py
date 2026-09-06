@@ -34,7 +34,7 @@ from signalflow.errors import (
     FlowConfigError,
     KillSwitchTripped,
     LeakageError,
-    PipeError,
+    PipelineError,
     RegistryError,
     SchemaVersionError,
     SignalFlowError,
@@ -57,11 +57,10 @@ from signalflow.decorators import (
 
 
 from signalflow.data import BinanceSource, Dataset, SyntheticSource, data
-from signalflow.data import MemorySource as MemorySource  # deprecated alias
 
 
-from signalflow.transform import SMA, Feature, FeaturePipe, Transform, build_pipe
-from signalflow.transform.encode import Binning, IVSelector, WoE
+from signalflow.transform import SMA, Feature, FeaturePipeline, Transform
+from signalflow.transform.encode import Binning, IVSelector, Scaler, WoE
 from signalflow.transform.store import FeatureStore
 
 
@@ -79,10 +78,12 @@ from signalflow.sampler import (
 
 from signalflow.model import (
     ForecastModel,
+    KFold,
+    Rolling,
     MaxValidator,
     MeanValidator,
     VoteValidator,
-    WalkForwardFold,
+    Fold,
     WalkForwardResult,
     classification_scorecard,
     walk_forward,
@@ -145,6 +146,8 @@ except Exception:
     pass
 
 __all__ = [
+    "KFold",
+    "Rolling",
     "__version__",
     "RISE",
     "FALL",
@@ -171,7 +174,7 @@ __all__ = [
     "UntrainedModelError",
     "FlowConfigError",
     "LeakageError",
-    "PipeError",
+    "PipelineError",
     "KillSwitchTripped",
     "ArtifactError",
     "FingerprintMismatch",
@@ -186,13 +189,13 @@ __all__ = [
     "SyntheticSource",
     "Transform",
     "Feature",
-    "FeaturePipe",
+    "FeaturePipeline",
     "FeatureStore",
-    "build_pipe",
     "SMA",
     "WoE",
     "Binning",
     "IVSelector",
+    "Scaler",
     "target",
     "Target",
     "FixedHorizon",
@@ -212,7 +215,7 @@ __all__ = [
     "VoteValidator",
     "walk_forward",
     "WalkForwardResult",
-    "WalkForwardFold",
+    "Fold",
     "classification_scorecard",
     "SignalDetector",
     "SmaCrossDetector",

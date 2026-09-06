@@ -6,8 +6,9 @@ import pytest
 
 from signalflow.data import data
 from signalflow.model import ForecastModel, WalkForwardResult, walk_forward
+from signalflow.model.cv import KFold
 from signalflow.target import FixedHorizon
-from signalflow.transform import SMA, FeaturePipe
+from signalflow.transform import SMA, FeaturePipeline
 
 warnings.filterwarnings("ignore", message="X does not have valid feature names")
 
@@ -20,8 +21,8 @@ def wf_result():
     model = ForecastModel(
         backend="lightgbm",
         target=FixedHorizon(bars=12),
-        features=FeaturePipe(SMA(20), SMA(10)),
-        n_folds=3,
+        features=FeaturePipeline(SMA(20), SMA(10)),
+        cv=KFold(3),
     )
     return walk_forward(model, ds, train="30d", step="30d"), ds
 
@@ -63,9 +64,7 @@ def test_fold_predictions_match_full_history_predictions():
     ds = data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-06-01", interval="1h")
     model = ForecastModel(
         target=FixedHorizon(bars=12),
-        features=FeaturePipe(SMA(50)),
-        encode=None,
-        select=None,
+        features=FeaturePipeline(SMA(50)),
     )
     result = walk_forward(model, ds, train="60d", step="10d")
     assert result.folds

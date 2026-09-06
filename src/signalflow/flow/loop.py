@@ -1,6 +1,7 @@
 """The decision loop - one loop for backtest/paper/live."""
 
 import time
+from typing import Any
 
 import polars as pl
 from loguru import logger
@@ -9,16 +10,19 @@ from signalflow._logging import frame_summary, step
 from signalflow.engine.engine import Engine
 from signalflow.engine.types import Order
 from signalflow.enums import FALL, NONE, RISE, SIGNAL_COL, IntentKind, OrderType, RunMode
-from signalflow.errors import PipeError
+from signalflow.errors import PipelineError
+from signalflow.flow.bundle import MIN_OOS_COVERAGE
 from signalflow.strategy.observation import Observation
 from signalflow.transform.base import ensure_sorted
 
-_EMPTY_SIGNALS_SCHEMA = {"pair": pl.Utf8, "ts": pl.Datetime("ms"), "signal": pl.Utf8, "p_success": pl.Float64}
+EMPTY_SIGNALS_SCHEMA: dict[str, Any] = {
+    "pair": pl.Utf8,
+    "ts": pl.Datetime("ms"),
+    "signal": pl.Utf8,
+    "p_success": pl.Float64,
+}
 
-MIN_OOS_COVERAGE = 0.95
-
-
-def enriched_signals(flow, data, oos: bool = False, log: bool = True) -> pl.DataFrame:
+def enriched_signals(flow: Any, data: Any, oos: bool = False, log: bool = True) -> pl.DataFrame:
     """Precompute forecast columns, run detectors, and (event-gated) validator scores.
 
     When ``oos`` is true, every forecast slot and the validator use leak-free
@@ -46,15 +50,15 @@ def enriched_signals(flow, data, oos: bool = False, log: bool = True) -> pl.Data
         try:
             computed = det.compute(enriched.frame)
         except Exception as e:
-            raise PipeError(f"detector {det.name!r} failed during compute: {e}") from e
+            raise PipelineError(f"detector {det.name!r} failed during compute: {e}") from e
         if SIGNAL_COL not in computed.columns:
-            raise PipeError(
+            raise PipelineError(
                 f"detector {det.name!r} did not produce the {SIGNAL_COL!r} column; produced columns: {computed.columns}"
             )
         emitted = set(computed.get_column(SIGNAL_COL).drop_nulls().unique().to_list())
         invalid = emitted - {RISE, FALL, NONE}
         if invalid:
-            raise PipeError(
+            raise PipelineError(
                 f"detector {det.name!r} emitted invalid signal values {sorted(invalid)}; "
                 f"expected only {sorted({RISE, FALL, NONE})}"
             )
@@ -70,7 +74,7 @@ def enriched_signals(flow, data, oos: bool = False, log: bool = True) -> pl.Data
                 f"fall={(sig == FALL).sum():,}) over rows={computed.height:,} ({time.perf_counter() - t0:.2f}s)"
             )
         parts.append(s)
-    signals = pl.concat(parts) if parts else pl.DataFrame(schema={**_EMPTY_SIGNALS_SCHEMA, "detector": pl.Utf8})
+    signals = pl.concat(parts) if parts else pl.DataFrame(schema={**EMPTY_SIGNALS_SCHEMA, "detector": pl.Utf8})
 
     if flow.validator is not None and signals.height > 0:
         vcol = getattr(flow.validator, "output", "p_success")
@@ -84,7 +88,7 @@ def enriched_signals(flow, data, oos: bool = False, log: bool = True) -> pl.Data
     return signals
 
 
-def _orders(intents, prices, ts):
+def orders_from_intents(intents: Any, prices: dict[str, float], ts: Any) -> list[Order]:
     orders = []
     for it in intents:
         price = prices.get(it.pair)
@@ -105,11 +109,8 @@ def _orders(intents, prices, ts):
     return orders
 
 
-EMPTY_SIGNALS_SCHEMA = _EMPTY_SIGNALS_SCHEMA
-orders_from_intents = _orders
 
-
-def _oos_coverage(flow, data) -> "float | None":
+def _oos_coverage(flow: Any, data: Any) -> "float | None":
     if not flow.forecasts:
         return None
     fractions = []
@@ -117,10 +118,19 @@ def _oos_coverage(flow, data) -> "float | None":
         pred = model.predict_oos(data)
         col = getattr(model, "output", "p_rise")
         fractions.append(1.0 - pred.get_column(col).null_count() / max(pred.height, 1))
-    return min(fractions)
+    return float(min(fractions))
 
 
-def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: dict | None = None, oos: bool = False):
+def run_event_loop(
+    flow: Any,
+    data: Any,
+    capital: Any,
+    target: Any,
+    broker: Any,
+    mode: RunMode,
+    mandate: dict | None = None,
+    oos: bool = False,
+) -> Any:
     from signalflow.flow.run import Run
 
     target = target or data.quote
@@ -145,8 +155,15 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
     started = False
     n_bars = n_intents = n_orders = n_fills = 0
     t_loop = time.perf_counter()
+    fill_mode = getattr(broker, "fill", "close")
+    pending: list = []
     for bar in data.iter_bars():
         n_bars += 1
+        if pending:
+            fills = broker.execute(pending, bar, at="open")
+            pending = []
+            n_fills += len(fills)
+            engine.apply(fills)
         snap = engine.snapshot(bar.ts, bar.prices)
         if not started:
             eq_ts.append(bar.ts)
@@ -155,14 +172,18 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
         peak = max(peak, snap.equity)
         sig_frame = by_ts.get(bar.ts)
         if sig_frame is None:
-            sig_frame = pl.DataFrame(schema=_EMPTY_SIGNALS_SCHEMA)
+            sig_frame = pl.DataFrame(schema=EMPTY_SIGNALS_SCHEMA)
         obs = Observation(bar.ts, sig_frame, snap, mandate or {})
         intents = flow.strategy.decide(obs)
         n_intents += len(intents)
         intents = flow.risk.clip(intents, snap, peak)
-        orders = _orders(intents, bar.prices, bar.ts)
+        orders = orders_from_intents(intents, bar.prices, bar.ts)
         n_orders += len(orders)
-        fills = broker.execute(orders, bar)
+        if fill_mode == "next_open":
+            pending = orders
+            fills = []
+        else:
+            fills = broker.execute(orders, bar)
         n_fills += len(fills)
         engine.apply(fills)
         eq_ts.append(bar.ts)
@@ -178,7 +199,9 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
         logger.warning(
             f"backtest of {flow.name!r}: only {coverage:.1%} of requested rows are covered by cached OOS predictions"
         )
-    promotable = (oos and (coverage is None or coverage >= MIN_OOS_COVERAGE)) or not flow.forecasts
+    # A rule-only flow is in-sample too (its thresholds were tuned on some span): the caller asserts
+    # out-of-sample evidence with oos=True; a model flow additionally needs enough OOS coverage.
+    promotable = oos and (coverage is None or coverage >= MIN_OOS_COVERAGE)
     run = Run(
         flow.name, mode.value, curve, engine.event_log, target, promotable=promotable, oos=oos, oos_coverage=coverage
     )
@@ -190,7 +213,7 @@ def run_event_loop(flow, data, capital, target, broker, mode: RunMode, mandate: 
     return run
 
 
-def run_quicktest(flow, data, capital, target, horizon: int = 24, fee: float = 0.001):
+def run_quicktest(flow: Any, data: Any, capital: Any, target: Any, horizon: int = 24, fee: float = 0.001) -> Any:
     """Vectorized triage: forward return per RISE signal. NOT promotable."""
     from signalflow.flow.run import Run
 

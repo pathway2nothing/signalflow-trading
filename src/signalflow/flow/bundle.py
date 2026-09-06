@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -16,7 +17,7 @@ MANIFEST_VERSION = 1
 MIN_OOS_COVERAGE = 0.95
 
 
-def _span(run) -> "list[str | None]":
+def _span(run: Any) -> "list[str | None]":
     ec = run.equity_curve
     if ec.height == 0 or "ts" not in ec.columns:
         return [None, None]
@@ -24,7 +25,7 @@ def _span(run) -> "list[str | None]":
     return [str(ts.min()), str(ts.max())]
 
 
-def write_bundle(flow, run, dir_path: "str | Path") -> str:
+def write_bundle(flow: Any, run: Any, dir_path: "str | Path") -> str:
     """Write a promotable bundle: flow.yaml + models + scorecard.json + manifest.json."""
     d = Path(dir_path)
     d.mkdir(parents=True, exist_ok=True)
@@ -59,7 +60,7 @@ def read_manifest(dir_path: "str | Path") -> dict:
     if not path.exists():
         raise ArtifactError(f"no {MANIFEST_NAME} in bundle {dir_path}")
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return dict(json.loads(path.read_text(encoding="utf-8")))
     except (ValueError, OSError) as e:
         raise ArtifactError(f"could not read {path}: {e}") from e
 

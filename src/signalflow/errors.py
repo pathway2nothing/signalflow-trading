@@ -17,8 +17,8 @@ class LeakageError(SignalFlowError):
     """Downstream training consumed in-sample forecasts; use OOS predictions."""
 
 
-class PipeError(SignalFlowError):
-    """A FeaturePipe was built with an incompatible transform."""
+class PipelineError(SignalFlowError):
+    """A FeaturePipeline was built with an incompatible transform."""
 
 
 class KillSwitchTripped(SignalFlowError):

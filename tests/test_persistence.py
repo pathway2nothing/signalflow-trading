@@ -6,10 +6,12 @@ import warnings
 import numpy as np
 import pytest
 
+import signalflow as sf
 from signalflow.data import data
 from signalflow.model import ForecastModel
+from signalflow.model.cv import KFold
 from signalflow.target import FixedHorizon
-from signalflow.transform import SMA, FeaturePipe
+from signalflow.transform import SMA, FeaturePipeline
 
 warnings.filterwarnings("ignore", message="X does not have valid feature names")
 
@@ -22,8 +24,8 @@ def fitted():
     model = ForecastModel(
         backend="lightgbm",
         target=FixedHorizon(bars=12),
-        features=FeaturePipe(SMA(20), SMA(10)),
-        n_folds=3,
+        features=FeaturePipeline(SMA(20), SMA(10)),
+        cv=KFold(3),
     )
     model.fit(ds)
     return model, ds
@@ -157,3 +159,25 @@ def test_hf_round_trip(fitted):
     model.save(f"hf://{repo_id}")
     loaded = ForecastModel.load(f"hf://{repo_id}")
     _assert_round_trip(loaded, model, ds)
+
+
+def test_artifact_records_environment_and_warns_on_mismatch(tmp_path, ds, fitted_forecast):
+    import json
+
+    from signalflow.model.store._layout import ENV_JSON, check_environment
+
+    uri = fitted_forecast.save(f"file://{tmp_path / 'env_model'}")
+    env = json.loads((tmp_path / "env_model" / ENV_JSON).read_text())
+    assert env["signalflow"] == sf.__version__ and "polars" in env and "lightgbm" in env
+    assert check_environment(env) == []
+    assert check_environment({**env, "polars": "0.1.0"}) == [f"polars 0.1.0 (artifact) vs {env['polars']} (now)"]
+    assert sf.ForecastModel.load(uri).predict(ds).equals(fitted_forecast.predict(ds))
+
+
+def test_hub_artifacts_need_trust_remote():
+    from signalflow.model.store import load_model
+
+    with pytest.raises(sf.ArtifactError, match="trust_remote"):
+        load_model("hf://someone/some-model")
+    with pytest.raises(sf.ArtifactError, match="trust_remote"):
+        sf.ForecastModel.load("hf://someone/some-model")

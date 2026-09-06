@@ -1,5 +1,7 @@
 """Flow serialization - deployment is data, not code."""
 
+from typing import TYPE_CHECKING, Any
+
 import yaml
 from loguru import logger
 
@@ -9,17 +11,20 @@ from signalflow.strategy.base import build_strategy
 from signalflow.strategy.risk import Risk
 from signalflow.transform.base import build_transform
 
+if TYPE_CHECKING:
+    from signalflow.flow.flow import Flow
 
-def _model_uri(model, slot: str, model_dir: str | None) -> str:
+
+def _model_uri(model: Any, slot: str, model_dir: str | None) -> str:
     uri = getattr(model, "_uri", None)
     if uri:
-        return uri
+        return str(uri)
     if model_dir:
-        return model.save(f"file://{model_dir}/{slot}")
+        return str(model.save(f"file://{model_dir}/{slot}"))
     raise ArtifactError(f"forecast {slot!r} has no pinned URI; save it first or pass model_dir=")
 
 
-def _strategy_cfg(strategy, model_dir: str | None = None, *, persist: bool = False) -> dict:
+def _strategy_cfg(strategy: Any, model_dir: str | None = None, *, persist: bool = False) -> dict:
     """Declarative strategy config; with ``persist`` first let the strategy pin its artifacts.
 
     A strategy carrying a trained artifact (an RL policy, say) exposes
@@ -32,15 +37,15 @@ def _strategy_cfg(strategy, model_dir: str | None = None, *, persist: bool = Fal
             save_artifacts(model_dir)
     to_config = getattr(strategy, "to_config", None)
     if callable(to_config):
-        return to_config()
+        return dict(to_config())
     return {"name": getattr(strategy, "_sf_name", type(strategy).__name__), "params": {}}
 
 
-def _build_strategy(cfg: dict):
+def _build_strategy(cfg: dict) -> Any:
     return build_strategy(cfg)
 
 
-def _validator_cfg(validator, model_dir: str | None) -> dict | None:
+def _validator_cfg(validator: Any, model_dir: str | None) -> dict | None:
     if validator is None:
         return None
     if hasattr(validator, "children"):
@@ -53,15 +58,15 @@ def _validator_cfg(validator, model_dir: str | None) -> dict | None:
     return {"uri": _model_uri(validator, "validator", model_dir)}
 
 
-def _build_validator(cfg: dict | None):
+def _build_validator(cfg: dict | None, trust_remote: bool = False) -> Any:
     if cfg is None:
         return None
     from signalflow.model import ForecastModel, MaxValidator, MeanValidator, VoteValidator
 
     if "uri" in cfg:
-        return ForecastModel.load(cfg["uri"])
+        return ForecastModel.load(cfg["uri"], trust_remote=trust_remote)
     combos = {"MeanValidator": MeanValidator, "MaxValidator": MaxValidator, "VoteValidator": VoteValidator}
-    children = [ForecastModel.load(u) for u in cfg["children"]]
+    children = [ForecastModel.load(u, trust_remote=trust_remote) for u in cfg["children"]]
     params = cfg.get("params") or {}
     return combos[cfg["combinator"]](children, **params)
 
@@ -76,7 +81,7 @@ def _warn_version_mismatch(saved: "str | None") -> None:
         )
 
 
-def _validate_registered(flow) -> None:
+def _validate_registered(flow: Any) -> None:
     from signalflow.enums import ComponentType
     from signalflow.registry import registry
 
@@ -100,7 +105,7 @@ def _validate_registered(flow) -> None:
             ) from e
 
 
-def save_flow(flow, path: str, model_dir: str | None = None, run=None) -> str:
+def save_flow(flow: Any, path: str, model_dir: str | None = None, run: Any = None) -> str:
     _validate_registered(flow)
     doc = {
         "signalflow_version": __version__,
@@ -133,7 +138,8 @@ def save_flow(flow, path: str, model_dir: str | None = None, run=None) -> str:
     return path
 
 
-def load_flow(path: str):
+def load_flow(path: str, trust_remote: bool = False) -> "Flow":
+    """Rebuild a Flow from ``path``; ``trust_remote`` is needed for ``hf://`` model URIs."""
     from signalflow.flow.flow import Flow
     from signalflow.model import ForecastModel
 
@@ -142,13 +148,15 @@ def load_flow(path: str):
 
     _warn_version_mismatch(doc.get("signalflow_version"))
     logger.debug(f"Flow.load: {doc.get('name')!r} from {path} (signalflow {doc.get('signalflow_version')})")
-    forecasts = {slot: ForecastModel.load(uri) for slot, uri in (doc.get("forecasts") or {}).items()}
-    detectors = [build_transform(d) for d in (doc.get("detectors") or [])]
+    forecasts = {
+        slot: ForecastModel.load(uri, trust_remote=trust_remote) for slot, uri in (doc.get("forecasts") or {}).items()
+    }
+    detectors: list[Any] = [build_transform(d) for d in (doc.get("detectors") or [])]
     return Flow(
         name=doc["name"],
         forecasts=forecasts,
         detectors=detectors,
-        validator=_build_validator(doc.get("validator")),
+        validator=_build_validator(doc.get("validator"), trust_remote=trust_remote),
         strategy=_build_strategy(doc.get("strategy") or {"name": "rules", "params": {}}),
         risk=Risk(**(doc.get("risk") or {})),
         quote=doc.get("quote", "USDT"),

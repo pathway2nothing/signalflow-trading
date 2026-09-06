@@ -8,7 +8,7 @@ from signalflow.data.dataset import Dataset
 from signalflow.engine.broker import SimBroker
 from signalflow.engine.types import Intent, Order
 from signalflow.enums import IntentKind, OrderType, Side
-from signalflow.flow.loop import _orders
+from signalflow.flow.loop import orders_from_intents
 from signalflow.flow.run import Run
 
 
@@ -57,7 +57,7 @@ def test_market_order_unaffected():
 
 def test_intent_limit_price_produces_limit_order():
     intents = [Intent("BTCUSDT", IntentKind.OPEN, Side.BUY, notional=1000.0, limit_price=50.0)]
-    orders = _orders(intents, {"BTCUSDT": 100.0}, datetime(2024, 1, 1))
+    orders = orders_from_intents(intents, {"BTCUSDT": 100.0}, datetime(2024, 1, 1))
     assert len(orders) == 1
     o = orders[0]
     assert o.type == OrderType.LIMIT and o.limit_price == 50.0

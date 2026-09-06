@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import polars as pl
 
+from signalflow._time import bar_seconds
 from signalflow.engine.types import Fill
 
 
@@ -21,9 +22,11 @@ class Run:
     equity_curve: pl.DataFrame
     fills: list[Fill] = field(default_factory=list)
     target: str = "USDT"
-    promotable: bool = True
+    promotable: bool = False
     oos: bool = False
     oos_coverage: "float | None" = None
+    meta: dict = field(default_factory=dict)
+    """Run-level counters the live loop reports: skipped bars, feed errors, strategy fallbacks."""
 
     @property
     def initial_equity(self) -> float:
@@ -43,7 +46,7 @@ class Run:
         eq = self.equity_curve.get_column("equity").to_numpy()
         if eq.size < 2:
             return np.array([])
-        return np.diff(eq) / eq[:-1]
+        return np.asarray(np.diff(eq) / eq[:-1])
 
     @property
     def max_drawdown(self) -> float:
@@ -58,12 +61,9 @@ class Run:
         seconds_per_year = 365.0 * 24.0 * 3600.0
         ec = self.equity_curve
         if ec.height >= 3 and "ts" in ec.columns:
-            secs = ec.get_column("ts").sort().diff().drop_nulls().dt.total_seconds()
-            positive = secs.filter(secs > 0)
-            if positive.len() > 0:
-                median_dt = float(positive.median())
-                if median_dt > 0:
-                    return seconds_per_year / median_dt
+            step = bar_seconds(ec.get_column("ts"))
+            if step > 0:
+                return seconds_per_year / step
         return 8760.0
 
     def sharpe(self, periods_per_year: float | None = None) -> float:

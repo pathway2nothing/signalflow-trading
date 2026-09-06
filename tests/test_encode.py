@@ -8,7 +8,7 @@ import signalflow as sf
 
 
 def _feat_and_target(ds):
-    pipe = sf.FeaturePipe(sf.SMA(20), sf.SMA(10), sf.SMA(50))
+    pipe = sf.FeaturePipeline(sf.SMA(20), sf.SMA(10), sf.SMA(50))
     feat = pipe.compute(ds.frame).drop_nulls()
     raw = feat.get_column("sma_50").to_numpy()
     z = (raw - raw.mean()) / (raw.std() + 1e-12)
@@ -94,23 +94,28 @@ def test_woe_binarization_config_round_trips():
     assert rebuilt.to_config() == cfg
 
 
-def test_woe_none_sentinel_round_trips():
-    woe = sf.WoE(refit=None, window=None)
-    cfg = woe.to_config()
-    rebuilt = sf.WoE.from_config(cfg)
-    assert rebuilt.refit is None and rebuilt.window is None
-    assert cfg["params"]["refit"] is None and cfg["params"]["window"] is None
+def test_scaler_fits_in_fold_and_keeps_column_names():
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-02-01", interval="1h")
+    pipe = sf.FeaturePipeline(sf.SMA(5), sf.SMA(20), sf.Scaler(method="robust"))
+    prefix, tail = pipe.split()
+    frame = prefix.compute(ds.frame).drop_nulls(subset=["sma_5", "sma_20"])
+    scaler = tail.clone().fit(frame)
+    assert scaler.outputs == ["sma_5", "sma_20"]
+    scaled = scaler.compute(frame)
+    assert abs(float(scaled.get_column("sma_5").median())) < 1e-9
+    state = scaler.transforms[0].state_dict()
+    again = sf.Scaler(method="robust").load_state(state)
+    assert again.compute(frame).equals(scaled)
+
+    model = sf.ForecastModel(target=sf.FixedHorizon(bars=6), features=pipe, cv=sf.KFold(3)).fit(ds)
+    assert model.model_._sf_cols == ["sma_5", "sma_20"]
+    assert model.predict(ds).get_column("p_rise").drop_nulls().len() > 0
 
 
-def test_woe_none_matches_empty_string_non_rolling():
-    data = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-10", interval="1h")
-
-    def _fit(refit, window):
-        return sf.ForecastModel(
-            target=sf.FixedHorizon(bars=6),
-            features=sf.FeaturePipe(sf.SMA(5)),
-            encode=sf.WoE(refit=refit, window=window),
-            min_train_rows=20,
-        ).fit(data)
-
-    assert _fit(None, None).oos_.equals(_fit("", "").oos_)
+def test_woe_replace_false_keeps_inputs():
+    df = pl.DataFrame({"f1": [float(i % 17) for i in range(300)], "f2": [float(i % 23) for i in range(300)]})
+    y = pl.Series([int(i % 3 == 0) for i in range(300)])
+    out = sf.WoE(replace=False).fit(df, y).compute(df)
+    assert set(out.columns) == {"f1", "f2", "f1__woe", "f2__woe"}
+    out = sf.WoE().fit(df, y).compute(df)
+    assert set(out.columns) == {"f1__woe", "f2__woe"}

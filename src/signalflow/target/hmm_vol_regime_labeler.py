@@ -100,6 +100,8 @@ class HMMVolRegime2StateLabeler(Labeler):
         unlike ``soft_H1_hurst``).
     """
 
+    horizon_field: ClassVar[str | None] = None  # smoothing reads the whole series: research-only target
+
     signal_category: SignalCategory = SignalCategory.VOLATILITY
 
     soft_classes: ClassVar[tuple[str, ...]] = ("calm", "turbulent")

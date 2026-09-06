@@ -7,7 +7,7 @@ description: Technical analysis extension with 248 features + 21 detectors for S
 
 **signalflow-ta** extends SignalFlow with 248 technical-analysis features and
 21 signal detectors. Each indicator is a standard `Feature` class that integrates
-directly with `FeaturePipe` and the component registry.
+directly with `FeaturePipeline` and the component registry.
 
 ---
 
@@ -47,7 +47,7 @@ command in the repo's component-count check).
 
 ```python
 import signalflow.ta as ta
-from signalflow.transform import FeaturePipe
+from signalflow.transform import FeaturePipeline
 
 # Create indicators
 rsi = ta.RsiMom(period=14)
@@ -55,7 +55,7 @@ bbands = ta.BollingerVol(period=20, num_std=2.0)
 atr = ta.AtrVol(period=14)
 
 # Use in pipeline
-pipeline = FeaturePipe(rsi, bbands, atr)
+pipeline = FeaturePipeline(rsi, bbands, atr)
 features_df = pipeline.compute(df)
 ```
 
@@ -69,10 +69,10 @@ from signalflow.ta.pipes import (
     volatility_bands_pipe,
     all_ta_pipe,
 )
-from signalflow.transform import FeaturePipe
+from signalflow.transform import FeaturePipeline
 
 # Compose a custom set
-pipeline = FeaturePipe(
+pipeline = FeaturePipeline(
     *momentum_core_pipe(normalized=True),
     *volatility_bands_pipe(),
 )

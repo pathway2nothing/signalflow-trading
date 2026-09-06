@@ -17,10 +17,11 @@ import numpy as np
 import polars as pl
 from loguru import logger
 
+from signalflow._time import advance, retreat
 from signalflow.data.dataset import Dataset
 from signalflow.experiment.cache import ArtifactCache
 from signalflow.model.forecast import ForecastModel
-from signalflow.model.oos import parse_duration
+from signalflow.model.oos import Fold
 from signalflow.target import LABEL_COL
 
 _METRIC_PRESETS = ("auc", "pr_auc", "brier")
@@ -46,22 +47,10 @@ def _resolve_metric(name: str, output_col: str) -> "Callable[[pl.DataFrame], flo
 
 
 @dataclass
-class WalkForwardFold:
-    """One train-on-trailing-window / evaluate-next-window step and its fitted model."""
-
-    train_start: datetime
-    train_end: datetime
-    test_start: datetime
-    test_end: datetime
-    model: "ForecastModel"
-    oos: pl.DataFrame
-
-
-@dataclass
 class WalkForwardResult:
     """Per-fold models and out-of-sample predictions from a walk-forward run."""
 
-    folds: list[WalkForwardFold]
+    folds: list[Fold]
 
     def oos(self) -> pl.DataFrame:
         """Merged out-of-sample rows across folds, deduped by (pair, ts)."""
@@ -90,35 +79,6 @@ class WalkForwardResult:
         return pl.DataFrame(rows)
 
 
-def _add_months(moment: datetime, months: int) -> datetime:
-    """Calendar-month arithmetic clamping the day into the target month."""
-    total = moment.month - 1 + months
-    year = moment.year + total // 12
-    month = total % 12 + 1
-    day = min(moment.day, _days_in_month(year, month))
-    return moment.replace(year=year, month=month, day=day)
-
-
-def _days_in_month(year: int, month: int) -> int:
-    nxt = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
-    return (nxt - datetime(year, month, 1)).days
-
-
-def _advance(moment: datetime, span: str) -> datetime:
-    """Step ``moment`` forward by a duration string; ``"1mo"``/``"3mo"`` are calendar months."""
-    text = span.strip().lower()
-    if text.endswith("mo"):
-        return _add_months(moment, int(text[:-2]))
-    return moment + parse_duration(text)
-
-
-def _retreat(moment: datetime, span: str) -> datetime:
-    text = span.strip().lower()
-    if text.endswith("mo"):
-        return _add_months(moment, -int(text[:-2]))
-    return moment - parse_duration(text)
-
-
 def _bounds(data: Dataset, start: "datetime | None", end: "datetime | None") -> "tuple[datetime, datetime]":
     ts = data.frame.get_column("ts")
     first = start if start is not None else ts.min()
@@ -131,10 +91,10 @@ def _windows(
 ) -> "list[tuple[datetime, datetime, datetime, datetime]]":
     first, last = _bounds(data, start, end)
     windows: list[tuple[datetime, datetime, datetime, datetime]] = []
-    test_start = _advance(first, train)
+    test_start = advance(first, train)
     while test_start < last:
-        test_end = min(_advance(test_start, step), last)
-        train_start = _retreat(test_start, train)
+        test_end = min(advance(test_start, step), last)
+        train_start = retreat(test_start, train)
         windows.append((train_start, test_start, test_start, test_end))
         test_start = test_end
     return windows
@@ -178,11 +138,12 @@ def walk_forward(
     t_wf = time.perf_counter()
     logger.debug(f"walk_forward: {len(windows)} folds, train={train} step={step}, data rows={data.height:,}")
     labels_all = model.target.labels(data) if model.target is not None else None
-    folds: list[WalkForwardFold] = []
+    folds: list[Fold] = []
     for i, (train_start, train_end, test_start, test_end) in enumerate(windows):
         t_fold = time.perf_counter()
         logger.debug(
-            f"walk_forward: fold {i + 1}/{len(windows)} train=[{train_start}..{train_end}) test=[{test_start}..{test_end})"
+            f"walk_forward: fold {i + 1}/{len(windows)} "
+            f"train=[{train_start}..{train_end}) test=[{test_start}..{test_end})"
         )
         fold_model = copy.deepcopy(model)
         train_ds = data.slice_time(train_start, train_end)
@@ -194,7 +155,7 @@ def walk_forward(
         if save_to is not None:
             fold_model.save(save_to.format(fold=i))
         folds.append(
-            WalkForwardFold(
+            Fold(
                 train_start=train_start,
                 train_end=train_end,
                 test_start=test_start,
@@ -203,6 +164,10 @@ def walk_forward(
                 oos=oos,
             )
         )
-        logger.debug(f"walk_forward: fold {i + 1}/{len(windows)} oos rows={oos.height:,} ({time.perf_counter() - t_fold:.2f}s)")
-    logger.info(f"walk_forward: {len(folds)} folds fitted, train={train} step={step} ({time.perf_counter() - t_wf:.2f}s)")
+        logger.debug(
+            f"walk_forward: fold {i + 1}/{len(windows)} oos rows={oos.height:,} ({time.perf_counter() - t_fold:.2f}s)"
+        )
+    logger.info(
+        f"walk_forward: {len(folds)} folds fitted, train={train} step={step} ({time.perf_counter() - t_wf:.2f}s)"
+    )
     return WalkForwardResult(folds=folds)

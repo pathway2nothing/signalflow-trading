@@ -1,7 +1,7 @@
 # CLI & YAML Config
 
 The `sf` command line wraps the same package you import as `signalflow`. It has
-five commands: `list`, `info`, `run`, `promote`, and `version`. Everything it
+six commands: `list`, `info`, `run`, `exp`, `promote`, and `version`. Everything it
 runs is registry-driven, so any component you register with `@sf.register_*`
 shows up automatically.
 
@@ -33,7 +33,7 @@ $ sf list transform
              transform components (8)
 name          summary
 ------------  --------------------------------------------------
-feature_pipe  Run child transforms in order; outputs are ...
+feature_pipeline  Run child transforms in order; outputs are ...
 sma           Simple moving average of close.
 sma_cross     RISE when the fast SMA crosses above the slow SMA.
 threshold     RISE when a forecast's probability exceeds p_min.
@@ -79,7 +79,7 @@ metric          value
 --------------  --------
 name            sma_rise
 mode            backtest
-promotable      True
+promotable      False
 oos             False
 n_fills         11
 initial_equity  10000.0

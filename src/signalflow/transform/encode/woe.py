@@ -63,19 +63,19 @@ def _binarize(
 class WoE(Transform):
     """Encode every feature column via Weight of Evidence against the target.
 
-    ``refit`` is the rolling retrain cadence and ``window`` the trailing training span
-    (duration strings such as ``"1d"``/``"365d"``); either set to ``None`` (or ``""`` for
-    back-compat) disables rolling refit and fits once over all data.
+    A pure encoding recipe: ``binning`` and ``smoothing`` define the table, and
     ``positive_threshold``/``positive_classes`` control how the target is binarized.
+    ``columns=None`` encodes every numeric non-reserved column; with ``replace``
+    (default) the encoded inputs are dropped so only the ``*__woe`` columns remain.
+    How often the table is refitted is the model's ``cv`` scheme, not the encoder's.
     """
 
     binning: Binning = field(default_factory=lambda: Binning("monotonic", 10))
-    refit: str | None = "1d"
-    window: str | None = "365d"
     smoothing: float = 0.5
     positive_threshold: float = 0.0
     positive_classes: tuple[float, ...] | None = None
     columns: list[str] | None = None
+    replace: bool = True
 
     requires_fit = True
     requires_target = True
@@ -86,8 +86,12 @@ class WoE(Transform):
 
     @property
     def outputs(self) -> list[str]:
-        cols = getattr(self, "columns_", [])
+        cols = getattr(self, "columns_", self.columns or [])
         return [f"{c}__woe" for c in cols]
+
+    @property
+    def removes(self) -> list[str]:
+        return list(getattr(self, "columns_", self.columns or [])) if self.replace else []
 
     def fit(self, df: pl.DataFrame, target: pl.Series | None = None) -> "WoE":
         if target is None:
@@ -107,6 +111,7 @@ class WoE(Transform):
             self.edges_[c] = edges
             self.woe_[c] = woe
             self.iv_[c] = iv
+        self._is_fitted = True
         logger.trace(f"WoE.fit: {len(cols)} columns, rows={df.height:,}, positive_rate={float(y.mean()):.3f}")
         return self
 
@@ -122,7 +127,10 @@ class WoE(Transform):
             idx = np.where(bins < 0, n_bins, bins)
             mapped = woe[idx]
             new_cols.append(pl.Series(f"{c}__woe", mapped))
-        return df.with_columns(new_cols)
+        out = df.with_columns(new_cols)
+        if self.replace:
+            out = out.drop([c for c in self.columns_ if c in out.columns])
+        return out
 
     def to_config(self) -> dict:
         return {
@@ -130,12 +138,11 @@ class WoE(Transform):
             "role": "encode",
             "params": {
                 "binning": self.binning.to_dict(),
-                "refit": self.refit,
-                "window": self.window,
                 "smoothing": self.smoothing,
                 "positive_threshold": self.positive_threshold,
                 "positive_classes": list(self.positive_classes) if self.positive_classes is not None else None,
                 "columns": self.columns,
+                "replace": self.replace,
             },
         }
 
@@ -166,4 +173,5 @@ class WoE(Transform):
         self.edges_ = {c: np.asarray(state["edges"][c], dtype=float) for c in self.columns_}
         self.woe_ = {c: np.asarray(state["woe"][c], dtype=float) for c in self.columns_}
         self.iv_ = {c: float(state["iv"][c]) for c in self.columns_}
+        self._is_fitted = True
         return self

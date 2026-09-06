@@ -38,4 +38,4 @@ except Exception:
         return decorator
 
 
-__all__ = ["njit", "prange", "HAS_NUMBA"]
+__all__ = ["HAS_NUMBA", "njit", "prange"]

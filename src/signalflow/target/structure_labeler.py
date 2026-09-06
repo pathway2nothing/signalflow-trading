@@ -55,6 +55,8 @@ class StructureLabeler(Labeler):
         detecting extrema, reducing numpy loop overhead.
     """
 
+    horizon_field: ClassVar[str | None] = "lookforward"
+
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
 
     soft_classes: ClassVar[tuple[str, ...]] = ("local_max", "local_min")
@@ -234,6 +236,8 @@ class ZigzagStructureLabeler(Labeler):
         not parallelizable, so numpy/python loops are used. Polars is
         used for rolling volatility computation in z-score mode.
     """
+
+    horizon_field: ClassVar[str | None] = None  # pivots confirm on a future reversal: unbounded look-ahead
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
 

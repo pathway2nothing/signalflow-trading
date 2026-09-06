@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 import polars as pl
 
-from signalflow.data.source.base import Source, interval_seconds, parse_time, validate_frame
+from signalflow._time import interval_seconds, to_epoch
+from signalflow.data.source.base import Source, validate_frame
 from signalflow.decorators import source
 
 
@@ -38,8 +39,8 @@ class SyntheticSource(Source):
         interval: str = "1h",
     ) -> pl.DataFrame:
         step = interval_seconds(interval)
-        start_dt = parse_time(start)
-        end_dt = parse_time(end) if end else start_dt + 5000 * step
+        start_dt = to_epoch(start)
+        end_dt = to_epoch(end) if end else start_dt + 5000 * step
         n = max(1, int((end_dt - start_dt) // step))
 
         frames: list[pl.DataFrame] = []
@@ -81,9 +82,6 @@ class SyntheticSource(Source):
             )
         return validate_frame(pl.concat(frames))
 
-
-MemorySource = SyntheticSource
-"""Deprecated alias for :class:`SyntheticSource`; the registry name ``memory`` maps to ``synthetic``."""
 
 
 class _Lcg:

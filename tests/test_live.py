@@ -182,9 +182,9 @@ def test_simulate_default_warmup_consumes_declared(small_ds):
 def test_required_warmup_combines_feature_model_and_detector(small_ds):
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12),
-        features=sf.FeaturePipe(sf.SMA(40)),
+        features=sf.FeaturePipeline(sf.SMA(40)),
         output="p_rise",
-        n_folds=3,
+        cv=sf.KFold(3),
     ).fit(small_ds)
     flow = sf.Flow(
         name="combo",

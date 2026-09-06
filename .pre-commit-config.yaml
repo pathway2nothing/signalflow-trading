@@ -11,10 +11,8 @@
 # commits only check what you changed. The ``--all-files`` run will surface
 # pre-existing format / lint drift across the repo; that's expected.
 #
-# Mypy is scoped tight to ``src/signalflow/core/`` - that subtree is fully
-# annotated and clean today; wider modules accumulate untyped helpers (numba
-# fallbacks, pre-existing target/detector files) that would flood the hook.
-# Expand the ``files:`` regex as more subtrees reach a clean baseline.
+# Mypy is scoped to ``src/signalflow/flow/`` (the decision core); widen the
+# ``files:`` regex subtree by subtree as each reaches a clean baseline.
 #
 # ``--follow-imports=silent`` prevents mypy from chasing imports out of core/
 # and reporting on the rest of the package.
@@ -30,7 +28,7 @@ repos:
     rev: v1.19.1
     hooks:
       - id: mypy
-        files: ^src/signalflow/core/
+        files: ^src/signalflow/flow/
         args: [--follow-imports=silent]
         additional_dependencies:
           - loguru

@@ -27,6 +27,9 @@ class SignalDetector(Transform):
     required_targets: ClassVar[dict] = {}
     """Slot -> acceptable registered target names; empty imposes no constraint."""
 
+    learned: ClassVar[bool] = False
+    """True for detectors that fit a model on the frame they detect on; their signals are in-sample."""
+
     @property
     def outputs(self) -> list[str]:
         return [SIGNAL_COL]

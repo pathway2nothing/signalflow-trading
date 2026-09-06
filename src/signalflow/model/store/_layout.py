@@ -18,6 +18,7 @@ from pathlib import Path
 
 import cloudpickle
 import polars as pl
+from loguru import logger
 
 from signalflow.errors import ArtifactError
 
@@ -26,6 +27,39 @@ OOS_DIR = "oos"
 OOS_PARQUET = "predictions.parquet"
 FINGERPRINT_JSON = "fingerprint.json"
 SIGNATURE_JSON = "signature.json"
+ENV_JSON = "env.json"
+
+_ENV_LIBS = ("polars", "numpy", "sklearn", "lightgbm", "cloudpickle", "torch")
+
+
+def environment() -> dict:
+    """Versions the pickled model depends on (python, signalflow and the numeric stack)."""
+    import importlib
+    import platform
+
+    from signalflow._version import __version__
+
+    env = {"python": platform.python_version(), "signalflow": __version__}
+    for lib in _ENV_LIBS:
+        try:
+            env[lib] = getattr(importlib.import_module(lib), "__version__", "?")
+        except Exception:
+            continue
+    return env
+
+
+def _major_minor(version: str) -> str:
+    return ".".join(str(version).split(".")[:2])
+
+
+def check_environment(saved: dict) -> list[str]:
+    """Libraries whose major.minor differs from the saved artifact's (empty when compatible)."""
+    current = environment()
+    return [
+        f"{lib} {saved[lib]} (artifact) vs {current[lib]} (now)"
+        for lib in saved
+        if lib in current and _major_minor(saved[lib]) != _major_minor(current[lib])
+    ]
 
 
 def write_layout(model, directory: str | Path) -> Path:
@@ -61,6 +95,7 @@ def write_layout(model, directory: str | Path) -> Path:
             json.dumps(signature, indent=2, default=str), encoding="utf-8"
         )
 
+    (d / ENV_JSON).write_text(json.dumps(environment(), indent=2), encoding="utf-8")
     return d
 
 
@@ -70,6 +105,17 @@ def read_layout(directory: str | Path):
     pkl = d / MODEL_PKL
     if not pkl.is_file():
         raise ArtifactError(f"no {MODEL_PKL} found under {d}")
+    env_file = d / ENV_JSON
+    if env_file.is_file():
+        try:
+            mismatches = check_environment(json.loads(env_file.read_text(encoding="utf-8")))
+        except (ValueError, OSError):
+            mismatches = []
+        if mismatches:
+            logger.warning(
+                f"model artifact {d} was saved under a different environment: {'; '.join(mismatches)}; "
+                f"unpickled behaviour may differ - retrain to be safe"
+            )
 
     try:
         with pkl.open("rb") as fh:

@@ -5,25 +5,19 @@ from datetime import UTC, datetime, timedelta
 import polars as pl
 
 import signalflow as sf
-from signalflow.model.oos import parse_duration, rolling_folds
+from signalflow._time import parse_duration
+from signalflow.model.oos import rolling_folds
 from signalflow.transform.encode.woe import Binning, WoE
-
-
-def test_parse_duration():
-    assert parse_duration("1d") == timedelta(days=1)
-    assert parse_duration("365d") == timedelta(days=365)
-    assert parse_duration("12h") == timedelta(hours=12)
-    assert parse_duration("30m") == timedelta(minutes=30)
 
 
 def test_rolling_folds_step_and_window():
     ts = [datetime(2024, 1, 1, tzinfo=UTC) + timedelta(hours=i) for i in range(24 * 10)]
     folds = rolling_folds(ts, parse_duration("1d"), parse_duration("3d"), timedelta(hours=6))
     assert len(folds) >= 8
-    assert all(f.train_start_ts is not None for f in folds)
-    assert folds[1].test_start_ts - folds[0].test_start_ts == timedelta(days=1)
+    assert all(f.train_start is not None for f in folds)
+    assert folds[1].test_start - folds[0].test_start == timedelta(days=1)
     f = folds[3]
-    assert f.train_end_ts - f.train_start_ts == timedelta(days=3)
+    assert f.train_end - f.train_start == timedelta(days=3)
 
 
 def test_woe_state_round_trip():
@@ -40,8 +34,8 @@ def test_model_records_rolling_refits():
     ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-12", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=6),
-        features=sf.FeaturePipe(sf.SMA(5), sf.SMA(10)),
-        encode=WoE(refit="1d", window="3d"),
+        features=sf.FeaturePipeline(sf.SMA(5), sf.SMA(10), sf.WoE(), sf.IVSelector()),
+        cv=sf.Rolling(step="1d", window="3d"),
         output="p_rise",
         min_train_rows=20,
     )
@@ -58,8 +52,8 @@ def test_model_records_rolling_refits():
 def _refit_model():
     return sf.ForecastModel(
         target=sf.FixedHorizon(bars=6),
-        features=sf.FeaturePipe(sf.SMA(5)),
-        encode=WoE(refit="1d", window="3d"),
+        features=sf.FeaturePipeline(sf.SMA(5), sf.WoE(), sf.IVSelector()),
+        cv=sf.Rolling(step="1d", window="3d"),
         min_train_rows=20,
     )
 
@@ -89,8 +83,8 @@ def test_model_dump_woe_history(tmp_path):
     ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-10", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=6),
-        features=sf.FeaturePipe(sf.SMA(5)),
-        encode=WoE(refit="1d", window="3d"),
+        features=sf.FeaturePipeline(sf.SMA(5), sf.WoE(), sf.IVSelector()),
+        cv=sf.Rolling(step="1d", window="3d"),
         min_train_rows=20,
     )
     model.fit(ds)
@@ -101,3 +95,29 @@ def test_model_dump_woe_history(tmp_path):
     with open(path) as fh:
         loaded = json.load(fh)
     assert isinstance(loaded, list) and loaded and "state" in loaded[0]
+
+
+def test_fold_cache_invalidates_when_feature_code_changes(tmp_path, monkeypatch):
+    """Editing a transform's source must change the fold-cache key (SF_ISSUES #20)."""
+    import signalflow.model.forecast as forecast_module
+    from signalflow.experiment.cache import ArtifactCache
+
+    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-12", interval="1h")
+    cache = ArtifactCache(str(tmp_path / "folds"))
+    _refit_model().fit(ds, cache=cache)
+
+    original = forecast_module.code_fingerprint
+    monkeypatch.setattr(
+        forecast_module, "code_fingerprint", lambda obj: "sha256:edited" if obj is sf.SMA else original(obj)
+    )
+    m2 = _refit_model()
+    calls: list[int] = []
+    real = m2._fit_fold_predict
+
+    def counting(*args, **kwargs):
+        calls.append(1)
+        return real(*args, **kwargs)
+
+    m2._fit_fold_predict = counting
+    m2.fit(ds, cache=cache)
+    assert calls, "changed feature code reused cached folds"

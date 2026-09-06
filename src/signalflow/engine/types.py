@@ -1,5 +1,6 @@
 """Engine value types - intents, orders, fills, positions."""
 
+import hashlib
 from dataclasses import dataclass, field
 
 from signalflow.enums import IntentKind, OrderType, Side
@@ -53,6 +54,12 @@ class Order:
     limit_price: float | None = None
     ts: object = None
     reason: str = ""
+
+
+def client_order_id(order: Order) -> str:
+    """Deterministic client-order id (same recipe for every broker) so a retried send never double-fills."""
+    raw = f"{order.pair}|{order.ts}|{order.side.name}|{order.qty}"
+    return "sf-" + hashlib.sha256(raw.encode()).hexdigest()[:29]
 
 
 @dataclass

@@ -3,7 +3,7 @@
 
 import numpy as np
 
-__all__ = ["quantile_edges", "monotonic_edges", "assign_bins", "compute_woe_table", "information_value"]
+__all__ = ["assign_bins", "compute_woe_table", "information_value", "monotonic_edges", "quantile_edges"]
 
 
 def quantile_edges(x: np.ndarray, max_bins: int) -> np.ndarray:

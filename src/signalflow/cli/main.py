@@ -1,10 +1,10 @@
 """
 ``sf`` - the SignalFlow command-line interface (click group).
 
-Five commands: ``list`` (enumerate the registry), ``info`` (a component's schema),
+Six commands: ``list`` (enumerate the registry), ``info`` (a component's schema),
 ``run`` (load a flow.yaml, build a dataset, backtest, print the scorecard),
-``promote`` (validate the flow's promotion evidence and generate the sf-prod
-strategy conf), and ``version``.
+``exp`` (run an experiment.yaml end to end), ``promote`` (validate the flow's
+promotion evidence and generate the sf-prod strategy conf), and ``version``.
 
 The registry autodiscovers components lazily, so importing :mod:`signalflow` and
 touching ``registry.snapshot()`` is enough to populate ``sf list``.
@@ -17,6 +17,7 @@ import click
 
 import signalflow as sf
 from signalflow.enums import ComponentType
+from signalflow.flow.bundle import MIN_OOS_COVERAGE
 
 _TYPE_MAP = {t.value: t for t in ComponentType}
 _TYPE_CHOICES = sorted(_TYPE_MAP)
@@ -114,14 +115,15 @@ def list_(type_: str | None) -> None:
 
 
 def _describe_instance(component_type: ComponentType, name: str) -> tuple[str, str]:
-    """Return ``(outputs, warmup)`` from a default-constructed instance, ``n/a`` on failure."""
+    """Return ``(outputs, warmup)`` from a default-constructed instance, or why one cannot be built."""
     try:
         obj = sf.registry.create(component_type, name)
-        outputs = getattr(obj, "outputs", None)
-        warmup = getattr(obj, "warmup", None)
-        return (str(outputs) if outputs else "n/a", str(warmup) if warmup is not None else "n/a")
-    except Exception:
-        return "n/a", "n/a"
+    except Exception as exc:
+        reason = f"n/a (default construction failed: {type(exc).__name__}: {exc})"
+        return reason, reason
+    outputs = getattr(obj, "outputs", None)
+    warmup = getattr(obj, "warmup", None)
+    return (str(outputs) if outputs else "n/a", str(warmup) if warmup is not None else "n/a")
 
 
 @main.command()
@@ -199,7 +201,7 @@ def _promotion_blockers(card: dict) -> list[str]:
     if not card.get("oos"):
         failing.append("oos")
     cov = card.get("oos_coverage")
-    if cov is not None and cov < 0.95:
+    if cov is not None and cov < MIN_OOS_COVERAGE:
         failing.append(f"oos_coverage={cov}")
     return failing
 

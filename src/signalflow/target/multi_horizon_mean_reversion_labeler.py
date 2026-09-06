@@ -47,6 +47,8 @@ class MultiHorizonMeanReversionLabeler(Labeler):
         ``soft_D3_revert`` (0.172).
     """
 
+    horizon_field: ClassVar[str | None] = "horizons"
+
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
 
     soft_classes: ClassVar[tuple[str, ...]] = (

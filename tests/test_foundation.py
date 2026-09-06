@@ -180,7 +180,7 @@ def test_cross_rate():
 
 
 def test_feature_pipe_causal_and_outputs(ds):
-    pipe = sf.FeaturePipe(sf.SMA(20), sf.SMA(30), sf.SMA(10))
+    pipe = sf.FeaturePipeline(sf.SMA(20), sf.SMA(30), sf.SMA(10))
     out = pipe.compute(ds.frame)
     assert "sma_20" in out.columns and "sma_10" in out.columns
     assert pipe.warmup == 30
@@ -190,20 +190,12 @@ def test_feature_pipe_causal_and_outputs(ds):
 
 
 def test_feature_pipe_rejects_detector():
-    with pytest.raises(sf.PipeError):
-        sf.FeaturePipe(sf.SmaCrossDetector(fast=5, slow=10))
+    with pytest.raises(sf.PipelineError):
+        sf.FeaturePipeline(sf.SmaCrossDetector(fast=5, slow=10))
 
 
 def test_transform_roundtrip_config():
-    pipe = sf.FeaturePipe(sf.SMA(20), sf.SMA(10))
+    pipe = sf.FeaturePipeline(sf.SMA(20), sf.SMA(10))
     cfg = pipe.to_config()
-    assert cfg["transform"] == "feature_pipe"
+    assert cfg["transform"] == "feature_pipeline"
     assert len(cfg["params"]["transforms"]) == 2
-
-
-def test_deprecated_source_name_resolves_to_synthetic():
-    from signalflow.data.source.synthetic import SyntheticSource
-
-    assert sf.registry.get(sf.ComponentType.SOURCE, "memory") is SyntheticSource
-    assert "memory" not in sf.registry.list(sf.ComponentType.SOURCE)
-    assert sf.MemorySource is sf.SyntheticSource

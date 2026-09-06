@@ -32,26 +32,26 @@ def load_spec(path: "str | Path") -> dict:
 
 
 def _build_model(mcfg: dict):
+    from signalflow.model.cv import build_cv
     from signalflow.model.forecast import ForecastModel
     from signalflow.target.base import make_target
     from signalflow.transform.base import build_transform
-    from signalflow.transform.encode import IVSelector, WoE
-    from signalflow.transform.pipe import FeaturePipe
+    from signalflow.transform.pipeline import FeaturePipeline
 
     target = make_target(mcfg["target"]["name"], **(mcfg["target"].get("params") or {}))
-    pipe = FeaturePipe(*[build_transform(f) for f in (mcfg.get("features") or [])])
-    if mcfg.get("encode", "default") == "default":
-        encode, select = WoE(), IVSelector()
-    else:
-        encode, select = None, None
+    if "encode" in mcfg:
+        raise FlowConfigError(
+            "model.encode is gone: declare the encoder as pipeline steps, e.g. "
+            "features: [..., {transform: woe}, {transform: iv_selector}]"
+        )
+    pipe = FeaturePipeline(*[build_transform(f) for f in (mcfg.get("features") or [])])
     return ForecastModel(
         backend=mcfg.get("backend", "lightgbm"),
         target=target,
         features=pipe,
-        encode=encode,
-        select=select,
         backend_params=mcfg.get("backend_params") or {},
         output=mcfg.get("output", "p_rise"),
+        cv=build_cv(mcfg.get("cv")),
     )
 
 

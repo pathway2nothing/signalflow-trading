@@ -7,7 +7,7 @@ from loguru import logger
 
 from signalflow._hash import code_fingerprint, stable_hash
 from signalflow.data.dataset import Dataset
-from signalflow.transform.pipe import FeaturePipe
+from signalflow.transform.pipeline import FeaturePipeline
 
 
 class FeatureStore:
@@ -16,7 +16,7 @@ class FeatureStore:
     def __init__(self, root: "str | Path") -> None:
         self.root = Path(root)
 
-    def key(self, features: FeaturePipe, data: Dataset) -> str:
+    def key(self, features: FeaturePipeline, data: Dataset) -> str:
         frame = data.frame
         return stable_hash(
             {
@@ -29,7 +29,7 @@ class FeatureStore:
             }
         )
 
-    def compute(self, features: FeaturePipe, data: Dataset) -> pl.DataFrame:
+    def compute(self, features: FeaturePipeline, data: Dataset) -> pl.DataFrame:
         path = self.root / f"{self.key(features, data).replace(':', '_')}.parquet"
         if path.exists():
             logger.debug(f"FeatureStore: hit {path.name} ({len(features.transforms)} transforms)")

@@ -8,14 +8,15 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 import polars as pl
 from loguru import logger
 
 from signalflow.decorators import broker
-from signalflow.engine.types import Fill, Order
+from signalflow.engine.quantize import SymbolFilters, quantize_order
+from signalflow.engine.types import Fill, Order, client_order_id
 from signalflow.enums import OrderType, Side
 
 
@@ -24,58 +25,71 @@ class Broker(Protocol):
     def execute(self, orders: list[Order], bar) -> list[Fill]: ...
 
 
-def sim_client_order_id(order: Order) -> str:
-    """Deterministic client-order id for non-exchange brokers (same recipe as Binance)."""
-    raw = f"{order.pair}|{order.ts}|{order.side.name}|{order.qty}"
-    return "sf-" + hashlib.sha256(raw.encode()).hexdigest()[:29]
-
-
 @broker("sim")
 @dataclass
 class SimBroker(Broker):
-    """Simulated fills with flat fee + slippage; next-available close pricing."""
+    """Simulated fills with flat fee + slippage.
+
+    ``fill="close"`` (default) executes an order at the close of the bar that
+    produced it; ``fill="next_open"`` defers it to the next bar's open, which is
+    what a live loop deciding on a closed candle actually gets. ``filters`` maps
+    pair -> ``{stepSize, tickSize, minQty, minNotional}`` and applies the same
+    quantization as :class:`BinanceBroker`, so paper and armed runs size orders
+    identically; orders below the minimums are skipped.
+    """
 
     fee_rate: float = 0.001
     slippage: float = 0.0005
     quote: str = "USDT"
+    fill: str = "close"
+    filters: "dict | None" = None
 
-    def execute(self, orders: list[Order], bar) -> list[Fill]:
+    def __post_init__(self) -> None:
+        if self.fill not in ("close", "next_open"):
+            raise ValueError(f"SimBroker.fill must be 'close' or 'next_open', got {self.fill!r}")
+        self._filters = {k: SymbolFilters.from_mapping(v) for k, v in (self.filters or {}).items()}
+
+    def execute(self, orders: list[Order], bar, at: str = "close") -> list[Fill]:
+        """Fill ``orders`` against ``bar``: at its close (``at="close"``) or at its open (``at="open"``)."""
+        prices = bar.prices if at == "close" or not getattr(bar, "open", None) else bar.open
         fills: list[Fill] = []
         for o in orders:
-            price = bar.prices.get(o.pair)
+            price = prices.get(o.pair)
             if price is None or o.qty <= 0:
                 continue
+            qty, limit_price = o.qty, o.limit_price
+            spec = self._filters.get(o.pair)
+            if spec is not None:
+                qty, limit_price, ok = quantize_order(o.qty, price, o.limit_price, spec)
+                if not ok:
+                    logger.debug(f"SimBroker: skipping {o.side.name} {o.pair} qty={o.qty}: below symbol minimums")
+                    continue
             if o.type == OrderType.LIMIT:
-                exec_price = self._limit_fill(o, bar, price)
+                exec_price = self._limit_fill(o, bar, price, limit_price)
                 if exec_price is None:
                     continue
             else:
                 exec_price = price * (1 + self.slippage) if o.side == Side.BUY else price * (1 - self.slippage)
-            fee = o.qty * exec_price * self.fee_rate
+            fee = qty * exec_price * self.fee_rate
             fills.append(
-                Fill(
-                    pair=o.pair,
-                    ts=bar.ts,
-                    side=o.side,
-                    qty=o.qty,
-                    price=exec_price,
-                    fee=fee,
-                    fee_asset=self.quote,
-                )
+                Fill(pair=o.pair, ts=bar.ts, side=o.side, qty=qty, price=exec_price, fee=fee, fee_asset=self.quote)
             )
         return fills
 
-    def _limit_fill(self, order: Order, bar, close: float) -> "float | None":
+    def _limit_fill(self, order: Order, bar, close: float, limit_price: "float | None") -> "float | None":
         """Fill a resting limit at its price if the bar traded through it, else skip."""
-        if order.limit_price is None:
+        if limit_price is None:
             return None
         high, low = self._bar_high_low(bar, order.pair, close)
         if order.side == Side.BUY:
-            return order.limit_price if low <= order.limit_price else None
-        return order.limit_price if high >= order.limit_price else None
+            return limit_price if low <= limit_price else None
+        return limit_price if high >= limit_price else None
 
     @staticmethod
     def _bar_high_low(bar, pair: str, close: float) -> "tuple[float, float]":
+        highs, lows = getattr(bar, "high", None), getattr(bar, "low", None)
+        if highs and lows and pair in highs and pair in lows:
+            return float(highs[pair]), float(lows[pair])
         frame = getattr(bar, "frame", None)
         if frame is not None and {"high", "low"} <= set(frame.columns):
             row = frame.filter(pl.col("pair") == pair)
@@ -111,8 +125,8 @@ class BinanceBroker(ExchangeBroker):
     LIMIT orders are IOC (bar-synchronous fill-or-gone), matching ``SimBroker``.
     """
 
-    api_key: str = ""
-    api_secret: str = ""
+    api_key: str = field(default="", repr=False)
+    api_secret: str = field(default="", repr=False)
     base_url: str = "https://testnet.binance.vision"
     recv_window: int = 5000
     timeout: float = 20.0
@@ -136,25 +150,36 @@ class BinanceBroker(ExchangeBroker):
         return fills
 
     def _execute_one(self, order: Order, bar) -> "Fill | None":
-        filters = self._filters(order.pair)
-        qty = self._floor_step(order.qty, filters.get("stepSize"))
+        spec = self._filters(order.pair)
         ref_price = order.limit_price if order.limit_price is not None else bar.prices.get(order.pair)
-        price = self._round_tick(order.limit_price, filters.get("tickSize")) if order.limit_price is not None else None
-        notional = float(qty) * float(ref_price or 0.0)
-        min_qty = filters.get("minQty", 0.0)
-        min_notional = filters.get("minNotional", 0.0)
-        if float(qty) < min_qty or (min_notional and notional < min_notional):
+        qty, price, ok = quantize_order(order.qty, float(ref_price or 0.0), order.limit_price, spec)
+        if not ok:
             logger.error(
-                f"BinanceBroker: skipping {order.side.name} {order.pair} qty={qty} notional={notional}: "
-                f"below exchange minimums (minQty={min_qty}, minNotional={min_notional})"
+                f"BinanceBroker: skipping {order.side.name} {order.pair} qty={qty}: below exchange minimums "
+                f"(minQty={spec.min_qty}, minNotional={spec.min_notional})"
             )
             return None
         resp = self._place(order, qty, price)
         if resp is None:
-            return None
+            # The send failed or timed out after the venue may have accepted it: ask before assuming nothing filled.
+            resp = self._query_after_failure(order)
+            if resp is None:
+                return None
         return self._resp_to_fill(resp, order)
 
-    def _filters(self, pair: str) -> dict:
+    def _query_after_failure(self, order: Order) -> "dict | None":
+        cid = client_order_id(order)
+        try:
+            resp = self.query_order(order.pair, cid)
+        except Exception as exc:
+            logger.error(f"BinanceBroker: could not query {cid} after a failed send: {exc}; treating as not filled")
+            return None
+        if float(resp.get("executedQty", 0.0) or 0.0) > 0:
+            logger.warning(f"BinanceBroker: order {cid} was executed by the venue despite the failed send")
+            return resp
+        return None
+
+    def _filters(self, pair: str) -> SymbolFilters:
         """Exchange LOT_SIZE/PRICE_FILTER/NOTIONAL limits for ``pair`` (fetched once, cached)."""
         if pair in self._filter_cache:
             return self._filter_cache[pair]
@@ -162,49 +187,12 @@ class BinanceBroker(ExchangeBroker):
             req = urllib.request.Request(f"{self.base_url}/api/v3/exchangeInfo?symbol={pair}", method="GET")
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 info = json.loads(resp.read().decode())
-            filters = self._parse_filters(info)
+            spec = SymbolFilters.from_binance(info)
         except Exception as e:
             logger.warning(f"BinanceBroker: could not fetch exchange filters for {pair}: {e}; sending unquantized")
-            filters = {}
-        self._filter_cache[pair] = filters
-        return filters
-
-    @staticmethod
-    def _parse_filters(info: dict) -> dict:
-        symbols = info.get("symbols") or []
-        if not symbols:
-            return {}
-        by_type = {f.get("filterType"): f for f in symbols[0].get("filters", [])}
-        lot = by_type.get("LOT_SIZE", {})
-        price = by_type.get("PRICE_FILTER", {})
-        notional = by_type.get("NOTIONAL") or by_type.get("MIN_NOTIONAL") or {}
-        return {
-            "stepSize": lot.get("stepSize"),
-            "minQty": float(lot.get("minQty", 0.0) or 0.0),
-            "tickSize": price.get("tickSize"),
-            "minNotional": float(notional.get("minNotional", 0.0) or 0.0),
-        }
-
-    @staticmethod
-    def _floor_step(value: float, step: "str | None") -> decimal.Decimal:
-        d = decimal.Decimal(str(value))
-        if not step:
-            return d
-        s = decimal.Decimal(str(step))
-        return (d / s).to_integral_value(rounding=decimal.ROUND_DOWN) * s
-
-    @staticmethod
-    def _round_tick(value: float, step: "str | None") -> decimal.Decimal:
-        d = decimal.Decimal(str(value))
-        if not step:
-            return d
-        s = decimal.Decimal(str(step))
-        return (d / s).to_integral_value(rounding=decimal.ROUND_HALF_UP) * s
-
-    @staticmethod
-    def client_order_id(order: Order) -> str:
-        """Deterministic id so a retried send dedupes venue-side instead of double-filling."""
-        return sim_client_order_id(order)
+            spec = SymbolFilters()
+        self._filter_cache[pair] = spec
+        return spec
 
     def query_order(self, pair: str, client_order_id: str) -> dict:
         """Signed GET of an order's current venue state by its client order id."""
@@ -221,32 +209,32 @@ class BinanceBroker(ExchangeBroker):
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             return json.loads(resp.read().decode())
 
-    def _place(self, order: Order, qty: decimal.Decimal, price: "decimal.Decimal | None") -> "dict | None":
+    def _place(self, order: Order, qty: float, price: "float | None") -> "dict | None":
         params = {
             "symbol": order.pair,
             "side": order.side.name,
-            "quantity": f"{qty:f}",
-            "newClientOrderId": self.client_order_id(order),
+            "quantity": f"{decimal.Decimal(str(qty)):f}",
+            "newClientOrderId": client_order_id(order),
             "newOrderRespType": "FULL",
             "recvWindow": self.recv_window,
-            "timestamp": int(time.time() * 1000),
         }
         if order.type == OrderType.LIMIT and price is not None:
             params["type"] = "LIMIT"
             params["timeInForce"] = "IOC"
-            params["price"] = f"{price:f}"
+            params["price"] = f"{decimal.Decimal(str(price)):f}"
         else:
             params["type"] = "MARKET"
         return self._signed_post(params)
 
     def _signed_post(self, params: dict) -> "dict | None":
-        query = urllib.parse.urlencode(params)
-        signature = hmac.new(self.api_secret.encode(), query.encode(), hashlib.sha256).hexdigest()
-        url = f"{self.base_url}/api/v3/order?{query}&signature={signature}"
-        req = urllib.request.Request(url, method="POST", headers={"X-MBX-APIKEY": self.api_key})
+        """POST a signed order; every retry re-signs with a fresh ``timestamp`` so it stays inside ``recvWindow``."""
         attempt = 0
         while True:
             attempt += 1
+            query = urllib.parse.urlencode({**params, "timestamp": int(time.time() * 1000)})
+            signature = hmac.new(self.api_secret.encode(), query.encode(), hashlib.sha256).hexdigest()
+            url = f"{self.base_url}/api/v3/order?{query}&signature={signature}"
+            req = urllib.request.Request(url, method="POST", headers={"X-MBX-APIKEY": self.api_key})
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     return json.loads(resp.read().decode())

@@ -48,9 +48,7 @@ slice so features start valid, exactly as production would see them.
 ```python
 model = sf.ForecastModel(
     target=sf.FixedHorizon(bars=12),
-    features=sf.FeaturePipe(sf.SMA(20), sf.SMA(50)),
-    encode=None,
-    select=None,
+    features=sf.FeaturePipeline(sf.SMA(20), sf.SMA(50)),   # raw features: no stateful step
 )
 result = sf.walk_forward(model, ds, train="90d", step="30d")
 
@@ -64,17 +62,15 @@ the `{fold}` placeholder is filled with the fold index.
 
 ## Rolling refit on a trailing window
 
-When a flow's `ForecastModel` uses a WoE encoder, the walk-forward refits the
-whole stack on a schedule set by the encoder's `refit` (step) and `window`
-(trailing train span):
+`ForecastModel.fit` refits the whole stack (the pipeline's stateful tail - `WoE`,
+`IVSelector`, `Scaler` - and the estimator) per fold; the fold layout is the model's `cv` scheme - `sf.Rolling(step, window)`
+(default `Rolling("7d", "365d")`) or `sf.KFold(n)`:
 
 ```python
-from signalflow.transform.encode import WoE
-
 model = sf.ForecastModel(
     target=sf.FixedHorizon(bars=12),
-    features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20)),
-    encode=WoE(refit="1d", window="365d"),      # refit daily on a trailing year
+    features=sf.FeaturePipeline(sf.SMA(10), sf.SMA(20), sf.WoE(), sf.IVSelector()),
+    cv=sf.Rolling(step="1d", window="365d"),   # refit daily on a trailing year
 )
 model.fit(ds)
 ```
@@ -110,10 +106,10 @@ The cache key folds in the feature/encoder/target config, the code fingerprint,
 the dataset identity, and the fold's window bounds - so editing a feature or
 changing the data invalidates the affected folds automatically.
 
-A fitted `FeaturePipe` or any transform tree is also serializable on its own:
+A fitted `FeaturePipeline` or any transform tree is also serializable on its own:
 
 ```python
-pipe = sf.FeaturePipe(sf.SMA(10), sf.SMA(20))
+pipe = sf.FeaturePipeline(sf.SMA(10), sf.SMA(20))
 pipe.save("pipe.yaml")
-same = sf.FeaturePipe.load("pipe.yaml")
+same = sf.FeaturePipeline.load("pipe.yaml")
 ```

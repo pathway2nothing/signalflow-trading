@@ -15,7 +15,7 @@ promotion, and trading all move the same artifact.
 | Module | Responsibility |
 |--------|----------------|
 | `data/` | `Dataset` (`data/dataset.py`) - lazy, immutable market-data container; sources under `data/source/` (`synthetic.py`, `binance.py`, `cached.py`). |
-| `transform/` | `Transform` base and `FeaturePipe` (`transform/pipe.py`), the `SMA` feature, WoE/IV encoders (`transform/encode/`), and `build_pipe` (`transform/build.py`). |
+| `transform/` | `Transform` base and `FeaturePipeline` (`transform/pipeline.py`, with `FeaturePipeline.from_names` for registry-name builds), the `SMA` feature, WoE/IV encoders (`transform/encode/`). |
 | `target/` | `Target` base (`target/base.py`) and the labelers (`FixedHorizon`, `TripleBarrier`, and the rest of `target/*.py`). |
 | `model/` | `ForecastModel` (`model/forecast.py`), walk-forward (`model/walkforward.py`), OOS/fold helpers (`model/oos.py`), validator combinators (`model/validators.py`), persistence (`model/store/`). |
 | `sampler/` | `Sampler` base (`sampler/base.py`) and samplers (uniform, CUSUM, meta-labeling, uniqueness). |
@@ -23,8 +23,8 @@ promotion, and trading all move the same artifact.
 | `strategy/` | `StrategyModel` (`strategy/base.py`), `RulesStrategy` (`strategy/rules.py`), `LLMStrategy` (`strategy/llm.py`), `Risk` (`strategy/risk.py`), `Observation` (`strategy/observation.py`). |
 | `engine/` | `Engine`, brokers (`SimBroker`, `BinanceBroker`), clock, and order/fill types. |
 | `flow/` | `Flow` (`flow/flow.py`), the shared decision loop (`flow/loop.py`), the live loop (`flow/live.py`), `Run` (`flow/run.py`), YAML serialization (`flow/yaml.py`). |
-| `experiment/` | `ArtifactCache` (`experiment/cache.py`) - keyed fold cache. |
-| `registry.py` | The seven-type component registry with lazy autodiscovery and entry-point plugins. |
+| `experiment/` | `ArtifactCache` (`experiment/cache.py`, keyed fold cache), `run_experiment` + `experiment.yaml` spec (`experiment/spec.py`), `Scorecard`/bootstrap statistics (`experiment/scorecard.py`, `stats.py`), MLflow tracking (`experiment/tracking.py`), seeding. |
+| `registry.py` | The eight-type component registry: an explicit list of core modules plus entry-point plugins. |
 | `enums.py` | `ComponentType`, `Provenance`, `RunMode`, and the signal constants. |
 | `errors.py` | The exception hierarchy. |
 | `cli/` | The `sf` command-line entry point. |
@@ -75,12 +75,12 @@ promotion, and trading all move the same artifact.
 
 ## Registry and plugins
 
-`registry.py` holds a `ComponentType -> name -> ComponentInfo` map with seven types
-(`SOURCE`, `TRANSFORM`, `MODEL`, `STRATEGY`, `SAMPLER`, `BROKER`, `METRIC`) plus a
-`TARGET` type used by targets. Discovery is lazy: `autodiscover` walks the
-`signalflow.*` packages and then loads `signalflow.components` entry points, so an
-installed plugin (`signalflow-ta`, `signalflow-labs`) registers its components with
-no imports or wiring. A registered name is exactly what `flow.yaml` serializes and
+`registry.py` holds a `ComponentType -> name -> ComponentInfo` map with eight types
+(`SOURCE`, `TRANSFORM`, `TARGET`, `MODEL`, `STRATEGY`, `SAMPLER`, `BROKER`, `METRIC`).
+Discovery is lazy: `autodiscover` imports an explicit list of core modules and then
+loads `signalflow.components` entry points, so an installed plugin (`signalflow-ta`,
+`signalflow-labs`) registers its components with no imports or wiring - and `sf list`
+never imports a plugin's heavy dependencies (torch) unless the plugin does so itself. A registered name is exactly what `flow.yaml` serializes and
 `sf list` enumerates.
 
 ## Persistence story

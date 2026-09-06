@@ -7,14 +7,17 @@ failure it falls back to a deterministic RulesStrategy.
 
 import json
 import os
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from loguru import logger
 from pydantic import BaseModel, Field
 
 from signalflow.decorators import strategy
 from signalflow.engine.types import Intent
 from signalflow.enums import IntentKind, Side
+from signalflow.errors import KillSwitchTripped
 from signalflow.strategy.base import Strategy, build_strategy
 from signalflow.strategy.observation import Observation
 from signalflow.strategy.rules import RulesStrategy
@@ -67,7 +70,7 @@ class OpenAICompatClient:
 
     base_url: str = ""
     model: str = ""
-    api_key: str = "not-needed"
+    api_key: str = field(default="not-needed", repr=False)
     max_tokens: int = 1024
     timeout: float = 60.0
 
@@ -76,7 +79,7 @@ class OpenAICompatClient:
         self.model = self.model or os.environ.get("SIGNALFLOW_LLM_MODEL", DEFAULT_MODEL)
 
     def decide(self, context: dict, schema: dict) -> "dict | None":
-        """Call the chat endpoint and parse a JSON decisions object; None on failure."""
+        """Call the chat endpoint and parse a JSON decisions object; ``None`` (logged) on failure."""
         try:
             import httpx
 
@@ -97,19 +100,30 @@ class OpenAICompatClient:
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"]
             return json.loads(content)
-        except Exception:
+        except Exception as exc:
+            logger.warning(f"LLM client {self.model!r} at {self.base_url}: {type(exc).__name__}: {exc}")
             return None
 
 
 @strategy("llm")
 @dataclass
 class LLMStrategy(Strategy):
-    """Turn an LLM's structured decisions into intents, with a rules fallback."""
+    """Turn an LLM's structured decisions into intents.
+
+    When the client fails or returns something that does not validate, the
+    strategy falls back to ``fallback`` (a ``RulesStrategy`` by default) and logs
+    a WARNING each time; ``fallbacks`` counts them and the live loop reports the
+    count in ``Run.meta``. With ``fallback=None`` a failure raises
+    :class:`KillSwitchTripped` instead, so an armed flow stops rather than
+    silently trading rules it was not configured to trade.
+    """
 
     client: LLMClient
     mandate: str = ""
     fallback: object = field(default_factory=RulesStrategy)
-    _cache: dict = field(default_factory=dict, init=False, repr=False)
+    cache_size: int = 10_000
+    fallbacks: int = field(default=0, init=False, repr=False)
+    _cache: OrderedDict = field(default_factory=OrderedDict, init=False, repr=False)
 
     def to_config(self) -> dict:
         """Serialize to a portable config; the client's API key is never written."""
@@ -127,6 +141,7 @@ class LLMStrategy(Strategy):
                 "client": client_cfg,
                 "mandate": self.mandate,
                 "fallback": fallback_cfg,
+                "cache_size": self.cache_size,
             },
         }
 
@@ -143,11 +158,12 @@ class LLMStrategy(Strategy):
             timeout=client_cfg.get("timeout", 60.0),
         )
         fallback_cfg = params.get("fallback")
-        fallback = build_strategy(fallback_cfg) if fallback_cfg else RulesStrategy()
+        fallback = build_strategy(fallback_cfg) if fallback_cfg else None
         return cls(
             client=client,
             mandate=params.get("mandate", ""),
             fallback=fallback,
+            cache_size=int(params.get("cache_size", 10_000)),
         )
 
     def decide(self, obs: Observation) -> list[Intent]:
@@ -160,17 +176,28 @@ class LLMStrategy(Strategy):
         else:
             try:
                 raw = self.client.decide(context, DECISIONS_SCHEMA)
-            except Exception:
+            except Exception as exc:
+                logger.warning(f"LLMStrategy: client raised {type(exc).__name__}: {exc}")
                 raw = None
             self._cache[key] = raw
+            while len(self._cache) > self.cache_size:
+                self._cache.popitem(last=False)
 
         if raw is None:
-            return self.fallback.decide(obs)
+            return self._fall_back(obs, "no decision from the client")
         try:
             decisions = Decisions.model_validate(raw)
-        except Exception:
-            return self.fallback.decide(obs)
+        except Exception as exc:
+            return self._fall_back(obs, f"invalid decision payload ({type(exc).__name__})")
         return self._to_intents(decisions, obs)
+
+    def _fall_back(self, obs: Observation, reason: str) -> list[Intent]:
+        self.fallbacks += 1
+        if self.fallback is None:
+            raise KillSwitchTripped(f"LLMStrategy at {obs.ts}: {reason} and no fallback strategy is configured")
+        name = getattr(self.fallback, "name", type(self.fallback).__name__)
+        logger.warning(f"LLMStrategy at {obs.ts}: {reason}; falling back to {name!r} (fallback #{self.fallbacks})")
+        return self.fallback.decide(obs)
 
     @staticmethod
     def _hash_context(context: dict) -> int:

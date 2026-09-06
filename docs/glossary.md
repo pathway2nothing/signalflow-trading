@@ -26,12 +26,12 @@ A column-producing step over a Dataset. Features (e.g. `SMA`) and detectors
 (e.g. `ThresholdDetector`) share one `Transform` contract, so both serialize the
 same way and both appear in the registry under a name.
 
-### FeaturePipe
+### FeaturePipeline
 An ordered group of feature transforms. It is fit/serializable on its own and is
 what a `ForecastModel` computes its inputs from.
 
 ```python
-pipe = sf.FeaturePipe(sf.SMA(10), sf.SMA(20))
+pipe = sf.FeaturePipeline(sf.SMA(10), sf.SMA(20))
 ```
 
 ### Target
@@ -78,7 +78,10 @@ raises `UntrainedModelError`. The same Flow object runs `backtest`, `paper`, and
 
 ### Run
 The result of executing a Flow: equity curve, fills, and a standard `.scorecard()`
-metric dict. `run.oos` flags an out-of-sample-only run.
+metric dict. `run.oos` flags an out-of-sample-only run; `run.promotable` is true only
+for an `oos=True` run with enough coverage (a rule-only flow is in-sample too).
+`Flow.quicktest` is a vectorized triage (forward return per RISE signal) that is
+never promotable.
 
 ### Provenance
 The stamp recorded on model outputs that records which fold/span produced them. The
@@ -90,17 +93,18 @@ trained on.
 ## Encoding & warmup
 
 ### WoE / IV
-Weight-of-Evidence encoding is the default feature encoding: each feature is binned
-and mapped to the log-odds of the target, monotone and leak-aware because it is fit
-out-of-fold. **Information Value (IV)** scores each encoded feature; `IVSelector` keeps
-only columns whose IV clears a threshold.
+Weight-of-Evidence encoding is a pipeline step: each feature is binned and mapped to
+the log-odds of the target, monotone and leak-aware because the model refits it inside
+every walk-forward fold. **Information Value (IV)** scores each encoded feature;
+`IVSelector` keeps only columns whose IV clears a threshold. Both are declared
+explicitly in the `FeaturePipeline`; a pipeline without them trains on raw features.
 
 ```python
 from signalflow.transform.encode import WoE
 model = sf.ForecastModel(
     target=sf.FixedHorizon(bars=12),
-    features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20)),
-    encode=WoE(refit="1d", window="365d"),   # rolling refit on a trailing year
+    features=sf.FeaturePipeline(sf.SMA(10), sf.SMA(20), WoE(), sf.IVSelector()),
+    cv=sf.Rolling(step="1d", window="365d"),   # refit the whole stack daily on a trailing year
 )
 ```
 

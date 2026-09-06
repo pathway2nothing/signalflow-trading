@@ -1,7 +1,7 @@
 """Flow - the declarative, deployable, tradeable unit."""
 
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from signalflow.enums import ComponentType, RunMode
 from signalflow.errors import FlowConfigError, UnknownComponentError, UntrainedModelError
@@ -48,8 +48,15 @@ class Flow:
         return slots
 
     def _check_wiring(self) -> None:
+        from loguru import logger
+
         available = set(self._available_slots())
         for det in self.detectors:
+            if getattr(det, "learned", False):
+                logger.warning(
+                    f"detector {det.name!r} is learned: it fits on the frame it detects on, so its signals "
+                    f"are in-sample; treat backtests of this flow as not promotable"
+                )
             for slot in getattr(det, "required_slots", lambda: ())():
                 if slot not in available:
                     raise FlowConfigError(
@@ -58,7 +65,7 @@ class Flow:
                     )
             self._check_targets(det)
 
-    def _check_targets(self, det) -> None:
+    def _check_targets(self, det: Any) -> None:
         constraints = getattr(det, "required_targets", {}) or {}
         for slot, accepted in constraints.items():
             model = self.forecasts.get(slot)
@@ -73,7 +80,7 @@ class Flow:
                 )
 
     @staticmethod
-    def _resolve_targets(names) -> tuple:
+    def _resolve_targets(names: Any) -> tuple:
         from signalflow.registry import registry
 
         resolved = []
@@ -99,7 +106,7 @@ class Flow:
         return max(candidates)
 
     @staticmethod
-    def _model_warmup(model) -> int:
+    def _model_warmup(model: Any) -> int:
         """Feature-pipe warmup of a forecast model or a validator combinator."""
         features = getattr(model, "features", None)
         if features is not None and hasattr(features, "warmup"):
@@ -109,33 +116,40 @@ class Flow:
             return max((Flow._model_warmup(child) for child in children), default=0)
         return 0
 
-    def quicktest(self, data, capital, target: str | None = None, horizon: int = 24, fee: float = 0.001):
+    def quicktest(
+        self, data: Any, capital: Any, target: str | None = None, horizon: int = 24, fee: float = 0.001
+    ) -> Any:
         return run_quicktest(self, data, capital, target, horizon=horizon, fee=fee)
 
-    def backtest(self, data, capital, target: str | None = None, broker=None, oos: bool = False):
-        """Backtest the flow. ``oos=True`` scores leak-free out-of-fold predictions and
-        stamps the Run promotable; the default in-sample run of a model flow is not promotable.
+    def backtest(
+        self, data: Any, capital: Any, target: str | None = None, broker: Any = None, oos: bool = False
+    ) -> Any:
+        """Backtest the flow.
+
+        ``oos=True`` scores leak-free out-of-fold predictions and stamps the Run
+        promotable (with enough OOS coverage). Without it the run is in-sample and not
+        promotable - for a rule-only flow too, since its parameters were tuned somewhere.
         """
         broker = broker or self._sim_broker()
         return run_event_loop(self, data, capital, target, broker, RunMode.BACKTEST, oos=oos)
 
-    def paper(self, data, capital, target: str | None = None, broker=None):
+    def paper(self, data: Any, capital: Any, target: str | None = None, broker: Any = None) -> Any:
         """Replay a Dataset with simulated fills - the same loop as backtest, paper mode."""
         broker = broker or self._sim_broker()
         return run_event_loop(self, data, capital, target, broker, RunMode.PAPER)
 
     def live(
         self,
-        feed,
-        capital,
+        feed: Any,
+        capital: Any,
         target: str | None = None,
-        broker=None,
+        broker: Any = None,
         armed: bool = False,
         maxlen: int = 5000,
         max_bars: int | None = None,
         state_path: str | None = None,
         compute_window: "int | None" = None,
-    ):
+    ) -> Any:
         """Trade a live (or replayed) feed via the real-time loop.
 
         ``feed`` may be a LiveFeed or a Dataset (wrapped in a ReplayFeed). Armed
@@ -163,15 +177,15 @@ class Flow:
 
     def simulate(
         self,
-        data,
-        capital,
+        data: Any,
+        capital: Any,
         target: str | None = None,
-        broker=None,
+        broker: Any = None,
         warmup: int | None = None,
         maxlen: int = 5000,
         state_path: str | None = None,
         compute_window: "int | None" = None,
-    ):
+    ) -> Any:
         """Full-speed incremental live simulation (walk-forward).
 
         Replays a Dataset through the live decision loop with no real-time wait:
@@ -194,15 +208,15 @@ class Flow:
             compute_window=compute_window,
         )
 
-    def _sim_broker(self):
+    def _sim_broker(self) -> Any:
         from signalflow.engine.broker import SimBroker
 
         return SimBroker(quote=self.quote)
 
-    def replace(self, **changes) -> "Flow":
+    def replace(self, **changes: Any) -> "Flow":
         return replace(self, **changes)
 
-    def save(self, path: str, model_dir: str | None = None, run=None) -> str:
+    def save(self, path: str, model_dir: str | None = None, run: Any = None) -> str:
         """Serialize the flow to YAML at ``path`` and return it.
 
         Each forecast/validator must already have a pinned URI, or pass ``model_dir`` to
@@ -214,17 +228,18 @@ class Flow:
 
         return save_flow(self, path, model_dir=model_dir, run=run)
 
-    def save_bundle(self, dir_path: str, run) -> str:
+    def save_bundle(self, dir_path: str, run: Any) -> str:
         """Write a promotable bundle (flow.yaml + models + scorecard.json + manifest.json)."""
         from signalflow.flow.bundle import write_bundle
 
         return write_bundle(self, run, dir_path)
 
     @classmethod
-    def load(cls, path: str) -> "Flow":
+    def load(cls, path: str, trust_remote: bool = False) -> "Flow":
+        """Load a saved flow; ``trust_remote=True`` is required for ``hf://`` model artifacts."""
         from signalflow.flow.yaml import load_flow
 
-        return load_flow(path)
+        return load_flow(path, trust_remote=trust_remote)
 
     def __repr__(self) -> str:
         return (

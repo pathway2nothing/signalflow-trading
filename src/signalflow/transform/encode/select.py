@@ -6,7 +6,6 @@ import polars as pl
 from loguru import logger
 
 from signalflow._logging import names
-
 from signalflow.decorators import transform
 from signalflow.enums import RESERVED_COLUMNS
 from signalflow.transform.base import Transform
@@ -34,6 +33,7 @@ class IVSelector(Transform):
 
     requires_fit = True
     requires_target = True
+    narrows = True
 
     def __post_init__(self) -> None:
         if self.positive_classes is not None:
@@ -57,7 +57,13 @@ class IVSelector(Transform):
             self.iv_[c] = iv
             if iv >= self.min_iv:
                 keep.append(c)
+        if not keep and self.iv_:
+            logger.warning(
+                f"IVSelector.fit: no column reached min_iv={self.min_iv}; keeping all {len(self.iv_)} candidates"
+            )
+            keep = list(self.iv_)
         self.keep_ = keep
+        self._is_fitted = True
         dropped = [c for c in self.iv_ if c not in keep]
         logger.trace(
             f"IVSelector.fit: kept {len(keep)}/{len(self.iv_)} columns (min_iv={self.min_iv}); dropped {names(dropped)}"

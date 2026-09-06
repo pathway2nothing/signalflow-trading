@@ -7,10 +7,10 @@ from signalflow.sampler.uniform import UniformSampler
 from signalflow.sampler.uniqueness import UniquenessSampler
 
 __all__ = [
-    "Sampler",
-    "SampleSet",
-    "UniformSampler",
-    "MetaLabelingSampler",
     "CUSUMSampler",
+    "MetaLabelingSampler",
+    "SampleSet",
+    "Sampler",
+    "UniformSampler",
     "UniquenessSampler",
 ]

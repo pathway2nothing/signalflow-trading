@@ -15,8 +15,7 @@ jobs:
       - name: Install (core + test + extras)
         run: uv pip install -e ".[test,live,llm]"
       - name: Lint (ruff)
-        run: uvx ruff check src tests
-        continue-on-error: true
+        run: uvx ruff@0.15.14 check src tests
       - name: Run tests
         env:
           PYTHONUTF8: "1"
@@ -34,3 +33,25 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: .venv/bin/python -m pytest tests/test_flow.py tests/test_engine.py tests/test_model.py -q
+
+  plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv venv
+      - name: Install core + plugins (dev branches, CPU torch)
+        run: |
+          uv pip install -e ".[test]"
+          uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+          uv pip install "signalflow-ta[numba] @ git+https://github.com/pathway2nothing/signalflow-ta@dev"
+          uv pip install "signalflow-labs[rl] @ git+https://github.com/pathway2nothing/signalflow-labs@dev"
+      - name: Core round-trip with plugins registered
+        env:
+          PYTHONUTF8: "1"
+        run: .venv/bin/python -m pytest tests/test_flow.py tests/test_serialization.py tests/test_golden.py -q
+      - name: Plugin smoke (ta + labs live components)
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          .venv/bin/python -c "import signalflow as sf, signalflow.ta, signalflow.labs; n = len(sf.registry.list(sf.ComponentType.TRANSFORM)); assert n > 200, n; print('transforms', n)"

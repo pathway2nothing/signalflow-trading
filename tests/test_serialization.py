@@ -59,32 +59,32 @@ def test_feature_pipe_load_rejects_non_pipe(tmp_path):
     path = str(tmp_path / "not_a_pipe.yaml")
     with open(path, "w", encoding="utf-8") as fh:
         yaml.safe_dump(sf.SMA(10).to_config(), fh)
-    with pytest.raises(sf.PipeError):
-        sf.FeaturePipe.load(path)
+    with pytest.raises(sf.PipelineError):
+        sf.FeaturePipeline.load(path)
 
 
 def test_feature_pipe_config_round_trip():
-    pipe = sf.FeaturePipe(sf.SMA(10), sf.SMA(20))
+    pipe = sf.FeaturePipeline(sf.SMA(10), sf.SMA(20))
     rebuilt = build_transform(pipe.to_config())
-    assert isinstance(rebuilt, sf.FeaturePipe)
+    assert isinstance(rebuilt, sf.FeaturePipeline)
     assert rebuilt.outputs == pipe.outputs
     ds = _ds()
     assert rebuilt.compute(ds.frame).equals(pipe.compute(ds.frame))
 
 
 def test_nested_feature_pipe_round_trip():
-    pipe = sf.FeaturePipe(sf.FeaturePipe(sf.SMA(5)), sf.SMA(30))
+    pipe = sf.FeaturePipeline(sf.FeaturePipeline(sf.SMA(5)), sf.SMA(30))
     rebuilt = build_transform(pipe.to_config())
     assert rebuilt.outputs == pipe.outputs == ["sma_5", "sma_30"]
     inner = rebuilt.transforms[0]
-    assert isinstance(inner, sf.FeaturePipe)
+    assert isinstance(inner, sf.FeaturePipeline)
 
 
 def test_feature_pipe_save_load(tmp_path):
-    pipe = sf.FeaturePipe(sf.SMA(10), sf.SMA(50))
+    pipe = sf.FeaturePipeline(sf.SMA(10), sf.SMA(50))
     path = str(tmp_path / "pipe.yaml")
     pipe.save(path)
-    loaded = sf.FeaturePipe.load(path)
+    loaded = sf.FeaturePipeline.load(path)
     assert loaded.outputs == pipe.outputs
 
 
@@ -231,7 +231,7 @@ def test_non_dataclass_to_config_raises():
         def detect(self, df):
             return df.with_columns(pl.lit(sf.NONE).alias("signal"))
 
-    with pytest.raises(sf.PipeError):
+    with pytest.raises(sf.PipelineError):
         PlainNoReg(5).to_config()
 
 

@@ -98,19 +98,19 @@ def test_equity_survives_missing_pair_price():
 
 def test_detector_without_signal_column_raises(ds):
     flow = sf.Flow(name="d03a", detectors=[_NoSignalDetector()])
-    with pytest.raises(sf.PipeError, match="did not produce") as exc:
+    with pytest.raises(sf.PipelineError, match="did not produce") as exc:
         flow.backtest(ds, capital=10_000)
     assert "d03_no_signal_col" in str(exc.value)
 
 
 def test_detector_off_vocabulary_raises(ds):
     flow = sf.Flow(name="d03b", detectors=[_BadVocabDetector()])
-    with pytest.raises(sf.PipeError, match="invalid signal values"):
+    with pytest.raises(sf.PipelineError, match="invalid signal values"):
         flow.backtest(ds, capital=10_000)
 
 
 def test_detector_compute_exception_wrapped(ds):
     flow = sf.Flow(name="d03c", detectors=[_RaisingDetector()])
-    with pytest.raises(sf.PipeError) as exc:
+    with pytest.raises(sf.PipelineError) as exc:
         flow.backtest(ds, capital=10_000)
     assert "d03_raises" in str(exc.value)

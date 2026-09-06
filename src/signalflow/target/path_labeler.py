@@ -427,6 +427,8 @@ class TrendBreakLabeler(Labeler):
         *presence* of a trend) by classifying its *continuation* vs *break*.
     """
 
+    horizon_field: ClassVar[str | None] = "window"  # OLS over the past and the *forward* window
+
     signal_category: SignalCategory = SignalCategory.TREND_MOMENTUM
 
     soft_classes: ClassVar[tuple[str, ...]] = ("no_break", "continue", "break")

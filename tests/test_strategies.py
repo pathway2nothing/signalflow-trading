@@ -6,14 +6,14 @@ import warnings
 import polars as pl
 import pytest
 
-warnings.filterwarnings("ignore", message="X does not have valid feature names")
-pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature names")
-
 import signalflow as sf
 from signalflow.engine.engine import Engine
 from signalflow.flow.loop import enriched_signals
 from signalflow.strategy.llm import Decisions, LLMStrategy, OpenAICompatClient
 from signalflow.strategy.observation import Observation
+
+warnings.filterwarnings("ignore", message="X does not have valid feature names")
+pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature names")
 
 
 @pytest.fixture(scope="module")
@@ -22,8 +22,8 @@ def flow_data():
     model = sf.ForecastModel(
         backend="lightgbm",
         target=sf.FixedHorizon(12),
-        features=sf.FeaturePipe(sf.SMA(20), sf.SMA(10)),
-        n_folds=3,
+        features=sf.FeaturePipeline(sf.SMA(20), sf.SMA(10)),
+        cv=sf.KFold(3),
     )
     model.fit(data)
     flow = sf.Flow(

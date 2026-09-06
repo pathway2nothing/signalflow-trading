@@ -62,7 +62,13 @@ def save(model, location: str) -> str:
     return f"hf://{repo_id}{suffix}"
 
 
-def load(location: str):
+def load(location: str, trust_remote: bool = False):
+    """Download the layout and unpickle it - remote code runs; refused unless ``trust_remote=True``."""
+    if not trust_remote:
+        raise ArtifactError(
+            f"loading {location!r} from the Hugging Face Hub unpickles remote code; pass trust_remote=True "
+            "only for repositories you control"
+        )
     import huggingface_hub
 
     repo_id, revision = _parse_location(location)

@@ -55,7 +55,7 @@ def test_feature_on_shuffled_input_matches_sorted():
 
 def test_pipe_fused_output_matches_sequential_eager():
     frame = _ds().frame
-    pipe = sf.FeaturePipe(sf.SMA(5), _Lag(1), _EagerDouble(), sf.SMA(10), _Lag(2))
+    pipe = sf.FeaturePipeline(sf.SMA(5), _Lag(1), _EagerDouble(), sf.SMA(10), _Lag(2))
     fused = pipe.compute(frame)
 
     cur = frame
@@ -70,7 +70,12 @@ def test_pipe_fused_output_matches_sequential_eager():
 
 def test_with_forecasts_aligned_fast_path_matches_join():
     ds = _ds()
-    pred = ds.frame.select(["pair", "ts"]).with_row_index("_i").with_columns((pl.col("_i") / 1000).alias("p_rise")).drop("_i")
+    pred = (
+        ds.frame.select(["pair", "ts"])
+        .with_row_index("_i")
+        .with_columns((pl.col("_i") / 1000).alias("p_rise"))
+        .drop("_i")
+    )
     fast = ds.with_forecasts(pred)
     joined = ds.frame.join(pred, on=["pair", "ts"], how="left")
     assert fast.frame.equals(joined)

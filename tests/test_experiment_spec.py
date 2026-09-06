@@ -30,7 +30,6 @@ model:
   features:
     - {transform: sma, params: {length: 10}}
     - {transform: sma, params: {length: 50}}
-  encode: null
   backend_params: {seed: 0, deterministic: true, num_threads: 1, verbosity: -1}
 scheme:
   walk_forward: {train: 90d, step: 30d}

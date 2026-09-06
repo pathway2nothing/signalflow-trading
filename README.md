@@ -57,8 +57,9 @@ import signalflow as sf
 ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 
 model = sf.ForecastModel(target=sf.FixedHorizon(bars=12),
-                         features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20), sf.SMA(50)))
-model.fit(ds)                                          # train tier-1 forecaster
+                         features=sf.FeaturePipeline(sf.SMA(10), sf.SMA(20), sf.SMA(50),
+                                                     sf.WoE(), sf.IVSelector()))
+model.fit(ds)                                          # train tier-1 forecaster (encoders fit in-fold)
 
 flow = sf.Flow(name="sma_rise",
                forecasts={"rise": model},
@@ -96,9 +97,11 @@ sf version
 
 ## Three invariants worth knowing
 
-**WoE/IV encoding is the default.** Features flow through Weight-of-Evidence
-encoding against the target, and `IVSelector` keeps only columns whose Information
-Value clears a threshold. Encoding is monotone, leak-aware, and fit out-of-fold.
+**Encoders are pipeline steps, fitted in-fold.** `FeaturePipeline(SMA(10), WoE(),
+IVSelector())` declares the whole chain: the stateless prefix is computed once, the
+stateful tail (`Scaler`, Weight-of-Evidence `WoE`, `IVSelector`) is refitted on the
+training rows of every walk-forward fold, so a target encoder never sees its own
+test rows. Without a stateful step the model trains on the raw features.
 
 **A Flow is inference-only.** Every forecast slot (and the optional validator
 slot) must hold a *trained* model. Constructing a `Flow` around an unfitted model

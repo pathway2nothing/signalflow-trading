@@ -32,6 +32,8 @@ class FlashMoveLabeler(Labeler):
     or a duration string resolved against the dataset interval.
     """
 
+    horizon_field: ClassVar[str | None] = "flash_horizon"
+
     signal_category: SignalCategory = SignalCategory.ANOMALY
 
     soft_classes: ClassVar[tuple[str, ...]] = ("flash_dn", "normal", "flash_up")

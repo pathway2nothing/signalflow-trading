@@ -21,7 +21,10 @@ def _messages(lines, level=None):
 
 def test_fit_and_backtest_report_each_step(lines):
     ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-15", interval="1h")
-    model = sf.ForecastModel(target=sf.FixedHorizon(bars=12), features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20)))
+    model = sf.ForecastModel(
+        target=sf.FixedHorizon(bars=12),
+        features=sf.FeaturePipeline(sf.SMA(10), sf.SMA(20), sf.WoE(), sf.IVSelector()),
+    )
     model.fit(ds)
     flow = sf.Flow(
         name="log_probe",
@@ -34,8 +37,8 @@ def test_fit_and_backtest_report_each_step(lines):
     debug = "\n".join(_messages(lines, "DEBUG"))
     for needle in (
         "Dataset.from_source: source=synthetic",
-        "FeaturePipe: fused 2 features",
-        "FeaturePipe.compute: 2 transforms",
+        "FeaturePipeline: fused 2 features",
+        "FeaturePipeline.compute: 2 transforms",
         "ForecastModel.fit(p_rise): backend=lightgbm",
         "ForecastModel.fit: features",
         "ForecastModel.fit: sampler",
@@ -74,9 +77,8 @@ def test_simulate_logs_progress_not_per_bar_detail(lines):
 
 
 def test_step_reports_failure_and_reraises(lines):
-    with pytest.raises(ValueError, match="boom"):
-        with step("probe", k=1):
-            raise ValueError("boom")
+    with pytest.raises(ValueError, match="boom"), step("probe", k=1):
+        raise ValueError("boom")
     assert any(m.startswith("probe: failed after") and "ValueError: boom" in m for m in _messages(lines, "DEBUG"))
 
     with step("probe", k=1) as log:

@@ -28,7 +28,9 @@ model:
   features:
     - {transform: sma, params: {length: 10}}
     - {transform: sma, params: {length: 50}}
-  encode: default        # `default` = WoE + IVSelector; `null` = raw features
+    - {transform: woe}            # stateful steps are refitted inside every fold
+    - {transform: iv_selector, params: {min_iv: 0.1}}
+  cv: {scheme: rolling, step: 7d, window: 365d}   # or {scheme: kfold, n: 5}
 scheme:
   walk_forward: {train: 90d, step: 30d}   # or `fit: {}` for a single fit
 metrics: [auc, brier]
@@ -47,9 +49,11 @@ Semantics:
 
 - `seed` seeds `random`/`numpy` via `seed_everything`.
 - `data` is forwarded to `sf.data(**data)` (so `cache_dir` caches fetched bars).
+- `model.cv` selects the walk-forward scheme of `ForecastModel.fit` (`rolling` with
+  `step`/`window`, or `kfold` with `n`); omitted means `Rolling("7d", "365d")`.
 - `model.target` is built from the TARGET registry; `model.features` are built from
-  the TRANSFORM registry into a `FeaturePipe`; `encode: default` uses WoE + IVSelector,
-  `null` uses raw features.
+  the TRANSFORM registry into a `FeaturePipeline`; encoders (`woe`, `iv_selector`,
+  `scaler`) are ordinary steps of that list and are refitted inside every fold.
 - `scheme.walk_forward` runs `sf.walk_forward` and evaluates each of `metrics` per
   fold; `scheme: {fit: {}}` fits once and reports `classification_scorecard`.
 - `backtest` (optional) fits the template on the full span, assembles a `Flow`, and

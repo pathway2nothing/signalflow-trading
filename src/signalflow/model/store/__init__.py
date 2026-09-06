@@ -4,7 +4,7 @@
 from signalflow.errors import ArtifactError
 from signalflow.model.store.uri import resolve_uri
 
-__all__ = ["save_model", "load_model", "resolve_uri"]
+__all__ = ["load_model", "resolve_uri", "save_model"]
 
 
 def _backend(scheme: str):
@@ -29,7 +29,9 @@ def save_model(model, uri: str) -> str:
     return _backend(scheme).save(model, location)
 
 
-def load_model(uri: str):
-    """Load a ForecastModel from ``uri``."""
+def load_model(uri: str, trust_remote: bool = False):
+    """Load a ForecastModel from ``uri``; ``hf://`` artifacts need ``trust_remote=True`` (remote code)."""
     scheme, location = resolve_uri(uri)
+    if scheme == "hf":
+        return _backend(scheme).load(location, trust_remote=trust_remote)
     return _backend(scheme).load(location)

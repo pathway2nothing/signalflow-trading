@@ -9,7 +9,8 @@ from dataclasses import dataclass
 import polars as pl
 from loguru import logger
 
-from signalflow.data.source.base import Source, interval_seconds, parse_time, validate_frame
+from signalflow._time import interval_seconds, to_epoch
+from signalflow.data.source.base import Source, validate_frame
 from signalflow.decorators import source
 
 _BASE = "https://api.binance.com/api/v3/klines"
@@ -34,8 +35,8 @@ class BinanceSource(Source):
         interval: str = "1h",
     ) -> pl.DataFrame:
         interval_seconds(interval)  # fail fast on an unsupported interval
-        start_ms = parse_time(start) * 1000
-        end_ms = (parse_time(end) * 1000) if end else int(time.time() * 1000)
+        start_ms = to_epoch(start) * 1000
+        end_ms = (to_epoch(end) * 1000) if end else int(time.time() * 1000)
         frames = [self._fetch_pair(p, start_ms, end_ms, interval) for p in pairs]
         return validate_frame(pl.concat([f for f in frames if f.height > 0]))
 
@@ -53,7 +54,9 @@ class BinanceSource(Source):
                 break
             for k in batch:
                 rows.append((k[0], float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])))
-            logger.debug(f"binance: {pair} {interval}: request {n_req}/~{expected}, +{len(batch)} bars ({len(rows)} total)")
+            logger.debug(
+                f"binance: {pair} {interval}: request {n_req}/~{expected}, +{len(batch)} bars ({len(rows)} total)"
+            )
             last_open = batch[-1][0]
             cursor = last_open + step
             if len(batch) < _LIMIT:

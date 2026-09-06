@@ -17,6 +17,7 @@ import numpy as np
 import polars as pl
 
 from signalflow.enums import SignalCategory
+from signalflow.target._numba import njit, prange
 from signalflow.target._soft_helpers import percentile_tercile_soft
 from signalflow.target.base import register_target
 from signalflow.target.labeler import Labeler
@@ -26,8 +27,6 @@ _MODE_TO_CLASSES: dict[str, tuple[str, str, str]] = {
     "runup": ("ru_mild", "ru_normal", "ru_strong"),
     "calmar": ("calmar_low", "calmar_mid", "calmar_high"),
 }
-
-from signalflow.target._numba import njit, prange
 
 
 @njit(parallel=True, cache=True)

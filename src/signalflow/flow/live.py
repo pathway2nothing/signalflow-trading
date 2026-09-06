@@ -9,32 +9,26 @@ engine) is identical to the backtest.
 import json
 import os
 import time
+from collections import deque
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import polars as pl
 from loguru import logger
 
+from signalflow._time import INTERVAL_SECONDS, interval_seconds
 from signalflow.data.dataset import Bar, Dataset
-from signalflow.data.source.base import INTERVAL_SECONDS, interval_seconds
 from signalflow.engine.clock import Clock
 from signalflow.engine.engine import Engine
-from signalflow.engine.types import Fill, OrderEvent, Position
+from signalflow.engine.types import Fill, OrderEvent, Position, client_order_id
 from signalflow.enums import RunMode, Side
-from signalflow.flow.loop import _EMPTY_SIGNALS_SCHEMA, _orders, enriched_signals
+from signalflow.flow.loop import EMPTY_SIGNALS_SCHEMA, enriched_signals, orders_from_intents
 from signalflow.strategy.observation import Observation
 
 
-def _order_id(broker, order) -> str:
-    """Client-order id for an order: the broker's own recipe for a Binance venue, else the sim recipe."""
-    from signalflow.engine.broker import BinanceBroker, sim_client_order_id
-
-    return broker.client_order_id(order) if isinstance(broker, BinanceBroker) else sim_client_order_id(order)
-
-
-def _order_status(order, fills) -> str:
+def _order_status(order: Any, fills: Any) -> str:
     """Fill status of ``order`` given this bar's fills (filled/partial/skipped)."""
     for f in fills:
         if f.pair == order.pair and f.side == order.side:
@@ -45,7 +39,7 @@ def _order_status(order, fills) -> str:
     return "skipped"
 
 
-def _reconcile_on_resume(engine, broker) -> None:
+def _reconcile_on_resume(engine: Any, broker: Any) -> None:
     """Query the venue for any 'placed' order lacking a 'result' and apply the missing fill."""
     resolved = {e.client_order_id for e in engine.order_log if e.kind == "result"}
     dangling = [e for e in engine.order_log if e.kind == "placed" and e.client_order_id not in resolved]
@@ -68,6 +62,27 @@ def _reconcile_on_resume(engine, broker) -> None:
 
 _PROGRESS_EVERY = 500
 """Live/simulate loops log a DEBUG progress line every this many bars (and on every fill)."""
+
+
+class _History:
+    """The trailing ``window`` bars as one frame: appends add a chunk, trims are zero-copy slices."""
+
+    def __init__(self, window: int) -> None:
+        self.window = max(int(window), 1)
+        self.frame: pl.DataFrame | None = None
+        self._lengths: deque[int] = deque()
+
+    def push(self, frame: pl.DataFrame) -> None:
+        self.frame = frame if self.frame is None else pl.concat([self.frame, frame], rechunk=False)
+        self._lengths.append(frame.height)
+        while len(self._lengths) > self.window:
+            self.frame = self.frame.slice(self._lengths.popleft())
+        if self.frame.n_chunks() > 2 * self.window + 8:
+            self.frame = self.frame.rechunk()
+
+    @property
+    def bars(self) -> int:
+        return len(self._lengths)
 
 
 def _closed_only(frame: pl.DataFrame, step_s: int, now_s: float) -> pl.DataFrame:
@@ -107,7 +122,7 @@ class ReplayFeed(LiveFeed):
     def __post_init__(self) -> None:
         self.quote = self.data.quote
 
-    def _cutoff(self):
+    def _cutoff(self) -> Any:
         if self.warmup_bars <= 0:
             return None
         ts = self.data.frame.get_column("ts").unique().sort()
@@ -135,7 +150,7 @@ class PollingFeed(LiveFeed):
     yields the still-forming current candle.
     """
 
-    source: object
+    source: Any
     pairs: list[str]
     interval: str = "1m"
     quote: str = "USDT"
@@ -143,15 +158,34 @@ class PollingFeed(LiveFeed):
     max_bars: "int | None" = None
     lag_seconds: float = 3.0
     backfill_bars: int = 5000
+    fetch_retries: int = 5
+    retry_backoff_s: float = 2.0
     clock: Clock = field(default_factory=lambda: Clock(RunMode.LIVE))
+    errors: int = field(default=0, init=False)
+    """Polls that failed even after ``fetch_retries`` (the bar was skipped, the loop went on)."""
 
     def __post_init__(self) -> None:
-        self._last_ts = None
+        self._last_ts: Any = None
+
+    def _fetch_with_retry(self, start: int) -> pl.DataFrame:
+        """Fetch closed bars, retrying transient source errors with linear backoff; empty frame after giving up."""
+        last: Exception | None = None
+        for attempt in range(1, self.fetch_retries + 1):
+            try:
+                frame: pl.DataFrame = self.source.fetch(self.pairs, start=start, interval=self.interval)
+                return frame
+            except Exception as exc:
+                last = exc
+                logger.warning(f"PollingFeed: fetch failed (attempt {attempt}/{self.fetch_retries}): {exc}")
+                self.clock.sleep(self.retry_backoff_s * attempt)
+        self.errors += 1
+        logger.error(f"PollingFeed: giving up on this poll after {self.fetch_retries} attempts: {last}")
+        return pl.DataFrame(schema={"pair": pl.Utf8, "ts": pl.Datetime("ms")})
 
     def warmup(self) -> Dataset:
         step = interval_seconds(self.interval)
         now = float(self.clock.now() or self.clock.wall())
-        start = int(now) - (self.warmup_bars + 1) * step
+        start = int(now) - (int(self.warmup_bars or 0) + 1) * step
         frame = _closed_only(self.source.fetch(self.pairs, start=start, interval=self.interval), step, now)
         ds = Dataset(frame=frame, quote=self.quote)
         if frame.height:
@@ -171,7 +205,7 @@ class PollingFeed(LiveFeed):
                 )
             else:
                 start = int(now - 2 * step)
-            fresh = _closed_only(self.source.fetch(self.pairs, start=start, interval=self.interval), step, now)
+            fresh = _closed_only(self._fetch_with_retry(start), step, now)
             new_bars = [
                 b
                 for b in Dataset(frame=fresh, quote=self.quote).iter_bars()
@@ -187,14 +221,14 @@ class PollingFeed(LiveFeed):
                     break
 
 
-def _iso(ts) -> "str | None":
+def _iso(ts: Any) -> "str | None":
     """Serialize a timestamp to ISO text, tolerating already-string values."""
     if ts is None:
         return None
     return ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
 
 
-def _parse_ts(value):
+def _parse_ts(value: Any) -> Any:
     """Parse an ISO timestamp back to a datetime, leaving non-ISO values unchanged."""
     if value is None:
         return None
@@ -206,8 +240,39 @@ def _parse_ts(value):
         return value
 
 
+def _journal_path(path: str) -> str:
+    root, _ext = os.path.splitext(path)
+    return f"{root}.fills.jsonl"
+
+
+def append_fills_journal(path: str, fills: list) -> None:
+    """Append every fill as one JSON line next to the state file (an audit trail that never rewrites)."""
+    if not fills:
+        return
+    with open(_journal_path(path), "a", encoding="utf-8") as fh:
+        for f in fills:
+            fh.write(
+                json.dumps(
+                    {
+                        "pair": f.pair,
+                        "ts": _iso(f.ts),
+                        "side": f.side.value,
+                        "qty": f.qty,
+                        "price": f.price,
+                        "fee": f.fee,
+                        "fee_asset": f.fee_asset,
+                    }
+                )
+                + "\n"
+            )
+
+
 def save_state(engine: Engine, path: str, peak: "float | None" = None) -> None:
-    """Persist balances/positions/marks, the fill log, and the drawdown peak so a restart resumes."""
+    """Persist balances/positions/marks, the fill log, and the drawdown peak so a restart resumes.
+
+    The file is written to a temporary sibling and atomically moved into place,
+    so a crash mid-write never leaves a truncated book behind.
+    """
     state = {
         "balances": engine.balances,
         "positions": {
@@ -241,8 +306,10 @@ def save_state(engine: Engine, path: str, peak: "float | None" = None) -> None:
             for e in engine.order_log
         ],
     }
-    with open(path, "w") as fh:
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(state, fh)
+    os.replace(tmp, path)
 
 
 def load_state(engine: Engine, path: str) -> "dict | None":
@@ -281,45 +348,47 @@ def load_state(engine: Engine, path: str) -> "dict | None":
         )
         for e in state.get("order_log", [])
     ]
-    return state
+    return dict(state)
 
 
-def _close_epoch(bar_ts, step_s: int) -> float:
+def _close_epoch(bar_ts: Any, step_s: int) -> float:
     """Wall-clock epoch (UTC) at which ``bar_ts``'s candle closed."""
-    return bar_ts.replace(tzinfo=UTC).timestamp() + step_s
+    return float(bar_ts.replace(tzinfo=UTC).timestamp() + step_s)
 
 
-def resolve_warmup_bars(flow, feed: LiveFeed) -> int:
+def resolve_warmup_bars(flow: Any, feed: LiveFeed) -> int:
     """Fill a feed's unset (``None``) warmup coverage from the flow's requirement.
 
     Returns the flow's required warmup so callers can log and bound-check it.
     """
-    required = flow.required_warmup
+    required = int(flow.required_warmup)
     if getattr(feed, "warmup_bars", 0) is None:
-        feed.warmup_bars = required
+        setattr(feed, "warmup_bars", required)  # noqa: B010 - protocol has no such attribute
     return required
 
 
 def run_live_loop(
-    flow,
+    flow: Any,
     feed: LiveFeed,
-    capital,
-    broker,
+    capital: Any,
+    broker: Any,
     target: "str | None" = None,
     maxlen: int = 5000,
     max_bars: "int | None" = None,
     mandate: "dict | None" = None,
     state_path: "str | None" = None,
-    on_bar=None,
+    on_bar: Any = None,
     max_latency_s: float = 10.0,
     armed: bool = False,
     compute_window: "int | None" = None,
-):
+    late_bar_policy: str = "warn",
+) -> Any:
     """Drive a Flow over a live (or replayed) feed.
 
     Warmup history fills the buffer without trading; decisions begin on the first
     streamed bar. Per live bar, decision latency (execution wall-clock minus the
-    bar's close time) is measured and a breach of ``max_latency_s`` is logged.
+    bar's close time) is measured; a breach of ``max_latency_s`` is logged, or with
+    ``late_bar_policy="skip"`` the bar is not traded at all (counted in ``Run.meta``).
     Runs are not promotable. Per-bar signals are recomputed over the trailing
     ``required_warmup + 1`` bars (``compute_window`` overrides); a transform that
     under-declares its ``warmup`` will surface as ``simulate != backtest``.
@@ -359,46 +428,71 @@ def run_live_loop(
             if armed and isinstance(broker, ExchangeBroker) and hasattr(broker, "query_order"):
                 _reconcile_on_resume(engine, broker)
 
-    buf: list = []
+    history = _History(window)
     t_run = time.perf_counter()
     for wbar in feed.warmup().iter_bars():
-        buf.append(wbar.frame)
+        history.push(wbar.frame)
     step_s = INTERVAL_SECONDS.get(getattr(feed, "interval", None) or "")
     mode = "simulate" if isinstance(feed, ReplayFeed) else "live"
     logger.debug(
-        f"Flow.{mode}({flow.name!r}): warmup bars={len(buf)} window={window} maxlen={maxlen} "
+        f"Flow.{mode}({flow.name!r}): warmup bars={history.bars} window={window} maxlen={maxlen} "
         f"capital={capital} armed={armed} broker={type(broker).__name__}"
     )
 
+    if late_bar_policy not in ("warn", "skip"):
+        raise ValueError(f"late_bar_policy must be 'warn' or 'skip', got {late_bar_policy!r}")
+    fill_mode = getattr(broker, "fill", "close")
+    is_replay = isinstance(feed, ReplayFeed)
+    pending: list = []
     eq_ts, eq_val = [], []
     started = False
-    n_fills = n_signals = 0
+    n_fills = n_signals = n_skipped = 0
     for n, bar in enumerate(feed.stream()):
-        buf.append(bar.frame)
-        if len(buf) > maxlen:
-            buf = buf[-maxlen:]
-        tail = buf[-window:] if len(buf) > window else buf
-        hist = Dataset(frame=pl.concat(tail), quote=feed.quote)
-        signals = enriched_signals(flow, hist, log=False)
-        sig_frame = (
-            signals.filter(pl.col("ts") == bar.ts) if signals.height else pl.DataFrame(schema=_EMPTY_SIGNALS_SCHEMA)
-        )
+        history.push(bar.frame)
+        if pending:
+            fills = broker.execute(pending, bar, at="open")
+            for o in pending:
+                engine.record_order(
+                    OrderEvent(client_order_id(o), o.pair, o.side, o.qty, bar.ts, "result", _order_status(o, fills))
+                )
+            pending = []
+            engine.apply(fills)
+            n_fills += len(fills)
+            if state_path:
+                append_fills_journal(state_path, fills)
+        latency = (time.time() - _close_epoch(bar.ts, step_s)) if (step_s and not is_replay) else None
         snap = engine.snapshot(bar.ts, bar.prices)
         if not started:
             eq_ts.append(bar.ts)
             eq_val.append(snap.equity)
             started = True
         peak = max(peak, snap.equity)
+        if latency is not None and latency > max_latency_s and late_bar_policy == "skip":
+            n_skipped += 1
+            logger.warning(f"live: bar {bar.ts} arrived {latency:.1f}s after its close (> {max_latency_s}s); skipped")
+            eq_ts.append(bar.ts)
+            eq_val.append(engine.equity(bar.prices))
+            continue
+        assert history.frame is not None
+        hist = Dataset(frame=history.frame, quote=feed.quote)
+        signals = enriched_signals(flow, hist, log=False)
+        sig_frame = (
+            signals.filter(pl.col("ts") == bar.ts) if signals.height else pl.DataFrame(schema=EMPTY_SIGNALS_SCHEMA)
+        )
         obs = Observation(bar.ts, sig_frame, snap, mandate or {})
         intents = flow.risk.clip(flow.strategy.decide(obs), snap, peak, raise_on_trip=armed)
-        orders = _orders(intents, bar.prices, bar.ts)
+        orders = orders_from_intents(intents, bar.prices, bar.ts)
         for o in orders:
-            engine.record_order(OrderEvent(_order_id(broker, o), o.pair, o.side, o.qty, bar.ts, "placed"))
-        fills = broker.execute(orders, bar)
-        for o in orders:
-            engine.record_order(
-                OrderEvent(_order_id(broker, o), o.pair, o.side, o.qty, bar.ts, "result", _order_status(o, fills))
-            )
+            engine.record_order(OrderEvent(client_order_id(o), o.pair, o.side, o.qty, bar.ts, "placed"))
+        if fill_mode == "next_open":
+            pending = orders
+            fills = []
+        else:
+            fills = broker.execute(orders, bar)
+            for o in orders:
+                engine.record_order(
+                    OrderEvent(client_order_id(o), o.pair, o.side, o.qty, bar.ts, "result", _order_status(o, fills))
+                )
         engine.apply(fills)
         n_fills += len(fills)
         n_signals += sig_frame.height
@@ -409,20 +503,26 @@ def run_live_loop(
                 f"Flow.{mode}: bar {n + 1} ts={bar.ts} signals={sig_frame.height} orders={len(orders)} "
                 f"fills={len(fills)} equity={eq_val[-1]:,.2f}"
             )
-
-        latency = (time.time() - _close_epoch(bar.ts, step_s)) if step_s else None
         if fills and latency is not None and latency > max_latency_s:
             logger.warning(f"live: order latency {latency:.1f}s exceeds {max_latency_s}s budget at close {bar.ts}")
-
         if state_path:
-            save_state(engine, state_path, peak=peak)
+            append_fills_journal(state_path, fills)
+            if fills or orders or (n + 1) % _PROGRESS_EVERY == 0:
+                save_state(engine, state_path, peak=peak)
         if on_bar is not None:
             on_bar(engine, bar, fills, latency)
         if max_bars is not None and n + 1 >= max_bars:
             break
+    if state_path:
+        save_state(engine, state_path, peak=peak)
 
     curve = pl.DataFrame({"ts": eq_ts, "equity": eq_val})
-    run = Run(flow.name, RunMode.LIVE.value, curve, engine.event_log, target, promotable=False)
+    meta = {
+        "skipped_bars": n_skipped,
+        "feed_errors": int(getattr(feed, "errors", 0) or 0),
+        "strategy_fallbacks": int(getattr(flow.strategy, "fallbacks", 0) or 0),
+    }
+    run = Run(flow.name, RunMode.LIVE.value, curve, engine.event_log, target, promotable=False, meta=meta)
     logger.info(
         f"Flow.{mode}({flow.name!r}): bars={len(eq_val) - 1 if eq_val else 0:,} signals={n_signals:,} "
         f"fills={n_fills:,} equity {run.initial_equity:,.2f} -> {run.final_equity:,.2f} ({run.total_return:+.2%}) "

@@ -38,7 +38,7 @@ class _PartialNanFeature(sf.Feature):
 
 
 def test_untrained_guard(ds):
-    m = sf.ForecastModel(target=sf.FixedHorizon(12), features=sf.FeaturePipe(sf.SMA(20)))
+    m = sf.ForecastModel(target=sf.FixedHorizon(12), features=sf.FeaturePipeline(sf.SMA(20)))
     with pytest.raises(sf.UntrainedModelError):
         m.predict(ds)
 
@@ -65,19 +65,18 @@ def test_predict_oos_strict_raises_on_gap(ds, fitted_forecast):
 
 def test_fingerprint_present(fitted_forecast):
     fp = fitted_forecast.fingerprint
-    assert fp["cv"]["scheme"] == "rolling"
+    assert fp["cv"]["scheme"] in ("rolling", "kfold") and "n_folds_effective" in fp["cv"]
     assert "model_code" in fp and fp["id"].startswith("sha256:")
 
 
-def test_default_encode_is_woe(ds):
-    m = sf.ForecastModel(target=sf.FixedHorizon(12), features=sf.FeaturePipe(sf.SMA(20)))
-    assert isinstance(m.encode, sf.WoE)
-    assert isinstance(m.select, sf.IVSelector)
-
-
-def test_encode_opt_out():
-    m = sf.ForecastModel(target=sf.FixedHorizon(12), features=sf.FeaturePipe(sf.SMA(20)), encode=None)
-    assert m.encode is None
+def test_pipeline_tail_is_the_model_encoder():
+    raw = sf.ForecastModel(target=sf.FixedHorizon(12), features=sf.FeaturePipeline(sf.SMA(20)))
+    assert raw.tail is None and raw.prefix.outputs == ["sma_20"]
+    encoded = sf.ForecastModel(
+        target=sf.FixedHorizon(12), features=sf.FeaturePipeline(sf.SMA(20), sf.WoE(), sf.IVSelector())
+    )
+    assert [t.name for t in encoded.tail.transforms] == ["woe", "iv_selector"]
+    assert encoded.prefix.outputs == ["sma_20"]
 
 
 def test_operating_point_returns_quantile(ds, fitted_forecast):
@@ -121,30 +120,28 @@ def test_make_folds_clamps_to_available_timestamps():
 
 def test_fingerprint_records_effective_folds():
     m = sf.ForecastModel(
-        target=sf.FixedHorizon(12), features=sf.FeaturePipe(sf.SMA(20)), encode=None, select=None, n_folds=5
+        target=sf.FixedHorizon(12), features=sf.FeaturePipeline(sf.SMA(20)), cv=sf.KFold(5)
     ).fit(sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h"))
     cv = m.fingerprint["cv"]
-    assert cv["n_folds"] == 5
+    assert cv["scheme"] == "kfold" and cv["n"] == 5
     assert cv["n_folds_effective"] == 4
 
 
 def test_all_nan_feature_raises(ds):
     m = sf.ForecastModel(
-        target=sf.FixedHorizon(12), features=sf.FeaturePipe(_AllNanFeature()), encode=None, select=None
+        target=sf.FixedHorizon(12), features=sf.FeaturePipeline(_AllNanFeature())
     )
-    with pytest.raises(sf.PipeError):
+    with pytest.raises(sf.PipelineError):
         m.fit(ds)
 
 
 def test_partial_nan_rows_are_dropped(ds):
     clean = sf.ForecastModel(
-        target=sf.FixedHorizon(12), features=sf.FeaturePipe(sf.SMA(20)), encode=None, select=None
+        target=sf.FixedHorizon(12), features=sf.FeaturePipeline(sf.SMA(20))
     ).fit(ds)
     dirty = sf.ForecastModel(
         target=sf.FixedHorizon(12),
-        features=sf.FeaturePipe(sf.SMA(20), _PartialNanFeature()),
-        encode=None,
-        select=None,
+        features=sf.FeaturePipeline(sf.SMA(20), _PartialNanFeature()),
     ).fit(ds)
     assert dirty.oos_.height > 0
     assert dirty.oos_.height < clean.oos_.height
@@ -154,13 +151,13 @@ def test_model_embargo_uses_resolved_horizon():
     small = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-01", interval="1h")
     str_model = sf.ForecastModel(
         target=sf.FixedHorizon(bars="1d"),
-        features=sf.FeaturePipe(sf.SMA(5)),
-        encode=None,
-        select=None,
+        features=sf.FeaturePipeline(sf.SMA(5)),
         min_train_rows=20,
     ).fit(small)
     int_model = sf.ForecastModel(
-        target=sf.FixedHorizon(bars=24), features=sf.FeaturePipe(sf.SMA(5)), encode=None, select=None, min_train_rows=20
+        target=sf.FixedHorizon(bars=24),
+        features=sf.FeaturePipeline(sf.SMA(5)),
+        min_train_rows=20,
     ).fit(small)
     assert str_model.fingerprint["cv"]["embargo"] == 24
     assert int_model.fingerprint["cv"]["embargo"] == 24

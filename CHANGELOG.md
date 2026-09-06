@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (breaking - the API is pre-1.0, no compatibility aliases are kept)
+
+- `FeaturePipe` is now `FeaturePipeline` (`signalflow.transform.pipeline`); the
+  registry name is `feature_pipeline` and the config role is `pipeline`. The
+  constructor also accepts one list of transforms. `build_pipe()` became the
+  classmethod `FeaturePipeline.from_names(...)`; `PipeError` is `PipelineError`.
+  Saved `flow.yaml` files written with the old names must be regenerated.
+- The deprecated source name `memory` / `MemorySource` and the registry's
+  deprecated-name resolution were removed; use `synthetic` / `SyntheticSource`.
+- One `Fold` dataclass (`signalflow.model.oos.Fold`, fields `train_start`,
+  `train_end`, `test_start`, `test_end`, plus `model`/`oos` from `walk_forward`)
+  replaces `WalkForwardFold` and the old `*_ts` field names.
+- `signalflow._time` is the single home of `parse_duration`, `advance`/`retreat`
+  (calendar months), `parse_datetime`/`to_epoch` (always UTC), `INTERVAL_SECONDS`
+  and `bar_seconds`; the duplicate parsers in sources, the model and targets
+  are gone. Epoch conversion of ISO dates is now explicitly UTC.
+- `flow.loop` exports `EMPTY_SIGNALS_SCHEMA` and `orders_from_intents` (no
+  underscore variants); `MIN_OOS_COVERAGE` lives only in `flow.bundle`;
+  `client_order_id(order)` in `engine.types` replaces `sim_client_order_id` and
+  `BinanceBroker.client_order_id`.
+- `ForecastModel.predict` returns null wherever a raw feature input is null/NaN
+  (the warmup window or an undefined value): training never sees such rows, so
+  scoring them was an extrapolation from the encoder's missing bin. Detectors
+  therefore no longer fire inside the warmup, and `flow.simulate()` with the
+  default warmup now equals `flow.backtest()` for model flows too.
+
+- The walk-forward scheme is a model parameter: `ForecastModel(cv=sf.Rolling(step,
+  window))` (default `Rolling("7d", "365d")`) or `cv=sf.KFold(n)`; `n_folds` and
+  the `WoE.refit`/`WoE.window` fields are gone. `WoE` is a pure encoding recipe
+  refitted inside every fold. `experiment.yaml` takes `model.cv`. The old default
+  (a daily refit) is `cv=sf.Rolling(step="1d", window="365d")`.
+
+- Encoders are pipeline steps: `FeaturePipeline(SMA(10), WoE(), IVSelector())`.
+  `ForecastModel` splits the pipeline at the first `requires_fit` transform, computes
+  the stateless prefix once and refits a clone of the stateful tail inside every fold
+  (`ForecastModel.tail_` holds the production tail). The `encode`/`select` fields are
+  gone; a pipeline without a stateful step trains on raw features (logged at INFO).
+  `WoE(replace=True)` drops the columns it encodes; `IVSelector` is a `narrows`
+  transform (its outputs are the kept subset) and keeps every candidate, with a
+  warning, when none clears `min_iv`. New `Scaler` (standard/robust, fit on train).
+  `Transform` gained `clone()`, `is_fitted`, `removes` and `narrows`;
+  `FeaturePipeline` gained `split()`. `experiment.yaml` rejects `model.encode`;
+  list the encoder steps under `model.features`. `signature.json` now records
+  `raw_columns` and `model_columns` instead of `encode`/`select_keep`.
+
+- `Dataset.iter_bars` sorts once and yields zero-copy slices at precomputed offsets
+  instead of iterating a `group_by`; `Bar` carries `high`/`low` maps next to `prices`
+  so limit fills need no per-bar filter. The live/simulate loop keeps its trailing
+  window as one frame with chunk appends and slice trims instead of re-concatenating
+  the buffer every bar. Fills and equity are unchanged; the 357k-bar backtest that
+  took 223 s runs in seconds (`SF_BENCH=1 pytest tests/test_bench.py`).
+
+- `SimBroker(fill="next_open", filters={pair: {stepSize, tickSize, minQty,
+  minNotional}})`: orders can execute at the next bar's open (what a loop deciding
+  on a closed candle really gets) and are quantized with the same arithmetic as the
+  venue (`engine.quantize`), so paper and armed runs size orders identically.
+  `Bar` carries an `open` map. Default fills stay at the decision bar's close.
+- Live loop: the state file is written atomically (temp file + rename) and only
+  when the book changed; every fill is appended to `<state>.fills.jsonl`;
+  `PollingFeed` retries transient source errors with backoff and counts the polls it
+  had to skip; `late_bar_policy="skip"` refuses to trade a bar that arrived after
+  `max_latency_s`; `Run.meta` reports skipped bars, feed errors and strategy fallbacks.
+- `LLMStrategy` logs a WARNING and counts every fallback (`fallbacks`); with
+  `fallback=None` a failed decision raises `KillSwitchTripped` instead of silently
+  trading rules; the decision cache is bounded (`cache_size`). The client logs its
+  own failures instead of swallowing them.
+- `BinanceBroker`: `api_key`/`api_secret` are hidden from `repr`; every retried send
+  is re-signed with a fresh `timestamp`; after a failed send the venue is queried by
+  client-order id before the order is treated as unfilled.
+- `Risk.clip` returns clipped copies instead of mutating the strategy's intents.
+
+- `Labeler.horizon_field` names the forward look-ahead field explicitly (an int,
+  a duration string, or a tuple of horizons); the attribute-name heuristic that
+  could silently yield a one-bar embargo is gone, and a misdeclared field raises.
+- `Run.promotable` defaults to `False` and a run is promotable only when it was
+  scored with `oos=True` (and, for model flows, with enough OOS coverage) - a
+  rule-only flow is in-sample too.
+- Model artifacts carry `env.json` (python, signalflow and the numeric stack);
+  loading under a different major.minor logs a warning. `hf://` artifacts unpickle
+  remote code and are refused unless `ForecastModel.load(uri, trust_remote=True)` /
+  `Flow.load(path, trust_remote=True)`.
+- The registry imports an explicit list of core modules instead of walking every
+  `signalflow.*` package, so registering plugins (`sf list`) no longer imports torch;
+  `sf info` reports why a component could not be default-constructed instead of `n/a`.
+
+### Fixed
+
+- The fold cache (`ForecastModel.fit(cache=...)`) now folds the source code of
+  every feature transform and of the target into its key, so editing a feature
+  invalidates the cached out-of-fold predictions as the docs promised.
+- `TripleBarrier` labels run through a numba kernel (python fallback when numba
+  is absent) instead of a pure-python double loop; labels are unchanged.
+
 ### Added
 
 - Step-level logging across the core: one INFO summary per `ForecastModel.fit`,

@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 
 import polars as pl
 
-from signalflow.errors import PipeError, UnfittedTransformError
+from signalflow.errors import PipelineError, UnfittedTransformError
 
 
 class Transform(ABC):
@@ -36,6 +36,8 @@ class Transform(ABC):
 
     requires_fit: bool = False
     requires_target: bool = False
+    narrows: bool = False
+    """A selector: its ``outputs`` are the subset of input columns it keeps (nothing is appended)."""
 
     @property
     def name(self) -> str:
@@ -52,7 +54,7 @@ class Transform(ABC):
         parameters can be captured for the flow.yaml round-trip.
         """
         if not dataclasses.is_dataclass(self) and type(self).__init__ is not object.__init__:
-            raise PipeError(
+            raise PipelineError(
                 f"{type(self).__qualname__} is not a dataclass; its constructor parameters "
                 f"cannot be captured for flow.yaml round-trip"
             )
@@ -78,7 +80,21 @@ class Transform(ABC):
     @property
     @abstractmethod
     def outputs(self) -> list[str]:
-        """Column names this transform appends."""
+        """Column names this transform appends (or keeps, when it ``narrows``)."""
+
+    @property
+    def removes(self) -> list[str]:
+        """Input column names this transform drops from the frame (e.g. an encoder replacing its inputs)."""
+        return []
+
+    @property
+    def is_fitted(self) -> bool:
+        """Stateless transforms are always ready; stateful ones set ``_is_fitted`` in ``fit``."""
+        return (not self.requires_fit) or bool(getattr(self, "_is_fitted", False))
+
+    def clone(self) -> "Transform":
+        """A fresh, unfitted copy built from the declarative config (no fitted state)."""
+        return type(self).from_config(self.to_config())
 
     def fit(self, df: pl.DataFrame, target: pl.Series | None = None) -> "Transform":
         """Stateful transforms override; stateless ones are a no-op."""
@@ -112,6 +128,8 @@ def ensure_sorted(df: pl.DataFrame) -> pl.DataFrame:
     while ``sort`` re-materializes the whole frame. Sources and pipes emit sorted
     frames, so the check almost always succeeds and the sort is skipped.
     """
+    if "pair" not in df.columns or "ts" not in df.columns:
+        return df  # nothing to order by (a bare feature/label frame)
     return df if is_sorted_pair_ts(df) else df.sort(["pair", "ts"])
 
 

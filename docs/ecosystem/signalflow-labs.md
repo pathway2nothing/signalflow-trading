@@ -38,7 +38,7 @@ import signalflow.labs as labs
 model = sf.ForecastModel(
     backend=labs.TorchMLPBackend(hidden_sizes=(64, 32), epochs=50),
     target=sf.FixedHorizon(bars=12),
-    features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20), sf.SMA(50)),
+    features=sf.FeaturePipeline(sf.SMA(10), sf.SMA(20), sf.SMA(50)),
 )
 model.fit(ds)
 ```

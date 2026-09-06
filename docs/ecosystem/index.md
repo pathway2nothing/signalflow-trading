@@ -18,7 +18,7 @@ component registry, data containers, and Flow patterns.
 
     ---
 
-    Core framework: `Dataset`, `Transform`/`FeaturePipe`, `ForecastModel`, `Flow`,
+    Core framework: `Dataset`, `Transform`/`FeaturePipeline`, `ForecastModel`, `Flow`,
     `Engine`, `Run`. Component registry, Polars-first processing, deploy-is-data
     YAML serialization.
 

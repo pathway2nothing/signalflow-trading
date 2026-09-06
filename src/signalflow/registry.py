@@ -4,7 +4,7 @@ Central component registry - the backbone of serialization.
 Every core class registers under a name; that name is what ``flow.yaml``
 serializes, ``sf list`` enumerates, and plugin packages inject into. Construction
 from config is ``registry.create(ComponentType.TRANSFORM, "revert_confluence",
-**params)``-shaped. Seven types instead of the old 21.
+**params)``-shaped. Eight component types (``ComponentType``).
 
 The design (lazy autodiscovery, dataclass-field schema introspection) is the
 proven one from the previous framework, trimmed to the current type set.
@@ -12,7 +12,6 @@ proven one from the previous framework, trimmed to the current type set.
 
 import dataclasses
 import importlib
-import pkgutil
 import sys
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
@@ -23,10 +22,25 @@ from loguru import logger
 from signalflow.enums import ComponentType
 from signalflow.errors import RegistryError, UnknownComponentError
 
-_DEPRECATED_NAMES: dict[tuple[ComponentType, str], str] = {
-    (ComponentType.SOURCE, "memory"): "synthetic",
-}
-"""Old registry names that still resolve (with a warning) to their current name."""
+_CORE_MODULES: tuple[str, ...] = (
+    "signalflow.data.source.synthetic",
+    "signalflow.data.source.binance",
+    "signalflow.transform.features",
+    "signalflow.transform.pipeline",
+    "signalflow.transform.encode.woe",
+    "signalflow.transform.encode.select",
+    "signalflow.transform.encode.scale",
+    "signalflow.target",
+    "signalflow.sampler",
+    "signalflow.detector",
+    "signalflow.strategy.rules",
+    "signalflow.strategy.llm",
+    "signalflow.engine.broker",
+)
+"""Core modules whose import registers components; plugins come through entry points."""
+
+_OPTIONAL_CORE_MODULES = frozenset({"signalflow.strategy.llm"})
+"""Core modules behind an optional extra (their absence is not an error)."""
 
 
 @dataclass
@@ -88,20 +102,11 @@ class Registry:
             logger.warning(f"Overriding {component_type.value}:{key} with {cls.__name__}")
         bucket[key] = ComponentInfo.from_class(cls, role=role, legacy=legacy)
 
-    @staticmethod
-    def _resolve(component_type: ComponentType, name: str) -> str:
-        key = name.lower()
-        current = _DEPRECATED_NAMES.get((component_type, key))
-        if current is None:
-            return key
-        logger.warning(f"{component_type.value}:{key!r} is a deprecated name; use {current!r}")
-        return current
-
     def get(self, component_type: ComponentType, name: str) -> type[Any]:
         """Return the registered class for ``name``; raise ``UnknownComponentError`` if absent."""
         self._discover_if_needed()
         bucket = self._items.get(component_type, {})
-        key = self._resolve(component_type, name)
+        key = name.lower()
         try:
             return bucket[key].cls
         except KeyError as e:
@@ -112,7 +117,7 @@ class Registry:
         """Return the ``ComponentInfo`` (class, role, docs) for ``name``."""
         self._discover_if_needed()
         bucket = self._items.get(component_type, {})
-        key = self._resolve(component_type, name)
+        key = name.lower()
         try:
             return bucket[key]
         except KeyError as e:
@@ -186,20 +191,19 @@ class Registry:
         self._discover_entry_points()
 
     def _discover_internal(self) -> None:
-        try:
-            import signalflow as _root
-        except ImportError:
-            return
-        pkg_path = getattr(_root, "__path__", None)
-        if pkg_path is None:
-            return
-        for _imp, modname, _is_pkg in pkgutil.walk_packages(pkg_path, prefix="signalflow."):
+        """Import the core modules that register components (an explicit list, no package walk).
+
+        Walking every ``signalflow.*`` package would also import plugin namespaces
+        (``signalflow.labs`` pulls torch); plugins register through entry points instead.
+        """
+        for modname in _CORE_MODULES:
             if modname in sys.modules:
                 continue
             try:
                 importlib.import_module(modname)
             except Exception as e:
-                logger.debug(f"autodiscover: skip {modname}: {e}")
+                level = "debug" if modname in _OPTIONAL_CORE_MODULES else "warning"
+                getattr(logger, level)(f"autodiscover: core module {modname} failed to import: {e}")
 
     def _discover_entry_points(self) -> None:
         from signalflow._version import PLUGIN_API_VERSION

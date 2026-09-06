@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 import signalflow as sf
-from signalflow.engine.types import OrderEvent
+from signalflow.engine.types import OrderEvent, client_order_id
 from signalflow.enums import Side
 from signalflow.flow.live import load_state, run_live_loop, save_state
 
@@ -67,7 +67,7 @@ def test_state_preserves_order_log(tmp_path):
 
 def _dangling_state(tmp_path):
     order = sf.Order("BTCUSDT", Side.BUY, 1.0, ts="2024-01-01T00:00:00")
-    cid = sf.BinanceBroker.client_order_id(order)
+    cid = client_order_id(order)
     eng = sf.Engine(10_000.0)
     eng.record_order(OrderEvent(cid, "BTCUSDT", Side.BUY, 1.0, "2024-01-01T00:00:00", "placed"))
     path = str(tmp_path / "book.json")

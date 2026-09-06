@@ -5,9 +5,9 @@ from signalflow.detector.classic import SmaCrossDetector
 from signalflow.detector.fusion import MarketDropDetector, RevertDetector, ThresholdDetector
 
 __all__ = [
+    "MarketDropDetector",
+    "RevertDetector",
     "SignalDetector",
     "SmaCrossDetector",
     "ThresholdDetector",
-    "RevertDetector",
-    "MarketDropDetector",
 ]

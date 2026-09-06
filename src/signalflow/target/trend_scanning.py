@@ -211,6 +211,8 @@ class TrendScanningLabeler(Labeler):
            - ``null`` otherwise
     """
 
+    horizon_field: ClassVar[str | None] = "max_lookforward"
+
     signal_category: SignalCategory = SignalCategory.TREND_MOMENTUM
 
     soft_classes: ClassVar[tuple[str, ...]] = ("fall", "neutral", "rise")

@@ -17,7 +17,7 @@ import signalflow as sf
 ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 
 model = sf.ForecastModel(target=sf.FixedHorizon(bars=12),
-                         features=sf.FeaturePipe(sf.SMA(10), sf.SMA(20), sf.SMA(50)))
+                         features=sf.FeaturePipeline(sf.SMA(10), sf.SMA(20), sf.SMA(50)))
 model.fit(ds)                                          # train tier-1 forecaster
 
 flow = sf.Flow(name="sma_rise",
@@ -31,7 +31,7 @@ print(run.scorecard())                                 # total_return, sharpe, m
 What each step does:
 
 1. `sf.data("synthetic", ...)` builds a **Dataset** - one lazy, immutable container.
-2. `sf.ForecastModel(...)` pairs a **Target** (`FixedHorizon`) with a **FeaturePipe**;
+2. `sf.ForecastModel(...)` pairs a **Target** (`FixedHorizon`) with a **FeaturePipeline**;
    `fit` trains it out-of-fold.
 3. `sf.Flow(...)` assembles the deployable stack: forecasts -> detectors -> strategy.
 4. `flow.backtest(...)` returns a **Run**; `run.scorecard()` is the standard metric dict.

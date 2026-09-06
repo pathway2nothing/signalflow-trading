@@ -7,7 +7,7 @@ import urllib.request
 from types import SimpleNamespace
 
 from signalflow.engine.broker import BinanceBroker
-from signalflow.engine.types import Order
+from signalflow.engine.types import Order, client_order_id
 from signalflow.enums import OrderType, Side
 
 _EXCHANGE_INFO = {
@@ -86,12 +86,11 @@ def test_below_min_notional_skipped(monkeypatch):
 
 
 def test_idempotent_client_order_id():
-    b = _broker()
     o1 = Order("BTCUSDT", Side.BUY, 0.117, ts="2024-01-01T00:00:00")
     o2 = Order("BTCUSDT", Side.BUY, 0.117, ts="2024-01-01T00:00:00")
-    assert b.client_order_id(o1) == b.client_order_id(o2)
-    assert b.client_order_id(o1).startswith("sf-")
-    assert len(b.client_order_id(o1)) <= 36
+    assert client_order_id(o1) == client_order_id(o2)
+    assert client_order_id(o1).startswith("sf-")
+    assert len(client_order_id(o1)) <= 36
 
 
 def test_retry_then_success(monkeypatch):

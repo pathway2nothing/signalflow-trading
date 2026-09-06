@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import polars as pl
 
+from signalflow._time import bar_seconds, parse_duration
 from signalflow.data.dataset import Dataset
 from signalflow.enums import ComponentType
 from signalflow.registry import registry
@@ -45,21 +46,13 @@ def make_target(name: str, **params: object) -> "Target":
 
 
 def _median_bar_seconds(data: Dataset) -> float:
-    """Median spacing in seconds between consecutive bars of a dataset."""
+    """Median spacing in seconds between consecutive bars of a dataset (interval fallback)."""
     frame = data.frame
-    if "ts" in frame.columns and frame.height >= 2:
-        ts = frame.get_column("ts").unique().sort()
-        if ts.len() >= 2:
-            secs = ts.diff().drop_nulls().dt.total_seconds()
-            positive = secs.filter(secs > 0)
-            if positive.len() > 0:
-                return float(positive.median())
+    seconds = bar_seconds(frame.get_column("ts")) if "ts" in frame.columns else 0.0
+    if seconds > 0:
+        return seconds
     interval = data.source_params.get("interval")
-    if interval:
-        from signalflow.model.oos import parse_duration
-
-        return parse_duration(interval).total_seconds()
-    return 0.0
+    return parse_duration(interval).total_seconds() if interval else 0.0
 
 
 def resolve_bars(value: int | str, data: Dataset) -> int:
@@ -68,8 +61,6 @@ def resolve_bars(value: int | str, data: Dataset) -> int:
         raise TypeError("horizon must be an int bar count or a duration string, not bool")
     if isinstance(value, int):
         return value
-    from signalflow.model.oos import parse_duration
-
     seconds = parse_duration(value).total_seconds()
     bar_seconds = _median_bar_seconds(data)
     if bar_seconds <= 0:

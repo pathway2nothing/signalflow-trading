@@ -13,11 +13,18 @@ from signalflow.enums import Provenance
 
 
 class Bar(NamedTuple):
-    """One timestamp's cross-section, fed to the decision loop."""
+    """One timestamp's cross-section, fed to the decision loop.
+
+    ``prices``/``high``/``low`` map pair -> close/high/low of that bar; ``frame`` is
+    the zero-copy slice of the dataset's rows at ``ts``.
+    """
 
     ts: object
     frame: pl.DataFrame
     prices: dict[str, float]
+    high: "dict[str, float] | None" = None
+    low: "dict[str, float] | None" = None
+    open: "dict[str, float] | None" = None
 
 
 @dataclass(frozen=True)
@@ -116,12 +123,40 @@ class Dataset:
         return cross_rate(base, quote, prices)
 
     def iter_bars(self, columns: list[str] | None = None) -> Iterator[Bar]:
-        """Yield one :class:`Bar` per timestamp in order (the replay backbone)."""
-        frame = self.frame if columns is None else self.frame.select(["pair", "ts", "close", *columns])
-        for ts, sub in frame.sort("ts").group_by("ts", maintain_order=True):
-            ts_val = ts[0] if isinstance(ts, tuple) else ts
-            prices = dict(zip(sub.get_column("pair"), sub.get_column("close"), strict=True))
-            yield Bar(ts=ts_val, frame=sub, prices=prices)
+        """Yield one :class:`Bar` per timestamp in order (the replay backbone).
+
+        The frame is stably sorted by ``ts`` once (pairs keep their order inside a
+        timestamp); every bar is then a zero-copy ``slice`` at a precomputed offset,
+        so the per-bar cost is independent of the dataset size.
+        """
+        frame = self.frame
+        if columns is not None:
+            keep = ["pair", "ts", "close", *[c for c in ("high", "low", "open") if c in frame.columns], *columns]
+            frame = frame.select(list(dict.fromkeys(keep)))
+        if frame.height == 0:
+            return
+        frame = frame.sort("ts", maintain_order=True)
+        groups = frame.group_by("ts", maintain_order=True).agg(pl.len().alias("n"))
+        ts_values = groups.get_column("ts").to_list()
+        lengths = groups.get_column("n").to_list()
+        pairs = frame.get_column("pair").to_list()
+        close = frame.get_column("close").to_list()
+        high = frame.get_column("high").to_list() if "high" in frame.columns else None
+        low = frame.get_column("low").to_list() if "low" in frame.columns else None
+        open_ = frame.get_column("open").to_list() if "open" in frame.columns else None
+        offset = 0
+        for ts_val, n in zip(ts_values, lengths, strict=True):
+            end = offset + n
+            keys = pairs[offset:end]
+            yield Bar(
+                ts=ts_val,
+                frame=frame.slice(offset, n),
+                prices=dict(zip(keys, close[offset:end], strict=True)),
+                high=dict(zip(keys, high[offset:end], strict=True)) if high is not None else None,
+                low=dict(zip(keys, low[offset:end], strict=True)) if low is not None else None,
+                open=dict(zip(keys, open_[offset:end], strict=True)) if open_ is not None else None,
+            )
+            offset = end
 
 
 def _same_index(frame: pl.DataFrame, cols: pl.DataFrame) -> bool:

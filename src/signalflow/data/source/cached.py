@@ -1,12 +1,13 @@
 """Disk-backed OHLCV cache that wraps any Source and fetches only missing spans."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import polars as pl
 from loguru import logger
 
-from signalflow.data.source.base import INTERVAL_SECONDS, Source, validate_frame
+from signalflow._time import INTERVAL_SECONDS, parse_datetime
+from signalflow.data.source.base import Source, validate_frame
 
 _OVERLAP = timedelta(days=1)
 
@@ -14,17 +15,6 @@ _OVERLAP = timedelta(days=1)
 def _interval_step(interval: str) -> timedelta:
     """Bar width for cache-completeness checks; zero (never complete) for an unknown interval."""
     return timedelta(seconds=INTERVAL_SECONDS.get(interval, 0))
-
-
-def _parse_dt(value: str) -> datetime:
-    """Parse an ISO date or datetime string into a naive datetime."""
-    text = str(value).strip().replace("T", " ")
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(text, fmt)
-        except ValueError:
-            continue
-    raise ValueError(f"unrecognised date {value!r}; use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS")
 
 
 def _fmt(moment: datetime) -> str:
@@ -84,13 +74,13 @@ class CachedSource(Source):
             return [(start, end)]
         have_min = cached.get_column("ts").min()
         have_max = cached.get_column("ts").max()
-        want_start = _parse_dt(start)
+        want_start = parse_datetime(start)
         spans: list[tuple[str, str | None]] = []
         if want_start < have_min:
             spans.append((start, _fmt(have_min + _OVERLAP)))
         if end is None:
             spans.append((_fmt(have_max - _OVERLAP), None))
-        elif _parse_dt(end) > have_max + _interval_step(interval):
+        elif parse_datetime(end) > have_max + _interval_step(interval):
             spans.append((_fmt(have_max - _OVERLAP), end))
         return spans
 
@@ -119,16 +109,16 @@ class CachedSource(Source):
             merged.write_parquet(tmp)
             tmp.replace(path)
 
-        lo = _parse_dt(start)
+        lo = parse_datetime(start)
         frame = merged.filter(pl.col("ts") >= lo)
         if end is not None:
-            frame = frame.filter(pl.col("ts") <= _parse_dt(end))
+            frame = frame.filter(pl.col("ts") <= parse_datetime(end))
         return frame
 
     def _fetch_pair_daily(self, pair: str, start: str, end: "str | None", interval: str) -> pl.DataFrame:
         step = _interval_step(interval)
-        start_dt = _parse_dt(start)
-        end_dt = _parse_dt(end) if end is not None else datetime.now(timezone.utc).replace(tzinfo=None)
+        start_dt = parse_datetime(start)
+        end_dt = parse_datetime(end) if end is not None else datetime.now(UTC).replace(tzinfo=None)
         day_dir = self.root / interval / pair
         parts: list[pl.DataFrame] = []
         day = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)

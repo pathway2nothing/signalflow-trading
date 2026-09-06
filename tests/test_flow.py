@@ -41,10 +41,8 @@ def test_oos_backtest_reports_coverage():
     ds_full = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-04-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12),
-        features=sf.FeaturePipe(sf.SMA(20)),
-        encode=None,
-        select=None,
-        n_folds=3,
+        features=sf.FeaturePipeline(sf.SMA(20)),
+        cv=sf.KFold(3),
     ).fit(ds_fit)
     flow = sf.Flow(
         name="cov",
@@ -60,9 +58,8 @@ def test_oos_backtest_full_coverage_promotable():
     ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12),
-        features=sf.FeaturePipe(sf.SMA(20)),
-        encode=None,
-        select=None,
+        features=sf.FeaturePipeline(sf.SMA(20)),
+        cv=sf.Rolling(step="1d", window="365d"),  # daily blocks: nearly full OOS coverage of the span
     ).fit(ds)
     flow = sf.Flow(
         name="cov_full",
@@ -94,14 +91,14 @@ def test_market_drop_detector_empty_slot_raises():
         sf.MarketDropDetector(p_min=0.6)
 
 
-def test_detector_only_flow_promotable(ds):
+def test_detector_only_flow_promotable_only_with_oos(ds):
     f = sf.Flow(
         name="det_only",
         detectors=[sf.SmaCrossDetector(fast=3, slow=8)],
         strategy=sf.RulesStrategy(entry=sf.Entry(size_pct=0.1), exit=sf.Exit(tp=0.03, sl=0.015)),
     )
-    run = f.backtest(ds, capital=50_000)
-    assert run.promotable is True
+    assert f.backtest(ds, capital=50_000).promotable is False  # in-sample by default, rules or not
+    assert f.backtest(ds, capital=50_000, oos=True).promotable is True  # the caller asserts OOS evidence
 
 
 def test_quicktest_not_promotable(flow, ds):
@@ -121,7 +118,7 @@ def test_quicktest_forwards_fee(ds):
 
 
 def test_untrained_flow_raises(ds):
-    unfit = sf.ForecastModel(target=sf.FixedHorizon(12), features=sf.FeaturePipe(sf.SMA(20)))
+    unfit = sf.ForecastModel(target=sf.FixedHorizon(12), features=sf.FeaturePipeline(sf.SMA(20)))
     with pytest.raises(sf.UntrainedModelError):
         sf.Flow(name="bad", forecasts={"x": unfit})
 
@@ -130,7 +127,7 @@ def test_leakage_invariant(ds, fitted_forecast):
     """Invariant L: training a validator on in-sample (full) signals must raise."""
     det = sf.ThresholdDetector(forecast="revert", p_min=0.5)
     bad = det.run(ds, forecasts={"revert": fitted_forecast}, oos=False)
-    meta = sf.ForecastModel(target=sf.TripleBarrier(), features=sf.FeaturePipe(sf.SMA(20)))
+    meta = sf.ForecastModel(target=sf.TripleBarrier(), features=sf.FeaturePipeline(sf.SMA(20)))
     with pytest.raises(sf.LeakageError):
         meta.fit(ds, sampler=sf.MetaLabelingSampler(signals=bad))
 
@@ -166,9 +163,9 @@ def test_oos_signals_train_validator(ds, fitted_forecast):
     assert good.provenance == sf.Provenance.OOS
     meta = sf.ForecastModel(
         target=sf.TripleBarrier(tp=0.02, sl=0.01, max_bars=24),
-        features=sf.FeaturePipe(sf.SMA(20), sf.SMA(50)),
+        features=sf.FeaturePipeline(sf.SMA(20), sf.SMA(50)),
         output="p_success",
-        n_folds=3,
+        cv=sf.KFold(3),
     )
     meta.fit(ds, sampler=sf.MetaLabelingSampler(signals=good))
     assert meta.is_fitted

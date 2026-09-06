@@ -26,8 +26,8 @@ def fitted_flow():
     fc = sf.ForecastModel(
         backend="lightgbm",
         target=sf.FixedHorizon(bars=12),
-        features=sf.FeaturePipe(sf.SMA(20), sf.SMA(10)),
-        n_folds=3,
+        features=sf.FeaturePipeline(sf.SMA(20), sf.SMA(10)),
+        cv=sf.KFold(3),
     )
     fc.fit(ds)
     flow = sf.Flow(

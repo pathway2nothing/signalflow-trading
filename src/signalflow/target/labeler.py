@@ -104,36 +104,45 @@ class Labeler(Target, ABC):
     softness_k: float = 3.0
     """Sigmoid steepness for soft probability calibration."""
 
+    horizon_field: ClassVar[str | None] = "horizon"
+    """Name of the field holding the forward look-ahead (bars or a duration string).
+
+    Every labeler declares it explicitly: an int field, a duration string, or a
+    tuple of horizons (the largest counts). ``None`` means the labeler declares no
+    forward look-ahead and the walk-forward embargo is a single bar - only right for
+    a target that is not usable for leak-free evaluation anyway.
+    """
+
     @property
     def horizon(self) -> int:
         """Forward bars consumed - used for purge/embargo in the walk-forward CV."""
-
-        own = self.__dict__.get("horizon")
-        if isinstance(own, int) and own > 0:
-            return own
-        for attr in ("max_horizon", "max_bars", "n_bars", "lookforward", "max_lookforward", "flash_horizon", "window"):
-            val = getattr(self, attr, None)
-            if isinstance(val, int) and val > 0:
-                return val
-        horizons = getattr(self, "horizons", None)
-        if horizons:
-            try:
-                return int(max(horizons))
-            except (TypeError, ValueError):
-                pass
-        return 1
+        raw = self._effective_horizon()
+        if isinstance(raw, str):
+            return 1  # a duration string is resolved against the data by horizon_bars()
+        return int(raw)
 
     def _effective_horizon(self) -> int | str:
-        """Raw forward-look value, keeping a duration string unresolved for ``horizon_bars``."""
-        candidates = [self.__dict__.get("horizon")]
-        for attr in ("max_horizon", "max_bars", "n_bars", "lookforward", "max_lookforward", "flash_horizon", "window"):
-            candidates.append(getattr(self, attr, None))
-        for val in candidates:
-            if isinstance(val, str) and val:
-                return val
-            if isinstance(val, int) and not isinstance(val, bool) and val > 0:
-                return val
-        return self.horizon
+        """Raw forward-look value from ``horizon_field`` (int bars, duration string, or max of a tuple)."""
+        field_name = type(self).horizon_field
+        if field_name is None:
+            return 1
+        if field_name == "horizon" and "horizon" in self.__dict__:
+            val = self.__dict__["horizon"]
+        else:
+            try:
+                val = getattr(self, field_name)
+            except AttributeError as exc:
+                raise TypeError(
+                    f"{type(self).__name__}.horizon_field = {field_name!r} names no field; declare the forward "
+                    f"look-ahead explicitly"
+                ) from exc
+        if isinstance(val, (tuple, list)):
+            if not val:
+                raise ValueError(f"{type(self).__name__}.{field_name} is empty; no forward horizon")
+            return int(max(val))
+        if isinstance(val, bool) or val is None:
+            raise TypeError(f"{type(self).__name__}.{field_name} must be an int or duration string, got {val!r}")
+        return val
 
     def _resolve_durations(self, data: Dataset) -> "Labeler":
         """Return a copy with duration-string fields resolved to bar counts, or self if none."""

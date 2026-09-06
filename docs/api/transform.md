@@ -1,7 +1,7 @@
 # Transform & Features
 
 Transforms turn raw market data into model-ready features. `Feature` is the
-base contract, `FeaturePipe` chains transforms into a pipeline, and the
+base contract, `FeaturePipeline` chains transforms into a pipeline, and the
 selection helpers score and prune features by informativeness.
 
 ## Transform contract
@@ -14,7 +14,7 @@ selection helpers score and prune features by informativeness.
     options:
       show_root_heading: true
 
-::: signalflow.FeaturePipe
+::: signalflow.FeaturePipeline
     options:
       show_root_heading: true
 

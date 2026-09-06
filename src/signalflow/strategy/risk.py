@@ -1,7 +1,7 @@
 """Risk layer - deterministic hard constraints on proposed intents."""
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from loguru import logger
 
@@ -72,7 +72,7 @@ class Risk:
             if n_pos >= self.max_positions:
                 continue
             if it.notional is not None:
-                it.notional = min(it.notional, self.max_notional_per_pair * eq)
+                it = replace(it, notional=min(it.notional, self.max_notional_per_pair * eq))
             out.append(it)
             n_pos += 1
         return out

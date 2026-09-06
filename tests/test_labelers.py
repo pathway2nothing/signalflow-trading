@@ -86,8 +86,8 @@ def test_forecast_model_with_legacy_target(small_ds):
 
     model = sf.ForecastModel(
         target=TripleBarrierLabeler(horizon=24, vol_window=12),
-        features=sf.FeaturePipe(sf.SMA(20)),
-        n_folds=3,
+        features=sf.FeaturePipeline(sf.SMA(20)),
+        cv=sf.KFold(3),
     )
     model.fit(small_ds)
     assert model.is_fitted
@@ -143,19 +143,17 @@ def test_forecast_final_fit_degeneracy_raises_inner_fold_warns():
     train = pl.DataFrame({LABEL_COL: [1.0] * 20})
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12),
-        features=sf.FeaturePipe(),
-        encode=None,
-        select=None,
+        features=sf.FeaturePipeline(),
     )
 
     with pytest.raises(sf.DegenerateTargetError):
         model._fit_stack(train, fold=None)
 
     class _Fold:
-        train_start_ts = None
-        test_start_ts = None
+        train_start = None
+        test_start = None
 
-    _enc, _sel, est = model._fit_stack(train, fold=_Fold())
+    _tail, est = model._fit_stack(train, fold=_Fold())
     assert hasattr(est, "_sf_degenerate")
 
 
@@ -305,7 +303,7 @@ def test_new_targets_registered_and_fit():
 
     ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-05-01", interval="1h")
     model = sf.ForecastModel(
-        target=sf.VolHorizon(bars=12), features=sf.FeaturePipe(sf.SMA(10)), encode=None, select=None
+        target=sf.VolHorizon(bars=12), features=sf.FeaturePipeline(sf.SMA(10))
     ).fit(ds)
     assert model.is_fitted
     for scan_target in (sf.VolTripleBarrier(max_bars=12), sf.ReversionBarrier(anchor_bars=48, max_bars=24)):

@@ -63,7 +63,8 @@ def step(label: str, **fields) -> Iterator[dict]:
     try:
         yield fields
     except Exception as exc:
-        logger.opt(depth=2).debug(f"{label}: failed after {time.perf_counter() - t0:.2f}s ({type(exc).__name__}: {exc})")
+        elapsed = time.perf_counter() - t0
+        logger.opt(depth=2).debug(f"{label}: failed after {elapsed:.2f}s ({type(exc).__name__}: {exc})")
         raise
     else:
         extras = " ".join(f"{k}={v}" for k, v in fields.items())
