@@ -22,7 +22,7 @@ and ship**. The public surface is six nouns.
 
 | Noun | What it is |
 |------|------------|
-| **Dataset** | One lazy, immutable market-data container. `sf.data(...)` builds it; the same object feeds backtest, paper, and live. |
+| **Dataset** | One lazy, immutable market-data container. `sf.dataset(...)` builds it; the same object feeds backtest, paper, and live. |
 | **Transform** | A column-producing step - features (`SMA` in core; `RSI`, `ATR`, `ZScore`, ... via the `signalflow-ta` plugin) and detectors (`SmaCrossDetector`, `ThresholdDetector`) share one contract. |
 | **Models** | `ForecastModel` (trainable predictor -> probability column) plus validator combinators. |
 | **Flow** | The central, deployable, tradeable unit: forecasts -> detectors -> validator -> strategy -> risk. |
@@ -39,7 +39,7 @@ the [Glossary](glossary.md) for per-term definitions.
 ```python
 import signalflow as sf
 
-ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 
 model = sf.ForecastModel(target=sf.FixedHorizon(bars=12),
                          features=sf.FeaturePipeline(sf.SMA(10), sf.SMA(20), sf.SMA(50)))

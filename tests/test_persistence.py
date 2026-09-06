@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import signalflow as sf
-from signalflow.data import data
+from signalflow.data import dataset
 from signalflow.model import ForecastModel
 from signalflow.model.cv import KFold
 from signalflow.target import FixedHorizon
@@ -20,7 +20,7 @@ pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature na
 
 @pytest.fixture(scope="module")
 def fitted():
-    ds = data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+    ds = dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
     model = ForecastModel(
         backend="lightgbm",
         target=FixedHorizon(bars=12),

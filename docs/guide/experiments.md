@@ -48,7 +48,7 @@ tracking:
 Semantics:
 
 - `seed` seeds `random`/`numpy` via `seed_everything`.
-- `data` is forwarded to `sf.data(**data)` (so `cache_dir` caches fetched bars).
+- `data` is forwarded to `sf.dataset(**data)` (so `cache_dir` caches fetched bars).
 - `model.cv` selects the walk-forward scheme of `ForecastModel.fit` (`rolling` with
   `step`/`window`, or `kfold` with `n`); omitted means `Rolling("7d", "365d")`.
 - `model.target` is built from the TARGET registry; `model.features` are built from

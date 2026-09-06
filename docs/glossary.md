@@ -13,12 +13,12 @@ together and where the invariants are enforced, see [Concepts](concepts.md).
 ## Core nouns
 
 ### Dataset
-One lazy, immutable market-data container built by `sf.data(...)`. The same object
+One lazy, immutable market-data container built by `sf.dataset(...)`. The same object
 feeds `backtest`, `paper`, and `live` - there is no separate live data path to drift.
 
 ```python
 import signalflow as sf
-ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 ```
 
 ### Transform

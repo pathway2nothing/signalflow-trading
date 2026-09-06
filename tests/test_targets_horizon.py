@@ -18,7 +18,7 @@ def _declared(target) -> int:
 
 @pytest.fixture(scope="module")
 def ds():
-    return sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-08", interval="1h")
+    return sf.dataset("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-08", interval="1h")
 
 
 @pytest.mark.parametrize("name", sf.registry.list(sf.ComponentType.TARGET))

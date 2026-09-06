@@ -94,13 +94,13 @@ def run_experiment(path: "str | Path") -> dict:
 
     Writes the same dict to ``results.json`` next to the spec.
     """
-    from signalflow.data.dataset import data as build_data
+    from signalflow.data.dataset import dataset as build_dataset
     from signalflow.model.metrics import classification_scorecard
     from signalflow.model.walkforward import walk_forward
 
     spec = load_spec(path)
     seed_everything(int(spec.get("seed", 0)))
-    ds = build_data(**spec["data"])
+    ds = build_dataset(**spec["data"])
     template = _build_model(spec["model"])
     metrics = spec.get("metrics") or ["auc"]
     scheme = spec.get("scheme") or {}

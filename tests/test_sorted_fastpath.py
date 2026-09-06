@@ -35,7 +35,7 @@ class _EagerDouble(Transform):
 
 
 def _ds():
-    return sf.data("synthetic", pairs=["BTCUSDT", "ETHUSDT"], start="2023-01-01", end="2023-01-10", interval="1h")
+    return sf.dataset("synthetic", pairs=["BTCUSDT", "ETHUSDT"], start="2023-01-01", end="2023-01-10", interval="1h")
 
 
 def test_ensure_sorted_is_identity_on_sorted_frames():

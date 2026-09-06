@@ -11,7 +11,7 @@ pytestmark = pytest.mark.skipif(not os.environ.get("SF_BENCH"), reason="set SF_B
 
 
 def test_backtest_loop_357k_bars_under_10s():
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2025-01-01", end="2025-09-06", interval="1m")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2025-01-01", end="2025-09-06", interval="1m")
     flow = sf.Flow(name="bench", detectors=[sf.SmaCrossDetector(fast=10, slow=30)], strategy=sf.RulesStrategy())
     t0 = time.perf_counter()
     run = flow.backtest(ds, capital=10_000)
@@ -21,7 +21,7 @@ def test_backtest_loop_357k_bars_under_10s():
 
 
 def test_backtest_two_pairs_two_weeks_under_1_5s():
-    ds = sf.data("synthetic", pairs=["BTCUSDT", "ETHUSDT"], start="2025-01-01", end="2025-01-15", interval="1m")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT", "ETHUSDT"], start="2025-01-01", end="2025-01-15", interval="1m")
     flow = sf.Flow(name="bench2", detectors=[sf.SmaCrossDetector(fast=10, slow=30)], strategy=sf.RulesStrategy())
     t0 = time.perf_counter()
     flow.backtest(ds, capital=10_000)

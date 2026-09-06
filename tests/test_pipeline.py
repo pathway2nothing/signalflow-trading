@@ -4,7 +4,7 @@ import polars as pl
 import pytest
 from loguru import logger
 
-from signalflow.data import data
+from signalflow.data import dataset
 from signalflow.decorators import feature
 from signalflow.errors import PipelineError, UnknownComponentError
 from signalflow.transform import FeaturePipeline
@@ -25,7 +25,7 @@ class _BoomFeature(Feature):
 
 @pytest.fixture(scope="module")
 def sample():
-    return data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+    return dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 
 
 def test_builds_from_sma():
@@ -66,7 +66,7 @@ def test_pipeline_split_and_outputs_with_stateful_tail():
     assert pipe.outputs == ["sma_10", "sma_20"]  # tail outputs unknown before fit
     assert not pipe.is_fitted and prefix.is_fitted
 
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-02-01", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-02-01", interval="1h")
     frame = prefix.compute(ds.frame).drop_nulls(subset=["sma_10", "sma_20"])
     y = (frame.get_column("close").shift(-1) > frame.get_column("close")).cast(pl.Int64).fill_null(0)
     fitted = tail.clone().fit(frame, y)
@@ -79,7 +79,7 @@ def test_pipeline_split_and_outputs_with_stateful_tail():
 def test_model_with_encoder_in_pipeline_round_trips(tmp_path):
     import signalflow as sf
 
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-03-01", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-03-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=6),
         features=sf.FeaturePipeline(sf.SMA(5), sf.SMA(10), sf.WoE(), sf.IVSelector()),

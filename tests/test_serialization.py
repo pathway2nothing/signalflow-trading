@@ -12,7 +12,7 @@ from signalflow.transform.encode.woe import Binning, WoE
 
 
 def _ds():
-    return sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-05", interval="1h")
+    return sf.dataset("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-05", interval="1h")
 
 
 def _observation():

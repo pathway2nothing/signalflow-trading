@@ -20,7 +20,7 @@ def _messages(lines, level=None):
 
 
 def test_fit_and_backtest_report_each_step(lines):
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-15", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-15", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12),
         features=sf.FeaturePipeline(sf.SMA(10), sf.SMA(20), sf.WoE(), sf.IVSelector()),
@@ -66,7 +66,7 @@ def test_fit_and_backtest_report_each_step(lines):
 
 
 def test_simulate_logs_progress_not_per_bar_detail(lines):
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-01-08", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-01-08", interval="1h")
     flow = sf.Flow(name="sim_probe", detectors=[sf.SmaCrossDetector(fast=5, slow=10)])
     flow.simulate(ds, capital=10_000)
 

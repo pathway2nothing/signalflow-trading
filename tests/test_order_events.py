@@ -12,7 +12,7 @@ from signalflow.flow.live import load_state, run_live_loop, save_state
 
 @pytest.fixture(scope="module")
 def small_ds():
-    return sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-08", interval="1h")
+    return sf.dataset("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-08", interval="1h")
 
 
 def _flow():

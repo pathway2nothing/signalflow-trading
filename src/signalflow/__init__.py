@@ -56,7 +56,7 @@ from signalflow.decorators import (
 )
 
 
-from signalflow.data import BinanceSource, Dataset, SyntheticSource, data
+from signalflow.data import BinanceSource, Dataset, SyntheticSource, dataset
 
 
 from signalflow.transform import SMA, Feature, FeaturePipeline, Transform
@@ -183,7 +183,7 @@ __all__ = [
     "UnfittedTransformError",
     "DegenerateTargetError",
     "RegistryError",
-    "data",
+    "dataset",
     "Dataset",
     "BinanceSource",
     "SyntheticSource",

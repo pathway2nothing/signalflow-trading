@@ -1,6 +1,6 @@
 # Data
 
-Market data is held in a `Dataset` and produced by data sources. The `data`
+Market data is held in a `Dataset` and produced by data sources. The `dataset`
 helper is a convenience loader that returns a ready-to-use `Dataset`.
 
 ## Dataset
@@ -11,7 +11,7 @@ helper is a convenience loader that returns a ready-to-use `Dataset`.
 
 ## Loader
 
-::: signalflow.data
+::: signalflow.data.dataset.dataset
     options:
       show_root_heading: true
 

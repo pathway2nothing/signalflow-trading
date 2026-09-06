@@ -33,7 +33,7 @@ GOLDEN_TRIPLE_BARRIER_POSITIVES = 254
 
 @pytest.fixture(scope="module")
 def golden_ds():
-    return sf.data("synthetic", pairs=["BTCUSDT", "ETHUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
+    return sf.dataset("synthetic", pairs=["BTCUSDT", "ETHUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
 
 
 @pytest.fixture(scope="module")

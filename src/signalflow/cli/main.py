@@ -185,7 +185,7 @@ def run(
     """Load FLOW_YAML, build a dataset, backtest, and print the scorecard."""
     flow = sf.Flow.load(flow_yaml)
     pair_list = [p.strip() for p in pairs.split(",") if p.strip()]
-    dataset = sf.data(source, pairs=pair_list, start=start, end=end, interval=interval)
+    dataset = sf.dataset(source, pairs=pair_list, start=start, end=end, interval=interval)
     run_result = flow.backtest(dataset, capital=capital)
 
     scorecard = run_result.scorecard()

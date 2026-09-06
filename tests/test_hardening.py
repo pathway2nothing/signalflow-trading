@@ -132,7 +132,7 @@ def test_sim_broker_quantizes_like_the_venue():
 
 @pytest.fixture(scope="module")
 def ds():
-    return sf.data("synthetic", pairs=["BTCUSDT", "ETHUSDT"], start="2023-01-01", end="2023-02-15", interval="1h")
+    return sf.dataset("synthetic", pairs=["BTCUSDT", "ETHUSDT"], start="2023-01-01", end="2023-02-15", interval="1h")
 
 
 def _cross_flow():

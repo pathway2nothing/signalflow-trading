@@ -14,7 +14,7 @@ offline against the built-in `synthetic` source - no API keys.
 ```python
 import signalflow as sf
 
-ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 
 model = sf.ForecastModel(target=sf.FixedHorizon(bars=12),
                          features=sf.FeaturePipeline(sf.SMA(10), sf.SMA(20), sf.SMA(50)))
@@ -30,7 +30,7 @@ print(run.scorecard())                                 # total_return, sharpe, m
 
 What each step does:
 
-1. `sf.data("synthetic", ...)` builds a **Dataset** - one lazy, immutable container.
+1. `sf.dataset("synthetic", ...)` builds a **Dataset** - one lazy, immutable container.
 2. `sf.ForecastModel(...)` pairs a **Target** (`FixedHorizon`) with a **FeaturePipeline**;
    `fit` trains it out-of-fold.
 3. `sf.Flow(...)` assembles the deployable stack: forecasts -> detectors -> strategy.
@@ -75,7 +75,7 @@ disk; a repeated request for a covered range hits the parquet cache and makes no
 network call.
 
 ```python
-ds = sf.data("binance", pairs=["BTCUSDT"], start="2023-01-01", interval="1h", cache_dir="data/cache")
+ds = sf.dataset("binance", pairs=["BTCUSDT"], start="2023-01-01", interval="1h", cache_dir="data/cache")
 ```
 
 ---

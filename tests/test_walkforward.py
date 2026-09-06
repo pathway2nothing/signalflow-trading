@@ -4,7 +4,7 @@ import warnings
 
 import pytest
 
-from signalflow.data import data
+from signalflow.data import dataset
 from signalflow.model import ForecastModel, WalkForwardResult, walk_forward
 from signalflow.model.cv import KFold
 from signalflow.target import FixedHorizon
@@ -17,7 +17,7 @@ pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature na
 
 @pytest.fixture(scope="module")
 def wf_result():
-    ds = data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-05-01", interval="1h")
+    ds = dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-05-01", interval="1h")
     model = ForecastModel(
         backend="lightgbm",
         target=FixedHorizon(bars=12),
@@ -61,7 +61,7 @@ def test_evaluate_one_row_per_fold(wf_result):
 
 
 def test_fold_predictions_match_full_history_predictions():
-    ds = data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-06-01", interval="1h")
+    ds = dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-06-01", interval="1h")
     model = ForecastModel(
         target=FixedHorizon(bars=12),
         features=FeaturePipeline(SMA(50)),

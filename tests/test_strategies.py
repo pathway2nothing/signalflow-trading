@@ -18,7 +18,7 @@ pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature na
 
 @pytest.fixture(scope="module")
 def flow_data():
-    data = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
+    data = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
     model = sf.ForecastModel(
         backend="lightgbm",
         target=sf.FixedHorizon(12),

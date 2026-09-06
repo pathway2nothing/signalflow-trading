@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import polars as pl
 
-from signalflow.data import CachedSource, data
+from signalflow.data import CachedSource, dataset
 
 _EPOCH = datetime(2000, 1, 1)
 
@@ -120,7 +120,7 @@ def test_corrupt_cache_self_heals(tmp_path):
 
 def test_cache_dir_param_on_sf_data(tmp_path):
     src = TsSource()
-    uncached = data(src, pairs=["BTCUSDT"], start="2023-01-01", end="2023-01-05", interval="1h")
-    cached = data(src, pairs=["BTCUSDT"], start="2023-01-01", end="2023-01-05", interval="1h", cache_dir=tmp_path)
+    uncached = dataset(src, pairs=["BTCUSDT"], start="2023-01-01", end="2023-01-05", interval="1h")
+    cached = dataset(src, pairs=["BTCUSDT"], start="2023-01-01", end="2023-01-05", interval="1h", cache_dir=tmp_path)
     assert (tmp_path / "1h" / "BTCUSDT.parquet").exists()
     assert cached.frame.sort(["pair", "ts"]).equals(uncached.frame.sort(["pair", "ts"]))

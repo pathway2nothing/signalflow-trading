@@ -12,7 +12,7 @@ pytestmark = pytest.mark.filterwarnings("ignore:X does not have valid feature na
 
 
 def _model_and_ds():
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-03-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12),
         features=sf.FeaturePipeline(sf.SMA(20), sf.SMA(50)),
@@ -43,7 +43,7 @@ def test_classification_scorecard_auc_matches_sklearn():
 
 
 def test_walk_forward_evaluate_auc_preset():
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-06-01", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-06-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12), features=sf.FeaturePipeline(sf.SMA(20))
     )
@@ -55,7 +55,7 @@ def test_walk_forward_evaluate_auc_preset():
 
 
 def test_walk_forward_evaluate_unknown_preset_raises():
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-04-01", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-04-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=12), features=sf.FeaturePipeline(sf.SMA(20))
     )

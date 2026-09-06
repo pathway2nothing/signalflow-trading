@@ -95,7 +95,7 @@ def test_woe_binarization_config_round_trips():
 
 
 def test_scaler_fits_in_fold_and_keeps_column_names():
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-02-01", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-02-01", interval="1h")
     pipe = sf.FeaturePipeline(sf.SMA(5), sf.SMA(20), sf.Scaler(method="robust"))
     prefix, tail = pipe.split()
     frame = prefix.compute(ds.frame).drop_nulls(subset=["sma_5", "sma_20"])

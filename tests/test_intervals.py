@@ -1,6 +1,5 @@
 """Bar-interval support shared by the built-in sources, the disk cache, and the live feed."""
 
-import importlib
 from datetime import timedelta
 
 import pytest
@@ -55,10 +54,7 @@ class _FakeBinance(BinanceSource):
 
 @pytest.mark.parametrize("interval", ["3m", "30m", "2h", "6h", "8h", "12h", "1w"])
 def test_binance_pagination_uses_new_interval_widths(interval, monkeypatch):
-    # `sf.data` (the function) shadows the `signalflow.data` package attribute, so neither
-    # `import signalflow.data.source.binance as m` nor a dotted monkeypatch path resolves.
-    binance_module = importlib.import_module("signalflow.data.source.binance")
-    monkeypatch.setattr(binance_module, "_LIMIT", 4)
+    monkeypatch.setattr("signalflow.data.source.binance._LIMIT", 4)
     src = _FakeBinance(limit=4)
     step = INTERVAL_SECONDS[interval]
     n_bars = 10

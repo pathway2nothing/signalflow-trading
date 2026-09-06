@@ -38,6 +38,16 @@ class Dataset:
     provenance: Provenance = Provenance.FULL
     col_provenance: dict = field(default_factory=dict)
 
+    def __repr__(self) -> str:
+        f = self.frame
+        pairs = f.get_column("pair").n_unique() if f.height else 0
+        span = f", {f.get_column('ts').min()} .. {f.get_column('ts').max()}" if f.height else ""
+        interval = self.source_params.get("interval", "")
+        return (
+            f"Dataset(source={self.source_name or '?'!r}, interval={interval!r}, "
+            f"pairs={pairs}, rows={f.height}, cols={f.width}{span})"
+        )
+
     @classmethod
     def from_source(
         cls,
@@ -171,7 +181,7 @@ def _same_index(frame: pl.DataFrame, cols: pl.DataFrame) -> bool:
 _FLOAT_DTYPES = {"f32": pl.Float32, "float32": pl.Float32, "f64": pl.Float64, "float64": pl.Float64}
 
 
-def data(
+def dataset(
     source: str | Source,
     pairs: list[str],
     start: str,
@@ -211,4 +221,4 @@ def data(
     return ds
 
 
-__all__ = ["CANONICAL_COLUMNS", "Bar", "Dataset", "data"]
+__all__ = ["CANONICAL_COLUMNS", "Bar", "Dataset", "dataset"]

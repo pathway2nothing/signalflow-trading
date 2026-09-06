@@ -16,7 +16,7 @@ _UNIX = datetime(1970, 1, 1)
 
 @pytest.fixture(scope="module")
 def small_ds():
-    return sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-08", interval="1h")
+    return sf.dataset("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-01-08", interval="1h")
 
 
 def _flow():
@@ -131,7 +131,7 @@ class _UnderdeclaredDetector(sf.SignalDetector):
 
 
 def test_underdeclared_warmup_breaks_parity():
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-15", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", end="2023-02-15", interval="1h")
     flow = sf.Flow(
         name="under",
         detectors=[_UnderdeclaredDetector()],

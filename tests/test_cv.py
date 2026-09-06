@@ -42,7 +42,7 @@ def test_cv_config_round_trip():
 
 
 def test_model_cv_is_recorded_in_fingerprint():
-    ds = sf.data("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-02-01", interval="1h")
+    ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2024-01-01", end="2024-02-01", interval="1h")
     model = sf.ForecastModel(
         target=sf.FixedHorizon(bars=6), features=sf.FeaturePipeline(sf.SMA(5)), cv={"scheme": "kfold", "n": 3}
     ).fit(ds)
