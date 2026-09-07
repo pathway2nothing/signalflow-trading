@@ -95,13 +95,13 @@ Options: `--source`, `--pairs` (comma-separated), `--start`, `--end`,
 ## `promote` - validate and show the promotion op
 
 Load and validate a flow, then report the registry operation promotion would
-perform. The real promotion into sf-prod happens there, not here.
+perform. The real promotion happens in the production runner, not here.
 
 ```console
 $ sf promote flow.yaml --to shadow
 validated flow 'sma_rise' from flow.yaml
 would register: stage=shadow flow='sma_rise' quote=USDT
-no server contacted - real promotion happens in sf-prod.
+no server contacted - real promotion happens in the production runner.
 ```
 
 ## `version` - print the installed version

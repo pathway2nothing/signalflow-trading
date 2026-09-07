@@ -4,11 +4,6 @@ Multi-horizon ensemble of mean-reversion events.
 Runs :class:`MeanReversionEventLabeler` over several forward horizons and
 averages the resulting per-class soft probabilities; the hard label is
 the argmax of the averaged triple.
-
-This is the production version of iter-33's
-``soft_D3_multi_horizon`` ensemble - slightly outperformed the
-single-horizon variant (soft MI 0.179 vs 0.178 on the validated pool)
-and showed marginally better train→test stability across labels.
 """
 
 
@@ -40,11 +35,6 @@ class MultiHorizonMeanReversionLabeler(Labeler):
         null; otherwise rows are normalised to sum to 1.
 
     Hard label is the argmax over the averaged triple.
-
-    Research provenance:
-        iter-33 (sf-profit) ``soft_D3_multi_horizon`` - best soft MI
-        0.173 on ``signed_range_60`` in the validated pool, edging out
-        ``soft_D3_revert`` (0.172).
     """
 
     horizon_field: ClassVar[str | None] = "horizons"

@@ -91,7 +91,7 @@ flow.live(feed, capital=50_000, armed=True,             # real orders on Binance
 sf list                 # registry snapshot grouped by type
 sf list transform       # one type, with one-line summaries
 sf run flow.yaml --source synthetic --pairs BTCUSDT --start 2023-01-01 --interval 1h --capital 50000
-sf promote flow.yaml --to shadow   # validate + show the registry op (real promotion: sf-prod)
+sf promote flow.yaml --to shadow   # validate + show the registry op (real promotion happens in your runner)
 sf version
 ```
 
@@ -141,7 +141,6 @@ components via entry points - no imports or wiring needed.
 |---------|-------------|
 | **signalflow-ta** | Technical-indicator plugin: 248 features + 21 detectors (`[ta]` extra) |
 | **signalflow-labs** | Neural encoders, RL strategy, torch backends (`[labs]` extra) |
-| **sf-prod** | Promotion, shadow/live rollout, monitoring |
 
 ---
 

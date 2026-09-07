@@ -91,13 +91,6 @@ class HMMVolRegime2StateLabeler(Labeler):
 
     Output (soft mode, :meth:`compute_soft`):
         ``p_calm``, ``p_turbulent`` summing to 1.
-
-    Research provenance:
-        iter-35 (sf-profit) - best soft label of all iterations.
-        Soft MI = 0.391 with ``GMMVolRegime5State`` ``volreg5_q90`` and
-        0.385 with ``volreg5_q10`` on the validated pool subset.
-        Marginal entropy H = 0.999 bits (balanced, not degenerate
-        unlike ``soft_H1_hurst``).
     """
 
     horizon_field: ClassVar[str | None] = None  # smoothing reads the whole series: research-only target

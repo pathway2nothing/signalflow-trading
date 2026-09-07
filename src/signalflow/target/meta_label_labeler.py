@@ -21,8 +21,8 @@ Two configurable resolution modes:
       ``min_return``. Cheap and matches the original AFML formulation.
     * ``mode="triple_barrier"`` - first-touch of a profit barrier at
       ``min_return`` or a stop barrier at ``-max_loss``; ``take`` if PT is hit
-      first, otherwise ``skip``. Captures the path-dependence the iter-32
-      experiments showed was missing in TP-binary labels.
+      first, otherwise ``skip``. Captures the path-dependence that TP-binary
+      labels miss.
 """
 
 from dataclasses import dataclass

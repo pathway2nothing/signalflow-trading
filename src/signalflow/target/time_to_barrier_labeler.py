@@ -15,10 +15,9 @@ regression / survival target. For each bar we record:
                             hit first (right-censored observation).
 
 The continuous ``hit_time`` lets downstream models fit hazard / survival
-formulations (e.g. parametric ``log(1 - hit_time)`` or DeepSurv-style heads),
-addressing the iter-32 finding that fixed-horizon binary labels discard the
-*speed* of mean reversion - a signal worth more than the direction alone for
-sizing and stop placement.
+formulations (e.g. parametric ``log(1 - hit_time)`` or DeepSurv-style heads):
+fixed-horizon binary labels discard the *speed* of mean reversion, a signal
+worth more than the direction alone for sizing and stop placement.
 """
 
 from dataclasses import dataclass

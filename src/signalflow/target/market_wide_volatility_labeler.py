@@ -48,10 +48,6 @@ class MarketWideVolatilityRegimeLabeler(Labeler):
     via the same percentile-tercile sigmoid that
     :class:`VolatilityRegimeLabeler` uses.
 
-    Research provenance:
-        iter-33 (sf-profit) ``soft_C1_mkt_vol`` - best soft MI 0.096
-        against ``natr_ratio_60_1440`` on the validated pool.
-
     ``lookback_window`` accepts a bar count (int, assuming 1-minute data for the default)
     or a duration string resolved against the dataset interval.
     """

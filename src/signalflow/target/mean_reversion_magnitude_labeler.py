@@ -84,12 +84,10 @@ class MeanReversionMagnitudeLabeler(Labeler):
     sigmoid-saturated around the two thresholds, so model heads can fit the
     full distribution rather than a hard cut.
 
-    Why this exists (research provenance):
-        sf-profit ``experiments_report.md`` 2026-05 - the binary
-        ``D3_rev_mean_revert`` reached forward AUC 0.98–0.99 but the resulting
-        strategy only captured a small share of available revert size
-        (in-sample 50% → OOS 7%). A magnitude target lets downstream models
-        size positions by *expected* revert depth instead of a yes/no flag.
+    Why this exists: a binary revert/no-revert label can score a high AUC while
+    the resulting strategy captures only a small share of the available revert
+    size. A magnitude target lets downstream models size positions by
+    *expected* revert depth instead of a yes/no flag.
     """
 
     signal_category: SignalCategory = SignalCategory.PRICE_STRUCTURE
