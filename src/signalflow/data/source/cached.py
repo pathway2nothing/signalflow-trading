@@ -12,6 +12,31 @@ from signalflow.data.source.base import Source, validate_frame
 _OVERLAP = timedelta(days=1)
 
 
+_MARKER = ".ts_convention"
+
+
+def _ensure_close_time(root: Path) -> None:
+    """Migrate a cache written when ``ts`` was the open time (one shift per file, then a marker).
+
+    Bars keep their day partition: a bar that opened in a day closes in it too
+    (the last one exactly at midnight, which the ``> day .. <= day_end`` bounds keep).
+    """
+    marker = root / _MARKER
+    if marker.exists():
+        return
+    files = sorted(root.glob("*/**/*.parquet")) if root.exists() else []
+    if files:
+        logger.warning(f"CachedSource: migrating {len(files)} file(s) under {root} from open-time to close-time ts")
+        for path in files:
+            step = _interval_step(path.relative_to(root).parts[0])
+            shifted = pl.read_parquet(path).with_columns((pl.col("ts") + step).alias("ts"))
+            tmp = path.with_suffix(".parquet.tmp")
+            shifted.write_parquet(tmp)
+            tmp.replace(path)
+    root.mkdir(parents=True, exist_ok=True)
+    marker.write_text("close\n", encoding="utf-8")
+
+
 def _interval_step(interval: str) -> timedelta:
     """Bar width for cache-completeness checks; zero (never complete) for an unknown interval."""
     return timedelta(seconds=INTERVAL_SECONDS.get(interval, 0))
@@ -41,6 +66,7 @@ class CachedSource(Source):
         self.root = Path(root)
         self.partition = partition
         self.name = getattr(inner, "name", "cached")
+        _ensure_close_time(self.root)
 
     def fetch(
         self,
@@ -130,7 +156,7 @@ class CachedSource(Source):
                 cached is not None
                 and cached.height > 0
                 and step > timedelta(0)
-                and cached.get_column("ts").max() >= day_end - step
+                and cached.get_column("ts").max() >= day_end  # the day's last bar closes at day_end
             )
             if not complete:
                 fetched = self.inner.fetch([pair], _fmt(day), _fmt(day_end), interval)
@@ -139,7 +165,7 @@ class CachedSource(Source):
                     pl.concat(pieces)
                     .unique(subset=["pair", "ts"], keep="last")
                     .sort(["pair", "ts"])
-                    .filter((pl.col("ts") >= day) & (pl.col("ts") < day_end))
+                    .filter((pl.col("ts") > day) & (pl.col("ts") <= day_end))
                     if pieces
                     else None
                 )

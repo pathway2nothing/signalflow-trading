@@ -15,8 +15,10 @@ from signalflow.enums import Provenance
 class Bar(NamedTuple):
     """One timestamp's cross-section, fed to the decision loop.
 
-    ``prices``/``high``/``low`` map pair -> close/high/low of that bar; ``frame`` is
-    the zero-copy slice of the dataset's rows at ``ts``.
+    ``ts`` is the bar's **close** time (the framework-wide convention: a bar is
+    stamped when it is complete). ``prices``/``high``/``low`` map pair ->
+    close/high/low of that bar; ``frame`` is the zero-copy slice of the dataset's
+    rows at ``ts``.
     """
 
     ts: object
@@ -29,7 +31,11 @@ class Bar(NamedTuple):
 
 @dataclass(frozen=True)
 class Dataset:
-    """Immutable view over canonical OHLCV plus any computed columns."""
+    """Immutable view over canonical OHLCV plus any computed columns.
+
+    ``ts`` is each bar's close time: the moment the candle completed and its
+    values became known. Sources, caches and feeds all follow this convention.
+    """
 
     frame: pl.DataFrame
     source_name: str = ""

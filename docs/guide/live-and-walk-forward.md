@@ -38,6 +38,50 @@ flow.live(feed, capital=10_000, armed=True,     # real orders
 gap between the bar's close and order execution; a breach of the latency budget
 is logged.
 
+## Stopping a running loop
+
+`Risk(kill_switch_path="kill")` makes that file the switch: while it exists every new
+entry is dropped (closes still pass), and the check runs on every bar, so creating or
+deleting the file from outside engages or releases a running `live`/`simulate`. A
+drawdown breach trips the switch the same way (and writes the file); `risk.reset()`
+releases it explicitly. The trip is saved with the book, so a loop resumed from
+`state_path` starts tripped when it was tripped. Armed runs raise
+`KillSwitchTripped` instead of silently dropping orders.
+
+## Bring your own loop
+
+A runner that already owns its feed, portfolio store and executor does not need
+`flow.live`: the loop's body is a public, stateless call. `flow.buffer()` keeps
+the trailing `required_warmup + 1` bars (appends are cheap, trims are zero-copy
+slices), and `flow.decide(history, snapshot, ts)` returns what the flow would do
+on that bar - the signals it saw, the intents after the risk layer, and the
+orders to send - without touching any state:
+
+```python
+flow = sf.Flow.load("flows/my-flow/flow.yaml")
+flow.check_warmup()                                   # refuse under-declared components up front
+
+buf = flow.buffer()                                   # window = required_warmup + 1
+buf.push(my_feed.history(pairs, bars=flow.required_warmup))
+
+peak = my_store.peak_equity()
+for bar in my_feed.closed_bars():                     # one frame per closed bar, all pairs
+    buf.push(bar.frame)
+    snap = sf.PortfolioSnapshot(                      # your books, in the type the strategy reads
+        ts=bar.ts, target="USDT", balances=my_store.balances(),
+        positions=my_store.positions(), equity=my_store.equity(bar.prices), prices=bar.prices,
+    )
+    d = flow.decide(buf, snap, bar.ts, peak=peak, mandate={"max_notional": 5_000})
+    peak = max(peak, snap.equity)
+    my_store.save_signals(d.signals)                  # pair, ts, signal at this bar
+    my_executor.send(d.orders)                        # already risk-clipped and sized
+```
+
+`simulate` and `live` are built from the same two pieces, so an external loop
+agrees with them bar for bar. For paper trading against a live ticker instead of
+the bar's close, `SimBroker.execute(orders, bar, prices=ticker)` fills at the
+given prices with the broker's slippage and fees.
+
 ## Calendar walk-forward
 
 `sf.walk_forward` turns a declarative model template into per-fold models trained
@@ -77,6 +121,26 @@ model.fit(ds)
 
 Each refit fits fresh bin edges + WoE/IV tables on its window. The binning can
 shift from one refit to the next - that is expected; every refit is recorded.
+
+## Comparing models and folds
+
+`sf.scorecard_table` gives one row per model - or per walk-forward fold - with
+`n_test`, `prevalence`, the firing `threshold` and `f1 / precision / recall / pr_auc /
+roc_auc / brier`, so candidates are compared on one frame instead of hand-rolled loops:
+
+```python
+result = sf.walk_forward(model, ds, train="90d", step="30d")
+table = sf.scorecard_table(result, ds, operating="train_q0.9")   # threshold calibrated on each fold's train window
+sf.scorecard_means(table, by="target")                          # averaged per target, with row counts
+
+sf.scorecard_table({"h12": m12, "h24": m24}, ds, operating=0.6)  # fitted models on their OOS predictions
+```
+
+The operating point is a fixed threshold, `"q<quantile>"` of the evaluated scores,
+or `"train_q<quantile>"` - the quantile of the scores over the training window,
+which is what a live threshold calibrated on the past would have been. Each fold
+also carries a `tag` (`YYYYMM` of its test start); `walk_forward(save_to="..._{tag}")`
+names saved fold models by it.
 
 ## Inspecting and caching the refit history
 

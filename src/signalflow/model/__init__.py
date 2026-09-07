@@ -2,7 +2,7 @@
 
 from signalflow.model.cv import CVScheme, KFold, Rolling, build_cv
 from signalflow.model.forecast import ForecastModel
-from signalflow.model.metrics import classification_scorecard
+from signalflow.model.metrics import classification_scorecard, scorecard_means, scorecard_table
 from signalflow.model.oos import Fold
 from signalflow.model.validators import MaxValidator, MeanValidator, VoteValidator
 from signalflow.model.walkforward import WalkForwardResult, walk_forward
@@ -19,5 +19,7 @@ __all__ = [
     "WalkForwardResult",
     "build_cv",
     "classification_scorecard",
+    "scorecard_means",
+    "scorecard_table",
     "walk_forward",
 ]

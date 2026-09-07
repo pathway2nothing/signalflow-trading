@@ -9,6 +9,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (breaking - the API is pre-1.0, no compatibility aliases are kept)
 
+- `scorecard_table(models | WalkForwardResult, data, operating=, metrics=)` - one row
+  per model or per fold (`n_test`, `prevalence`, `threshold`, f1/precision/recall/
+  pr_auc/roc_auc/brier) and `scorecard_means(table, by="target")`. Operating points:
+  a threshold, `"q<q>"` of the OOS scores, or `"train_q<q>"` of the training-window
+  scores (per fold for walk-forward). `classification_scorecard(threshold=)` accepts
+  the same specs. `Fold.tag` (`YYYYMM` of the test start) and `save_to="..._{tag}"`.
+- Pluggable experiment tracking: `experiment_run(..., tracker=)` takes a registered
+  name, a `Tracker` instance, or a list (fan-out) and yields the tracker instead of the
+  mlflow module. Built-in adapters `mlflow`, `wandb` and `litlogger` import their
+  package only when used (none is a required dependency; `[wandb]` / `[litlogger]`
+  extras install them); `null` logs nothing. Register your own with
+  `@sf.register_tracker(name)` (subclass `sf.BaseTracker`) or the `signalflow.trackers`
+  entry point. `experiment.yaml` accepts `tracking: {tracker, experiment, options}`
+  next to the `mlflow: <name>` short form. `log_config` works with any tracker.
+- Provenance on every tracked run: `experiment_run` tags the MLflow run with the
+  signalflow / ta / labs versions and their editable-checkout commits, the working
+  directory's commit (`+dirty` when modified), python, platform, polars and `seed`
+  (`signalflow.experiment.provenance.provenance()`, exported as `sf.provenance`;
+  `record_provenance=False` opts out, explicit `tags` win). `log_config(path)`
+  attaches a config file to the active run; `run_experiment` attaches its yaml.
+- Bar timestamps are close times. `ts` marks the moment a candle completed, not
+  when it opened: `BinanceSource` stamps `open_time + interval`, `SyntheticSource`
+  likewise, `PollingFeed` keeps bars with `ts <= now` and resumes from the last close,
+  order latency is measured from `ts`. `CachedSource` migrates an existing open-time
+  cache in place on first use (one shift per file) and writes a `.ts_convention`
+  marker; day partitions keep their membership. Every dataset built from a source
+  now starts one interval later and ends exactly at `end`; fill and signal
+  timestamps shift accordingly, values do not.
+- The kill switch works while a loop runs: with `kill_switch_path` set, `Risk.tripped`
+  re-reads the file on every `clip`, so an operator engages or releases a running
+  `live`/`simulate` by creating or deleting it (transitions are logged). `Risk.trip()`
+  / `Risk.reset()` are the explicit controls, `Risk.state()` / `Risk.restore()` persist
+  a trip through `save_state`, and a loop resumed from `state_path` starts tripped
+  when it was tripped.
+- `Flow.live` passes `mandate`, `on_bar`, `max_latency_s` and `late_bar_policy` through
+  to the loop; `Flow.simulate` passes `mandate` and `on_bar`.
+- Detector score columns: `SignalDetector.score_columns` names the columns `detect`
+  leaves on the frame that should travel with each emitted signal; `enriched_signals`
+  (hence backtest, `Decision.signals` and `Observation.signals`) carries them on the
+  detector's own rows and aligns different detectors by name (nulls elsewhere).
+  `ThresholdDetector` exposes its forecast column (`<slot>/p_rise`);
+  `Observation.score_columns` lists what is present and the LLM prompt context
+  includes it. Detector `outputs` now include the score columns.
+- The live loop's body is public and stateless: `Flow.decide(history, snapshot, ts)`
+  returns a `Decision(ts, signals, intents, orders)` for one bar without touching any
+  state, and `Flow.buffer()` is the trailing-window history it reads
+  (`signalflow.flow.decide.Buffer`, `required_warmup + 1` bars by default; accepts one
+  bar or a whole frame). `run_live_loop` is built from the same two calls, so an
+  external runner and `simulate`/`live` agree bar for bar.
+- `SimBroker.execute(orders, bar, prices=...)` fills at explicit prices (a live ticker)
+  with the broker's slippage and fees, instead of the bar's close or open.
+- `FeaturePipeline.warmup` is additive along dependency chains: a step that reads
+  another step's output needs its own `warmup` plus the producer's; independent
+  steps still take the max. `FeaturePipeline.effective_warmups()` exposes the
+  per-step numbers and `Transform.requires` (default `None` = unknown, charged
+  conservatively) declares what a step reads; `SMA.requires == ["close"]`.
+  Pipelines with chained steps now report a larger `warmup`, so `simulate` starts
+  trading later on them.
+- Warmup canary: `Flow.check_warmup()` measures every detector and model pipeline
+  on a synthetic series against its declared warmup and raises `WarmupError`
+  when a component needs more bars than it declares. `Flow.simulate` and
+  `Flow.live` run it by default (`check_warmup=False` to skip); `sf promote`
+  refuses under-declared flows unless `--force`. Building blocks live in
+  `signalflow.transform.warmup` (`measure_warmup`, `check_pipeline`, `check_flow`).
 - `sf.data(...)` is now `sf.dataset(...)` (`signalflow.data.dataset.dataset`); the
   name `signalflow.data` is the data subpackage again, so `import
   signalflow.data.source.binance` and dotted `monkeypatch` paths resolve.

@@ -27,6 +27,12 @@ class Fold:
     model: object = None
     oos: object = None
 
+    @property
+    def tag(self) -> str:
+        """``YYYYMM`` of the test window's start - a stable per-fold label (``save_to="..._{tag}"``)."""
+        start = self.test_start
+        return start.strftime("%Y%m") if hasattr(start, "strftime") else str(start)
+
 
 def make_folds(ts_unique_sorted: list, n_folds: int) -> list[Fold]:
     """Split sorted unique timestamps into n_folds contiguous blocks."""

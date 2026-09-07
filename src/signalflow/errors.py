@@ -51,3 +51,7 @@ class UnfittedTransformError(SignalFlowError):
 
 class DegenerateTargetError(SignalFlowError):
     """A target coerced to a single class, so no classifier can be trained on it."""
+
+
+class WarmupError(SignalFlowError):
+    """A transform or detector needs more bars than its declared ``warmup``."""

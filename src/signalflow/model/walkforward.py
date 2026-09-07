@@ -132,7 +132,8 @@ def walk_forward(
 
     ``model`` is a declarative template (unfitted); each fold clones it, fits on
     ``[test_start - train, test_start)`` and predicts ``[test_start, test_start + step)``.
-    ``save_to`` may template the fold index, e.g. ``"mlflow://models/exp_{fold}"``.
+    ``save_to`` may template the fold index or its ``YYYYMM`` tag, e.g.
+    ``"mlflow://models/exp_{fold}"`` or ``"mlflow://models/exp_{tag}"``.
     """
     windows = _windows(data, train, step, start, end)
     t_wf = time.perf_counter()
@@ -152,18 +153,17 @@ def walk_forward(
         preds = fold_model.predict(test_ds)
         oos = preds.join(labels_all, on=["pair", "ts"], how="left") if labels_all is not None else preds
         oos = oos.filter((pl.col("ts") >= test_start) & (pl.col("ts") < test_end)).sort(["pair", "ts"])
-        if save_to is not None:
-            fold_model.save(save_to.format(fold=i))
-        folds.append(
-            Fold(
-                train_start=train_start,
-                train_end=train_end,
-                test_start=test_start,
-                test_end=test_end,
-                model=fold_model,
-                oos=oos,
-            )
+        fold = Fold(
+            train_start=train_start,
+            train_end=train_end,
+            test_start=test_start,
+            test_end=test_end,
+            model=fold_model,
+            oos=oos,
         )
+        if save_to is not None:
+            fold_model.save(save_to.format(fold=i, tag=fold.tag))
+        folds.append(fold)
         logger.debug(
             f"walk_forward: fold {i + 1}/{len(windows)} oos rows={oos.height:,} ({time.perf_counter() - t_fold:.2f}s)"
         )

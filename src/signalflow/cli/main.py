@@ -256,6 +256,14 @@ def promote(flow_yaml: str, target: str, dry_run: bool, force: bool) -> None:
             _emit(f"promote: flow {flow.name!r} is not promotable; failing evidence: {', '.join(failing)}")
             raise SystemExit(1)
 
+    failing_warmup = [c for c in flow.check_warmup(raise_on_fail=False) if not c.ok]
+    if failing_warmup:
+        for check in failing_warmup:
+            _emit(f"promote: warmup {check}")
+        if not force:
+            raise SystemExit(1)
+        _emit("promote: --force set; proceeding despite under-declared warmup")
+
     if target == "shadow":
         _emit(f"validated flow {flow.name!r} from {flow_yaml}")
         _emit(f"would register: stage=shadow flow={flow.name!r} quote={flow.quote}")

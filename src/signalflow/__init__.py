@@ -41,6 +41,7 @@ from signalflow.errors import (
     UnfittedTransformError,
     UnknownComponentError,
     UntrainedModelError,
+    WarmupError,
 )
 from signalflow.registry import registry
 from signalflow.decorators import (
@@ -59,7 +60,7 @@ from signalflow.decorators import (
 from signalflow.data import BinanceSource, Dataset, SyntheticSource, dataset
 
 
-from signalflow.transform import SMA, Feature, FeaturePipeline, Transform
+from signalflow.transform import SMA, Feature, FeaturePipeline, Transform, WarmupCheck
 from signalflow.transform.encode import Binning, IVSelector, Scaler, WoE
 from signalflow.transform.store import FeatureStore
 
@@ -86,6 +87,8 @@ from signalflow.model import (
     Fold,
     WalkForwardResult,
     classification_scorecard,
+    scorecard_means,
+    scorecard_table,
     walk_forward,
 )
 from signalflow.detector import (
@@ -118,16 +121,21 @@ from signalflow.strategy import (
     RulesStrategy,
     StrategyModel,
 )
-from signalflow.flow import Flow, LiveFeed, PollingFeed, ReplayFeed, Run, run_live_loop
+from signalflow.flow import Buffer, Decision, Flow, LiveFeed, PollingFeed, ReplayFeed, Run, run_live_loop
 
 
 from signalflow.experiment import (
     ArtifactCache,
+    BaseTracker,
+    Tracker,
     Experiment,
     Scorecard,
     bootstrap_ci,
     experiment_run,
+    log_config,
     monte_carlo_bounds,
+    provenance,
+    register_tracker,
     run_experiment,
     seed_everything,
 )
@@ -172,6 +180,8 @@ __all__ = [
     "register_source",
     "SignalFlowError",
     "UntrainedModelError",
+    "WarmupError",
+    "WarmupCheck",
     "FlowConfigError",
     "LeakageError",
     "PipelineError",
@@ -217,6 +227,8 @@ __all__ = [
     "WalkForwardResult",
     "Fold",
     "classification_scorecard",
+    "scorecard_means",
+    "scorecard_table",
     "SignalDetector",
     "SmaCrossDetector",
     "ThresholdDetector",
@@ -240,6 +252,8 @@ __all__ = [
     "StrategyModel",
     "OBSERVATION_SCHEMA_VERSION",
     "Flow",
+    "Buffer",
+    "Decision",
     "Run",
     "LiveFeed",
     "ReplayFeed",
@@ -251,6 +265,11 @@ __all__ = [
     "bootstrap_ci",
     "monte_carlo_bounds",
     "experiment_run",
+    "log_config",
+    "provenance",
+    "Tracker",
+    "BaseTracker",
+    "register_tracker",
     "seed_everything",
     "run_experiment",
     *_OPT,

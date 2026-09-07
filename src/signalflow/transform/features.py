@@ -23,6 +23,10 @@ class SMA(Feature):
         return self.length
 
     @property
+    def requires(self) -> list[str]:
+        return ["close"]
+
+    @property
     def outputs(self) -> list[str]:
         return [f"sma_{self.length}"]
 

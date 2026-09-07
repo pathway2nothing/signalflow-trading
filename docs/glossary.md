@@ -21,6 +21,13 @@ import signalflow as sf
 ds = sf.dataset("synthetic", pairs=["BTCUSDT"], start="2023-01-01", interval="1h")
 ```
 
+### Bar time
+`ts` is the bar's **close** time everywhere: sources stamp a candle when it is
+complete, the disk cache stores it that way (an older open-time cache is shifted
+once and marked), the live feed keeps only bars with `ts <= now`, and decision
+latency is measured from `ts`. A dataset requested for `start..end` holds the bars
+that close after `start` up to and including `end`.
+
 ### Transform
 A column-producing step over a Dataset. Features (e.g. `SMA`) and detectors
 (e.g. `ThresholdDetector`) share one `Transform` contract, so both serialize the
@@ -109,10 +116,14 @@ model = sf.ForecastModel(
 ```
 
 ### Warmup
-The minimum number of leading bars a feature needs before its output is stable. A
-Flow derives `required_warmup` from its feature pipe; `simulate(warmup=N)` reserves a
-leading window that fills buffers without trading. Fixing the warmup makes backtest and
-live cold-start cut the identical slice, so parity holds.
+The minimum number of leading bars a feature needs before its output is stable. Along
+a chain it is additive: a step that reads another step's output needs its own warmup
+plus the producer's (`FeaturePipeline.effective_warmups()`); independent steps take
+the max. A Flow derives `required_warmup` from its components; `simulate(warmup=N)`
+reserves a leading window that fills buffers without trading. `Flow.check_warmup()`
+(the canary, run by `simulate`, `live` and `sf promote`) measures each component on a
+synthetic series and raises `WarmupError` when it needs more bars than it declares, so
+backtest and live cold-start cut the identical slice and parity holds.
 
 ---
 

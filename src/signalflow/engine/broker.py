@@ -49,9 +49,13 @@ class SimBroker(Broker):
             raise ValueError(f"SimBroker.fill must be 'close' or 'next_open', got {self.fill!r}")
         self._filters = {k: SymbolFilters.from_mapping(v) for k, v in (self.filters or {}).items()}
 
-    def execute(self, orders: list[Order], bar, at: str = "close") -> list[Fill]:
-        """Fill ``orders`` against ``bar``: at its close (``at="close"``) or at its open (``at="open"``)."""
-        prices = bar.prices if at == "close" or not getattr(bar, "open", None) else bar.open
+    def execute(
+        self, orders: list[Order], bar, at: str = "close", prices: "dict[str, float] | None" = None
+    ) -> list[Fill]:
+        """Fill ``orders`` against ``bar``: at its close (``at="close"``), at its open (``at="open"``),
+        or at explicit ``prices`` (pair -> price, e.g. a live ticker) with the same slippage and fees."""
+        if prices is None:
+            prices = bar.prices if at == "close" or not getattr(bar, "open", None) else bar.open
         fills: list[Fill] = []
         for o in orders:
             price = prices.get(o.pair)

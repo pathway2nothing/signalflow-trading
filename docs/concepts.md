@@ -136,15 +136,23 @@ Features need a leading window of history before their output is stable. A Flow
 derives that window from its components:
 
 ```python
-print(flow.required_warmup)                 # max over detector + feature-pipe warmups
+print(flow.required_warmup)                 # max over detectors and model pipelines
+print(model.features.effective_warmups())   # per step; a chain adds its producer's warmup
+flow.check_warmup()                         # the canary: measured need <= declared, else WarmupError
 sim = flow.simulate(ds, capital=10_000, warmup=flow.required_warmup)
 ```
 
-`simulate(warmup=N)` reserves a leading lookback window that fills buffers without
-trading - a train/test boundary for walk-forward. `warmup=None` resolves to
-`required_warmup`; an explicit `0` is honored. Fixing the warmup makes backtest and
-live cold-start cut the identical slice, so the parity in Invariant 2 holds from the
-first bar. Enforcement: `Flow.required_warmup` and `Flow.simulate` (`flow/flow.py`).
+Within a pipeline warmup is additive: a step that reads another step's output needs
+its own warmup plus the producer's; independent steps take the max. Declarations are
+not trusted blindly - `Flow.check_warmup()` computes every detector and model pipeline
+on a synthetic series and on a trailing window of exactly the declared bars and
+requires the last rows to agree; `simulate`, `live` and `sf promote` run it first
+(`check_warmup=False` skips it). `simulate(warmup=N)` reserves a leading lookback
+window that fills buffers without trading - a train/test boundary for walk-forward.
+`warmup=None` resolves to `required_warmup`; an explicit `0` is honored. Fixing the
+warmup makes backtest and live cold-start cut the identical slice, so the parity in
+Invariant 2 holds from the first bar. Enforcement: `FeaturePipeline.effective_warmups`,
+`Flow.check_warmup` and `Flow.simulate` (`transform/warmup.py`, `flow/flow.py`).
 
 ---
 

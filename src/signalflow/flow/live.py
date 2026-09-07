@@ -9,7 +9,6 @@ engine) is identical to the backtest.
 import json
 import os
 import time
-from collections import deque
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC
@@ -24,8 +23,7 @@ from signalflow.engine.clock import Clock
 from signalflow.engine.engine import Engine
 from signalflow.engine.types import Fill, OrderEvent, Position, client_order_id
 from signalflow.enums import RunMode, Side
-from signalflow.flow.loop import EMPTY_SIGNALS_SCHEMA, enriched_signals, orders_from_intents
-from signalflow.strategy.observation import Observation
+from signalflow.flow.decide import Buffer, decide
 
 
 def _order_status(order: Any, fills: Any) -> str:
@@ -58,39 +56,18 @@ def _reconcile_on_resume(engine: Any, broker: Any) -> None:
             engine.record_order(OrderEvent(ev.client_order_id, ev.pair, ev.side, ev.qty, ev.ts, "result", "unknown"))
 
 
-
-
 _PROGRESS_EVERY = 500
 """Live/simulate loops log a DEBUG progress line every this many bars (and on every fill)."""
 
 
-class _History:
-    """The trailing ``window`` bars as one frame: appends add a chunk, trims are zero-copy slices."""
-
-    def __init__(self, window: int) -> None:
-        self.window = max(int(window), 1)
-        self.frame: pl.DataFrame | None = None
-        self._lengths: deque[int] = deque()
-
-    def push(self, frame: pl.DataFrame) -> None:
-        self.frame = frame if self.frame is None else pl.concat([self.frame, frame], rechunk=False)
-        self._lengths.append(frame.height)
-        while len(self._lengths) > self.window:
-            self.frame = self.frame.slice(self._lengths.popleft())
-        if self.frame.n_chunks() > 2 * self.window + 8:
-            self.frame = self.frame.rechunk()
-
-    @property
-    def bars(self) -> int:
-        return len(self._lengths)
+_History = Buffer
 
 
 def _closed_only(frame: pl.DataFrame, step_s: int, now_s: float) -> pl.DataFrame:
-    """Drop the still-forming candle: keep only bars whose close <= now."""
+    """Drop the still-forming candle: keep only bars whose close (``ts``) <= now."""
     if frame.height == 0:
         return frame
-    cutoff_ms = int(now_s * 1000) - step_s * 1000
-    return frame.filter(pl.col("ts").dt.epoch("ms") <= cutoff_ms)
+    return frame.filter(pl.col("ts").dt.epoch("ms") <= int(now_s * 1000))
 
 
 @runtime_checkable
@@ -200,9 +177,8 @@ class PollingFeed(LiveFeed):
             self.clock.sleep((now // step + 1) * step + self.lag_seconds - now)
             now = self.clock.wall()
             if self._last_ts is not None:
-                start = max(
-                    int(self._last_ts.replace(tzinfo=UTC).timestamp()) + step, int(now - self.backfill_bars * step)
-                )
+                # the next candle opens exactly when the last one closed (ts is the close)
+                start = max(int(self._last_ts.replace(tzinfo=UTC).timestamp()), int(now - self.backfill_bars * step))
             else:
                 start = int(now - 2 * step)
             fresh = _closed_only(self._fetch_with_retry(start), step, now)
@@ -267,8 +243,8 @@ def append_fills_journal(path: str, fills: list) -> None:
             )
 
 
-def save_state(engine: Engine, path: str, peak: "float | None" = None) -> None:
-    """Persist balances/positions/marks, the fill log, and the drawdown peak so a restart resumes.
+def save_state(engine: Engine, path: str, peak: "float | None" = None, risk: Any = None) -> None:
+    """Persist balances/positions/marks, the fill log, the drawdown peak and the risk state so a restart resumes.
 
     The file is written to a temporary sibling and atomically moved into place,
     so a crash mid-write never leaves a truncated book behind.
@@ -281,6 +257,7 @@ def save_state(engine: Engine, path: str, peak: "float | None" = None) -> None:
         },
         "marks": engine.marks,
         "peak": peak,
+        "risk": risk.state() if risk is not None and hasattr(risk, "state") else None,
         "event_log": [
             {
                 "pair": f.pair,
@@ -352,8 +329,8 @@ def load_state(engine: Engine, path: str) -> "dict | None":
 
 
 def _close_epoch(bar_ts: Any, step_s: int) -> float:
-    """Wall-clock epoch (UTC) at which ``bar_ts``'s candle closed."""
-    return float(bar_ts.replace(tzinfo=UTC).timestamp() + step_s)
+    """Wall-clock epoch (UTC) at which the candle closed - ``ts`` itself, since ``ts`` is the close."""
+    return float(bar_ts.replace(tzinfo=UTC).timestamp())
 
 
 def resolve_warmup_bars(flow: Any, feed: LiveFeed) -> int:
@@ -425,10 +402,12 @@ def run_live_loop(
             logger.info(f"live: resumed book from {state_path}")
             if state.get("peak") is not None:
                 peak = float(state["peak"])
+            if hasattr(flow.risk, "restore"):
+                flow.risk.restore(state.get("risk"))
             if armed and isinstance(broker, ExchangeBroker) and hasattr(broker, "query_order"):
                 _reconcile_on_resume(engine, broker)
 
-    history = _History(window)
+    history = Buffer(window)
     t_run = time.perf_counter()
     for wbar in feed.warmup().iter_bars():
         history.push(wbar.frame)
@@ -473,15 +452,18 @@ def run_live_loop(
             eq_ts.append(bar.ts)
             eq_val.append(engine.equity(bar.prices))
             continue
-        assert history.frame is not None
-        hist = Dataset(frame=history.frame, quote=feed.quote)
-        signals = enriched_signals(flow, hist, log=False)
-        sig_frame = (
-            signals.filter(pl.col("ts") == bar.ts) if signals.height else pl.DataFrame(schema=EMPTY_SIGNALS_SCHEMA)
+        decision = decide(
+            flow,
+            history,
+            snap,
+            bar.ts,
+            peak=peak,
+            mandate=mandate,
+            raise_on_trip=armed,
+            prices=bar.prices,
+            quote=feed.quote,
         )
-        obs = Observation(bar.ts, sig_frame, snap, mandate or {})
-        intents = flow.risk.clip(flow.strategy.decide(obs), snap, peak, raise_on_trip=armed)
-        orders = orders_from_intents(intents, bar.prices, bar.ts)
+        sig_frame, orders = decision.signals, decision.orders
         for o in orders:
             engine.record_order(OrderEvent(client_order_id(o), o.pair, o.side, o.qty, bar.ts, "placed"))
         if fill_mode == "next_open":
@@ -508,13 +490,13 @@ def run_live_loop(
         if state_path:
             append_fills_journal(state_path, fills)
             if fills or orders or (n + 1) % _PROGRESS_EVERY == 0:
-                save_state(engine, state_path, peak=peak)
+                save_state(engine, state_path, peak=peak, risk=flow.risk)
         if on_bar is not None:
             on_bar(engine, bar, fills, latency)
         if max_bars is not None and n + 1 >= max_bars:
             break
     if state_path:
-        save_state(engine, state_path, peak=peak)
+        save_state(engine, state_path, peak=peak, risk=flow.risk)
 
     curve = pl.DataFrame({"ts": eq_ts, "equity": eq_val})
     meta = {

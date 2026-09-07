@@ -62,8 +62,8 @@ component registry, data containers, and Flow patterns.
 
 ## Architecture
 
-All packages share the SignalFlow component registry via semantic decorators
-(`@sf.detector`, `@sf.feature`, `@sf.transform`, `@sf.model`, `@sf.strategy`).
+All packages share the SignalFlow component registry via semantic decorators from
+`signalflow.decorators` (`@feature`, `@detector`, `@transform`, `@model`, `@strategy`, ...).
 Components from any installed package are discoverable through the same registry:
 
 ```python

@@ -138,7 +138,7 @@ def test_underdeclared_warmup_breaks_parity():
         strategy=sf.RulesStrategy(entry=sf.Entry(size_pct=0.5), exit=sf.Exit(tp=0.01, sl=0.01)),
     )
     bt = flow.backtest(ds, capital=10_000)
-    sim = flow.simulate(ds, capital=10_000)
+    sim = flow.simulate(ds, capital=10_000, check_warmup=False)
     assert sim.final_equity != pytest.approx(bt.final_equity, abs=1e-6)
 
 

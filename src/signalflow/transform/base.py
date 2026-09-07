@@ -75,7 +75,23 @@ class Transform(ABC):
 
     @property
     def warmup(self) -> int:
+        """Bars of history needed before this transform's output at a bar is valid.
+
+        Counted on the transform's *own* inputs. A pipeline adds the warmup of the
+        transforms that produce those inputs (see :meth:`FeaturePipeline.effective_warmups`),
+        and :mod:`signalflow.transform.warmup` measures whether the declaration holds.
+        """
         return 0
+
+    @property
+    def requires(self) -> "list[str] | None":
+        """Input columns this transform reads, or ``None`` when unknown.
+
+        Raw dataset columns (``open``/``close``/...) add no warmup; a column produced by
+        an earlier transform adds that transform's effective warmup. ``None`` is taken
+        conservatively as "reads every earlier output".
+        """
+        return None
 
     @property
     @abstractmethod

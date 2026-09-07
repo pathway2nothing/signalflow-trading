@@ -53,7 +53,7 @@ class BinanceSource(Source):
             if not batch:
                 break
             for k in batch:
-                rows.append((k[0], float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])))
+                rows.append((k[0] + step, float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])))
             logger.debug(
                 f"binance: {pair} {interval}: request {n_req}/~{expected}, +{len(batch)} bars ({len(rows)} total)"
             )

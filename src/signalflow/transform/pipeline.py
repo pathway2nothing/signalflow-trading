@@ -16,6 +16,15 @@ from signalflow.transform.base import Feature, Transform, build_transform, ensur
 _PROBE_ROWS = 128
 
 
+def resolved_requires(t: Transform) -> "list[str] | None":
+    """Concrete input columns of ``t``: ``required_cols()`` when it resolves templates, else ``requires``."""
+    resolver = getattr(t, "required_cols", None)
+    if callable(resolver):
+        return list(resolver())
+    reqs = getattr(t, "requires", None)
+    return list(reqs) if isinstance(reqs, (list, tuple)) else None
+
+
 def _is_plain_feature(t: Transform) -> bool:
     """A :class:`Feature` that relies on the base ``compute`` (pure ``exprs``) and can be fused lazily."""
     return isinstance(t, Feature) and type(t).compute is Feature.compute
@@ -88,7 +97,35 @@ class FeaturePipeline(Transform):
 
     @property
     def warmup(self) -> int:
-        return max((t.warmup for t in self.transforms), default=0)
+        """Bars the whole pipeline needs: the largest *effective* warmup of its steps."""
+        return max(self.effective_warmups(), default=0)
+
+    def effective_warmups(self) -> list[int]:
+        """Per-step warmup with producers added in: a chain sums, independent steps take the max.
+
+        A step that reads a column produced earlier in the pipeline needs its own
+        ``warmup`` plus the effective warmup of that producer; raw dataset columns
+        add nothing. A step whose ``requires`` is unknown (``None``) is charged the
+        largest effective warmup so far, which is exact for encoders, selectors and
+        scalers that consume every feature and conservative for anything else.
+        """
+        producer: dict[str, int] = {}
+        effective: list[int] = []
+        for t in self.transforms:
+            reqs = resolved_requires(t)
+            if reqs is None:
+                base = max(producer.values(), default=0)
+            else:
+                base = max((producer.get(c, 0) for c in reqs), default=0)
+            eff = int(t.warmup) + base
+            effective.append(eff)
+            if t.narrows:
+                producer = {c: v for c, v in producer.items() if c in t.outputs}
+            for c in t.removes:
+                producer.pop(c, None)
+            for c in t.outputs:
+                producer[c] = eff
+        return effective
 
     @property
     def outputs(self) -> list[str]:

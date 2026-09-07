@@ -12,7 +12,7 @@ import yaml
 
 from signalflow.errors import FlowConfigError
 from signalflow.experiment.seeding import seed_everything
-from signalflow.experiment.tracking import experiment_run
+from signalflow.experiment.tracking import experiment_run, log_config
 
 _ALLOWED_TOP = {"kind", "name", "seed", "data", "model", "scheme", "metrics", "backtest", "tracking"}
 
@@ -123,13 +123,30 @@ def run_experiment(path: "str | Path") -> dict:
     result_dict = {"folds": folds, "model_scorecard": model_scorecard, "run_scorecard": run_scorecard, "spec": spec}
     Path(path).with_name("results.json").write_text(json.dumps(result_dict, indent=2, default=str), encoding="utf-8")
 
-    tracking = spec.get("tracking") or {}
-    if tracking.get("mlflow"):
-        with experiment_run(tracking["mlflow"], params=_flatten(spec)) as mlflow_mod:
-            if mlflow_mod is not None:
+    tracker, experiment, options = tracking_target(spec.get("tracking") or {})
+    if tracker and experiment:
+        with experiment_run(
+            experiment, params=_flatten(spec), seed=int(spec.get("seed", 0)), tracker=tracker, **options
+        ) as handle:
+            if handle is not None:
+                log_config(path)
                 for card, prefix in ((model_scorecard, "model"), (run_scorecard, "run")):
                     if card:
-                        mlflow_mod.log_metrics(
+                        handle.log_metrics(
                             {f"{prefix}.{k}": float(v) for k, v in card.items() if isinstance(v, (int, float))}
                         )
     return result_dict
+
+
+def tracking_target(tracking: dict) -> "tuple[str | list | None, str | None, dict]":
+    """``(tracker, experiment, options)`` from a spec's ``tracking:`` block.
+
+    ``mlflow: <experiment>`` is the short form; the general form is
+    ``tracker: <name or list>``, ``experiment: <name>``, ``options: {...}``.
+    """
+    options = dict(tracking.get("options") or {})
+    if tracking.get("tracker"):
+        return tracking["tracker"], tracking.get("experiment") or tracking.get("mlflow"), options
+    if tracking.get("mlflow"):
+        return "mlflow", tracking["mlflow"], options
+    return None, None, options

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from signalflow.enums import ComponentType, RunMode
 from signalflow.errors import FlowConfigError, UnknownComponentError, UntrainedModelError
+from signalflow.flow.decide import Buffer, Decision, decide
 from signalflow.flow.live import ReplayFeed, run_live_loop
 from signalflow.flow.loop import run_event_loop, run_quicktest
 from signalflow.strategy.risk import Risk
@@ -105,6 +106,48 @@ class Flow:
             candidates.append(self._model_warmup(self.validator))
         return max(candidates)
 
+    def buffer(self, window: int | None = None) -> "Buffer":
+        """A trailing-window buffer sized for this flow (``required_warmup + 1`` bars by default)."""
+        return Buffer(self.required_warmup + 1 if window is None else window)
+
+    def decide(
+        self,
+        history: Any,
+        snapshot: Any,
+        ts: Any = None,
+        *,
+        peak: float | None = None,
+        mandate: dict | None = None,
+        raise_on_trip: bool = False,
+        prices: dict | None = None,
+    ) -> "Decision":
+        """What this flow would do on one bar, with no side effects.
+
+        The live loop's body as a call: forecasts and detectors over ``history``
+        (a :meth:`buffer`, a Dataset or a frame), the strategy on the signals at
+        ``ts`` and the portfolio ``snapshot``, the risk layer, and the orders to
+        send. See :func:`signalflow.flow.decide.decide` for the parameters.
+        """
+        return decide(
+            self, history, snapshot, ts, peak=peak, mandate=mandate, raise_on_trip=raise_on_trip, prices=prices
+        )
+
+    def check_warmup(self, interval: str = "1h", raise_on_fail: bool = True, **kw: Any) -> list:
+        """Measure every detector and model pipeline against its declared warmup (the canary).
+
+        Runs each component on a deterministic synthetic series and on a trailing
+        window of exactly the declared bars; they must agree on the last row(s).
+        Returns the list of :class:`~signalflow.transform.warmup.WarmupCheck`; with
+        ``raise_on_fail`` a failing component raises :class:`WarmupError`. Called by
+        default from :meth:`simulate` and :meth:`live`.
+        """
+        from signalflow.transform.warmup import check_flow, raise_if_failed
+
+        checks = check_flow(self, interval=interval, **kw)
+        if raise_on_fail:
+            raise_if_failed(checks)
+        return checks
+
     @staticmethod
     def _model_warmup(model: Any) -> int:
         """Feature-pipe warmup of a forecast model or a validator combinator."""
@@ -149,11 +192,21 @@ class Flow:
         max_bars: int | None = None,
         state_path: str | None = None,
         compute_window: "int | None" = None,
+        check_warmup: bool = True,
+        mandate: dict | None = None,
+        on_bar: Any = None,
+        max_latency_s: float = 10.0,
+        late_bar_policy: str = "warn",
     ) -> Any:
         """Trade a live (or replayed) feed via the real-time loop.
 
         ``feed`` may be a LiveFeed or a Dataset (wrapped in a ReplayFeed). Armed
         trading requires an explicit ExchangeBroker; SimBroker is paper-only.
+        ``check_warmup`` runs :meth:`check_warmup` first and refuses to start on a
+        component that needs more bars than it declares. ``mandate`` reaches the
+        strategy on every bar; ``on_bar(engine, bar, fills, latency)`` is called
+        after each bar; ``max_latency_s``/``late_bar_policy`` (``"warn"`` or
+        ``"skip"``) govern bars that arrive late.
         """
         if armed and broker is None:
             raise FlowConfigError(
@@ -162,6 +215,8 @@ class Flow:
         broker = broker or self._sim_broker()
         if not hasattr(feed, "stream"):
             feed = ReplayFeed(feed)
+        if check_warmup:
+            self.check_warmup(interval=getattr(feed, "interval", None) or "1h")
         return run_live_loop(
             self,
             feed,
@@ -173,6 +228,10 @@ class Flow:
             state_path=state_path,
             armed=armed,
             compute_window=compute_window,
+            mandate=mandate,
+            on_bar=on_bar,
+            max_latency_s=max_latency_s,
+            late_bar_policy=late_bar_policy,
         )
 
     def simulate(
@@ -185,6 +244,9 @@ class Flow:
         maxlen: int = 5000,
         state_path: str | None = None,
         compute_window: "int | None" = None,
+        check_warmup: bool = True,
+        mandate: dict | None = None,
+        on_bar: Any = None,
     ) -> Any:
         """Full-speed incremental live simulation (walk-forward).
 
@@ -193,8 +255,12 @@ class Flow:
         as in live. ``warmup`` reserves a leading lookback window that fills the
         buffer without trading; ``None`` resolves to :attr:`required_warmup` while
         an explicit ``0`` is honored. Use it to confirm the live path before arming.
+        ``check_warmup`` runs the warmup canary first (see :meth:`check_warmup`);
+        ``mandate`` and ``on_bar`` are passed to the loop as in :meth:`live`.
         """
         broker = broker or self._sim_broker()
+        if check_warmup:
+            self.check_warmup(interval=getattr(data, "source_params", {}).get("interval") or "1h")
         warmup = self.required_warmup if warmup is None else warmup
         feed = ReplayFeed(data, warmup_bars=warmup)
         return run_live_loop(
@@ -206,6 +272,8 @@ class Flow:
             maxlen=maxlen,
             state_path=state_path,
             compute_window=compute_window,
+            mandate=mandate,
+            on_bar=on_bar,
         )
 
     def _sim_broker(self) -> Any:

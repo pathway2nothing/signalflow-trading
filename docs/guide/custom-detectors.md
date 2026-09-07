@@ -48,6 +48,31 @@ Rules that matter:
   the flow reserves enough history before it starts trading and the incremental
   live loop stays exactly equal to the vectorized backtest.
 
+## Scores that travel with the signal
+
+A rule usually fires on a number - a probability, a regime posterior, the gap to
+a mean. Declare those columns as `score_columns` and they ride along with every
+emitted signal (in `enriched_signals`, `Decision.signals` and
+`Observation.signals`), so a strategy, a runner's persistence or a report can
+read them without running the detector a second time:
+
+```python
+class GapDetector(sf.SignalDetector):
+    @property
+    def score_columns(self) -> list[str]:
+        return ["gap"]
+
+    def detect(self, df):
+        gap = (pl.col("close") / pl.col("close").rolling_mean(10).over("pair") - 1).alias("gap")
+        return df.with_columns(gap).with_columns(
+            pl.when(pl.col("gap") > 0).then(pl.lit(sf.RISE)).otherwise(pl.lit(sf.NONE)).alias("signal")
+        )
+```
+
+`ThresholdDetector` exposes its forecast column (`rise/p_rise`) this way; the
+`signalflow-ta` detectors carry their OLD `score` plus the indicator columns they
+fire on. Detectors with different scores align by name - missing ones are null.
+
 ## Putting it in a Flow
 
 A detector that computes its own features (like the one above) needs no

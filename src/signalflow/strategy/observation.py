@@ -11,6 +11,9 @@ from signalflow.errors import SchemaVersionError
 OBSERVATION_SCHEMA_VERSION = 1
 
 
+_STANDARD_SIGNAL_COLS = frozenset({"pair", "ts", "signal", "p_success", "detector"})
+
+
 @dataclass
 class Observation:
     """Validated signals + portfolio + market state + constraints at one ts."""
@@ -89,9 +92,14 @@ class Observation:
             dtype=np.float64,
         )
 
+    @property
+    def score_columns(self) -> list[str]:
+        """Detector score columns present on this bar's signals (everything beyond the standard fields)."""
+        return [c for c in self.signals.columns if c not in _STANDARD_SIGNAL_COLS]
+
     def to_prompt_context(self) -> dict:
         """JSON-able structured context for an LLM strategy (no raw candles)."""
-        cols = [c for c in ("pair", "signal", "p_success") if c in self.signals.columns]
+        cols = [c for c in ("pair", "signal", "p_success", *self.score_columns) if c in self.signals.columns]
         return {
             "ts": str(self.ts),
             "mandate": self.mandate,

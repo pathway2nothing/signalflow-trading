@@ -26,6 +26,10 @@ class ThresholdDetector(SignalDetector):
     def required_slots(self) -> "tuple[str, ...]":
         return (self.forecast,) if self.forecast else ()
 
+    @property
+    def score_columns(self) -> list[str]:
+        return [f"{self.forecast}/{self.output}"]
+
     def detect(self, df: pl.DataFrame) -> pl.DataFrame:
         rise = pl.col(f"{self.forecast}/{self.output}") > self.p_min
         return df.with_columns(pl.when(rise).then(pl.lit(RISE)).otherwise(pl.lit(NONE)).alias(SIGNAL_COL))

@@ -31,8 +31,20 @@ class SignalDetector(Transform):
     """True for detectors that fit a model on the frame they detect on; their signals are in-sample."""
 
     @property
+    def score_columns(self) -> list[str]:
+        """Columns ``detect`` leaves on the frame that should travel with each signal.
+
+        A forecast probability, a regime posterior, the indicator the rule fired
+        on: whatever a strategy, a runner's persistence or a report wants to see
+        next to ``signal`` without recomputing the detector. They are carried on
+        emitted rows only (``enriched_signals``, ``Decision.signals``,
+        ``Observation.signals``). Default: none.
+        """
+        return []
+
+    @property
     def outputs(self) -> list[str]:
-        return [SIGNAL_COL]
+        return [SIGNAL_COL, *self.score_columns]
 
     def required_slots(self) -> "tuple[str, ...]":
         """Forecast slot names this detector reads; empty when it fuses none."""

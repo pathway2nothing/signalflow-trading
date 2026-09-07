@@ -58,7 +58,38 @@ Semantics:
   fold; `scheme: {fit: {}}` fits once and reports `classification_scorecard`.
 - `backtest` (optional) fits the template on the full span, assembles a `Flow`, and
   runs `backtest(capital, oos=...)`.
-- `tracking.mlflow` (an experiment name) logs the params and scorecard metrics.
+- `tracking.mlflow` (an experiment name) logs the params and scorecard metrics, tags
+  the run with its provenance (signalflow / ta / labs versions and editable-checkout
+  commits, the working directory's commit with `+dirty` when modified, python,
+  platform, polars, seed) and attaches the yaml as a `config/` artifact. The same
+  tags come with every `experiment_run(...)`; `sf.provenance()` returns them as a dict.
+
+## Tracking backends
+
+Tracking is pluggable. `experiment_run(name, tracker=...)` takes a registered name, a
+tracker instance, or a list to fan out; the built-ins import their package only when
+used, so none is a required dependency:
+
+| name | package | notes |
+|---|---|---|
+| `mlflow` | `mlflow` (`[live]` extra) | `tracking_uri=` option |
+| `wandb` | `wandb` | experiment -> `project`; options go to `wandb.init` (e.g. `mode="offline"`) |
+| `litlogger` | `litlogger` (Lightning AI) | options go to `LitLogger(...)`; best-effort over its surface |
+| `null` | - | logs nothing |
+
+```yaml
+tracking:
+  tracker: wandb            # or a list: [mlflow, litlogger]
+  experiment: exp_007_targets
+  options: {mode: offline}
+```
+
+`tracking: {mlflow: <experiment>}` remains the short form. Your own backend is a
+class with `start / log_params / set_tags / log_metrics / log_artifact / end`
+(subclass `sf.BaseTracker` and override what you support), registered with
+`@sf.register_tracker("name")` or published under the `signalflow.trackers` entry
+point by any package. A backend whose package is missing disables tracking with a
+warning instead of failing the experiment.
 
 ## Output
 

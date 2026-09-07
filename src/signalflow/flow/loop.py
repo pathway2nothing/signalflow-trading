@@ -22,6 +22,7 @@ EMPTY_SIGNALS_SCHEMA: dict[str, Any] = {
     "p_success": pl.Float64,
 }
 
+
 def enriched_signals(flow: Any, data: Any, oos: bool = False, log: bool = True) -> pl.DataFrame:
     """Precompute forecast columns, run detectors, and (event-gated) validator scores.
 
@@ -29,7 +30,8 @@ def enriched_signals(flow: Any, data: Any, oos: bool = False, log: bool = True) 
     out-of-fold predictions; rows outside the model's OOS coverage are null, so
     detectors do not fire there. Leave it false for the production in-sample path.
     ``log=False`` silences the per-slot/per-detector DEBUG lines (the live loop
-    calls this every bar and reports progress itself).
+    calls this every bar and reports progress itself). Each detector's
+    ``score_columns`` ride along on the rows it emits (null on other detectors' rows).
     """
     enriched = data
     for slot, model in flow.forecasts.items():
@@ -62,9 +64,10 @@ def enriched_signals(flow: Any, data: Any, oos: bool = False, log: bool = True) 
                 f"detector {det.name!r} emitted invalid signal values {sorted(invalid)}; "
                 f"expected only {sorted({RISE, FALL, NONE})}"
             )
+        scores = [c for c in getattr(det, "score_columns", []) if c in computed.columns and c not in ("pair", "ts")]
         s = (
             computed.filter(pl.col(SIGNAL_COL) != NONE)
-            .select(["pair", "ts", SIGNAL_COL])
+            .select(["pair", "ts", SIGNAL_COL, *scores])
             .with_columns(pl.lit(det.name).alias("detector"))
         )
         if log:
@@ -74,7 +77,11 @@ def enriched_signals(flow: Any, data: Any, oos: bool = False, log: bool = True) 
                 f"fall={(sig == FALL).sum():,}) over rows={computed.height:,} ({time.perf_counter() - t0:.2f}s)"
             )
         parts.append(s)
-    signals = pl.concat(parts) if parts else pl.DataFrame(schema={**EMPTY_SIGNALS_SCHEMA, "detector": pl.Utf8})
+    signals = (
+        pl.concat(parts, how="diagonal_relaxed")
+        if parts
+        else pl.DataFrame(schema={**EMPTY_SIGNALS_SCHEMA, "detector": pl.Utf8})
+    )
 
     if flow.validator is not None and signals.height > 0:
         vcol = getattr(flow.validator, "output", "p_success")
@@ -107,7 +114,6 @@ def orders_from_intents(intents: Any, prices: dict[str, float], ts: Any) -> list
                 Order(it.pair, it.side, it.qty, type=otype, limit_price=it.limit_price, ts=ts, reason=it.reason)
             )
     return orders
-
 
 
 def _oos_coverage(flow: Any, data: Any) -> "float | None":

@@ -77,7 +77,7 @@ class SyntheticSource(Source):
     of the pair name) and trades ``turnover`` per day. Volume scales with the
     interval and with the size of each bar's move. Pair names only seed the
     generator and pick the level - nothing here is a real quote. Use ``binance``
-    for real candles.
+    for real candles. ``ts`` is each bar's close time, like every source.
     """
 
     name: str = "synthetic"
@@ -121,7 +121,7 @@ class SyntheticSource(Source):
                 low = min(price, new_price) * (1.0 - abs(rng.normal()) * vol_bar * 0.5)
                 # busier bars on bigger moves; log-normal noise with unit mean
                 activity = (0.6 + 0.5 * abs(z)) * math.exp(0.4 * rng.normal() - 0.08)
-                ts.append(t * 1000)
+                ts.append((t + step) * 1000)  # ts is the bar's close
                 o.append(price)
                 h.append(hi)
                 lo.append(low)

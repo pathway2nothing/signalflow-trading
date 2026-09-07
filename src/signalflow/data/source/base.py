@@ -11,7 +11,7 @@ CANONICAL_COLUMNS = ["pair", "ts", "open", "high", "low", "close", "volume"]
 
 @runtime_checkable
 class Source(Protocol):
-    """Fetches market data as canonical OHLCV rows."""
+    """Fetches market data as canonical OHLCV rows; ``ts`` is each bar's close time."""
 
     name: str
 

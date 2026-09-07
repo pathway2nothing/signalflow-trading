@@ -153,3 +153,40 @@ def test_promote_dry_run_writes_nothing(tmp_path) -> None:
     assert result.exit_code == 0
     assert not to_dir.exists()
     assert "use_v5_flow: true" in result.output
+
+
+from signalflow.decorators import detector as _detector  # noqa: E402 - test-only registration
+
+
+@_detector("under_declared_for_promote_test")
+class _UnderDeclaredForPromote(sf.SignalDetector):
+    """Needs 30 bars, declares 5 - the promote step must refuse it."""
+
+    @property
+    def warmup(self) -> int:
+        return 5
+
+    def detect(self, df):
+        import polars as pl
+
+        sma = pl.col("close").rolling_mean(30).over("pair")
+        return df.with_columns(
+            pl.when(pl.col("close") > sma).then(pl.lit(sf.RISE)).otherwise(pl.lit(sf.NONE)).alias("signal")
+        )
+
+
+def test_promote_refuses_under_declared_warmup(tmp_path) -> None:
+    import json
+
+    flow = sf.Flow(name="under", detectors=[_UnderDeclaredForPromote()])
+    path = tmp_path / "flow.yaml"
+    flow.save(str(path))
+    (tmp_path / "scorecard.json").write_text(json.dumps({"promotable": True, "oos": True}), encoding="utf-8")
+
+    result = CliRunner().invoke(main, ["promote", str(path), "--to", "shadow"])
+    assert result.exit_code == 1
+    assert "promote: warmup FAIL" in result.output
+
+    forced = CliRunner().invoke(main, ["promote", str(path), "--to", "shadow", "--force"])
+    assert forced.exit_code == 0
+    assert "proceeding despite under-declared warmup" in forced.output
