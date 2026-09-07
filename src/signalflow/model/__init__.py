@@ -5,7 +5,7 @@ from signalflow.model.forecast import ForecastModel
 from signalflow.model.metrics import classification_scorecard, scorecard_means, scorecard_table
 from signalflow.model.oos import Fold
 from signalflow.model.validators import MaxValidator, MeanValidator, VoteValidator
-from signalflow.model.walkforward import WalkForwardResult, walk_forward
+from signalflow.model.walkforward import WalkForwardResult, walk_forward, walk_forward_windows
 
 __all__ = [
     "CVScheme",
@@ -22,4 +22,5 @@ __all__ = [
     "scorecard_means",
     "scorecard_table",
     "walk_forward",
+    "walk_forward_windows",
 ]

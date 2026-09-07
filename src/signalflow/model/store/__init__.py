@@ -16,6 +16,10 @@ def _backend(scheme: str):
         from signalflow.model.store import mlflow_store
 
         return mlflow_store
+    if scheme == "lit":
+        from signalflow.model.store import lit_store
+
+        return lit_store
     if scheme == "hf":
         from signalflow.model.store import hf_store
 

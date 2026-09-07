@@ -57,6 +57,7 @@ from signalflow.decorators import (
 )
 
 
+from signalflow._time import interval_seconds, parse_datetime
 from signalflow.data import BinanceSource, Dataset, SyntheticSource, dataset
 
 
@@ -90,6 +91,7 @@ from signalflow.model import (
     scorecard_means,
     scorecard_table,
     walk_forward,
+    walk_forward_windows,
 )
 from signalflow.detector import (
     MarketDropDetector,
@@ -195,6 +197,8 @@ __all__ = [
     "RegistryError",
     "dataset",
     "Dataset",
+    "interval_seconds",
+    "parse_datetime",
     "BinanceSource",
     "SyntheticSource",
     "Transform",
@@ -224,6 +228,7 @@ __all__ = [
     "MaxValidator",
     "VoteValidator",
     "walk_forward",
+    "walk_forward_windows",
     "WalkForwardResult",
     "Fold",
     "classification_scorecard",

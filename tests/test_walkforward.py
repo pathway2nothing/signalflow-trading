@@ -5,7 +5,7 @@ import warnings
 import pytest
 
 from signalflow.data import dataset
-from signalflow.model import ForecastModel, WalkForwardResult, walk_forward
+from signalflow.model import ForecastModel, WalkForwardResult, walk_forward, walk_forward_windows
 from signalflow.model.cv import KFold
 from signalflow.target import FixedHorizon
 from signalflow.transform import SMA, FeaturePipeline
@@ -74,3 +74,14 @@ def test_fold_predictions_match_full_history_predictions():
         assert joined.height == fold.oos.height
         diff = (joined.get_column("p_rise") - joined.get_column("p_full")).abs().max()
         assert diff == 0.0
+
+
+def test_walk_forward_windows_matches_the_run(wf_result):
+    """The public planner reproduces the fold boundaries without fitting anything."""
+    result, ds = wf_result
+    planned = walk_forward_windows(ds, train="30d", step="30d")
+    assert [(f.train_start, f.train_end, f.test_start, f.test_end) for f in planned] == [
+        (f.train_start, f.train_end, f.test_start, f.test_end) for f in result.folds
+    ]
+    assert [f.tag for f in planned] == [f.tag for f in result.folds]
+    assert all(f.model is None and f.oos is None for f in planned)

@@ -39,7 +39,7 @@ live = [
 ]
 # Optional experiment-tracking backends (mlflow ships with [live]).
 wandb = ["wandb>=0.17"]
-litlogger = ["litlogger"]
+litlogger = ["litlogger", "litmodels"]
 # LLM strategy via any open OpenAI-compatible server (Ollama, vLLM, LM Studio, TGI).
 llm = [
   "httpx>=0.27",

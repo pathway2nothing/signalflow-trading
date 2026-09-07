@@ -1,5 +1,7 @@
 """Pluggable trackers: registration, fan-out, provenance tags, config artifacts, optional backends."""
 
+import os
+
 import pytest
 
 import signalflow as sf
@@ -83,6 +85,19 @@ def test_missing_backend_disables_tracking_with_a_warning(monkeypatch):
     assert log_config("pyproject.toml") is False
 
 
+def test_backend_that_cannot_start_does_not_kill_the_run():
+    """A logger without credentials warns and yields None; the research still runs."""
+
+    @sf.register_tracker("exploding")
+    class _Exploding(sf.BaseTracker):
+        def start(self, experiment, run_name=None):
+            raise RuntimeError("403 from the tracking server")
+
+    with sf.experiment_run("exp", tracker="exploding") as t:
+        assert t is None
+    assert log_config("pyproject.toml") is False
+
+
 def test_spec_tracking_block_forms():
     assert tracking_target({"mlflow": "exp1"}) == ("mlflow", "exp1", {})
     assert tracking_target({"tracker": "wandb", "experiment": "exp2", "options": {"mode": "offline"}}) == (
@@ -108,8 +123,48 @@ def test_wandb_offline_run_if_installed(tmp_path):
     assert wandb.run is None
 
 
-def test_litlogger_run_if_installed():
-    pytest.importorskip("litlogger")
+def test_litlogger_adapter_shape():
+    """The adapter drives litlogger's module API; a real run needs cloud credentials, so it is opt-in."""
+    litlogger = pytest.importorskip("litlogger")
+    for fn in ("init", "log_metrics", "log_metadata", "log_file", "finalize"):
+        assert hasattr(litlogger, fn), f"litlogger has no {fn}"
+
+    from signalflow.experiment.tracking import LitLoggerTracker
+
+    class _FakeExperiment:
+        def __init__(self):
+            self.calls = []
+
+        def log_metadata(self, meta):
+            self.calls.append(("metadata", meta))
+
+        def log_metrics(self, metrics, step=None):
+            self.calls.append(("metrics", metrics, step))
+
+        def log_file(self, path, remote_path=None):
+            self.calls.append(("file", path, remote_path))
+
+        def finalize(self):
+            self.calls.append(("finalize",))
+
+    tracker = LitLoggerTracker()
+    tracker.experiment = fake = _FakeExperiment()
+    tracker.log_params({"a": 1})
+    tracker.set_tags({"seed": "3"})
+    tracker.log_metrics({"auc": 0.5}, step=1)
+    tracker.log_artifact("experiment.yaml", "config")
+    tracker.end()
+    assert fake.calls == [
+        ("metadata", {"a": "1"}),
+        ("metadata", {"seed": "3"}),
+        ("metrics", {"auc": 0.5}, 1),
+        ("file", "experiment.yaml", "config/experiment.yaml"),
+        ("finalize",),
+    ]
+
+
+@pytest.mark.skipif(not os.environ.get("SF_LIT_LIVE"), reason="set SF_LIT_LIVE=1 to log to the Lightning cloud")
+def test_litlogger_live_run():
     with sf.experiment_run("sf-test", params={"a": 1}, tracker="litlogger", record_provenance=False) as t:
         assert t is not None
         t.log_metrics({"auc": 0.5}, step=1)

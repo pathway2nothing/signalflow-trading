@@ -74,7 +74,7 @@ used, so none is a required dependency:
 |---|---|---|
 | `mlflow` | `mlflow` (`[live]` extra) | `tracking_uri=` option |
 | `wandb` | `wandb` | experiment -> `project`; options go to `wandb.init` (e.g. `mode="offline"`) |
-| `litlogger` | `litlogger` (Lightning AI) | options go to `LitLogger(...)`; best-effort over its surface |
+| `litlogger` | `litlogger` (Lightning AI) | options go to `litlogger.init(...)`: `root_dir`, `teamspace`, `print_url` |
 | `null` | - | logs nothing |
 
 ```yaml
@@ -90,6 +90,18 @@ class with `start / log_params / set_tags / log_metrics / log_artifact / end`
 `@sf.register_tracker("name")` or published under the `signalflow.trackers` entry
 point by any package. A backend whose package is missing disables tracking with a
 warning instead of failing the experiment.
+
+### Model artifacts
+
+`model.save(uri)` / `ForecastModel.load(uri)` accept `file://`, `mlflow://`,
+`lit://` (Lightning AI, via `litmodels`) and `hf://`. On Lightning a bare name is
+qualified with `LIGHTNING_TEAMSPACE` and the returned URI is pinned to the uploaded
+version, so a fold model saved during a walk-forward is reproducible:
+
+```python
+result = sf.walk_forward(model, ds, train="6mo", step="1mo", save_to="lit://models/exp002_rise_{tag}")
+fold = sf.ForecastModel.load("lit://models/exp002_rise_202401")
+```
 
 ## Output
 

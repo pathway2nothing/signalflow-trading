@@ -142,60 +142,45 @@ class MLflowTracker(BaseTracker):
 
 @register_tracker("litlogger")
 class LitLoggerTracker(BaseTracker):
-    """Lightning AI LitLogger (``pip install litlogger``); constructor ``options`` go to ``LitLogger(...)``.
+    """Lightning AI experiment logger (``pip install litlogger``).
 
-    A best-effort adapter over the LitLogger surface: hyperparameters for params
-    and tags, ``log_metrics`` for metrics, ``log_artifact``/``log_file`` for files
-    when the installed version offers them, ``finalize`` at the end. Missing calls
-    are reported once and skipped rather than failing the run.
+    ``litlogger`` is a module-level API around one `Experiment`: this adapter
+    calls ``litlogger.init(name=..., **options)`` and then logs through the
+    returned experiment. Metrics go to ``log_metrics``, params and tags to
+    ``log_metadata`` (its tag store, string values), artifacts to ``log_file``,
+    and the run ends with ``finalize``. ``options`` reach ``init`` (``root_dir``,
+    ``teamspace``, ``print_url``, ...). Model objects and model artifacts are also
+    supported by the backend (``log_model`` / ``log_model_artifact``) - reach for
+    them through :attr:`experiment` when you need them.
     """
 
     def __init__(self, **options: Any) -> None:
         self.options = options
-        self._logger: Any = None
-        self._warned: set[str] = set()
+        self.experiment: Any = None
 
     def start(self, experiment: str, run_name: "str | None" = None) -> None:
         try:
             import litlogger
         except ImportError as exc:
             raise ImportError("litlogger is not installed (pip install litlogger)") from exc
-        cls = getattr(litlogger, "LitLogger", None)
-        if cls is None:
-            raise ImportError("litlogger is installed but exposes no LitLogger class")
-        self._logger = cls(name=run_name or experiment, **self.options)
-
-    def _call(self, names: "tuple[str, ...]", *args: Any, **kwargs: Any) -> bool:
-        for name in names:
-            fn = getattr(self._logger, name, None)
-            if callable(fn):
-                try:
-                    fn(*args, **kwargs)
-                except TypeError:
-                    fn(*args)
-                return True
-        if names[0] not in self._warned:
-            self._warned.add(names[0])
-            logger.warning(f"LitLoggerTracker: the installed litlogger has none of {names}; skipping")
-        return False
+        self.experiment = litlogger.init(name=run_name or experiment, **self.options)
 
     def log_params(self, params: dict) -> None:
-        self._call(("log_hyperparams", "log_params"), params)
+        self.set_tags(params)
 
     def set_tags(self, tags: dict) -> None:
-        self._call(("log_hyperparams", "log_params"), {f"tag.{k}": v for k, v in tags.items()})
+        self.experiment.log_metadata({str(k): str(v) for k, v in tags.items()})
 
     def log_metrics(self, metrics: dict, step: "int | None" = None) -> None:
-        if not self._call(("log_metrics",), metrics, step=step):
-            for key, value in metrics.items():
-                self._call(("log",), key, value, step=step)
+        self.experiment.log_metrics({k: float(v) for k, v in metrics.items()}, step=step)
 
     def log_artifact(self, path: str, artifact_path: "str | None" = None) -> None:
-        self._call(("log_artifact", "log_file"), str(path))
+        remote = f"{artifact_path}/{Path(path).name}" if artifact_path else None
+        self.experiment.log_file(str(path), remote_path=remote)
 
     def end(self) -> None:
-        if self._logger is not None:
-            self._call(("finalize", "finish", "close"))
+        if self.experiment is not None:
+            self.experiment.finalize()
 
 
 @register_tracker("wandb")
@@ -319,6 +304,14 @@ def experiment_run(
         handle.start(name, run_name)
     except ImportError as exc:
         logger.warning(f"experiment_run: {exc}; tracking disabled")
+        yield None
+        return
+    except Exception as exc:
+        # A logger that cannot start (no credentials, server down, quota) must not
+        # destroy the run it was supposed to record: warn loudly and keep computing.
+        logger.warning(
+            f"experiment_run: tracker {tracker!r} failed to start ({type(exc).__name__}: {exc}); tracking disabled"
+        )
         yield None
         return
     token = _ACTIVE.set(handle)

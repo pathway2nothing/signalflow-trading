@@ -3,7 +3,7 @@
 
 from signalflow.errors import ArtifactError
 
-_SCHEMES = ("file", "mlflow", "hf")
+_SCHEMES = ("file", "mlflow", "lit", "hf")
 
 
 def resolve_uri(uri: str) -> tuple[str, str]:

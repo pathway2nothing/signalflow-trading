@@ -151,11 +151,10 @@ def scorecard_table(
                 continue
             train_scores = None
             if isinstance(operating, str) and operating.lower().startswith("train_q"):
-                preds = model.predict(data)
-                window = (pl.col("ts") < fold.test_start) & (
-                    pl.col("ts") >= fold.train_start if fold.train_start is not None else pl.lit(True)
-                )
-                train_scores = preds.filter(window).get_column(model.output)
+                # Score only the fold's own training window: predicting the whole dataset
+                # per fold would cost as much again as the walk-forward that produced it.
+                train_ds = data.slice_time(fold.train_start, fold.test_start)
+                train_scores = model.predict(train_ds).get_column(model.output)
             thr = resolve_operating(operating, train_scores, frame.get_column(model.output))
             y = frame.get_column(LABEL_COL).cast(pl.Int8).to_numpy()
             p = frame.get_column(model.output).to_numpy()

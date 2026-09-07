@@ -86,18 +86,35 @@ def _bounds(data: Dataset, start: "datetime | None", end: "datetime | None") -> 
     return first, last
 
 
-def _windows(
-    data: Dataset, train: str, step: str, start: "datetime | None", end: "datetime | None"
-) -> "list[tuple[datetime, datetime, datetime, datetime]]":
+def walk_forward_windows(
+    data: Dataset,
+    train: str,
+    step: str,
+    start: "datetime | None" = None,
+    end: "datetime | None" = None,
+) -> "list[Fold]":
+    """The fold boundaries :func:`walk_forward` would use, without fitting anything.
+
+    Returns :class:`~signalflow.model.oos.Fold` objects with the four window bounds
+    (and their ``tag``) but no ``model``/``oos``, so a caller can reproduce the exact
+    same split - to load fold models saved earlier under ``save_to="..._{tag}"``, to
+    plan a run, or to report the schedule - without repeating the calendar arithmetic.
+    """
     first, last = _bounds(data, start, end)
-    windows: list[tuple[datetime, datetime, datetime, datetime]] = []
+    folds: list[Fold] = []
     test_start = advance(first, train)
     while test_start < last:
         test_end = min(advance(test_start, step), last)
-        train_start = retreat(test_start, train)
-        windows.append((train_start, test_start, test_start, test_end))
+        folds.append(
+            Fold(
+                train_start=retreat(test_start, train),
+                train_end=test_start,
+                test_start=test_start,
+                test_end=test_end,
+            )
+        )
         test_start = test_end
-    return windows
+    return folds
 
 
 def _test_slice(data: Dataset, test_start: datetime, test_end: datetime, warmup: int) -> Dataset:
@@ -135,12 +152,14 @@ def walk_forward(
     ``save_to`` may template the fold index or its ``YYYYMM`` tag, e.g.
     ``"mlflow://models/exp_{fold}"`` or ``"mlflow://models/exp_{tag}"``.
     """
-    windows = _windows(data, train, step, start, end)
+    windows = walk_forward_windows(data, train, step, start, end)
     t_wf = time.perf_counter()
     logger.debug(f"walk_forward: {len(windows)} folds, train={train} step={step}, data rows={data.height:,}")
     labels_all = model.target.labels(data) if model.target is not None else None
     folds: list[Fold] = []
-    for i, (train_start, train_end, test_start, test_end) in enumerate(windows):
+    for i, window in enumerate(windows):
+        train_start, train_end = window.train_start, window.train_end
+        test_start, test_end = window.test_start, window.test_end
         t_fold = time.perf_counter()
         logger.debug(
             f"walk_forward: fold {i + 1}/{len(windows)} "

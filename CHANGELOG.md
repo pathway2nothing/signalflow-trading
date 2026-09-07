@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (breaking - the API is pre-1.0, no compatibility aliases are kept)
 
+- A tracking backend that cannot start (missing credentials, server down, quota) now
+  warns and disables tracking instead of raising: `experiment_run` yields `None` and
+  the research run continues, as it already did for a missing package.
+- `sf.parse_datetime` and `sf.interval_seconds` are public: reading dates and
+  intervals out of a config no longer means importing `signalflow._time`.
+- `walk_forward_windows(data, train, step, start=, end=)` returns the folds
+  `walk_forward` would use, with their bounds and `tag` but no model - so loading fold
+  models saved under `save_to="..._{tag}"` no longer means repeating the calendar
+  arithmetic (`walk_forward` itself now uses it).
+- Lightning AI as a first-class experiment backend: the `litlogger` tracker drives the
+  real module API (`litlogger.init` -> `log_metrics` / `log_metadata` / `log_file` /
+  `finalize`; the earlier adapter looked for a `LitLogger` class that does not exist),
+  and a new `lit://` model store uploads and downloads the artifact layout through
+  `litmodels`, so `model.save("lit://models/<name>")` and `ForecastModel.load(...)`
+  work like `mlflow://`. A bare name is qualified with `LIGHTNING_TEAMSPACE`; a saved
+  URI is pinned to its version. Install with the `[litlogger]` extra.
 - `scorecard_table(models | WalkForwardResult, data, operating=, metrics=)` - one row
   per model or per fold (`n_test`, `prevalence`, `threshold`, f1/precision/recall/
   pr_auc/roc_auc/brier) and `scorecard_means(table, by="target")`. Operating points:
