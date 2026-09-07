@@ -19,7 +19,7 @@ validator combinators aggregate several models into a single decision.
     options:
       show_root_heading: true
 
-::: signalflow.WalkForwardFold
+::: signalflow.Fold
     options:
       show_root_heading: true
 
