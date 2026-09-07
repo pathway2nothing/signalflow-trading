@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (breaking - the API is pre-1.0, no compatibility aliases are kept)
 
+- Feature configuration can be written as a tree instead of a flat list. A feature
+  belongs to exactly one consumer, so the structure is a forest: each node names its
+  transform (`registry`, optionally `cls` and `fit`, which are validated against the
+  code) and nests the nodes producing its inputs. Nesting also *scopes* the consumer -
+  a transform taking `columns` (WoE, Scaler, IVSelector) is bound to exactly what its
+  inputs produce, so one encoder per feature group replaces "encode every column at
+  once". `FeaturePipeline.from_tree` / `.from_yaml` / `.graph`; `experiment.yaml`
+  accepts a tree, a path to a pipeline file, or the old list under `model.features`.
+  Errors (unknown transform, wrong params, a `cls`/`fit` that disagrees with the code)
+  are raised while parsing, not at compute time.
 - A tracking backend that cannot start (missing credentials, server down, quota) now
   warns and disables tracking instead of raising: `experiment_run` yields `None` and
   the research run continues, as it already did for a missing package.

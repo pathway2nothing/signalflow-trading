@@ -2,6 +2,7 @@
 
 import time
 from collections.abc import Sequence
+from pathlib import Path
 
 import polars as pl
 import yaml
@@ -48,6 +49,9 @@ class FeaturePipeline(Transform):
                     "not in a FeaturePipeline (signal-as-feature is a separate explicit step)"
                 )
         self.transforms: tuple[Transform, ...] = tuple(transforms)
+        self.node_names: tuple[str, ...] = tuple(t.name for t in self.transforms)
+        self.tree: dict | None = None
+        """The forest this pipeline was parsed from, when it came from a tree config."""
 
     @classmethod
     def from_names(
@@ -231,16 +235,69 @@ class FeaturePipeline(Transform):
         return cur
 
     def to_config(self) -> dict:
-        return {
-            "transform": "feature_pipeline",
-            "role": "pipeline",
-            "params": {"transforms": [t.to_config() for t in self.transforms]},
-        }
+        """Round-trippable config: the tree it was parsed from, else the flat step list."""
+        params: dict = {"transforms": [t.to_config() for t in self.transforms]}
+        if self.tree is not None:
+            params = {"pipeline": self.tree}
+        return {"transform": "feature_pipeline", "role": "pipeline", "params": params}
 
     @classmethod
     def from_config(cls, cfg: dict) -> "FeaturePipeline":
-        children = [build_transform(c) for c in (cfg.get("params") or {}).get("transforms", [])]
+        """Rebuild from either shape: the tree/forest under ``pipeline``, or the flat step list."""
+        params = cfg.get("params") or {}
+        tree = cfg.get("pipeline") if "pipeline" in cfg else params.get("pipeline")
+        if tree is not None:
+            return cls.from_tree(tree)
+        children = [build_transform(c) for c in params.get("transforms", [])]
         return cls(*children)
+
+    @classmethod
+    def from_tree(cls, tree: "dict | list") -> "FeaturePipeline":
+        """Build from a forest of nodes: each node names its transform and nests its inputs.
+
+        A feature belongs to exactly one consumer, so nesting is the edge and the
+        execution order is the post-order walk. See :mod:`signalflow.transform.graph`.
+        """
+        from signalflow.transform.graph import parse_nodes
+
+        nodes = parse_nodes(tree)
+        pipe = cls(*[node for _, node in nodes])
+        pipe.node_names = tuple(name for name, _ in nodes)
+        pipe.tree = tree if isinstance(tree, dict) else None
+        return pipe
+
+    @classmethod
+    def from_yaml(cls, path: "str | Path") -> "FeaturePipeline":
+        """Read a pipeline written as its own YAML file (see :meth:`save`)."""
+        with open(path, encoding="utf-8") as fh:
+            loaded = yaml.safe_load(fh) or {}
+        if isinstance(loaded, dict) and ("pipeline" in loaded or "params" in loaded or "transform" in loaded):
+            return cls.from_config(loaded)
+        return cls.from_tree(loaded)
+
+    @property
+    def graph(self) -> list[dict]:
+        """Nodes with the columns each one reads and produces - the derived dependency view."""
+        from signalflow.transform.pipeline import resolved_requires
+
+        produced: dict[str, str] = {}
+        out: list[dict] = []
+        for name, t in zip(self.node_names, self.transforms, strict=False):
+            reqs = resolved_requires(t)
+            feeds = sorted({produced[c] for c in (reqs or []) if c in produced})
+            out.append(
+                {
+                    "node": name,
+                    "transform": t.name,
+                    "fit": bool(t.requires_fit),
+                    "reads": list(reqs) if reqs is not None else ["<any earlier output>"],
+                    "outputs": list(t.outputs),
+                    "fed_by": feeds if reqs is not None else sorted(set(produced.values())),
+                }
+            )
+            for c in t.outputs:
+                produced[c] = name
+        return out
 
     def save(self, path: str) -> str:
         """Serialize the pipeline (config only) to a portable YAML file."""

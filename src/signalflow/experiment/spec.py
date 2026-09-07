@@ -36,7 +36,6 @@ def _build_model(mcfg: dict):
     from signalflow.model.forecast import ForecastModel
     from signalflow.target.base import make_target
     from signalflow.transform.base import build_transform
-    from signalflow.transform.pipeline import FeaturePipeline
 
     target = make_target(mcfg["target"]["name"], **(mcfg["target"].get("params") or {}))
     if "encode" in mcfg:
@@ -44,7 +43,7 @@ def _build_model(mcfg: dict):
             "model.encode is gone: declare the encoder as pipeline steps, e.g. "
             "features: [..., {transform: woe}, {transform: iv_selector}]"
         )
-    pipe = FeaturePipeline(*[build_transform(f) for f in (mcfg.get("features") or [])])
+    pipe = _build_features(mcfg.get("features"), build_transform)
     return ForecastModel(
         backend=mcfg.get("backend", "lightgbm"),
         target=target,
@@ -53,6 +52,26 @@ def _build_model(mcfg: dict):
         output=mcfg.get("output", "p_rise"),
         cv=build_cv(mcfg.get("cv")),
     )
+
+
+def _build_features(spec, build_transform):
+    """The model's features: a tree/forest, a path to a pipeline yaml, or the flat step list.
+
+    A mapping is a forest of nodes (nesting is the edge and it scopes each encoder to
+    its own group); a string is a path to a pipeline file saved with
+    ``FeaturePipeline.save``; a list keeps the old meaning.
+    """
+    from pathlib import Path
+
+    from signalflow.transform.pipeline import FeaturePipeline
+
+    if spec is None:
+        return FeaturePipeline()
+    if isinstance(spec, str):
+        return FeaturePipeline.from_yaml(Path(spec))
+    if isinstance(spec, dict):
+        return FeaturePipeline.from_tree(spec)
+    return FeaturePipeline(*[build_transform(f) for f in spec])
 
 
 def _fold_scores(result, metrics: list) -> list:

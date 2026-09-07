@@ -25,11 +25,15 @@ model:
   backend: lightgbm
   output: p_rise
   target: {name: fixed_horizon, params: {bars: 12}}
-  features:
-    - {transform: sma, params: {length: 10}}
-    - {transform: sma, params: {length: 50}}
-    - {transform: woe}            # stateful steps are refitted inside every fold
-    - {transform: iv_selector, params: {min_iv: 0.1}}
+  features:                       # a forest: nesting is the dependency edge
+    woe_sma:
+      registry: woe               # stateful steps are refitted inside every fold
+      inputs:                     # ... and are scoped to what these produce
+        - {registry: sma, params: {length: 10}}
+        - {registry: sma, params: {length: 50}}
+    keep:
+      registry: iv_selector
+      params: {min_iv: 0.1}
   cv: {scheme: rolling, step: 7d, window: 365d}   # or {scheme: kfold, n: 5}
 scheme:
   walk_forward: {train: 90d, step: 30d}   # or `fit: {}` for a single fit
@@ -63,6 +67,36 @@ Semantics:
   commits, the working directory's commit with `+dirty` when modified, python,
   platform, polars, seed) and attaches the yaml as a `config/` artifact. The same
   tags come with every `experiment_run(...)`; `sf.provenance()` returns them as a dict.
+
+### Feature trees
+
+A feature belongs to exactly one consumer, so a pipeline is a forest of trees: a
+node names the transform it runs and nests the nodes that produce its inputs. The
+nesting is the edge - there are no identifiers to wire up and no cycles to detect -
+and it also decides *scope*: a transform that takes `columns` (WoE, Scaler,
+IVSelector) is bound to exactly what its own inputs produce, which is how you get
+one encoder per feature group instead of one encoder over every column:
+
+```yaml
+features:
+  woe_volatility:
+    registry: woe
+    inputs:
+      - {registry: volatility/natr, params: {period: 24}}
+      - {registry: volatility/atr, params: {period: 24}}
+  woe_trend:
+    registry: woe
+    inputs:
+      - {registry: trend/adx, params: {period: 96}}
+```
+
+`cls` and `fit` may be written on a node; they are derived from the registry and
+validated on load, so a config can never quietly disagree with the code it names.
+A node without `inputs` reads the raw dataset columns. `model.features` also accepts
+a path to a pipeline file saved with `FeaturePipeline.save`, so a big pipeline can
+live beside `flow.yaml` in its own file, and `pipeline.graph` shows the derived
+edges. A plain list still works and keeps its old meaning: every step sees
+everything produced before it.
 
 ## Tracking backends
 
